@@ -151,7 +151,7 @@ PackageConfig () {
       echo "Include = /etc/pacman.d/mirrorlist-arch" >> /mnt/etc/pacman.conf
       echo "[multilib]" >> /mnt/etc/pacman.conf
       echo "Include = /etc/pacman.d/mirrorlist-arch" >> /mnt/etc/pacman.conf
-      sed -i '/\[lib32]/,/mirrorlist/ s/#//' /mnt/etc/pacman.conf
+      #sed -i '/\[lib32]/,/mirrorlist/ s/#//' /mnt/etc/pacman.conf
     ;;
     3|Void|void)
       echo -e "nothing"
