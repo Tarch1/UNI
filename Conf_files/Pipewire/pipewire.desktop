@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=pipewire
+Exec=/home/tarch1/.config/autostart/pipewire.sh
+Hidden=false
+X-GNOME-Autostart-enabled=true

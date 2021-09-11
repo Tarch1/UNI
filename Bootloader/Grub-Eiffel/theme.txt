@@ -1,0 +1,34 @@
+# Linux glass theme for Grub2
+
+# Global Property
+title-text: ""
+desktop-image: "eiffel_tower_under_construction.png"
+desktop-color: "#000000"
+terminal-font: "Unifont Regular 16"
+title-color: "#625c87"
+
+# Show the boot menu
++ boot_menu {
+  left = 15%
+  top = 29%
+  width = 70%
+  height = 60%
+  item_font = "Unifont Regular 16"
+  item_color = "#dddddd"
+  selected_item_color = "#545454"
+  item_height = 30
+  item_spacing = 6
+  selected_item_pixmap_style = "select_*.png"
+}
+
+# Show a countdown message using the label component
++ label {
+  top = 82%
+  left = 35%
+  width = 30%
+  align = "center"
+  id = "__timeout__"
+  text = "Booting in %d seconds"
+  color = "#545454"
+  font = "Unifont Regular 16"
+}

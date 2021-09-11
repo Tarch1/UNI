@@ -1,0 +1,450 @@
+#!/bin/bash
+
+########## INSTALLATION-SCRIPT ##########
+
+DistroChoice () {
+echo "$DSel selected, then proceed"
+  case "$DSel" in 
+  1|Arch|arch)
+    pkgmanager="pacman"
+    keylayout="KEYMAP=it"
+    keypath="etc/vconsole.conf"
+    pkgstrap="pacstrap"
+    fstabgen="genfstab"
+    chroot="arch-chroot"
+    initc0="systemctl"
+    initc1="enable"
+    initc2=""
+    sed -i 's/lightdm-openrc//' ../UNI/full-setup
+    sed -i 's/gdm-openrc//' ../UNI/full-setup
+  ;;
+  2|Artix|artix)
+    pkgmanager="pacman"
+    keylayout='KEYMAP="it"'
+    keypath="etc/conf.d/keymaps"
+    pkgstrap="basestrap"
+    fstabgen="fstabgen"
+    chroot="artix-chroot"
+    init="openrc"
+    initc0="rc-update"
+    initc1="add"
+    initc2="default"
+    rcpacks="$rc"
+    elogind="elogind elogind-openrc"
+    pacman-key --init
+    pacman-key --populate artix
+    pacman -Sy --needed --noconfirm artix-archlinux-support #lib32-artix-archlinux-support
+  ;;
+  3|Void|void)
+  pkgmanager="xbps-install"
+  VoidInstMethod
+  LibrarySel
+  OneOfTwo
+  ;;
+  *)
+  echo "Wrong Distro selected, type again" && DistroSel && DistroChoice
+  ;;
+  esac
+}
+
+DiskPartition () {
+  umount -R /mnt 
+  "$pkgmanager" -Sy --needed --noconfirm parted gptfdisk mtools ntfs-3g dialog
+  devicelist="$(lsblk -dplnx size -o name,size | grep -Ev "boot|rpmb|loop" | tac)"
+  DRIVE="$(dialog --stdout --menu "Select disk for installation" 0 0 0 ${devicelist})" || exit 1
+  #EXT_DRIVE="$(dialog --stdout --menu "Select secondary disk" 0 0 0 ${devicelist})" || exit 1
+  #parted "$DRIVE" mklabel gpt mkpart "EFI system partition" 0% 1% set 1 esp on mkpart "root partition" 1% 100%
+  sgdisk --zap-all \
+  --clear \
+  --new=1:0:+550M --typecode=1:ef00 \
+  --new=2:0:0 --typecode=2:8300 \
+  "$DRIVE"
+  sgdisk --verify "$DRIVE"
+  BOOT_PART="$(ls "${DRIVE}"* | grep -E "^${DRIVE}p?1$")"
+  ROOT_PART="$(ls "${DRIVE}"* | grep -E "^${DRIVE}p?2$")"
+  echo "$BOOT_PART $ROOT_PART"
+}
+
+BootFormat () {
+  bootlabel="EFI"
+  rootlabel="ROOT"
+  mkfs.fat -F32 -n "$bootlabel" "$BOOT_PART"
+  #mlabel -i "$BOOT_PART" ::"$bootlabel"
+}
+
+BtrfsFormat () {
+  mkfs.btrfs -f -L "$rootlabel" "$ROOT_PART"
+  btrfsdep="snapper btrfs-progs"
+  #btrfs filesystem label "$ROOT_PART" "$rootlabel"
+  mount "$ROOT_PART" /mnt
+  btrfs su cr /mnt/@
+  btrfs su cr /mnt/@home
+  btrfs su cr /mnt/@snapshots
+  umount /mnt
+  mount -o noatime,compress=lzo,space_cache=v2,subvol=@ "$ROOT_PART" /mnt
+  mkdir -p /mnt/{boot,home,.snapshots}
+  mount -o noatime,compress=lzo,space_cache=v2,subvol=@home "$ROOT_PART" /mnt/home
+  mount -o noatime,compress=lzo,space_cache=v2,discard=async,subvol=@snapshots "$ROOT_PART" /mnt/.snapshots
+  mount "$BOOT_PART" /mnt/boot
+  lsblk -f
+  modules="btrfs"
+}
+
+Ext4Format () {
+  mkfs.ext4 "$ROOT_PART" "$rootlabel"
+  #e2label "$ROOT_PART" "$rootlabel"
+  mount "$ROOT_PART" /mnt
+  mkdir /mnt/boot
+  mount "$BOOT_PART" /mnt/boot
+  lsblk -f
+}
+
+ExternalDriveSetup () {
+  mkdir -p /mnt/media/{internal_hdd,USB}
+  mount "$EXT_DRIVE" /mnt/media/internal_hdd
+}
+
+BaseSystemInstall () {
+  "$pkgstrap" /mnt $microcode
+  "$pkgstrap" /mnt $linux $init $btrfsdep $elogind
+  rm /mnt/etc/fstab
+  "$fstabgen" -U /mnt >> /mnt/etc/fstab
+  cat /mnt/etc/fstab
+}
+
+SyncTime () {
+  "$chroot" /mnt ln -sf /usr/share/zoneinfo/"$TZSel" /etc/localtime
+  "$chroot" /mnt hwclock --systohc --utc
+  #echo "TIMEZONE=$TZSel" >> /mnt/etc/rc.conf
+  #echo "HARDWARECLOCK=$HARDWARECLOCK" >> /mnt/etc/rc.conf
+  #echo "KEYMAP=$KEYMAP" >> /mnt/etc/rc.conf
+  #echo "FONT=$FONT" >> /mnt/etc/rc.conf
+  #echo "TTYS=$TTYS" >> /mnt/etc/rc.conf
+}
+
+LocaleGen () {
+  sed -i "/$LocSel/ s/#//g" /mnt/etc/locale.gen
+  "$chroot" /mnt locale-gen
+  echo "LANG=$LangSel" >> /mnt/etc/locale.conf
+  echo "$keylayout" >> /mnt/"$keypath"
+}
+
+HostConfig () {
+  echo " $HNSel \n 127.0.0.1 localhost \n ::1 localhost \n 127.0.1.1 $HNSel.localdomain $HNSel" >> /mnt/etc/hosts
+}
+
+PackageConfig () {
+  echo "$DSel"
+  case "$DSel" in
+    1|Arch|arch)
+      "$chroot" /mnt pacman -Syu --needed --noconfirm
+      "$chroot" /mnt pacman-key --init
+      "$chroot" /mnt pacman-key --populate archlinux
+      sed -i '/\[multilib],/mirrorlist/ s/#//' /mnt/etc/pacman.conf
+    ;;
+    2|Artix|artix)
+      "$chroot" /mnt pacman -Syu artix-archlinux-support
+      "$chroot" /mnt pacman-key --populate archlinux
+      echo "[extra]" >> /mnt/etc/pacman.conf
+      echo "Include = /etc/pacman.d/mirrorlist-arch" >> /mnt/etc/pacman.conf
+      echo "[community]" >> /mnt/etc/pacman.conf
+      echo "Include = /etc/pacman.d/mirrorlist-arch" >> /mnt/etc/pacman.conf
+      echo "[multilib]" >> /mnt/etc/pacman.conf
+      echo "Include = /etc/pacman.d/mirrorlist-arch" >> /mnt/etc/pacman.conf
+      sed -i '/\[lib32]/,/mirrorlist/ s/#//' /mnt/etc/pacman.conf
+    ;;
+    3|Void|void)
+      echo -e "nothing"
+    ;;
+    *)
+      echo "Wrong distro selected, try again" && DistroSel && PackageConfig
+    ;;
+    esac
+}
+
+PackageInstall () {
+  "$chroot" /mnt "$pkgmanager" -Syu --needed --noconfirm $dev $fs $net $bluetooth $audio $android $archive $filemanager $print $graphics $vulkan $hardwareacceleration $xorg $baseutils $apps $media $rcpacks
+  #cp ../UNI/Conf_files/mkinitcpio.conf /mnt/etc
+  sed -i "/MODULES/ s/()/($modules)/" /mnt/etc/mkinitcpio.conf
+}
+
+ServiceEnabler () {
+  "$chroot" /mnt $initc0 $initc1 NetworkManager $initc2
+  "$chroot" /mnt $initc0 $initc1 cupsd $initc2
+  "$chroot" /mnt $initc0 $initc1 avahi-daemon $initc2
+  #"$chroot" /mnt $initc0 $initc1 keymaps $initc2
+  #"$chroot" /mnt tlp start || true
+}
+
+AudioSetup () {
+  ###echo "options snd-hda-intel model=auto" | sudo tee -a /mnt/etc/modprobe.d/alsa-base.conf
+  ###echo "blacklist snd_soc_skl" | sudo tee -a /mnt/etc/modprobe.d/blacklist.conf
+  ##echo "options snd-hda-intel dmic_detect=0" | sudo tee -a /mnt/etc/modprobe.d/alsa-base.conf
+  #echo "options snd-intel-dspcfg dsp_driver=1" >> /mnt/etc/modprobe.d/dsp.conf
+  echo "no audio setup"
+}
+
+UserSetup () {
+  "$chroot" /mnt useradd -mG wheel,video,storage,input "$UNSel"
+  sed -i '/%wheel ALL=(ALL) ALL/ s/# //' /mnt/etc/sudoers
+  sed -i 's/"us"/"it"/' /etc/conf.d/keymaps
+  "$chroot" /mnt echo -n "Type password for $UNSel : "
+  "$chroot" /mnt passwd "$UNSel"
+  "$chroot" /mnt echo -n "Type password for root user : "
+  "$chroot" /mnt passwd 
+  cp ../UNI/Conf_files/bashrc /mnt/home/"$UNSel"
+  touch /mnt/home/"$UNSel"/.profile
+  echo 'export MOZ_ENABLE_WAYLAND=1' >> /mnt/home/"$UNSel"/.profile
+}
+
+BootloaderInstall () {
+  echo "$BLSel"
+  case $BLSel in
+    1|REFIND|refind)
+      "$chroot" /mnt "$pkgmanager" -Sy --needed --noconfirm refind
+      "$chroot" /mnt refind-install
+      mkdir /mnt/boot/EFI/refind/themes
+      mv /mnt/boot/EFI/refind/refind.conf /mnt/boot/EFI/refind/backup-refind.conf
+      mv /mnt/boot/reind_linux.conf /mnt/boot/backup-refind_linux.conf
+      cp ../UNI/Bootloader/Refind/refind.conf /mnt/boot/EFI/refind/refind.conf
+      cp ../UNI/Bootloader/Refind/refind_linux.conf /mnt/boot/refind_linux.conf
+      cp -r ../UNI/Bootloader/Refind/Refind-theme /mnt/boot/EFI/refind/themes/
+    ;;
+    2|GRUB|grub)
+      "$chroot" /mnt "$pkgmanager" -Sy --needed --noconfirm grub grub-btrfs
+      "$chroot" /mnt grub-install --target=x86_64-efi --efi-directory=/boot bootloader-id=GRUB
+      mkdir -p /mnt/boot/grub/themes
+      sed -i '$ a\GRUB_THEME="/boot/grub/themes/Grub-Eiffel/theme.txt"' /mnt/etc/default/grub
+      "$chroot" /mnt grub-mkconfig -o /boot/grub/themes
+      cp -r ../UNI/Bootloader/Grub-Eiffel /mnt/boot/grub/themes/
+    ;;
+    3|EFISTUB|efistub)
+      uuid="$(blkid -s "$PIDSel" -o value "$ROOT_PART")"
+      BFlags="\'rw root=$PIDSel=$uuid rootflags=subvol=@ initrd=\intel-ucode.img initrd=\initramfs-linux.img\'"
+      "$chroot" /mnt efibootmgr -c -d "$BOOT_PART" -p 1 -L "$DSel" -l /vmlinuz-linux -u "$BFlags"--verbose
+      echo "efibootmgr -b lastnumber -B" #delete previous boot entries
+    ;;
+    *)
+      echo "Wrong bootloader selected, try another" && BootLoaderSel && BootloaderInstall
+      echo "done"
+    ;;
+    esac
+}
+
+########## INSTALLATION-PROCESS ##########
+
+InstallSteps () {
+  DistroChoice && stage="DistroChoice"
+  DiskPartition && stage="DiskPartition"
+  BootFormat && stage="BootFormat"
+  "$FSSel" && stage="$FSSel"
+  ExternalDriveSetup && stage="ExternalDriveSetup"
+  BaseSystemInstall && stage="BaseSystemInstall"
+  SyncTime && stage="SyncTime"
+  LocaleGen && stage="LocaleGen"
+  HostConfig && stage="HostConfig"
+  PackageConfig && stage="PackageConfig"
+  PackageInstall && stage="PackageInstall"
+  ServiceEnabler && stage="ServiceEnabler"
+  AudioSetup && stage="AudioSetup"
+  UserSetup && stage="UserSetup"
+  BootloaderInstall && stage="BootloaderInstall"
+  stage=end
+}
+
+BaseInstallation () {
+  DistroSel
+  LocalizationSel
+  LanguageSel
+  TimezoneSel
+  HostnameSel
+  UsernameSel
+  PartIDSel
+  FilesystemSel
+  BootloaderSel
+  stage="0"
+  if [ -z "$*" ]
+  then InstallSteps 
+  else echo "!!!!!!!!!! ERROR AFTER STAGE $stage !!!!!!!!!!"
+  fi
+}
+
+########## PERSONALIZATION-SCRIPT ##########
+
+DistroSel () {
+  echo -en "Enter the distro we are going to setup : 1) Arch 2) Artix 3) Void \n"
+  read  DSel
+  case $DSel in
+    1|Arch|arch) echo "distro selected : Arch" && DSel="Arch"
+    ;;
+    2|Artix|artix) echo "distro selected : Artix" && DSel="Artix"
+    ;;
+    3|Void|void) echo "distro selected : Void" && DSel="Void"
+    ;;
+    *) echo "Wrong choice, type again" && DistroSel
+    ;;
+  esac
+}
+
+VoidInstMethod () {
+  echo -en "Enter installation type : 1) XBPS 2) ROOTFS \n"
+  read VIMethod
+  case $VIMethod in
+    1|XBPS|xbps) echo "Selected : Arch" && VIMethod="XBPS"
+    ;;
+    2|ROOTFS|rootfs) echo "Selected : Artix" && VIMethod="ROOTFS"
+    ;;
+    *) echo "Wrong choice, type again" && VoidInstMethod
+    ;;
+  esac
+}
+
+LibrarySel () {
+  echo -en "Enter base library name : 1) GLIBC 2) MUSL \n"
+  read LibSel
+  case $LibSel in
+  1|GLIBC|glibc) echo "Selected : Arch" && LibSel="GLIBC"
+  ;;
+  2|MUSL|musl) echo "Selected : Artix" && LibSel="MUSL"
+  ;;
+  *) echo "Wrong choice, type again" && LibrarySel
+  ;;
+  esac
+}
+
+LocalizationSel () {
+  echo -en "Enter localization : 1) en_US.UTF-8 2) en_GB.UTF-8 3) it_IT.UTF-8 \n"
+  read LocSel
+  case $LocSel in
+    1|en_US|en_US.UTF-8) echo "Selected : en_US.UTF-8" && LocSel="en_US.UTF-8"
+    ;;
+    2|en_GB|en_GB.UTF-8) echo "Selected : en_GB.UTF-8" && LocSel="en_GB.UTF-8"
+    ;;
+    3|it_IT|it_IT.UTF-8) echo "Selected : it_IT.UTF-8" && LocSel="it_IT.UTF-8"
+    ;;
+    *) echo "Wrong choice, type again" && LocalizationSel
+    ;;
+  esac
+}
+
+LanguageSel () {
+  echo -en "Enter preferred Language : 1) en_US.UTF-8 2) en_GB.UTF-8 3) it_IT.UTF-8 \n"
+  read LangSel
+  case $LangSel in
+    1|en_US|en_US.UTF-8) echo "Selected : en_US.UTF-8" && LangSel="en_US.UTF-8"
+    ;;
+    2|en_GB|en_GB.UTF-8) echo "Selected : en_GB.UTF-8" && LangSel="en_GB.UTF-8"
+    ;;
+    3|it_IT|it_IT.UTF-8) echo "Selected : it_IT.UTF-8" && LangSel="it_IT.UTF-8"
+    ;;
+    *) echo "Wrong choice, type again" && LanguageSel
+    ;;
+  esac
+}
+
+HostnameSel () {
+  read -p "Enter preferred hostname : " HNSel
+  read -p "If $HNSel is the right hostname type y or n for retype it : " HNSURE
+  if [ "$HNSURE" = y ]
+  then echo "OK"
+  else echo "Then again" && HostnameSel
+  fi
+}
+
+UsernameSel () {
+  read -p "Enter preferred username : " UNSel
+  read -p "If $UNSel is the right hostname type y or n for retype it : " UNSURE
+  if [ "$UNSURE" = y ]
+  then echo "OK"
+  else echo "Then again" && UsernameSel
+  fi
+}
+
+TimezoneSel () {
+  echo -en "The timezone default choice is Europe/Rome \n if you want another type with the same format : "
+  read TZSel
+  if [ $TZSel ]
+  then echo "Selected : $TZSel"
+  else TZSel="Europe/Rome"
+  fi
+}
+
+PartIDSel () {
+  echo -en "Enter partition identifier : 1) UUID 2) PARTUUID 3) LABEL \n"
+  read PIDSel
+  case $PIDSel in
+    1|UUID|uuid) echo "Selected : UUID" && PIDSel="UUID"
+    ;;
+    2|PARTUUID|partuuid) echo "Selected : PARTUUID" && PIDSel="PARTUUID"
+    ;;
+    3|LABEL|label) echo "Selected : LABEL" && PIDSel="LABEL"
+    ;;
+    *) echo "Wrong choice, type again" && PartIDSel
+    ;;
+  esac
+}
+
+FilesystemSel () {
+  echo -en "Enter base filesystem : 1) EXT4 2) BTRFS \n"
+  read FSSel
+  case $FSSel in
+    1|EXT4|ext4) echo "Selected : EXT4" && FSSel="Ext4Format"
+    ;;
+    2|BTRFS|btrfs) echo "Selected : BTRFS" && FSSel="BtrfsFormat"
+    ;;
+    *) echo "Wrong filesystem selected, try one of those provided" && FilesystemSel
+    ;;
+  esac
+}
+
+BootloaderSel () {
+  echo -en "Enter preferred bootloader : 1) Refind 2) Grub 3) Efistub \n"
+  read BLSel
+  case $BLSel in
+    1|REFIND|refind)
+      echo "distro selected : refind"
+      BLSel="refind"
+    ;;
+    2|GRUB|grub)
+      echo "distro selected : grub"
+      BLSel="grub"
+    ;;
+    3|EFISTUB|efistub)
+      echo "distro selected : efistub"
+      BLSel="efistub"
+    ;;
+    *)
+      echo "Wrong bootloader selected, try one of those provided"
+      BootloaderSel
+    ;;
+  esac
+  echo $BLSel
+  echo "$BLSel"
+}
+
+########## PACKAGE ##########
+
+microcode='intel-ucode'
+linux='base base-devel linux linux-firmware'
+init=''
+dev='wget git ntp linux-headers'
+baseutils='man bash-completion kitty vim nano'
+fs='efibootmgr os-prober mtools parted dosfstools sbsigntools ntfs-3g gvfs-mtp'
+net='networkmanager network-manager-applet'
+audio='pipewire pipewire-pulse pipewire-alsa pipewire-jack lib32-pipewire lib32-pipewire-jack'  #pulseaudio pulseaudio-bluetooth pavucontrol ##pulseaudio-alsa alsa-utils , for wine use (lib32-libpulse lib32-alsa-plugins)
+android='android-tools android-udev'
+bluetooth='bluez bluez-utils bluez-plugins'
+print='cups cups-pdf avahi'
+##xorg='xorg-server xorg-xinit xorg-xinit light numlockx libinput xorg-xinput xss-lock'
+apps='telegram-desktop firefox feh calc fd bpytop adriconf' #for netwotk bmon
+graphics='mesa nvidia-prime nvidia nvidia-utils lib32-nvidia-utils nvidia-settings'
+hardwareacceleration='libva-mesa-driver mesa-vdpau intel-media-driver'
+vulkan='vulkan-icd-loader lib32-vulkan-icd-loader lib32-mesa vulkan-intel lib32-vulkan-intel vulkan-mesa-layers'
+#filemanager='xed vifm pcmanfm tumbler raw-thumbnailer'
+archive='file-roller atool bzip2 cpio gzip lha xz lzop p7zip tar unrar zip unzip'
+#media='celluloid mate-utils pantheon-screenshot simplescreenrecorder'
+elogind=''
+rc='ntp-openrc avahi-openrc cups-openrc bluez-openrc networkmanager-openrc'
+
+
+BaseInstallation "$*"

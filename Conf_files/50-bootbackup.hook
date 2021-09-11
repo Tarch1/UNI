@@ -1,0 +1,12 @@
+[Trigger]
+Operation = Upgrade
+Operation = Install
+Operation = Remove
+Type = Path
+Target = boot/*
+
+[Action]
+Depends = rsync
+Description = Backing up /boot...
+When = PreTransaction
+Exec = /usr/bin/rsync -a --delete /boot /.bootbackup

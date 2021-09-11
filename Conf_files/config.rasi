@@ -1,0 +1,22 @@
+configuration {
+        width:          400;
+        lines:          7;
+        font:           "SF Pro Text 13";
+}
+
+@import "~/.cache/wal/colors-rofi-dark.rasi"
+
+window {
+	padding:	0;
+	border:		7;
+	border-radius:	7;
+	padding:        0px -10px 0px 0px;
+}
+
+entry {
+	placeholder:    "Search...";
+}
+
+element-icon {
+	size:		25px;
+}

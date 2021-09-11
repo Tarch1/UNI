@@ -1,0 +1,258 @@
+#!/bin/bash
+function YESNO() {
+	while true; do
+	read -p "is wath you want?" SS
+	case $SS in
+        [yY] | [yY][Ee][Ss] )
+                echo "Agreed" $SS
+                CC=1
+		break
+                ;;
+
+        [nN] | [n|N][O|o] )
+                echo "Ok, skipping this";
+                CC=0
+		break
+                ;;
+        *) echo "Invalid input, type Yes or No" >&2
+                ;;
+	esac
+	done
+	return $CC
+}
+
+function main(){
+
+  	umount -Rl /tmp 
+	clear
+	
+  	echo "Snapper" && YESNO	
+	if [ $CC == 1 ]
+	then Snapper="SNAPPER" || Snapper=""
+	fi
+
+	echo "Trizen" && YESNO
+	if [ $CC = 1 ]  
+	then Trizen="TRIZEN" || Trizen=""
+	fi
+
+	echo "A  base environment" && YESNO
+	if [ $CC = 1 ] 
+	then Env="ENV" || Env=""
+	fi
+
+	echo "A display manager (Lightdm)" && YESNO
+	if [ $CC = 1 ] 
+	then Dm="DM" || Dm=""
+	fi
+
+	echo "A window manager" && YESNO
+	if [ $CC = 1 ] 
+	then Wm="WM" || Wm=""
+	fi
+
+	stage=0    
+	
+	(
+	set -e
+	if [[ -z "$@" ]]
+	then
+		install || echo !!!!!!!!!!!!!!!!!!!! ERROR AFTER $stage !!!!!!!!!!!!!!!!!!!!
+	fi
+	)
+}
+
+function install(){
+	$Dm && stage=$Dm;
+	$Env && stage=$Env;
+	$Snapper && stage=$Snapper;
+	$Trizen && stage=$Trizen;
+	$Wm && stage=$Wm;				
+}
+
+function DM(){
+sudo pacman -Sy lightdm lightdm-openrc lightdm-webkit2-greeter lightdm-webkit-theme-litarvan --noconfirm
+sudo sed -i 's/#greeter-session=example-gtk-gnome/greeter-session=lightdm-webkit2-greeter/' /etc/lightdm/lightdm.conf
+sudo sed -i 's/antergos/litarvan/g' /etc/lightdm/lightdm-webkit2-greeter.conf
+sudo rc-update add lightdm default
+sudo systemctl enable lightdm
+}
+
+function ENV(){
+sudo pacman -S ttf-roboto rofi sxiv feh python-pywal lxappearance imagemagick pacman-contrib slock dunst tcl tk --noconfirm
+mkdir -p ~/{.wallpapers,.config/{kitty,polybar,rofi,dunst}}
+
+sudo ntpd -qg
+echo "Time set"
+
+###################-PIPEWIRE-###################
+
+sudo mkdir -p /etc/xdg/autostart/
+sudo cp ~/UNI/Conf_files/Pipewire/pipewire.desktop /etc/xdg/autostart/
+cp ~/UNI/Conf_files/Pipewire/pipewire.sh ~/.config/
+chmod +x ~/.config/pipewire.sh
+
+###################-COPYING-###################
+
+cp -r /media/internal_hdd/OS/Wallpapers/* ~/.wallpapers
+cp ~/UNI/Conf_files/picom.conf ~/.config/picom.conf
+
+cp ~/UNI/Conf_files/Dunst/dunstrc ~/.config/dunst/dunstrc
+cp ~/UNI/Conf_files/Dunst/dunst-color.sh ~/.config/dunst/dunst-color.sh 
+
+cp ~/UNI/Conf_files/Script/toggle-touchpad.sh ~/.config/toggle-touchpad.sh
+cp ~/UNI/Conf_files/Script/low-battery.sh ~/.config/low-battery.sh
+
+cp ~/UNI/Conf_files/config.rasi ~/.config/rofi/config.rasi
+
+cp ~/UNI/Conf_files/kitty.conf ~/.config/kitty/kitty.conf
+cp ~/UNI/Conf_files/Script/pfetch ~/.pfetch
+cp ~/UNI/Conf_files/nanorc ~/.nanorc
+
+cp /etc/X11/xinit/xinitrc ~/.xinitrc
+echo 'Xft.dpi: 90' > ~/.Xdefaults
+sudo echo "light -S 30" >> ~/.xprofile
+
+sudo cp ~/UNI/Conf_files/40-libinput.conf /usr/share/X11/xorg.conf.d/40-libinput.conf
+sudo ln -s /usr/share/X11/xorg.conf.d/40-libinput.conf /etc/X11/xorg.conf.d/40-libinput.conf
+
+sudo cp ~/UNI/Conf_files/90-backlight.rules /usr/lib/udev/rules.d/90-backlight.rules
+
+
+###################-PERMISSIONS-###################
+
+chmod +x ~/.xinitrc
+chmod +x ~/.config/toggle-touchpad.sh
+chmod +x ~/.config/dunst/dunst-color.sh
+chmod +x ~/.config/low-battery.sh
+chmod +x ~/.pfetch
+
+
+###################-EXECUTION-###################
+
+sudo sed -i '/ntfs/ s/ro/rw/' /etc/fstab
+sudo ntfsfix /dev/sda1
+
+#wpg-install.sh -b -g -i
+}
+
+function SNAPPER(){
+sudo umount /.snapshots/
+sudo rm -rf /.snapshots
+sudo snapper -c root create-config /
+sudo btrfs su del /.snapshots
+sudo mkdir /.snapshots
+sudo chmod 750 /.snapshots
+
+sudo sed -i 's/ALLOW_USERS=""/ALLOW_USERS="tarch1"/g' /etc/snapper/configs/root
+sudo sed -i 's/TIMELINE_LIMIT_HOURLY="10"/TIMELINE_LIMIT_HOURLY="3"/g' /etc/snapper/configs/root
+sudo sed -i 's/TIMELINE_LIMIT_DAILY="10"/TIMELINE_LIMIT_DAILY="2"/g' /etc/snapper/configs/root
+sudo sed -i 's/TIMELINE_LIMIT_WEEKLY="0"/TIMELINE_LIMIT_WEEKLY="1"/g' /etc/snapper/configs/root
+sudo sed -i 's/TIMELINE_LIMIT_MONTHLY="10"/TIMELINE_LIMIT_MONTHLY="1"/g' /etc/snapper/configs/root
+sudo sed -i 's/TIMELINE_LIMIT_YEARLY="10"/TIMELINE_LIMIT_YEARLY="1"/g' /etc/snapper/configs/root
+
+sudo chmod a+rx /.snapshots
+sudo chown :tarch1 /.snapshots
+
+sudo mkdir /etc/pacman.d/hooks
+sudo cp ~/UNI/Conf_files/50-bootbackup.hook /etc/pacman.d/hooks/50-bootbackup.hook
+sudo pacman -S rsync --noconfirm
+
+#sudo systemctl enable snapper-timeline.timer
+#sudo systemctl enable snapper-timeline.timer
+#sudo systemctl enable snapper-cleanup.timer
+#sudo systemctl enable snapper-cleanup.timer
+#sudo systemctl enable grub-btrfs.path
+#sudo systemctl enable grub-btrfs.path
+
+#rc-update add snapper-timeline.timer default
+#rc-update add snapper-timeline.timer default
+#rc-update add snapper-cleanup.timer default
+#rc-update add snapper-cleanup.timer default
+#rc-update add grub-btrfs.path default
+#rc-update add grub-btrfs.path default
+}
+
+function TRIZEN(){
+git clone https://aur.archlinux.org/trizen.git ~/trizen
+cd ~/trizen
+makepkg -si
+trizen -S clapper bibata-cursor-translucent
+# picom-ibhagwan-git gllock-git xidlehook wpgtk-git font-manager ttf-font-awesome betterlockscreen bibata-rainbow-cursor-theme
+}
+
+function WM(){
+while true; do
+read -p "What setup you want? [bspwm gnome herbstluftwm xmonad polybar]
+" SS
+#read yno
+case $SS in
+
+        bspwm ) sudo pacman -S bspwm sxhkd --noconfirm
+		mkdir ~/.config/{bspwm,sxhkd}
+		cp ~/UNI/Conf_files/Bspwm/sxhkdrc ~/.config/sxhkd/sxhkdrc
+		cp ~/UNI/Conf_files/Bspwm/bspwmrc ~/.config/bspwm/bspwmrc
+		chmod +x ~/.config/sxhkd/sxhkdrc
+		chmod +x ~/.config/bspwm/bspwmrc
+                break
+		;;
+
+        gnome ) sudo pacman -Syu lxappearance gnome-shell gnome-control-center gdm gdm-openrc  xdg-desktop-portal-gtk gnome-weather gnuchess gnome-chess gnome-calculator gnome-keyring evince
+		trizen -Syu chrome-gnome-shell
+		mkdir -p ~/{.wallpapers,.config}
+		cp -r /media/internal_hdd/OS/Wallpapers/* ~/.wallpapers
+		cp ~/UNI/Conf_files/kitty.conf ~/.config/kitty/kitty.conf
+		cp ~/UNI/Conf_files/Script/pfetch ~/.pfetch
+		cp ~/UNI/Conf_files/nanorc ~/.nanorc
+		echo 'Xft.dpi: 90' > ~/.Xdefaults
+		#sudo cp ~/UNI/Conf_files/40-libinput.conf /usr/share/X11/xorg.conf.d/40-libinput.conf
+		#sudo ln -s /usr/share/X11/xorg.conf.d/40-libinput.conf /etc/X11/xorg.conf.d/40-libinput.conf
+		chmod +x ~/.pfetch
+		sudo mkdir -p /etc/xdg/autostart/
+		sudo cp ~/UNI/Conf_files/Pipewire/pipewire.desktop /etc/xdg/autostart/
+		cp ~/UNI/Conf_files/Pipewire/pipewire.sh ~/.config/
+		chmod +x ~/.config/pipewire.sh
+		sudo rc-update add gdm default
+		sudo systemctl enable gdm
+		break
+		;;
+		
+ herbstluftwm ) sudo pacman -S herbstluftwm --noconfirm
+		mkdir ~/.config/herbstluftwm
+		cp ~/UNI/Conf_files/Herbstluftwm/autostart ~/.config/herbstluftwm/
+		chmod +x ~/.config/herbstluftwm/autostart
+                break
+		;;
+		
+        xmonad ) sudo pacman -S xmonad xmonad-contrib xmobar --noconfirm
+		mkdir ~/.xmonad
+		cp ~/UNI/Conf_files/Xmonad/xmonad.hs ~/.xmonad/xmonad.hs
+		cp ~/UNI/Conf_files/Xmonad/xmobarrc ~/.xmobarrc
+		break
+		;;
+		
+      polybar ) sudo pacman -S xdotool xorg-xwininfo xorg-xev  --noconfirm
+		trizen -S polybar
+		mkdir ~/.config/polybar
+		cp ~/UNI/Conf_files/Polybar/hide ~/.config/polybar/hide
+		cp ~/UNI/Conf_files/Polybar/launch.sh ~/.config/polybar/launch.sh
+		cp ~/UNI/Conf_files/Polybar/config ~/.config/polybar/config
+		chmod +x ~/.config/polybar/launch.sh
+		chmod +x ~/.config/polybar/hide
+                break
+                ;;
+		
+             *) echo 'Invalid input' >&2
+                ;;
+esac
+done
+
+echo "Another round" && YESNO
+if [ $CC == 1 ]
+then WM || echo "Nothing"
+fi
+}
+
+main "$@"
+
+#umount -R /mnt

@@ -1,0 +1,261 @@
+[global/wm]
+; Adjust the _NET_WM_STRUT_PARTIAL bottom value
+; Used for bottom aligned bars
+margin-top    = 0
+
+; Adjust the _NET_WM_STRUT_PARTIAL top value
+; Used for top aligned bars
+margin-bottom = 0
+
+
+[bar/bar1]
+width             = 50%
+height            = 30
+offset-x          = 25%
+offset-y          = 1%
+;radius            = 7.0
+fixed-center      = true
+
+tray-position = right
+tray-detached = true 
+tray-offset-x = 60
+
+border-bottom-size = 0
+
+background        = ${colors.background}
+foreground        = ${colors.foreground}
+
+padding-left      = 5
+padding-right     = 5
+spacing           = 0
+module-margin     = 2
+
+font-0            = Roboto:size=13;3
+#font-1            = Ionicons:style=Regular:size=13;2
+#font-2            = JoyPixels:scale=13;1
+
+modules-left      = apps date bspwm
+modules-center    = 
+modules-right     = battery backlight pulseaudio temperature wlan eth powermenu
+
+wm-restack        = bspwm
+
+;override-redirect = true
+;scroll-up        = bspwm-desknext
+;scroll-down      = bspwm-deskprev
+
+
+[colors]
+;for transparency https://gist.github.com/lopspower/03fb1cc0ac9f32ef38f4
+
+background  = ${env:color0_alpha:#222}
+foreground  = ${xrdb:color7:#222}
+primary     = ${xrdb:color1:#222}
+secondary   = ${xrdb:color2:#222}
+alert	    = ${xrdb:color3:#222}
+
+trans       = #00000000
+white       = #FFFFFF
+black       = #000000
+
+red         = #e53935
+pink        = #d81b60
+purple      = #8e24aa
+deep-purple = #5e35b1
+indigo      = #3949ab
+blue        = #1e88e5
+light-blue  = #039be5
+cyan        = #00acc1
+teal        = #00897b
+green       = #43a047
+light-green = #7cb342
+lime        = #c0ca33
+yellow      = #fdd835
+amber       = #ffb300
+orange      = #fb8c00
+deep-orange = #f4511e
+brown       = #6d4c41
+gray        = #BEBEBE
+blue-gray   = #546e7a
+
+
+[module/bspwm]
+type                      = internal/bspwm
+
+label-focused             = %icon%
+label-focused-foreground  = ${colors.foreground}
+label-focused-padding     = 1
+
+label-occupied            = 􀢙
+label-occupied-padding    = 1
+label-occupied-foreground = ${colors.secondary}
+
+label-urgent              = 􀢒
+label-urgent-foreground   = ${colors.alert}
+label-urgent-padding      = 1
+
+label-empty               = 􀥥
+label-empty-foreground    = ${colors.primary}
+label-empty-padding       = 1
+
+ws-icon-0                 = I;􀟔
+;terminal
+ws-icon-1                 = II;􀌌
+;web-browser
+ws-icon-2                 = III;􀞕 
+;game
+ws-icon-3                 = IV;􀈖
+;file-manager
+ws-icon-4                 = V;􀌫
+;telegram
+
+
+[module/xwindow]
+type              = internal/xwindow
+label             = %title:0:40:...%
+format            = <label>
+label-foreground  = ${colors.foreground}
+
+[module/backlight]
+type              = internal/backlight
+card              = intel_backlight
+format            = <ramp>
+ramp-0 = 􀆫
+ramp-1 = 􀆭
+ramp-2 = 􀆬
+ramp-3 = 􀆮
+label             = %percentage%
+label-foreground  = ${colors.foreground} 
+click_left	  = notify-send "$(curl wttr.in/ 2>/dev/null 3>/dev/null | head -n 7| sed -r "s:\x1B\[[0-9;]*[mK]::g")"
+
+
+[module/pulseaudio]
+type                     = internal/pulseaudio
+format-volume            = <ramp-volume> 
+label-volume             = %percentage%
+label-muted		 = 􀊣
+click-right              = pavucontrol &
+label-foreground	 = $(colors.primary)
+
+ramp-volume-0            = 􀊡
+ramp-volume-1            = 􀊥
+ramp-volume-2            = 􀊧
+ramp-volume-3            = 􀊩
+
+ramp-volume-0-foreground = $(colors.foreground)
+ramp-volume-1-foreground = $(colors.primary)
+ramp-volume-2-foreground = $(colors.secondary)
+ramp-volume-3-foreground = $(colors.alert)
+
+
+[module/battery]
+type                     = internal/battery
+battery                  = BAT0
+adapter                  = ADP1
+full-at                  = 95
+
+format-charging          = <animation-charging> <label-charging>
+format-discharging       = <ramp-capacity> <label-discharging>
+
+label-charging		 = " %percentage%"
+label-discharging        = " %percentage%"
+
+animation-charging-0     = 􀬘
+animation-charging-1     = 􀢋
+animation-charging-foreground = $(colors.primary)
+
+ramp-capacity-0		 = 􀛪
+ramp-capacity-1          = 􀛩
+ramp-capacity-2          = 􀛨
+ramp-capacity-foreground = $(colors.primary)
+
+
+[module/wlan]
+type                     = internal/network
+interface                = wlo1
+interval                 = 3.0
+format-connected         = <label-connected>
+label-connected          = 􀙇 
+format-disconnected      = 
+
+
+[module/eth]
+type                     = internal/network
+interface                = enp3s0
+interval                 = 3.0
+label-connected          = 
+format-disconnected      = 
+
+
+[module/cpu]
+type                     = internal/cpu
+interval                 = 2
+format-prefix            = 􀓓
+format-prefix-foreground = ${colors.foreground}
+label                    = %percentage%
+
+
+[module/date]
+type                     = internal/date
+interval                 = 1
+date                     = %A, %d %b
+time                     = %H:%M
+label                    = %time% %date%
+label-foreground         = ${colors.foreground}
+;format-prefix           =  
+;format-prefix-font      = 2
+
+[module/temperature]
+type              = internal/temperature
+thermal-zone      = 0
+format            = <ramp> <label>
+label             = %temperature-c%
+label-foreground  = ${colors.foreground}
+
+ramp-0            = ❄
+ramp-1            = 􀇫
+ramp-2            = 􀇬
+ramp-3 		  = 􀇪
+ramp-4		  = 􀙬
+ramp-5		  = 􀙭
+ramp-0-foreground = ${colors.foreground}
+ramp-1-foreground = ${colors.primary}
+ramp-2-foreground = ${colors.primary}
+ramp-3-foreground = ${colors.secondary}
+ramp-4-foreground = ${colors.secondary}
+ramp-5-foreground = ${colors.alert}
+
+
+
+[module/pacman-updates]
+type                     = custom/script
+exec                     = checkupdates | wc -l
+interval                 = 500
+label                    = %output%
+format-prefix            = "􀍟 "
+format-prefix-foreground = ${colors.primary}
+
+
+[module/powermenu]
+type  = custom/menu
+expand-right = false
+format-spacing = 2
+
+label-open                 = 􀜊
+label-open-foreground      = ${colors.foreground}
+label-close                = cancel
+label-close-foreground     = ${colors.primary}
+label-separator-foreground = ${colors.foreground}
+
+menu-0-0                   = "􀎡"
+menu-0-1                   = "􀚄"
+menu-0-2                   = "􀏎"
+menu-0-0-exec              = pkill -KILL -u $USER
+menu-0-1-exec              = loginctl reboot
+menu-0-2-exec              = loginctl poweroff
+
+[module/apps]
+type = custom/text
+content = 􀣺
+content-foreground  = ${colors.foreground}
+click-left = rofi -show drun -modi drun -show-icons -xoffset -720 -yoffset -407
