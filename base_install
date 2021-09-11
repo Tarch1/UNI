@@ -143,7 +143,7 @@ PackageConfig () {
       sed -i '/\[multilib],/mirrorlist/ s/#//' /mnt/etc/pacman.conf
     ;;
     2|Artix|artix)
-      "$chroot" /mnt pacman -Syu artix-archlinux-support
+      "$chroot" /mnt pacman -Syu --needed --noconfirm artix-archlinux-support
       "$chroot" /mnt pacman-key --populate archlinux
       echo "[extra]" >> /mnt/etc/pacman.conf
       echo "Include = /etc/pacman.d/mirrorlist-arch" >> /mnt/etc/pacman.conf
