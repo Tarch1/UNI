@@ -197,7 +197,8 @@ case $SS in
                 break
 		;;
 
-        gnome ) sudo pacman -Syu lxappearance gnome-shell gnome-control-center gdm gdm-openrc  xdg-desktop-portal-gtk gnome-weather gnuchess gnome-chess gnome-calculator gnome-keyring evince
+        gnome ) sudo pacman -Syu lxappearance gnome-shell gnome-control-center xdg-desktop-portal-gtk gnome-weather gnuchess gnome-chess gnome-calculator gnome-keyring evince
+		sudo pacman -Syu gdm gdm-openrc
 		trizen -Syu chrome-gnome-shell
 		mkdir -p ~/{.wallpapers,.config}
 		cp -r /media/internal_hdd/OS/Wallpapers/* ~/.wallpapers
