@@ -71,7 +71,7 @@ function install(){
 }
 
 function DM(){
-sudo pacman -Sy lightdm lightdm-openrc lightdm-webkit2-greeter lightdm-webkit-theme-litarvan --noconfirm
+sudo pacman -Sy lightdm lightdm-openrc lightdm-webkit2-greeter lightdm-webkit-theme-litarvan
 sudo sed -i 's/#greeter-session=example-gtk-gnome/greeter-session=lightdm-webkit2-greeter/' /etc/lightdm/lightdm.conf
 sudo sed -i 's/antergos/litarvan/g' /etc/lightdm/lightdm-webkit2-greeter.conf
 sudo rc-update add lightdm default
