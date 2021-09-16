@@ -56,10 +56,8 @@ echo "$OSSel selected, then proceed"
 DiskPartition () {
   umount -R /mnt 
   "$pkgmanager" -Sy "$pkgskips" parted gptfdisk mtools ntfs-3g dialog
-  
-  
-  devicelist="$(lsblk -dplnx size -o name,size | grep -Ev "boot|rpmb|loop" | tac)"
-  DRIVE="$(dialog --stdout --menu "Select disk for installation" 0 0 0 ${devicelist})" || exit 1
+  #devicelist="$(lsblk -dplnx size -o name,size | grep -Ev "boot|rpmb|loop" | tac)"
+  #DRIVE="$(dialog --stdout --menu "Select disk for installation" 0 0 0 ${devicelist})" || exit 1
   #EXT_DRIVE="$(dialog --stdout --menu "Select secondary disk" 0 0 0 ${devicelist})" || exit 1
   ##parted -s "mklabel gpt mkpart ESP fat32 1MiB 512MiB mkpart root ext4 512MiB 100% set 1 esp on"
   #parted -s "$DRIVE" mklabel gpt mkpart "EFI system partition" 0% 1% set 1 esp on mkpart "root partition" 1% 100% set 1 esp on
@@ -67,36 +65,35 @@ DiskPartition () {
   --clear \
   --new=1:0:+550M --typecode=1:ef00 \
   --new=2:0:0 --typecode=2:8300 \
-  "$DRIVE"
-  sgdisk --verify "$DRIVE"
-  #DEVICE="/dev/sda /dev/nvme0n1 /dev/mmcblk0"
-  #if [ -n "$(echo $DRIVE | grep "^/dev/[a-z]d[a-z]")" ]
-  #then DEVICE="sda"
-  #elif [ -n "$(echo $DRIVE | grep "^/dev/nvme")" ]
-  #then DEVICE="nvme"
-  #elif [ -n "$(echo $DRIVE | grep "^/dev/mmc")" ]
-  #then DEVICE="mmc"
-  #fi
-  #case $DEVICE in
-  #nvme)
-  #BOOT_PART="${DRIVE}p1"
-  #ROOT_PART="${DRIVE}p1"
-  #;;
-  #sda)
-  #BOOT_PART="${DRIVE}1"
-  #ROOT_PART="${DRIVE}1"
-  #;;
-  #mmc)
-  #BOOT_PART="${DRIVE}1"
-  #ROOT_PART="${DRIVE}1"
-  #;;
-  #esac
-  #UUID_BOOT=$(blkid -s UUID -o value $BOOT_PART)
-  #UUID_ROOT=$(blkid -s UUID -o value $ROOT_PART)
-  #PARTUUID_BOOT=$(blkid -s PARTUUID -o value $BOOT_PART)
-  #PARTUUID_ROOT=$(blkid -s PARTUUID -o value $ROOT_PART)
-  BOOT_PART="$(ls ${DRIVE}* | grep -E "^${DRIVE}p?1$")"
-  ROOT_PART="$(ls ${DRIVE}* | grep -E "^${DRIVE}p?2$")"
+  "$DSel"
+  sgdisk --verify "$DSel"
+  if [ -n "$(echo $DSel | grep "^/dev/[a-z]d[a-z]")" ]
+  then DEVICE="sda"
+  elif [ -n "$(echo $DSel | grep "^/dev/nvme")" ]
+  then DEVICE="nvme"
+  elif [ -n "$(echo $DSel | grep "^/dev/mmc")" ]
+  then DEVICE="mmc"
+  fi
+  case $DEVICE in
+  nvme)
+  BOOT_PART="${DRIVE}p1"
+  ROOT_PART="${DRIVE}p1"
+  ;;
+  sda)
+  BOOT_PART="${DRIVE}1"
+  ROOT_PART="${DRIVE}1"
+  ;;
+  mmc)
+  BOOT_PART="${DRIVE}1"
+  ROOT_PART="${DRIVE}1"
+  ;;
+  esac
+  UUID_BOOT=$(blkid -s UUID -o value $BOOT_PART)
+  UUID_ROOT=$(blkid -s UUID -o value $ROOT_PART)
+  PARTUUID_BOOT=$(blkid -s PARTUUID -o value $BOOT_PART)
+  PARTUUID_ROOT=$(blkid -s PARTUUID -o value $ROOT_PART)
+  #BOOT_PART="$(ls ${DRIVE}* | grep -E "^${DRIVE}p?1$")"
+  #ROOT_PART="$(ls ${DRIVE}* | grep -E "^${DRIVE}p?2$")"
   echo "$BOOT_PART $ROOT_PART $UUID_BOOT $UUID_ROOT $PARTUUID_BOOT $PARTUUID_ROOT"
 }
 
@@ -276,7 +273,7 @@ OperatingSystemSel () {
     ;;
     2|Artix|artix) echo "distro selected : Artix" && OSSel="Artix"
     ;;
-    3|Void|void) echo "distro selected : Void" && DSel="Void"
+    3|Void|void) echo "distro selected : Void" && OSSel="Void"
     ;;
     *) echo "Wrong choice, type again" && OperatingSystemSel
     ;;
@@ -287,7 +284,11 @@ DiskSel () {
   echo -en "\n Enter the disk you want to use : \n"
   lsblk -dplnx size -o name,size
   read  DSel
-  echo DSel
+  read -p "If $DSel is the right disk type y or n for retype it : " DSSURE
+  if [ "$DSSURE" = y ]
+  then echo "OK"
+  else echo "Then again" && DiskSel
+  fi
 }
 
 VoidInstMethod () {
