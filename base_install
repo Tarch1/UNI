@@ -35,7 +35,7 @@ echo "$DSel selected, then proceed"
     elogind="elogind elogind-openrc"
     pacman-key --init
     pacman-key --populate artix
-    pacman -Sy --needed --noconfirm artix-archlinux-support #lib32-artix-archlinux-support
+    pacman -Sy "$pkgskips" artix-archlinux-support #lib32-artix-archlinux-support
   ;;
   3|Void|void)
   pkgmanager="xbps-install"
