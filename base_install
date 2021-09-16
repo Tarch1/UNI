@@ -7,6 +7,7 @@ echo "$DSel selected, then proceed"
   case "$DSel" in 
   1|Arch|arch)
     pkgmanager="pacman"
+    pkgskips='--needed --noconfirm'
     keylayout="KEYMAP=it"
     keypath="etc/vconsole.conf"
     pkgstrap="pacstrap"
@@ -20,6 +21,7 @@ echo "$DSel selected, then proceed"
   ;;
   2|Artix|artix)
     pkgmanager="pacman"
+    pkgskips='--needed --noconfirm'
     keylayout='KEYMAP="it"'
     keypath="etc/conf.d/keymaps"
     pkgstrap="basestrap"
@@ -49,7 +51,7 @@ echo "$DSel selected, then proceed"
 
 DiskPartition () {
   umount -R /mnt 
-  "$pkgmanager" -Sy --needed --noconfirm parted gptfdisk mtools ntfs-3g dialog
+  "$pkgmanager" -Sy "$pkgskips" parted gptfdisk mtools ntfs-3g dialog
   devicelist="$(lsblk -dplnx size -o name,size | grep -Ev "boot|rpmb|loop" | tac)"
   DRIVE="$(dialog --stdout --menu "Select disk for installation" 0 0 0 ${devicelist})" || exit 1
   #EXT_DRIVE="$(dialog --stdout --menu "Select secondary disk" 0 0 0 ${devicelist})" || exit 1
@@ -163,13 +165,13 @@ PackageConfig () {
   echo "$DSel"
   case "$DSel" in
     1|Arch|arch)
-      "$chroot" /mnt pacman -Syu --needed --noconfirm
+      "$chroot" /mnt pacman -Syu "$pkgskips"
       "$chroot" /mnt pacman-key --init
       "$chroot" /mnt pacman-key --populate archlinux
       sed -i '/\[multilib],/mirrorlist/ s/#//' /mnt/etc/pacman.conf
     ;;
     2|Artix|artix)
-      "$chroot" /mnt pacman -Syu --needed --noconfirm artix-archlinux-support
+      "$chroot" /mnt pacman -Syu "$pkgskips" artix-archlinux-support
       "$chroot" /mnt pacman-key --populate archlinux
       echo "[extra]" >> /mnt/etc/pacman.conf
       echo "Include = /etc/pacman.d/mirrorlist-arch" >> /mnt/etc/pacman.conf
@@ -189,7 +191,7 @@ PackageConfig () {
 }
 
 PackageInstall () {
-  "$chroot" /mnt "$pkgmanager" -Syu --needed --noconfirm $dev $fs $net $bluetooth $audio $android $archive $filemanager $print $graphics $vulkan $hardwareacceleration $xorg $baseutils $apps $media $rcpacks
+  "$chroot" /mnt "$pkgmanager" -Syu "$pkgskips" $dev $fs $net $bluetooth $audio $android $archive $filemanager $print $graphics $vulkan $hardwareacceleration $xorg $baseutils $apps $media $rcpacks
   #cp ../UNI/Conf_files/mkinitcpio.conf /mnt/etc
   sed -i "/MODULES/ s/()/($modules)/" /mnt/etc/mkinitcpio.conf
 }
@@ -227,7 +229,7 @@ BootloaderInstall () {
   echo "$BLSel"
   case $BLSel in
     1|REFIND|refind)
-      "$chroot" /mnt "$pkgmanager" -Sy --needed --noconfirm refind
+      "$chroot" /mnt "$pkgmanager" -Sy "$pkgskips" refind
       "$chroot" /mnt refind-install
       mkdir /mnt/boot/EFI/refind/themes
       mv /mnt/boot/EFI/refind/refind.conf /mnt/boot/EFI/refind/backup-refind.conf
@@ -237,7 +239,7 @@ BootloaderInstall () {
       cp -r ../UNI/Bootloader/Refind/Refind-theme /mnt/boot/EFI/refind/themes/
     ;;
     2|GRUB|grub)
-      "$chroot" /mnt "$pkgmanager" -Sy --needed --noconfirm grub grub-btrfs
+      "$chroot" /mnt "$pkgmanager" -Sy "$pkgskips" grub grub-btrfs
       "$chroot" /mnt grub-install --target=x86_64-efi --efi-directory=/boot bootloader-id=GRUB
       mkdir -p /mnt/boot/grub/themes
       sed -i '$ a\GRUB_THEME="/boot/grub/themes/Grub-Eiffel/theme.txt"' /mnt/etc/default/grub
