@@ -53,7 +53,8 @@ DiskPartition () {
   devicelist="$(lsblk -dplnx size -o name,size | grep -Ev "boot|rpmb|loop" | tac)"
   DRIVE="$(dialog --stdout --menu "Select disk for installation" 0 0 0 ${devicelist})" || exit 1
   #EXT_DRIVE="$(dialog --stdout --menu "Select secondary disk" 0 0 0 ${devicelist})" || exit 1
-  #parted "$DRIVE" mklabel gpt mkpart "EFI system partition" 0% 1% set 1 esp on mkpart "root partition" 1% 100%
+  ##parted -s "mklabel gpt mkpart ESP fat32 1MiB 512MiB mkpart root ext4 512MiB 100% set 1 esp on"
+  #parted -s "$DRIVE" mklabel gpt mkpart "EFI system partition" 0% 1% set 1 esp on mkpart "root partition" 1% 100% set 1 esp on
   sgdisk --zap-all \
   --clear \
   --new=1:0:+550M --typecode=1:ef00 \
