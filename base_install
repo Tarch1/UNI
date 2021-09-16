@@ -2,9 +2,13 @@
 
 ########## INSTALLATION-SCRIPT ##########
 
+VOIDSteps () {
+
+}
+
 DistroChoice () {
-echo "$DSel selected, then proceed"
-  case "$DSel" in 
+echo "$OSSel selected, then proceed"
+  case "$OSSel" in 
   1|Arch|arch)
     pkgmanager="pacman"
     pkgskips='--needed --noconfirm'
@@ -44,7 +48,7 @@ echo "$DSel selected, then proceed"
   OneOfTwo
   ;;
   *)
-  echo "Wrong Distro selected, type again" && DistroSel && DistroChoice
+  echo "Wrong Distro selected, type again" && OperatingSystemSel && DistroChoice
   ;;
   esac
 }
@@ -52,6 +56,8 @@ echo "$DSel selected, then proceed"
 DiskPartition () {
   umount -R /mnt 
   "$pkgmanager" -Sy "$pkgskips" parted gptfdisk mtools ntfs-3g dialog
+  
+  
   devicelist="$(lsblk -dplnx size -o name,size | grep -Ev "boot|rpmb|loop" | tac)"
   DRIVE="$(dialog --stdout --menu "Select disk for installation" 0 0 0 ${devicelist})" || exit 1
   #EXT_DRIVE="$(dialog --stdout --menu "Select secondary disk" 0 0 0 ${devicelist})" || exit 1
@@ -63,6 +69,7 @@ DiskPartition () {
   --new=2:0:0 --typecode=2:8300 \
   "$DRIVE"
   sgdisk --verify "$DRIVE"
+  #DEVICE="/dev/sda /dev/nvme0n1 /dev/mmcblk0"
   #if [ -n "$(echo $DRIVE | grep "^/dev/[a-z]d[a-z]")" ]
   #then DEVICE="sda"
   #elif [ -n "$(echo $DRIVE | grep "^/dev/nvme")" ]
@@ -162,8 +169,8 @@ HostConfig () {
 }
 
 PackageConfig () {
-  echo "$DSel"
-  case "$DSel" in
+  echo "$OSSel"
+  case "$OSSel" in
     1|Arch|arch)
       "$chroot" /mnt pacman -Syu "$pkgskips"
       "$chroot" /mnt pacman-key --init
@@ -185,7 +192,7 @@ PackageConfig () {
       echo -e "nothing"
     ;;
     *)
-      echo "Wrong distro selected, try again" && DistroSel && PackageConfig
+      echo "Wrong distro selected, try again" && OperatingSystemSel && PackageConfig
     ;;
     esac
 }
@@ -249,7 +256,7 @@ BootloaderInstall () {
     3|EFISTUB|efistub)
       uuid="$(blkid -s "$PIDSel" -o value "$ROOT_PART")"
       BFlags="\'rw root=$PIDSel=$uuid rootflags=subvol=@ initrd=\intel-ucode.img initrd=\initramfs-linux.img\'"
-      "$chroot" /mnt efibootmgr -c -d "$BOOT_PART" -p 1 -L "$DSel" -l /vmlinuz-linux -u "$BFlags"--verbose
+      "$chroot" /mnt efibootmgr -c -d "$BOOT_PART" -p 1 -L "$OSSel" -l /vmlinuz-linux -u "$BFlags"--verbose
       echo "efibootmgr -b lastnumber -B" #delete previous boot entries
     ;;
     *)
@@ -259,59 +266,28 @@ BootloaderInstall () {
     esac
 }
 
-########## INSTALLATION-PROCESS ##########
-
-InstallSteps () {
-  DistroChoice && stage="DistroChoice"
-  DiskPartition && stage="DiskPartition"
-  BootFormat && stage="BootFormat"
-  "$FSSel" && stage="$FSSel"
-  ExternalDriveSetup && stage="ExternalDriveSetup"
-  BaseSystemInstall && stage="BaseSystemInstall"
-  SyncTime && stage="SyncTime"
-  LocaleGen && stage="LocaleGen"
-  HostConfig && stage="HostConfig"
-  PackageConfig && stage="PackageConfig"
-  PackageInstall && stage="PackageInstall"
-  ServiceEnabler && stage="ServiceEnabler"
-  AudioSetup && stage="AudioSetup"
-  UserSetup && stage="UserSetup"
-  BootloaderInstall && stage="BootloaderInstall"
-  stage=end
-}
-
-BaseInstallation () {
-  DistroSel
-  LocalizationSel
-  LanguageSel
-  TimezoneSel
-  HostnameSel
-  UsernameSel
-  PartIDSel
-  FilesystemSel
-  BootloaderSel
-  stage="0"
-  if [ -z "$*" ]
-  then InstallSteps 
-  else echo "!!!!!!!!!! ERROR AFTER STAGE $stage !!!!!!!!!!"
-  fi
-}
-
 ########## PERSONALIZATION-SCRIPT ##########
 
-DistroSel () {
+OperatingSystemSel () {
   echo -en "Enter the distro we are going to setup : 1) Arch 2) Artix 3) Void \n"
-  read  DSel
-  case $DSel in
-    1|Arch|arch) echo "distro selected : Arch" && DSel="Arch"
+  read  OSSel
+  case $OSSel in
+    1|Arch|arch) echo "distro selected : Arch" && OSSel="Arch"
     ;;
-    2|Artix|artix) echo "distro selected : Artix" && DSel="Artix"
+    2|Artix|artix) echo "distro selected : Artix" && OSSel="Artix"
     ;;
     3|Void|void) echo "distro selected : Void" && DSel="Void"
     ;;
-    *) echo "Wrong choice, type again" && DistroSel
+    *) echo "Wrong choice, type again" && OperatingSystemSel
     ;;
   esac
+}
+
+DiskSel () {
+  echo -en "\n Enter the disk you want to use : \n"
+  lsblk -dplnx size -o name,size
+  read  DSel
+  echo DSel
 }
 
 VoidInstMethod () {
@@ -448,6 +424,45 @@ BootloaderSel () {
   esac
   echo $BLSel
   echo "$BLSel"
+}
+
+########## INSTALLATION-PROCESS ##########
+
+InstallSteps () {
+  DistroChoice && stage="DistroChoice"
+  DiskPartition && stage="DiskPartition"
+  BootFormat && stage="BootFormat"
+  "$FSSel" && stage="$FSSel"
+  ExternalDriveSetup && stage="ExternalDriveSetup"
+  BaseSystemInstall && stage="BaseSystemInstall"
+  SyncTime && stage="SyncTime"
+  LocaleGen && stage="LocaleGen"
+  HostConfig && stage="HostConfig"
+  PackageConfig && stage="PackageConfig"
+  PackageInstall && stage="PackageInstall"
+  ServiceEnabler && stage="ServiceEnabler"
+  AudioSetup && stage="AudioSetup"
+  UserSetup && stage="UserSetup"
+  BootloaderInstall && stage="BootloaderInstall"
+  stage=end
+}
+
+BaseInstallation () {
+  OperatingSystemSel
+  DiskSel  
+  LocalizationSel
+  LanguageSel
+  TimezoneSel
+  HostnameSel
+  UsernameSel
+  PartIDSel
+  FilesystemSel
+  BootloaderSel
+  stage="0"
+  if [ -z "$*" ]
+  then InstallSteps 
+  else echo "!!!!!!!!!! ERROR AFTER STAGE $stage !!!!!!!!!!"
+  fi
 }
 
 ########## PACKAGE ##########
