@@ -68,25 +68,16 @@ DiskPartition () {
   --new=2:0:0 --typecode=2:8300 \
   "$DSel"
   sgdisk --verify "$DSel"
-  if [ -n "$(echo $DSel | grep "^/dev/[a-z]d[a-z]")" ]
-  then DEVICE="sda"
-  elif [ -n "$(echo $DSel | grep "^/dev/nvme")" ]
-  then DEVICE="nvme"
-  elif [ -n "$(echo $DSel | grep "^/dev/mmc")" ]
-  then DEVICE="mmc"
+  if [ -n "$(echo $DSel | grep "^/dev/[a-z]d[a-z]")" ]; then DEVICE="sda"
+  elif [ -n "$(echo $DSel | grep "^/dev/nvme")" ]; then DEVICE="nvme"
+  elif [ -n "$(echo $DSel | grep "^/dev/mmc")" ]; then DEVICE="mmc"
   fi
   case $DEVICE in
-  nvme)
-  BOOT_PART="$DRIVEp1"
-  ROOT_PART="$DRIVEp2"
+  nvme) BOOT_PART="$DRIVEp1" && ROOT_PART="$DRIVEp2"
   ;;
-  sda)
-  BOOT_PART="$DRIVE1"
-  ROOT_PART="$DRIVE2"
+  sda) BOOT_PART="$DRIVE1" && ROOT_PART="$DRIVE2"
   ;;
-  mmc)
-  BOOT_PART="$DRIVE1"
-  ROOT_PART="$DRIVE2"
+  mmc) BOOT_PART="$DRIVE1" && ROOT_PART="$DRIVE2"
   ;;
   esac
   UUID_BOOT=$(blkid -s UUID -o value $BOOT_PART)
