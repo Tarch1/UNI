@@ -56,21 +56,21 @@ echo "$OSSel selected, then proceed"
 DiskPartition () {
   umount -R /mnt 
   "$pkgmanager" -Sy "$pkgskips" parted gptfdisk mtools ntfs-3g dialog
-  #devicelist="$(lsblk -dplnx size -o name,size | grep -Ev "boot|rpmb|loop" | tac)"
-  #DRIVE="$(dialog --stdout --menu "Select disk for installation" 0 0 0 ${devicelist})" || exit 1
-  #EXT_DRIVE="$(dialog --stdout --menu "Select secondary disk" 0 0 0 ${devicelist})" || exit 1
+  devicelist="$(lsblk -dplnx size -o name,size | grep -Ev "boot|rpmb|loop" | tac)"
+  DRIVE="$(dialog --stdout --menu "Select disk for installation" 0 0 0 ${devicelist})" || exit 1
+  EXT_DRIVE="$(dialog --stdout --menu "Select secondary disk" 0 0 0 ${devicelist})" || exit 1
   ##parted -s "mklabel gpt mkpart ESP fat32 1MiB 512MiB mkpart root ext4 512MiB 100% set 1 esp on"
   #parted -s "$DRIVE" mklabel gpt mkpart "EFI system partition" 0% 1% set 1 esp on mkpart "root partition" 1% 100% set 1 esp on
-  echo "$DSel"
+  echo "$DRIVE"
   sgdisk --zap-all \
   --clear \
   --new=1:0:+550M --typecode=1:ef00 \
   --new=2:0:0 --typecode=2:8300 \
-  "$DSel"
-  sgdisk --verify "$DSel"
-  if [ -n "$(echo $DSel | grep "^/dev/[a-z]d[a-z]")" ]; then DEVICE="sda"
-  elif [ -n "$(echo $DSel | grep "^/dev/nvme")" ]; then DEVICE="nvme"
-  elif [ -n "$(echo $DSel | grep "^/dev/mmc")" ]; then DEVICE="mmc"
+  "$DRIVE"
+  sgdisk --verify "$DRIVE"
+  if [ -n "$(echo $DRIVE | grep "^/dev/[a-z]d[a-z]")" ]; then DEVICE="sda"
+  elif [ -n "$(echo $DRIVE | grep "^/dev/nvme")" ]; then DEVICE="nvme"
+  elif [ -n "$(echo $DRIVE | grep "^/dev/mmc")" ]; then DEVICE="mmc"
   fi
   case $DEVICE in
   nvme) BOOT_PART="$DRIVEp1" && ROOT_PART="$DRIVEp2"
@@ -442,7 +442,7 @@ InstallSteps () {
 
 BaseInstallation () {
   OperatingSystemSel
-  DiskSel  
+  #DiskSel  
   LocalizationSel
   LanguageSel
   TimezoneSel
