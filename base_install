@@ -77,16 +77,16 @@ DiskPartition () {
   fi
   case $DEVICE in
   nvme)
-  BOOT_PART="${DRIVE}p1"
-  ROOT_PART="${DRIVE}p1"
+  BOOT_PART="$DRIVEp1"
+  ROOT_PART="$DRIVEp2"
   ;;
   sda)
-  BOOT_PART="${DRIVE}1"
-  ROOT_PART="${DRIVE}1"
+  BOOT_PART="$DRIVE1"
+  ROOT_PART="$DRIVE2"
   ;;
   mmc)
-  BOOT_PART="${DRIVE}1"
-  ROOT_PART="${DRIVE}1"
+  BOOT_PART="$DRIVE1"
+  ROOT_PART="$DRIVE2"
   ;;
   esac
   UUID_BOOT=$(blkid -s UUID -o value $BOOT_PART)
