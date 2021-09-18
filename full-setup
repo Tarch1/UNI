@@ -1,4 +1,17 @@
 #!/bin/bash
+YesNoSel () {
+  read -p "$1 [y/N]" YN
+  case "$SS" in 
+  [yY] | [yY][eE][sS] )
+  CC=1
+  ;;
+  [nN] | [n|N][o|O] )
+  CC=0
+  ;;
+  *)
+  ;;
+  esac
+}
 function YESNO() {
 	while true; do
 	read -p "is wath you want?" SS
