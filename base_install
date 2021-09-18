@@ -3,7 +3,7 @@
 ########## INSTALLATION-SCRIPT ##########
 
 VOIDSteps () {
-
+echo no
 }
 
 DistroChoice () {
@@ -461,10 +461,11 @@ BaseInstallation () {
   FilesystemSel
   BootloaderSel
   stage="0"
-  if [ -z "$*" ]
-  then InstallSteps 
-  else echo "!!!!!!!!!! ERROR AFTER STAGE $stage !!!!!!!!!!"
-  fi
+  #if [ -z "$*" ]
+  #then InstallSteps 
+  #else echo "!!!!!!!!!! ERROR AFTER STAGE $stage !!!!!!!!!!"
+  #fi
+  InstallSteps || echo "!!!!!!!!!! ERROR AFTER STAGE $stage !!!!!!!!!!"
 }
 
 ########## PACKAGE ##########
