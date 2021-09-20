@@ -1,7 +1,7 @@
 #!/bin/bash
 Part () {
-  Snap="$(Snapper=Snapper || Snapper='')"
-  Triz="$(Trizen=Trizen || Trizen='')"
+  Snap="$(Snapper=Snapper)"
+  Triz="$(Trizen=Trizen)"
 }
 FuncPart () {
   if [ $CC == 1 ]
@@ -9,6 +9,7 @@ FuncPart () {
   fi
 }
 Installation () {
+  for value in "$@"
   i=0
   while (( i < 10)); do
   YesNoSel FuncPart $*
