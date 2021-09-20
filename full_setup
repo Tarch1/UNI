@@ -1,8 +1,18 @@
 #!/bin/bash
+Part () {
+  Snap="$(Snapper=Snapper || Snapper='')"
+  Triz="$(Trizen=Trizen || Trizen='')"
+}
+FuncPart () {
+  if [ $CC == 1 ]
+  then $*
+  fi
+}
 Installation () {
   i=0
   while (( i < 10)); do
-  YesNoSel $1
+  YesNoSel FuncPart $*
+  done
   YesNoSel "You need a subvolume manager like Snapper?"
   if [ $CC == 1 ]
   then Snapper="Snapper" || Snapper=""
@@ -198,4 +208,4 @@ YesNoSel () {
   esac
 }
 
-Installation "$*"
+Installation Part
