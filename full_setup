@@ -1,26 +1,27 @@
 #!/bin/bash
 Installation () {
-  umount -Rl /tmp 
-  clear
+  i=0
+  while (( i < 10)); do
+  YesNoSel $1
   YesNoSel "You need a subvolume manager like Snapper?"
   if [ $CC == 1 ]
-  then Snapper="SNAPPER" || Snapper=""
+  then Snapper="Snapper" || Snapper=""
   fi
   YesNoSel "You need an AUR helper like Trizen?"
   if [ $CC = 1 ]  
-  then Trizen="TRIZEN" || Trizen=""
+  then Trizen="Trizen" || Trizen=""
   fi
   YesNoSel "You need a base Environment for tiling window manager?"
   if [ $CC = 1 ] 
-  then Env="ENV" || Env=""
+  then Env="Env" || Env=""
   fi
   YesNoSel "You need a Display manager like Lightdm?"
   if [ $CC = 1 ] 
-  then Dm="DM" || Dm=""
+  then Dm="Dm" || Dm=""
   fi
   YesNoSel "You need one (or some) Window manager?"
   if [ $CC = 1 ] 
-  then Wm="WM" || Wm=""
+  then Wm="Wm" || Wm=""
   fi
   stage=0    
   Stages || echo "!!!!!!!!!! ERROR AFTER STAGE $stage !!!!!!!!!!"
