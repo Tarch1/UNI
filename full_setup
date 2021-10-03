@@ -3,12 +3,21 @@ Part () {
   Snap="$(Snapper=Snapper)"
   Triz="$(Trizen=Trizen)"
 }
+Part1=(
+'Snapper'
+'Trizen'
+)
 FuncPart () {
   if [ $CC == 1 ]
   then $*
   fi
 }
 Installation () {
+for value in "${Part1[@]}"; do
+    YesNoSel "${value}" 
+
+  done
+
   for value in "$@"
   i=0
   while (( i < 10)); do
