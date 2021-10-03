@@ -208,12 +208,15 @@ YesNoSel () {
   read -p "$1 [y/N]" YNS
   case "$YNS" in 
   [yY] | [yY][eE][sS] )
+"$1"="$1"
   CC=1
   ;;
   [nN] | [n|N][o|O] )
+"$1"=0
   CC=0
   ;;
   *)
+YesNoSel "$1"
   ;;
   esac
 }
