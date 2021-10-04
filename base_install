@@ -441,26 +441,19 @@ InstallSteps () {
 }
 
 BaseInstallation () {
-  Selection=( 'OperatingSystemSel' 'LocalizationSel' 'LanguageSel' 'TimezoneSel' 'HostnameSel' 'UsernameSel' 'PartIDSel' 'FilesystemSel' 'BootloaderSel' )
-  for i in "${Selection[@]}"; do
+  SelectionSteps=( 'OperatingSystemSel' 'LocalizationSel' 'LanguageSel' 'TimezoneSel' 
+  'HostnameSel' 'UsernameSel' 'PartIDSel' 'FilesystemSel' 'BootloaderSel' )
+  for i in "${SelectionSteps[@]}"; do
   "$i"
   done
-  OperatingSystemSel
-  #DiskSel  
-  LocalizationSel
-  LanguageSel
-  TimezoneSel
-  HostnameSel
-  UsernameSel
-  PartIDSel
-  FilesystemSel
-  BootloaderSel
-  stage="0"
-  #if [ -z "$*" ]
-  #then InstallSteps 
-  #else echo "!!!!!!!!!! ERROR AFTER STAGE $stage !!!!!!!!!!"
-  #fi
-  InstallSteps || echo "!!!!!!!!!! ERROR AFTER STAGE $stage !!!!!!!!!!"
+  #DiskSel
+  InstallationSteps=( 'DistroChoice' 'DiskPartition' 'BootFormat' "$FSSel" 'ExternalDriveSetup' 
+  'BaseSystemInstall' 'SyncTime' 'LocaleGen' 'HostConfig' 'PackageConfig' 'PackageInstall' 
+  'ServiceEnabler' 'AudioSetup' 'UserSetup' 'BootloaderInstall' )
+  for o in "${InstallationSteps[@]}"; do
+  "$o"
+  done 
+  #InstallSteps 
 }
 
 ########## PACKAGE ##########
