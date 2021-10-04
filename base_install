@@ -441,6 +441,10 @@ InstallSteps () {
 }
 
 BaseInstallation () {
+  Selection=( 'OperatingSystemSel' 'LocalizationSel' 'LanguageSel' 'TimezoneSel' 'HostnameSel' 'UsernameSel' 'PartIDSel' 'FilesystemSel' 'BootloaderSel' )
+  for i in "${Selection[@]}"; do
+  "$i"
+  done
   OperatingSystemSel
   #DiskSel  
   LocalizationSel
