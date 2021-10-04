@@ -54,7 +54,7 @@ Snapper () {
 
 Trizen () {
   git clone https://aur.archlinux.org/trizen.git ~/trizen
-  cd ~/trizen
+  cd ~/trizen || Trizen
   makepkg -si
   trizen -S clapper bibata-cursor-translucent
   #picom-ibhagwan-git gllock-git xidlehook wpgtk-git font-manager ttf-font-awesome betterlockscreen bibata-rainbow-cursor-theme
@@ -88,7 +88,7 @@ Environment () {
   cp ~/UNI/Conf_files/nanorc ~/.nanorc
   cp /etc/X11/xinit/xinitrc ~/.xinitrc
   echo 'Xft.dpi: 90' > ~/.Xdefaults
-  sudo echo "light -S 30" >> ~/.xprofile
+  echo "light -S 30" | sudo tee -a ~/.xprofile > /dev/null
   sudo cp ~/UNI/Conf_files/40-libinput.conf /usr/share/X11/xorg.conf.d/40-libinput.conf
   sudo ln -s /usr/share/X11/xorg.conf.d/40-libinput.conf /etc/X11/xorg.conf.d/40-libinput.conf
   sudo cp ~/UNI/Conf_files/90-backlight.rules /usr/lib/udev/rules.d/90-backlight.rules
