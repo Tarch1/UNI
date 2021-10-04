@@ -116,7 +116,7 @@ DisplayManager () {
   sudo systemctl enable lightdm
 }
 function WindowManager () {
-  read -p "What setup you want? [bspwm gnome herbstluftwm xmonad polybar]" SS
+  read -rp "What setup you want? [bspwm gnome herbstluftwm xmonad polybar]" SS
   case $SS in
 bspwm ) sudo pacman -S bspwm sxhkd --noconfirm
 mkdir ~/.config/{bspwm,sxhkd}
@@ -173,7 +173,7 @@ esac
 }
 
 YesNoSel () {
-  read -p "$1 $2 $3 [y/N]" YNS
+  read -rp "$1 $2 $3 [y/N]" YNS
   case "$YNS" in 
   [yY] | [yY][eE][sS] ) eval "$i=1"
   CC=1
