@@ -9,6 +9,9 @@ Installation () {
 }
 
 Stages () {
+for o in "${Part[@]}"; do
+"$o"
+done
   if [ $Snapper = 1 ]; then
   Snapper
   fi
