@@ -2,10 +2,6 @@
 
 ########## INSTALLATION-SCRIPT ##########
 
-VOIDSteps () {
-echo no
-}
-
 DistroChoice () {
 echo "$OSSel selected, then proceed"
   case "$OSSel" in 
@@ -276,9 +272,9 @@ DiskSel () {
   echo -en "\n Enter the disk you want to use : \n"
   lsblk -dplnx size -o name,size
   read  DSel
-  read -p "If $DSel is the right disk type y or n for retype it : " DSSURE
-  if [ "$DSSURE" = y ]
-  then echo "OK"
+  YesNoSel "If $DSel is the right disk type y or n for retype it :"
+  if [ "$CC" = 1 ]
+  then echo "OK, disk selected $DSel"
   else echo "Then again" && DiskSel
   fi
 }
@@ -341,18 +337,18 @@ LanguageSel () {
 
 HostnameSel () {
   read -p "Enter preferred hostname : " HNSel
-  read -p "If [ $HNSel ] is the right hostname type y or n for retype it : " HNSURE
-  if [ "$HNSURE" = y ]
-  then echo "OK"
+  YesNoSel "If [ $HNSel ] is the right hostname type y or n for retype it :"
+  if [ "$CC" = 1 ]
+  then echo "OK, hostname selected $HNSel"
   else echo "Then again" && HostnameSel
   fi
 }
 
 UsernameSel () {
   read -p "Enter preferred username : " UNSel
-  read -p "If [ $UNSel ] is the right hostname type y or n for retype it : " UNSURE
-  if [ "$UNSURE" = y ]
-  then echo "OK"
+  YesNoSel "If [ $UNSel ] is the right hostname type y or n for retype it :"
+  if [ "$CC" = 1 ]
+  then echo "OK, username selected $UNSel"
   else echo "Then again" && UsernameSel
   fi
 }
@@ -438,6 +434,19 @@ InstallSteps () {
   UserSetup && stage="UserSetup"
   BootloaderInstall && stage="BootloaderInstall"
   stage=end
+}
+
+YesNoSel () {
+  read -rp "$1 $2 $3 [y/N]" YNS
+  case "$YNS" in 
+  [yY] | [yY][eE][sS] ) eval "$u=1"
+  CC=1
+  ;;
+  [nN] | [nN][oO] ) eval "$u=0"
+  ;;
+  *) YesNoSel "$1"
+  ;;
+  esac
 }
 
 BaseInstallation () {
