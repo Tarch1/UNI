@@ -3,7 +3,7 @@ Part=( 'Snapper' 'Trizen' 'Environment' 'DisplayManager' 'WindowManager' )
 Part2=('You need a subvolume manager like' 'You need an AUR helper like ' 'You need a base' 'You need a' 'You need a (or some)' '')
 Installation () {
   for i in "${Part[@]}"; do
-  YesNoSel "You need" "$1" "?"
+  YesNoSel "You need" "$i" "?"
   done
   Stages || echo "!!!!!!!!!! ERROR AFTER STAGE $stage !!!!!!!!!!"
 }
