@@ -179,15 +179,12 @@ esac
 YesNoSel () {
   read -p "$1 $2 [y/N]" YNS
   case "$YNS" in 
-  [yY] | [yY][eE][sS] )
-  eval $i=1
+  [yY] | [yY][eE][sS] ) eval "$i=1"
   CC=1
   ;;
-  [nN] | [n|N][o|O] )
-  eval $i=0
+  [nN] | [n|N][o|O] ) eval "$i=0"
   ;;
-  *)
-YesNoSel "$1"
+  *) YesNoSel "$1"
   ;;
   esac
 }
