@@ -167,7 +167,7 @@ cp ~/UNI/Conf_files/Polybar/config ~/.config/polybar/config
 chmod +x ~/.config/polybar/launch.sh
 chmod +x ~/.config/polybar/hide
 ;;
-*) YesNoSel "Want another" ""
+*) YesNoSel "Want another WindowManager?"
 if [ $CC == 1 ]
 then WindowManager
 else echo "Nothing"
