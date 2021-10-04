@@ -5,13 +5,9 @@ Installation () {
   for i in "${Part[@]}"; do
   YesNoSel "You need" "$i" "?"
   done
-  Stages || echo "!!!!!!!!!! ERROR AFTER STAGE $stage !!!!!!!!!!"
-}
-
-Stages () {
-for o in "${Part[@]}"; do
-"$o"
-done
+  for o in "${Part[@]}"; do
+  "$o"
+  done
 }
 
 Snapper () {
