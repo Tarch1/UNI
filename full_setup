@@ -1,58 +1,29 @@
 #!/bin/bash
-Part () {
-  Snap="$(Snapper=Snapper)"
-  Triz="$(Trizen=Trizen)"
-}
-Part1=(
-'Snapper'
-'Trizen'
-)
-FuncPart () {
-  if [ $CC == 1 ]
-  then $*
-  fi
-}
+Part=('Snapper' 'Trizen' 'Environment' 'DisplayManager' 'WindowManager')
+Part2=('You need a subvolume manager like' 'You need an AUR helper like ' 'You need a base' 'You need a' 'You need a (or some)' '')
 Installation () {
-for value in "${Part1[@]}"; do
-    YesNoSel "${value}" 
-
+  for i in "${Part[@]}"; do
+  YesNoSel "$1"
   done
-
-  for value in "$@"
-  i=0
-  while (( i < 10)); do
-  YesNoSel FuncPart $*
-  done
-  YesNoSel "You need a subvolume manager like Snapper?"
-  if [ $CC == 1 ]
-  then Snapper="Snapper" || Snapper=""
-  fi
-  YesNoSel "You need an AUR helper like Trizen?"
-  if [ $CC = 1 ]  
-  then Trizen="Trizen" || Trizen=""
-  fi
-  YesNoSel "You need a base Environment for tiling window manager?"
-  if [ $CC = 1 ] 
-  then Env="Env" || Env=""
-  fi
-  YesNoSel "You need a Display manager like Lightdm?"
-  if [ $CC = 1 ] 
-  then Dm="Dm" || Dm=""
-  fi
-  YesNoSel "You need one (or some) Window manager?"
-  if [ $CC = 1 ] 
-  then Wm="Wm" || Wm=""
-  fi
-  stage=0    
   Stages || echo "!!!!!!!!!! ERROR AFTER STAGE $stage !!!!!!!!!!"
 }
 
 Stages () {
-  $Snapper && stage=$Snapper
-  $Trizen && stage=$Trizen
-  $Env && stage=$Env
-  $Dm && stage=$Dm
-  $Wm && stage=$Wm
+  if [ $Snapper = 1]; then
+  Snapper
+  fi
+  if [ $Trizen = 1]; then
+  Snapper
+  fi
+  if [ $Environment = 1]; then
+  Snapper
+  fi
+  if [ $DisplayManager = 1]; then
+  Snapper
+  fi
+  if [ $WindowManager = 1]; then
+  Snapper
+  fi
 }
 
 Snapper () {
@@ -85,7 +56,7 @@ Snapper () {
 #rc-update add grub-btrfs.path default
 }
 
-Trizen(){
+Trizen () {
   git clone https://aur.archlinux.org/trizen.git ~/trizen
   cd ~/trizen
   makepkg -si
@@ -93,7 +64,7 @@ Trizen(){
   #picom-ibhagwan-git gllock-git xidlehook wpgtk-git font-manager ttf-font-awesome betterlockscreen bibata-rainbow-cursor-theme
 }
 
-Env(){
+Environment () {
   sudo pacman -S ttf-roboto rofi sxiv feh python-pywal lxappearance imagemagick pacman-contrib slock dunst tcl tk --noconfirm
   mkdir -p ~/{.wallpapers,.config/{kitty,polybar,rofi,dunst}}
   
@@ -141,14 +112,14 @@ Env(){
   #wpg-install.sh -b -g -i
 }
 
-Dm () {
+DisplayManager () {
   sudo pacman -Sy lightdm lightdm-openrc lightdm-webkit2-greeter lightdm-webkit-theme-litarvan
   sudo sed -i 's/#greeter-session=example-gtk-gnome/greeter-session=lightdm-webkit2-greeter/' /etc/lightdm/lightdm.conf
   sudo sed -i 's/antergos/litarvan/g' /etc/lightdm/lightdm-webkit2-greeter.conf
   sudo rc-update add lightdm default
   sudo systemctl enable lightdm
 }
-function Wm () {
+function WindowManager () {
   read -p "What setup you want? [bspwm gnome herbstluftwm xmonad polybar]" SS
   case $SS in
 bspwm ) sudo pacman -S bspwm sxhkd --noconfirm
@@ -196,24 +167,24 @@ cp ~/UNI/Conf_files/Polybar/config ~/.config/polybar/config
 chmod +x ~/.config/polybar/launch.sh
 chmod +x ~/.config/polybar/hide
 ;;
-*) YesNoSel "Want another WM?"
+*) YesNoSel "Want another" ""
 if [ $CC == 1 ]
-then Wm || echo "Nothing"
+then WindowManager
+else echo "Nothing"
 fi
 ;;
 esac
 }
 
 YesNoSel () {
-  read -p "$1 [y/N]" YNS
+  read -p "$1 $2 [y/N]" YNS
   case "$YNS" in 
   [yY] | [yY][eE][sS] )
-"$1"="$1"
+  eval $i=1
   CC=1
   ;;
   [nN] | [n|N][o|O] )
-"$1"=0
-  CC=0
+  eval $i=0
   ;;
   *)
 YesNoSel "$1"
