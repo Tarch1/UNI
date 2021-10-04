@@ -182,7 +182,7 @@ YesNoSel () {
   [yY] | [yY][eE][sS] ) eval "$i=1"
   CC=1
   ;;
-  [nN] | [n|N][o|O] ) eval "$i=0"
+  [nN] | [nN][oO] ) eval "$i=0"
   ;;
   *) YesNoSel "$1"
   ;;
