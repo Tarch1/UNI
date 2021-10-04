@@ -5,19 +5,19 @@ Installation () {
   for i in "${Part[@]}"; do
   YesNoSel "You need" "$i" "?"
   done
-  if [ $Snapper = 1 ]; then
+  if [ "$Snapper" = 1 ]; then
   Snapper
   fi
-  if [ $Trizen = 1 ]; then
+  if [ "$Trizen" = 1 ]; then
   Trizen
   fi
-  if [ $Environment = 1 ]; then
+  if [ "$Environment" = 1 ]; then
   Environment
   fi
-  if [ $DisplayManager = 1 ]; then
+  if [ "$DisplayManager" = 1 ]; then
   DisplayManager
   fi
-  if [ $WindowManager = 1 ]; then
+  if [ "$WindowManager" = 1 ]; then
   WindowManager
   fi
 }
