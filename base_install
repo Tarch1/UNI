@@ -399,15 +399,15 @@ BootloaderSel () {
   read BLSel
   case $BLSel in
     1|REFIND|refind)
-      echo "distro selected : refind"
+      echo "bootloader selected : refind"
       BLSel="refind"
     ;;
     2|GRUB|grub)
-      echo "distro selected : grub"
+      echo "bootloader selected : grub"
       BLSel="grub"
     ;;
     3|EFISTUB|efistub)
-      echo "distro selected : efistub"
+      echo "bootloader selected : efistub"
       BLSel="efistub"
     ;;
     *)
