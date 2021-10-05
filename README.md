@@ -58,12 +58,19 @@ checking that they are properly unset with gsettings list-recursively | grep swi
 Pipewire troubleshooting
 
 Check if there is /etc/pipewire folder, else 
+
     cp -r /usr/share/pipewire /etc/
-if refuse to start 
+
+if refuse to start
+
     cp -r ~/.UNI/Conf_files/Pipewire/ ~/.config/autostart/
+
 last tentatives uncomment these 2 lines at the end of /etc/pipewire/pipewire.conf
+    
     #{ path = "/usr/bin/pipewire-media-session" args = "" }
     #{ path = "/usr/bin/pipewire" args = "-c pipewire-pulse.conf" }
+
 At the very end change from yes to no in /etc/pulse/client.conf
+
     autospawn = yes
     ;autospawn = yes
