@@ -24,23 +24,17 @@ After setup yout connecction run
   
 adjust packages at the end of base_install
 
-chmod +x base_install and run it
-
-  bash base_install
+    - chmod +x base_install
+    - bash base_install
 
 then reboot
 
-nmtui to connect on your network 
-run full-setup.sh
+Use nmtui to connect on your network 
+then personalize with 
 
-OPTIONAL: run the single command inside Setup-script instead of full-setup-sh:
+    - chmod +x full_setup
+    - bash full_setup
 
-     - run dm-setup.sh
-     - run env-setup.sh
-     - run snapper.sh
-     - run trizen.sh
-     - run wm-setup.sh  
-  
 Reboot and Enjoy!
 
 PS: if gnome on wayland not start's on machine's with hybrid gpu setup comment 
