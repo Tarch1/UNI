@@ -68,10 +68,9 @@ Environment () {
   
   ###################-PIPEWIRE-###################
   
-  sudo mkdir -p /etc/xdg/autostart/
-  sudo cp ~/UNI/Conf_files/Pipewire/pipewire.desktop /etc/xdg/autostart/
-  cp ~/UNI/Conf_files/Pipewire/pipewire.sh ~/.config/
-  chmod +x ~/.config/pipewire.sh
+  cp -r /usr/share/pipewire /etc/
+  # mkdir ~/.config/autostart
+  # cp -r ~/UNI/Conf_files/pipewire/ ~/.config/autostart
   
   ###################-COPYING-###################
   
@@ -138,9 +137,9 @@ echo 'Xft.dpi: 90' > ~/.Xdefaults
 #sudo ln -s /usr/share/X11/xorg.conf.d/40-libinput.conf /etc/X11/xorg.conf.d/40-libinput.conf
 chmod +x ~/.pfetch
 sudo mkdir -p /etc/xdg/autostart/
-sudo cp ~/UNI/Conf_files/Pipewire/pipewire.desktop /etc/xdg/autostart/
-cp ~/UNI/Conf_files/Pipewire/pipewire.sh ~/.config/
-chmod +x ~/.config/pipewire.sh
+cp -r /usr/share/pipewire /etc/
+#mkdir ~/.config/autostart
+#cp -r ~/UNI/Conf_files/pipewire/ ~/.config/autostart
 sudo rc-update add gdm default
 sudo systemctl enable gdm
 ;;
