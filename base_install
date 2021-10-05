@@ -413,8 +413,6 @@ BootloaderSel () {
       BootloaderSel
     ;;
   esac
-  echo $BLSel
-  echo "$BLSel"
 }
 
 ########## INSTALLATION-PROCESS ##########
