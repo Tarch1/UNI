@@ -441,6 +441,9 @@ BaseInstallation () {
   ArchTixSteps=( 'DistroChoice' 'DiskPartition' 'BootFormat' "$FSSel" 'ExternalDriveSetup' 
   'BaseSystemInstall' 'SyncTime' 'LocaleGen' 'HostConfig' 'PackageConfig' 'PackageInstall' 
   'ServiceEnabler' 'AudioSetup' 'UserSetup' 'BootloaderInstall' )
+  
+  VoidSteps=( 'DistroChoice' 'DiskPartition' 'BootFormat' "$FSSel" 'ExternalDriveSetup' )
+  
   echo "$OSSel"
   case "$OSSel" in
     1|Arch|arch) 
