@@ -41,7 +41,8 @@ PS: if gnome on wayland not start's on machine's with hybrid gpu setup comment
      
      DRIVER=="nvidia"......
 
-at /lib/udev/rules.d/61-gdm.rules or move away   
+at /lib/udev/rules.d/61-gdm.rules 
+if doesn't work, move away   
 
      sudo mv /usr/share/xsessions/gnome-xorg.desktop /usr/share/xsessions/gnome-xorg.desktop.back
 
