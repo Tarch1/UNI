@@ -6,34 +6,34 @@ STEP:
 
 Find your interface with: 
 
-    - ip a
-    - rfkill unblock all
-    - ip link interface up
+    ip a
+    rfkill unblock all
+    ip link interface up
 
 then use connmanctl:
 
-    - scan wifi
-    - services
-    - agent on
-    - connect wifi_***_psk
-    - quit
+    scan wifi
+    services
+    agent on
+    connect wifi_***_psk
+    quit
 After setup yout connecction run
 
-    - git clone https://github.com/Tarch1/Arch-tix
-    - cd Arch-tix/
+    git clone https://github.com/Tarch1/Arch-tix
+    cd Arch-tix/
   
 adjust packages at the end of base_install
 
-    - chmod +x base_install
-    - bash base_install
+    chmod +x base_install
+    bash base_install
 
 then reboot
 
 Use nmtui to connect on your network 
 then personalize with 
 
-    - chmod +x full_setup
-    - bash full_setup
+    chmod +x full_setup
+    bash full_setup
 
 Reboot and Enjoy!
 
