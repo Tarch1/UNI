@@ -52,4 +52,15 @@ For increasing volume steps: (less value = more steps)
 An addition for super+($number) navigation use: 
      
      for i in {1..9}; do gsettings set "org.gnome.shell.keybindings" "switch-to-application-$i" "[]"; done
+
 checking that they are properly unset with gsettings list-recursively | grep switch-to-application | sort
+
+Pipewire troubleshooting
+
+Check if there is /etc/pipewire folder, else 
+    cp -r /usr/share/pipewire /etc/
+if refuse to start 
+    cp -r ~/.UNI/Conf_files/Pipewire/ ~/.config/autostart/
+last tentatives uncomment these 2 lines at the end of /etc/pipewire/pipewire.conf
+    #{ path = "/usr/bin/pipewire-media-session" args = "" }
+    #{ path = "/usr/bin/pipewire" args = "-c pipewire-pulse.conf" }
