@@ -1,6 +1,10 @@
 [Desktop Entry]
 Type=Application
-Name=pipewire
-Exec=/home/tarch1/.config/autostart/pipewire.sh
+Exec=/usr/bin/pipewire & /usr/bin/pipewire-pulse & /usr/bin/pipewire-media-session
 Hidden=false
+NoDisplay=false
 X-GNOME-Autostart-enabled=true
+Name[en_GB]=pipewire
+Name=pipewire
+Comment[en_GB]=custom
+Comment=custom
