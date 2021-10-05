@@ -215,6 +215,7 @@ UserSetup () {
   "$chroot" /mnt echo -n "Type password for root user : "
   "$chroot" /mnt passwd 
   cp ../UNI/Conf_files/bashrc /mnt/home/"$UNSel"
+  cp -r ../UNI /mnt/home/
   touch /mnt/home/"$UNSel"/.profile
   echo 'export MOZ_ENABLE_WAYLAND=1' >> /mnt/home/"$UNSel"/.profile
 }
@@ -492,4 +493,3 @@ rc='ntp-openrc avahi-openrc cups-openrc bluez-openrc networkmanager-openrc'
 
 
 BaseInstallation 
-#"$*"
