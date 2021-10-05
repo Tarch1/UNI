@@ -64,3 +64,6 @@ if refuse to start
 last tentatives uncomment these 2 lines at the end of /etc/pipewire/pipewire.conf
     #{ path = "/usr/bin/pipewire-media-session" args = "" }
     #{ path = "/usr/bin/pipewire" args = "-c pipewire-pulse.conf" }
+At the very end change from yes to no in /etc/pulse/client.conf
+    autospawn = yes
+    ;autospawn = yes
