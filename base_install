@@ -441,8 +441,8 @@ BaseInstallation () {
   ArchTixSteps=( 'DistroChoice' 'DiskPartition' 'BootFormat' "$FSSel" 'ExternalDriveSetup' 
   'BaseSystemInstall' 'SyncTime' 'LocaleGen' 'HostConfig' 'PackageConfig' 'PackageInstall' 
   'ServiceEnabler' 'AudioSetup' 'UserSetup' 'BootloaderInstall' )
-  
-  case $OSSel in
+  echo "$OSSel"
+  case "$OSSel" in
     1|Arch|arch) 
     for a in "${ArchTixSteps[@]}"; do
     "$a"
@@ -459,6 +459,7 @@ BaseInstallation () {
     done
     ;;
     *) echo "Wrong choice, type again" && OperatingSystemSel
+    ;;
   esac 
 }
 
@@ -487,4 +488,5 @@ elogind=''
 rc='ntp-openrc avahi-openrc cups-openrc bluez-openrc networkmanager-openrc'
 
 
-BaseInstallation "$*"
+BaseInstallation 
+#"$*"
