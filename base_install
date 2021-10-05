@@ -122,6 +122,7 @@ Ext4Format () {
 }
 
 ExternalDriveSetup () {
+  sudo ntfsfix /dev/sda1
   mkdir -p /mnt/media/{internal_hdd,USB}
   mount "$EXT_DRIVE" /mnt/media/internal_hdd
 }
