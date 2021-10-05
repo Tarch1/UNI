@@ -84,7 +84,7 @@ DiskPartition () {
   #PARTUUID_ROOT=$(blkid -s PARTUUID -o value $ROOT_PART)
   #BOOT_PART="$(ls ${DRIVE}* | grep -E "^${DRIVE}p?1$")"
   #ROOT_PART="$(ls ${DRIVE}* | grep -E "^${DRIVE}p?2$")"
-  echo "$BOOT_PART $ROOT_PART $UUID_BOOT $UUID_ROOT $PARTUUID_BOOT $PARTUUID_ROOT"
+  echo "$BOOT_PART $ROOT_PART $UUID_BOOT $UUID_ROOT"
 }
 
 BootFormat () {
