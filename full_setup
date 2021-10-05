@@ -180,7 +180,7 @@ YesNoSel () {
   ;;
   [nN] | [nN][oO] ) eval "$i=0"
   ;;
-  *) YesNoSel "$1"
+  *) YesNoSel "$i" "$1"
   ;;
   esac
 }
