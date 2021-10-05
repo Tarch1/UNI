@@ -86,7 +86,7 @@ Environment () {
   cp ~/UNI/Conf_files/Script/pfetch ~/.pfetch
   cp ~/UNI/Conf_files/nanorc ~/.nanorc
   cp /etc/X11/xinit/xinitrc ~/.xinitrc
-  echo 'Xft.dpi: 90' > ~/.Xdefaults
+  echo 'Xft.dpi: 90' | tee -a ~/.Xdefaults > /dev/null
   echo "light -S 30" | sudo tee -a ~/.xprofile > /dev/null
   sudo cp ~/UNI/Conf_files/40-libinput.conf /usr/share/X11/xorg.conf.d/40-libinput.conf
   sudo ln -s /usr/share/X11/xorg.conf.d/40-libinput.conf /etc/X11/xorg.conf.d/40-libinput.conf
