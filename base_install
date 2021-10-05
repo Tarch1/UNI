@@ -419,25 +419,6 @@ BootloaderSel () {
 
 ########## INSTALLATION-PROCESS ##########
 
-InstallSteps () {
-  DistroChoice && stage="DistroChoice"
-  DiskPartition && stage="DiskPartition"
-  BootFormat && stage="BootFormat"
-  "$FSSel" && stage="$FSSel"
-  ExternalDriveSetup && stage="ExternalDriveSetup"
-  BaseSystemInstall && stage="BaseSystemInstall"
-  SyncTime && stage="SyncTime"
-  LocaleGen && stage="LocaleGen"
-  HostConfig && stage="HostConfig"
-  PackageConfig && stage="PackageConfig"
-  PackageInstall && stage="PackageInstall"
-  ServiceEnabler && stage="ServiceEnabler"
-  AudioSetup && stage="AudioSetup"
-  UserSetup && stage="UserSetup"
-  BootloaderInstall && stage="BootloaderInstall"
-  stage=end
-}
-
 YesNoSel () {
   read -rp "$1 $2 $3 [y/N]" YNS
   case "$YNS" in 
@@ -454,17 +435,33 @@ YesNoSel () {
 BaseInstallation () {
   SelectionSteps=( 'OperatingSystemSel' 'LocalizationSel' 'LanguageSel' 'TimezoneSel' 
   'HostnameSel' 'UsernameSel' 'PartIDSel' 'FilesystemSel' 'BootloaderSel' )
-  for i in "${SelectionSteps[@]}"; do
-  "$i"
+  
+  for s in "${SelectionSteps[@]}"; do
+  "$s"
   done
-  #DiskSel
-  InstallationSteps=( 'DistroChoice' 'DiskPartition' 'BootFormat' "$FSSel" 'ExternalDriveSetup' 
+  
+  ArchTixSteps=( 'DistroChoice' 'DiskPartition' 'BootFormat' "$FSSel" 'ExternalDriveSetup' 
   'BaseSystemInstall' 'SyncTime' 'LocaleGen' 'HostConfig' 'PackageConfig' 'PackageInstall' 
   'ServiceEnabler' 'AudioSetup' 'UserSetup' 'BootloaderInstall' )
-  for o in "${InstallationSteps[@]}"; do
-  "$o"
-  done 
-  #InstallSteps 
+  
+  case $OSSel in
+    1|Arch|arch) 
+    for a in "${ArchTixSteps[@]}"; do
+    "$a"
+    done
+    ;;
+    2|Artix|artix) 
+    for a in "${ArchTixSteps[@]}"; do
+    "$a"
+    done
+    ;;
+    3|Void|void) 
+    for a in "${VoidSteps[@]}"; do
+    "$a"
+    done
+    ;;
+    *) echo "Wrong choice, type again" && OperatingSystemSel
+  esac 
 }
 
 ########## PACKAGE ##########
