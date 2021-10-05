@@ -76,9 +76,8 @@ DiskPartition () {
   mmc) BOOT_PART="$DRIVE"1 && ROOT_PART="$DRIVE"2
   ;;
   esac
-  "$PIDSel"_BOOT=$(blkid -s "$PIDSel" -o value $BOOT_PART)
-  "$PIDSel"_ROOT=$(blkid -s "$PIDSel" -o value $ROOT_PART)
-  done
+  eval "$PIDSel"_BOOT="$(blkid -s "$PIDSel" -o value $BOOT_PART)"
+  eval "$PIDSel"_ROOT="$(blkid -s "$PIDSel" -o value $ROOT_PART)"
   #UUID_BOOT=$(blkid -s UUID -o value $BOOT_PART)
   #UUID_ROOT=$(blkid -s UUID -o value $ROOT_PART)
   #PARTUUID_BOOT=$(blkid -s PARTUUID -o value $BOOT_PART)
