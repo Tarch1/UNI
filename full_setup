@@ -124,11 +124,11 @@ cp ~/UNI/Conf_files/Bspwm/bspwmrc ~/.config/bspwm/bspwmrc
 chmod +x ~/.config/sxhkd/sxhkdrc
 chmod +x ~/.config/bspwm/bspwmrc
 ;;
-gnome ) sudo pacman -Syu lxappearance gnome
+gnome ) sudo pacman -Syu lxappearance xdg-desktop-portal-gtk gnome
 #gnome-shell gnome-control-center xdg-desktop-portal-gtk gnome-weather gnuchess gnome-chess gnome-calculator gnome-keyring evince
 sudo pacman -Syu gdm gdm-openrc
 trizen -Syu chrome-gnome-shell
-mkdir -p ~/{.wallpapers,.config}
+mkdir -p ~/{.wallpapers,.config/{kitty}}
 cp -r /media/internal_hdd/OS/Wallpapers/* ~/.wallpapers
 cp ~/UNI/Conf_files/kitty.conf ~/.config/kitty/kitty.conf
 cp ~/UNI/Conf_files/Script/pfetch ~/.pfetch
