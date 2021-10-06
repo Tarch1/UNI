@@ -95,12 +95,6 @@ DiskPartition () {
   esac
   eval "$PIDSel"_BOOT="$(blkid -s "$PIDSel" -o value $BOOT_PART)"
   eval "$PIDSel"_ROOT="$(blkid -s "$PIDSel" -o value $ROOT_PART)"
-  #UUID_BOOT=$(blkid -s UUID -o value $BOOT_PART)
-  #UUID_ROOT=$(blkid -s UUID -o value $ROOT_PART)
-  #PARTUUID_BOOT=$(blkid -s PARTUUID -o value $BOOT_PART)
-  #PARTUUID_ROOT=$(blkid -s PARTUUID -o value $ROOT_PART)
-  #BOOT_PART="$(ls ${DRIVE}* | grep -E "^${DRIVE}p?1$")"
-  #ROOT_PART="$(ls ${DRIVE}* | grep -E "^${DRIVE}p?2$")"
   echo "$BOOT_PART $ROOT_PART $UUID_BOOT $UUID_ROOT"
 }
 
@@ -116,9 +110,10 @@ BtrfsFormat () {
   btrfsdep="snapper btrfs-progs"
   #btrfs filesystem label "$ROOT_PART" "$rootlabel"
   mount "$ROOT_PART" /mnt
-  btrfs su cr /mnt/@
-  btrfs su cr /mnt/@home
-  btrfs su cr /mnt/@snapshots
+  SubVol=('@' '@home' '@snapshots')
+  for b in "${SubVol[@]}"; do
+  btrfs su cr /mnt/"$b"
+  done
   umount /mnt
   mount -o noatime,compress=lzo,space_cache=v2,subvol=@ "$ROOT_PART" /mnt
   mkdir -p /mnt/{boot,home,.snapshots}
@@ -155,11 +150,10 @@ BaseSystemInstall () {
 SyncTime () {
   "$chroot" /mnt ln -sf /usr/share/zoneinfo/"$TZSel" /etc/localtime
   "$chroot" /mnt hwclock --systohc --utc
-  #echo "TIMEZONE=$TZSel" >> /mnt/etc/rc.conf
-  #echo "HARDWARECLOCK=$HARDWARECLOCK" >> /mnt/etc/rc.conf
-  #echo "KEYMAP=$KEYMAP" >> /mnt/etc/rc.conf
-  #echo "FONT=$FONT" >> /mnt/etc/rc.conf
-  #echo "TTYS=$TTYS" >> /mnt/etc/rc.conf
+  #RcConf=("HARDWARECLOCK=$HARDWARECLOCK" "KEYMAP=$KEYMAP" "FONT=$FONT" "TTYS=$TTYS")
+  #for rc in "${RcConf[@]}"; do
+  #echo "$rc" >> /mnt/etc/rc.conf
+  #done
 }
 
 LocaleGen () {
@@ -209,9 +203,18 @@ PackageInstall () {
 }
 
 ServiceEnabler () {
-  "$chroot" /mnt $initc0 $initc1 NetworkManager $initc2
-  "$chroot" /mnt $initc0 $initc1 cupsd $initc2
-  "$chroot" /mnt $initc0 $initc1 avahi-daemon $initc2
+  "$chroot" /mnt << EOF
+  ServiceSel=('NetworkManager' 'cupsd' 'avahi-daemon')
+  for c in  "${ServiceSel[@]}"
+  "$chroot" /mnt $initc0 $initc1 "$c" $initc2
+  done
+  echo 'done with EOF'
+  EOF
+  echo 'done with EOF'
+  ServiceSel=('NetworkManager' 'cupsd' 'avahi-daemon')
+  for c in  "${ServiceSel[@]}"
+  "$chroot" /mnt $initc0 $initc1 "$c" $initc2
+  done
   #"$chroot" /mnt $initc0 $initc1 keymaps $initc2
   #"$chroot" /mnt tlp start || true
 }
