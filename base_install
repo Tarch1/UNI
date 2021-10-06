@@ -88,29 +88,32 @@ BootFormat () {
   #mlabel -i "$BOOT_PART" ::"$bootlabel"
 }
 
-BtrfsFormat () {
-  mkfs.btrfs -f -L "$rootlabel" "$ROOT_PART"
-  btrfsdep="snapper btrfs-progs"
-  #btrfs filesystem label "$ROOT_PART" "$rootlabel"
-  mount "$ROOT_PART" /mnt
-  SubVol=('@' '@home' '@snapshots')
-  for b in "${SubVol[@]}"; do
-  btrfs su cr /mnt/"$b"
-  done
-  umount /mnt
-  mount -o noatime,compress=lzo,space_cache=v2,subvol=@ "$ROOT_PART" /mnt
-  mkdir -p /mnt/{boot,home,.snapshots}
-  mount -o noatime,compress=lzo,space_cache=v2,subvol=@home "$ROOT_PART" /mnt/home
-  mount -o noatime,compress=lzo,space_cache=v2,discard=async,subvol=@snapshots "$ROOT_PART" /mnt/.snapshots
-  mount "$BOOT_PART" /mnt/boot
-  lsblk -f
-  modules="btrfs"
-}
-
-Ext4Format () {
-  mkfs.ext4 "$ROOT_PART" "$rootlabel"
-  #e2label "$ROOT_PART" "$rootlabel"
-  mount "$ROOT_PART" /mnt
+RootFormat () {
+  case "$FSSel" in
+    ext4)
+    mkfs.ext4 "$ROOT_PART" "$rootlabel"
+    #e2label "$ROOT_PART" "$rootlabel"
+    mount "$ROOT_PART" /mnt
+    ;;
+    btrfs)
+    mkfs.btrfs -f -L "$rootlabel" "$ROOT_PART"
+    btrfsdep="snapper btrfs-progs"
+    modules="btrfs"
+    #btrfs filesystem label "$ROOT_PART" "$rootlabel"
+    mount "$ROOT_PART" /mnt
+    SubVol=('@' '@home' '@snapshots')
+    for b in "${SubVol[@]}"; do
+      btrfs su cr /mnt/"$b"
+    done
+    umount /mnt
+    mount -o noatime,compress=lzo,space_cache=v2,subvol=@ "$ROOT_PART" /mnt
+    mkdir -p /mnt/{home,.snapshots}
+    mount -o noatime,compress=lzo,space_cache=v2,subvol=@home "$ROOT_PART" /mnt/home
+    mount -o noatime,compress=lzo,space_cache=v2,discard=async,subvol=@snapshots "$ROOT_PART" /mnt/.snapshots
+    ;;
+    *)
+    ;;
+  esac
   mkdir /mnt/boot
   mount "$BOOT_PART" /mnt/boot
   lsblk -f
