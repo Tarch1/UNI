@@ -42,13 +42,13 @@ GraphicSel () { #{{{
 		echo Intel
 		VIDEO_DRIVER="intel"
 	else
-		echo VESA
-		VIDEO_DRIVER="vesa"
+		echo Generic
+		VIDEO_DRIVER="generic"
 	fi
-	if [[ $VIDEO_DRIVER == intel || $VIDEO_DRIVER == vesa ]]; then
+	if [[ $VIDEO_DRIVER == intel || $VIDEO_DRIVER == generic ]]; then
 	echo -en "Confirm video driver: 1) Intel (xf) 2) Mesa \n"
-	read intelvesa
-	case $intelvesa in
+	read IntelVesa
+	case "$IntelVesa" in
 	1)VIDEO_DRIVER=xf86-intel;;
 	2)VIDEO_DRIVER=mesa;;
 	*)VIDEO_DRIVER=mesa;;
