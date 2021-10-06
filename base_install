@@ -49,23 +49,6 @@ echo "$OSSel selected, then proceed"
   esac
 }
 
-UEFISel () {
-  if [[ "$(cat /sys/class/dmi/id/sys_vendor)" == 'Apple Inc.' ]] || [[ "$(cat /sys/class/dmi/id/sys_vendor)" == 'Apple Computer, Inc.' ]]
-  then modprobe -r -q efivars || true # if MAC
-	else	modprobe -q efivarfs # all others
-	fi
-	if [[ -d "/sys/firmware/efi/" ]]
-  then
-		## Mount efivarfs if it is not already mounted
-		if (mount | grep /sys/firmware/efi/efivars)
-    then mount -t efivarfs efivarfs /sys/firmware/efi/efivars
-		fi
-		Uefi=1 && echo "UEFI Mode detected"
-	else
-		Uefi=0 && echo "BIOS Mode detected"
-	fi
-}
-
 DiskPartition () {
   umount -R /mnt 
   "$pkgmanager" -Sy $pkgskips parted gptfdisk mtools ntfs-3g dialog
