@@ -414,21 +414,13 @@ BootloaderSel () {
   echo -en "Enter preferred bootloader : 1) Refind 2) Grub 3) Efistub \n"
   read BLSel
   case $BLSel in
-    1|REFIND|refind)
-      echo "bootloader selected : refind"
-      BLSel="refind"
+    1|REFIND|refind) BLSel="refind" && echo "bootloader selected : refind"
     ;;
-    2|GRUB|grub)
-      echo "bootloader selected : grub"
-      BLSel="grub"
+    2|GRUB|grub) BLSel="grub" && echo "bootloader selected : grub"
     ;;
-    3|EFISTUB|efistub)
-      echo "bootloader selected : efistub"
-      BLSel="efistub"
+    3|EFISTUB|efistub) BLSel="efistub" && echo "bootloader selected : efistub"
     ;;
-    *)
-      echo "Wrong bootloader selected, try one of those provided"
-      BootloaderSel
+    *) echo "Wrong bootloader selected, try one of those provided" && BootloaderSel
     ;;
   esac
 }
@@ -438,13 +430,16 @@ BootloaderSel () {
 YesNoSel () {
   read -rp "$1 $2 $3 [y/N]" YNS
   case "$YNS" in 
-  [yY] | [yY][eE][sS] ) eval "$u=1"
-  CC=1
-  ;;
-  [nN] | [nN][oO] ) eval "$u=0"
-  ;;
-  *) YesNoSel "$1"
-  ;;
+    [yY] | [yY][eE][sS])
+    eval "$u=1"
+    CC=1
+    ;;
+    [nN] | [nN][oO]) 
+    eval "$u=0"
+    CC=0
+    ;;
+    *) YesNoSel "$1"
+    ;;
   esac
 }
 
