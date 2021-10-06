@@ -16,19 +16,10 @@ UEFISel () {
 	fi
 }
 
-GraphicFind () {
-  _vga=$(lspci | grep VGA | tr "[:upper:]" "[:lower:]")
-  _vga_length=$(lspci | grep VGA | wc -l)
-  if [[ $_vga_length -eq 2 ]] && [[ -n $(echo "${_vga}" | grep "nvidia") || -f /sys/kernel/debug/dri/0/vbios.rom ]]; then
-    echo Optimus
-    VIDEO_DRIVER="optimus"
-  fi
-}
-
-gg () { #{{{
-	echo " Detecting video chipset "
-	GCard=$(lspci | grep VGA | tr "[:upper:]" "[:lower:]")
-	GCard_length=$(lspci | grep -c VGA)
+GraphicSel () { #{{{
+  echo " Detecting video chipset "
+  GCard=$(lspci | grep VGA | tr "[:upper:]" "[:lower:]")
+  GCard_length=$(lspci | grep -c VGA)
 
   if echo "$GCard" | grep -q 'nvidia' && [[ $GCard_length -eq 2 ]]; then 
     echo Optimus driver 
