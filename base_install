@@ -49,6 +49,23 @@ echo "$OSSel selected, then proceed"
   esac
 }
 
+UEFISel () {
+  if [[ "$(cat /sys/class/dmi/id/sys_vendor)" == 'Apple Inc.' ]] || [[ "$(cat /sys/class/dmi/id/sys_vendor)" == 'Apple Computer, Inc.' ]]
+  then modprobe -r -q efivars || true # if MAC
+	else	modprobe -q efivarfs # all others
+	fi
+	if [[ -d "/sys/firmware/efi/" ]]
+  then
+		## Mount efivarfs if it is not already mounted
+		if (mount | grep /sys/firmware/efi/efivars)
+    then mount -t efivarfs efivarfs /sys/firmware/efi/efivars
+		fi
+		Uefi=1 && echo "UEFI Mode detected"
+	else
+		Uefi=0 && echo "BIOS Mode detected"
+	fi
+}
+
 DiskPartition () {
   umount -R /mnt 
   "$pkgmanager" -Sy $pkgskips parted gptfdisk mtools ntfs-3g dialog
@@ -261,14 +278,10 @@ OperatingSystemSel () {
   echo -en "Enter the distro we are going to setup : 1) Arch 2) Artix 3) Void \n"
   read  OSSel
   case $OSSel in
-    1|Arch|arch) echo "distro selected : Arch" && OSSel="Arch"
-    ;;
-    2|Artix|artix) echo "distro selected : Artix" && OSSel="Artix"
-    ;;
-    3|Void|void) echo "distro selected : Void" && OSSel="Void"
-    ;;
-    *) echo "Wrong choice, type again" && OperatingSystemSel
-    ;;
+    1|Arch|arch) echo "distro selected : Arch" && OSSel="Arch" ;;
+    2|Artix|artix) echo "distro selected : Artix" && OSSel="Artix" ;;
+    3|Void|void) echo "distro selected : Void" && OSSel="Void" ;;
+    *) echo "Wrong choice, type again" && OperatingSystemSel ;;
   esac
 }
 
@@ -287,12 +300,9 @@ VoidInstMethod () {
   echo -en "Enter installation type : 1) XBPS 2) ROOTFS \n"
   read VIMethod
   case $VIMethod in
-    1|XBPS|xbps) echo "Selected : Arch" && VIMethod="XBPS"
-    ;;
-    2|ROOTFS|rootfs) echo "Selected : Artix" && VIMethod="ROOTFS"
-    ;;
-    *) echo "Wrong choice, type again" && VoidInstMethod
-    ;;
+    1|XBPS|xbps) echo "Selected : Arch" && VIMethod="XBPS" ;;
+    2|ROOTFS|rootfs) echo "Selected : Artix" && VIMethod="ROOTFS" ;;
+    *) echo "Wrong choice, type again" && VoidInstMethod ;;
   esac
 }
 
@@ -300,12 +310,9 @@ LibrarySel () {
   echo -en "Enter base library name : 1) GLIBC 2) MUSL \n"
   read LibSel
   case $LibSel in
-  1|GLIBC|glibc) echo "Selected : Arch" && LibSel="GLIBC"
-  ;;
-  2|MUSL|musl) echo "Selected : Artix" && LibSel="MUSL"
-  ;;
-  *) echo "Wrong choice, type again" && LibrarySel
-  ;;
+  1|GLIBC|glibc) echo "Selected : Arch" && LibSel="GLIBC" ;;
+  2|MUSL|musl) echo "Selected : Artix" && LibSel="MUSL" ;;
+  *) echo "Wrong choice, type again" && LibrarySel ;;
   esac
 }
 
@@ -358,12 +365,21 @@ UsernameSel () {
 }
 
 TimezoneSel () {
-  echo -en "The timezone default choice is Europe/Rome \n if you want another type with the same format : "
+  echo -en " Select Timezone : 1) Europe/Rome \n or type another with the same format "
   read TZSel
-  if [ $TZSel ]
-  then echo "Selected : $TZSel"
-  else TZSel="Europe/Rome"
-  fi
+  case $TZSel in
+    1|Europe/Rome|Rome) echo "Selected : Europe/Rome" && TZSel="Europe/Rome"
+    ;;
+    q|quit|exit) TZSel=""
+    ;;
+    *)
+    YesNoSel "Want this for timezone : $TZSel ?"
+    if [ "$CC" = 1 ]
+    then echo "OK, timezone selected $TZSel"
+    else echo "Then again" && TimezoneSel
+    fi
+    ;;
+  esac
 }
 
 PartIDSel () {
@@ -449,18 +465,15 @@ BaseInstallation () {
   echo "$OSSel"
   case "$OSSel" in
     1|Arch|arch) 
-    for a in "${ArchTixSteps[@]}"; do
-    "$a"
+    for a in "${ArchTixSteps[@]}"; do "$a"
     done
     ;;
     2|Artix|artix) 
-    for a in "${ArchTixSteps[@]}"; do
-    "$a"
+    for a in "${ArchTixSteps[@]}"; do "$a"
     done
     ;;
     3|Void|void) 
-    for a in "${VoidSteps[@]}"; do
-    "$a"
+    for a in "${VoidSteps[@]}"; do "$a"
     done
     ;;
     *) echo "Wrong choice, type again" && OperatingSystemSel
