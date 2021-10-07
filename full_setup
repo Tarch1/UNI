@@ -23,7 +23,8 @@ Snapper () {
   snapper -c root create-config /
   btrfs su del /.snapshots
   mkdir /.snapshots
-  chmod 750 /.snapshots "
+  chmod 750 /.snapshots
+  "
   
   sudo sed -i 's/ALLOW_USERS=""/ALLOW_USERS="tarch1"/g' /etc/snapper/configs/root
   sudo sed -i 's/TIMELINE_LIMIT_HOURLY="10"/TIMELINE_LIMIT_HOURLY="3"/g' /etc/snapper/configs/root
@@ -37,7 +38,8 @@ Snapper () {
   chown :tarch1 /.snapshots
   mkdir /etc/pacman.d/hooks
   cp ~/UNI/Conf_files/50-bootbackup.hook /etc/pacman.d/hooks/50-bootbackup.hook
-  pacman -S rsync --noconfirm "
+  pacman -S rsync --noconfirm
+  "
   
 #sudo systemctl enable snapper-timeline.timer
 #sudo systemctl enable snapper-cleanup.timer
@@ -104,11 +106,13 @@ Environment () {
 }
 
 DisplayManager () {
-  sudo pacman -Sy lightdm lightdm-openrc lightdm-webkit2-greeter lightdm-webkit-theme-litarvan
-  sudo sed -i 's/#greeter-session=example-gtk-gnome/greeter-session=lightdm-webkit2-greeter/' /etc/lightdm/lightdm.conf
-  sudo sed -i 's/antergos/litarvan/g' /etc/lightdm/lightdm-webkit2-greeter.conf
-  sudo rc-update add lightdm default
-  sudo systemctl enable lightdm
+  sudo -- bash -c "
+  pacman -Sy lightdm lightdm-openrc lightdm-webkit2-greeter lightdm-webkit-theme-litarvan
+  sed -i 's/#greeter-session=example-gtk-gnome/greeter-session=lightdm-webkit2-greeter/' /etc/lightdm/lightdm.conf
+  sed -i 's/antergos/litarvan/g' /etc/lightdm/lightdm-webkit2-greeter.conf
+  rc-update add lightdm default
+  systemctl enable lightdm
+  "
 }
 function WindowManager () {
   read -rp "What setup you want? [bspwm gnome herbstluftwm xmonad polybar] " SS
