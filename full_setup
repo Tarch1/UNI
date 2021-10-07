@@ -1,24 +1,19 @@
 #!/bin/bash
-Part=( 'Snapper' 'Trizen' 'Environment' 'DisplayManager' 'WindowManager' )
 Installation () {
+  local Part=( 'Snapper' 'Trizen' 'Environment' 'DisplayManager' 'WindowManager' )
+  local Steps=()
+  local CT=0
   for i in "${Part[@]}"; do
   YesNoSel "You need" "$i" "?"
+  if [[ "$i" == "${Part[CT]}" ]] && [[ "$CC" == 1 ]]; then Steps["$CT"]="$i"
+  else unset "Steps[$CT]"
+  fi
+  CT=$((CT + 1))
   done
-  if [ "$Snapper" = 1 ]; then
-  Snapper
-  fi
-  if [ "$Trizen" = 1 ]; then
-  Trizen
-  fi
-  if [ "$Environment" = 1 ]; then
-  Environment
-  fi
-  if [ "$DisplayManager" = 1 ]; then
-  DisplayManager
-  fi
-  if [ "$WindowManager" = 1 ]; then
-  WindowManager
-  fi
+  
+  for i in "${Steps[@]}"; do
+  "$i"
+  done
 }
 
 Snapper () {
@@ -114,7 +109,7 @@ DisplayManager () {
   sudo systemctl enable lightdm
 }
 function WindowManager () {
-  read -rp "What setup you want? [bspwm gnome herbstluftwm xmonad polybar]" SS
+  read -rp "What setup you want? [bspwm gnome herbstluftwm xmonad polybar] " SS
   case $SS in
 bspwm ) sudo pacman -S bspwm sxhkd --noconfirm
 mkdir ~/.config/{bspwm,sxhkd}
@@ -163,24 +158,25 @@ cp ~/UNI/Conf_files/Polybar/config ~/.config/polybar/config
 chmod +x ~/.config/polybar/launch.sh
 chmod +x ~/.config/polybar/hide
 ;;
-*) YesNoSel "Want another WindowManager?"
+*) echo "Wrong choice, type again" && WindowManager
+;;
+esac
+YesNoSel "Want another WindowManager?"
 if [ "$CC" = 1 ]
 then WindowManager
 else echo "Nothing"
 fi
-;;
-esac
 }
-
 YesNoSel () {
-  read -rp "$1 $2 $3 [y/N]" YNS
+  read -rp "$1 $2 $3 [y/N] " YNS
   case "$YNS" in 
-  [yY] | [yY][eE][sS] ) eval "$i=1"
+  [yY] | [yY][eE][sS] ) 
   CC=1
   ;;
-  [nN] | [nN][oO] ) eval "$i=0"
+  [nN] | [nN][oO] )
+  CC=0
   ;;
-  *) YesNoSel "$i" "$1"
+  *) echo "Wrong choice, type again" && YesNoSel "$1" "$i"
   ;;
   esac
 }
