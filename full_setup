@@ -142,6 +142,7 @@ cp -r /usr/share/pipewire /etc/
 #cp -r ~/UNI/Conf_files/pipewire/ ~/.config/autostart
 sudo rc-update add gdm default
 sudo systemctl enable gdm
+echo "MOZ_ENABLE_WAYLAND=1" | sudo tee -a /etc/environment > /dev/null
 ;;
 herbstluftwm ) sudo pacman -S herbstluftwm --noconfirm
 mkdir ~/.config/herbstluftwm
