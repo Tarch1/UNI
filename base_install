@@ -187,14 +187,7 @@ PackageInstall () {
 }
 
 ServiceEnabler () {
-  "$chroot" /mnt << EOF
-  ServiceSel=('NetworkManager' 'cupsd' 'avahi-daemon')
-  for c in  "${ServiceSel[@]}"
-  "$chroot" /mnt $initc0 $initc1 "$c" $initc2
-  done
-  echo 'done with EOF'
-  EOF
-  echo 'done with EOF'
+  #"$chroot" /mnt << EOF
   ServiceSel=('NetworkManager' 'cupsd' 'avahi-daemon')
   for c in  "${ServiceSel[@]}"
   "$chroot" /mnt $initc0 $initc1 "$c" $initc2
