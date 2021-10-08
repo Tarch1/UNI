@@ -1,4 +1,13 @@
 #!/bin/bash
+ArchitectureSel () {
+  case "$(uname -m)" in
+    aarch64) ;;
+    i686) ;;
+    x86_64) ;;
+  esac
+}
+
+
 UEFISel () {
   if [[ "$(cat /sys/class/dmi/id/sys_vendor)" == 'Apple Inc.' ]] || [[ "$(cat /sys/class/dmi/id/sys_vendor)" == 'Apple Computer, Inc.' ]]
   then modprobe -r -q efivars || true # if MAC
