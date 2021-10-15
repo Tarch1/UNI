@@ -1,52 +1,52 @@
 #!/bin/bash
 ArchitectureSel () {
-  case "$(uname -m)" in
-    aarch64) ;;
-    i686) ;;
-    x86_64) ;;
-  esac
+	case "$(uname -m)" in
+		aarch64) ;;
+		i686) ;;
+		x86_64) ;;
+	esac
 }
 
 
 UEFISel () {
-  if [[ "$(cat /sys/class/dmi/id/sys_vendor)" == 'Apple Inc.' ]] || [[ "$(cat /sys/class/dmi/id/sys_vendor)" == 'Apple Computer, Inc.' ]]
-  then modprobe -r -q efivars || true # if MAC
+	if [[ "$(cat /sys/class/dmi/id/sys_vendor)" == 'Apple Inc.' ]] || [[ "$(cat /sys/class/dmi/id/sys_vendor)" == 'Apple Computer, Inc.' ]]
+	then modprobe -r -q efivars || true # if MAC
 	else	modprobe -q efivarfs # all others
 	fi
+	
 	if [[ -d "/sys/firmware/efi/" ]]
-  then
-		## Mount efivarfs if it is not already mounted
+  	then	## Mount efivarfs if it is not already mounted
 		if (mount | grep /sys/firmware/efi/efivars)
-    then mount -t efivarfs efivarfs /sys/firmware/efi/efivars
+		then mount -t efivarfs efivarfs /sys/firmware/efi/efivars
 		fi
-		Uefi=1 && echo "UEFI Mode detected"
+	Uefi=1 && echo "UEFI Mode detected"
 	else
-		Uefi=0 && echo "BIOS Mode detected"
+	Uefi=0 && echo "BIOS Mode detected"
 	fi
 }
 
 GraphicSel () { #{{{
-  echo " Detecting video chipset "
-  GCard=$(lspci | grep VGA | tr "[:upper:]" "[:lower:]")
-  GCard_length=$(lspci | grep -c VGA)
+	echo " Detecting video chipset "
+	GCard=$(lspci | grep VGA | tr "[:upper:]" "[:lower:]")
+	GCard_length=$(lspci | grep -c VGA)
 
-  if echo "$GCard" | grep -q 'nvidia' && [[ $GCard_length -eq 2 ]]; then 
-    echo Optimus driver 
-    VIDEO_DRIVER="prime"
+	if echo "$GCard" | grep -q 'nvidia' && [[ $GCard_length -eq 2 ]]; then 
+	echo Optimus driver 
+	VIDEO_DRIVER="prime"
 	elif echo "$GCard" | grep -q "nvidia"; then
 		echo Nvidia
 		YesNoSel "Install NVIDIA proprietary driver" "$BETTER_VIDEO_DRIVER"
 		if [[ $CC == 1 ]]; then VIDEO_DRIVER="nvidia"
 		elif [[ $CC == 0 ]]; then	VIDEO_DRIVER="nouveau"
 		else echo 'something wrong'
-    fi
+		fi
 	elif echo "$GCard" | grep -q 'advanced micro devices'; then
 		echo AMD/ATI
 		YesNoSel "Install AMDGPU driver" "$BETTER_VIDEO_DRIVER"
 		if [[ $CC == 1 ]]; then VIDEO_DRIVER="amdgpu"
 		elif [[ $CC == 0 ]]; then	VIDEO_DRIVER="ati"
 		else echo 'something wrong'
-	  fi
+		fi
 	elif echo "$GCard" | grep -q "intel corporation"; then
 		echo Intel
 		VIDEO_DRIVER="intel"
@@ -55,12 +55,12 @@ GraphicSel () { #{{{
 		VIDEO_DRIVER="generic"
 	fi
 	if [[ $VIDEO_DRIVER == intel || $VIDEO_DRIVER == generic ]]; then
-	echo -en "Confirm video driver: 1) Intel (xf) 2) Mesa \n"
-	read IntelVesa
-	case "$IntelVesa" in
-	1)VIDEO_DRIVER=xf86-intel;;
-	2)VIDEO_DRIVER=mesa;;
-	*)VIDEO_DRIVER=mesa;;
-  esac
-  fi
+		echo -en "Confirm video driver: 1) Intel (xf) 2) Mesa \n"
+		read IntelVesa
+		case "$IntelVesa" in
+			1)VIDEO_DRIVER=xf86-intel;;
+			2)VIDEO_DRIVER=mesa;;
+			*)VIDEO_DRIVER=mesa;;
+		esac
+	fi
 }
