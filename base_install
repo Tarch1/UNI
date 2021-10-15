@@ -262,6 +262,15 @@ BootloaderInstall () {
 
 ########## PERSONALIZATION-SCRIPT ##########
 
+VirtualBoxTest () {
+  YesNoSel "If is a Virtualbox installation for test the script? :"
+  if [ "$CC" = 1 ]
+  then echo "OK, skip all check $VBTSel" && VBTSel=TestSteps
+  elif [ "$CC" = q ]; then VBTSel=''
+  else echo "Do again please" && VirtualBoxTest
+  fi
+}
+
 OperatingSystemSel () {
   echo -en "Enter the distro we are going to setup : 1) Arch 2) Artix 3) Void \n"
   read -r OSSel
@@ -374,11 +383,11 @@ PartIDSel () {
   echo -en "Enter partition identifier : 1) UUID 2) PARTUUID 3) LABEL \n"
   read -r PIDSel
   case $PIDSel in
-    1|UUID|uuid) echo "Selected : UUID" && PIDSel="UUID"
+    1|UUID|uuid) echo "Selected : UUID" && PIDSel=UUID
     ;;
-    2|PARTUUID|partuuid) echo "Selected : PARTUUID" && PIDSel="PARTUUID"
+    2|PARTUUID|partuuid) echo "Selected : PARTUUID" && PIDSel=PARTUUID
     ;;
-    3|LABEL|label) echo "Selected : LABEL" && PIDSel="LABEL"
+    3|LABEL|label) echo "Selected : LABEL" && PIDSel=LABEL
     ;;
     *) echo "Wrong choice, type again" && PartIDSel
     ;;
@@ -432,8 +441,20 @@ YesNoSel () {
 }
 
 BaseInstallation () {
+  if [ "$VBTSel" = TestSteps ]; then 
+  SelectionSteps=('OperatingSystemSel')
+  LangSel="en_GB.UTF-8" 
+  LocSel="en_GB.UTF-8" 
+  HNSel=tarch1 
+  UNSel=tarch1 
+  TZSel="Europe/Rome" 
+  PIDSel="UUID" 
+  FSSel=BtrfsFormat 
+  BLSel="refind"
+  else
   SelectionSteps=( 'OperatingSystemSel' 'LocalizationSel' 'LanguageSel' 'TimezoneSel' 
   'HostnameSel' 'UsernameSel' 'PartIDSel' 'FilesystemSel' 'BootloaderSel' )
+  fi
   
   for s in "${SelectionSteps[@]}"; do
   "$s"
@@ -453,7 +474,7 @@ BaseInstallation () {
     ;;
     2|Artix|artix) 
     for a in "${ArchTixSteps[@]}"; do "$a"
-    done
+    done$DRIVE
     ;;
     3|Void|void) 
     for a in "${VoidSteps[@]}"; do "$a"
