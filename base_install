@@ -126,7 +126,7 @@ ExternalDriveSetup () {
 }
 
 BaseSystemInstall () {
-  local BasePKG=( "$linux" "$init" "$btrfsdep" "$elogind" ) 
+  local BasePKG=( $linux $init $btrfsdep $elogind ) 
   "$pkgstrap" /mnt $microcode
   "$pkgstrap" /mnt "${BasePKG[@]}"
   rm /mnt/etc/fstab
@@ -182,9 +182,9 @@ PackageConfig () {
 }
 
 PackageInstall () {
-  EssentialPKG=( "$dev" "$fs" "$net" "$audio" "$filemanager" "$baseutils" "$media" "$rcpacks" )
-  AdditivePKG=( "$vulkan" "$hardwareacceleration" "$nvidiagraphics" "$print" "$apps" "$bluetooth" "$android" "$archive")
-  ExtraPKG=( "$xorg" )
+  EssentialPKG=( $dev $fs $net $audio $filemanager $baseutils $media $rcpacks )
+  AdditivePKG=( $vulkan $hardwareacceleration $nvidiagraphics $print $apps $bluetooth $android $archive )
+  ExtraPKG=( $xorg )
   "$chroot" /mnt "$pkgmanager" -Syu "$pkgskips" "${EssentialPKG[@]}"
   #"$chroot" /mnt "$pkgmanager" -Syu 
   #cp ../UNI/Conf_files/mkinitcpio.conf /mnt/etc
