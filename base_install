@@ -386,9 +386,9 @@ FilesystemSel () {
   echo -en "Enter base filesystem : 1) EXT4 2) BTRFS \n"
   read FSSel
   case $FSSel in
-    1|EXT4|ext4) echo "Selected : EXT4" && FSSel="Ext4Format"
+    1|EXT4|ext4) echo "Selected : EXT4"
     ;;
-    2|BTRFS|btrfs) echo "Selected : BTRFS" && FSSel="BtrfsFormat"
+    2|BTRFS|btrfs) echo "Selected : BTRFS"
     ;;
     *) echo "Wrong filesystem selected, try one of those provided" && FilesystemSel
     ;;
@@ -436,11 +436,11 @@ BaseInstallation () {
   "$s"
   done
   
-  ArchTixSteps=( 'DistroChoice' 'DiskPartition' 'BootFormat' "$FSSel" 'ExternalDriveSetup' 
+  ArchTixSteps=( 'DistroChoice' 'DiskPartition' 'BootFormat' 'RootFormat' 'ExternalDriveSetup' 
   'BaseSystemInstall' 'SyncTime' 'LocaleGen' 'HostConfig' 'PackageConfig' 'PackageInstall' 
   'ServiceEnabler' 'AudioSetup' 'UserSetup' 'BootloaderInstall' )
   
-  VoidSteps=( 'DistroChoice' 'DiskPartition' 'BootFormat' "$FSSel" 'ExternalDriveSetup' )
+  VoidSteps=( 'DistroChoice' 'DiskPartition' 'BootFormat' 'RootFormat' 'ExternalDriveSetup' )
   
   echo "$OSSel"
   case "$OSSel" in
