@@ -441,6 +441,7 @@ YesNoSel () {
 }
 
 BaseInstallation () {
+  VirtualBoxTest
   if [ "$VBTSel" = TestSteps ]; then 
   SelectionSteps=('OperatingSystemSel')
   LangSel="en_GB.UTF-8" 
@@ -474,7 +475,7 @@ BaseInstallation () {
     ;;
     2|Artix|artix) 
     for a in "${ArchTixSteps[@]}"; do "$a"
-    done$DRIVE
+    done
     ;;
     3|Void|void) 
     for a in "${VoidSteps[@]}"; do "$a"
