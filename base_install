@@ -90,12 +90,12 @@ BootFormat () {
 
 RootFormat () {
   case "$FSSel" in
-    ext4)
+    Ext4Format)
     mkfs.ext4 "$ROOT_PART" "$rootlabel"
     #e2label "$ROOT_PART" "$rootlabel"
     mount "$ROOT_PART" /mnt
     ;;
-    btrfs)
+    BtrfsFormat)
     mkfs.btrfs -f -L "$rootlabel" "$ROOT_PART"
     btrfsdep="snapper btrfs-progs"
     modules="btrfs"
@@ -386,9 +386,9 @@ FilesystemSel () {
   echo -en "Enter base filesystem : 1) EXT4 2) BTRFS \n"
   read FSSel
   case $FSSel in
-    1|EXT4|ext4) echo "Selected : EXT4"
+    1|EXT4|ext4) echo "Selected : EXT4" && "$FSSel"=BtrfsFormat
     ;;
-    2|BTRFS|btrfs) echo "Selected : BTRFS"
+    2|BTRFS|btrfs) echo "Selected : BTRFS" && "$FSSel"=Ext4Format
     ;;
     *) echo "Wrong filesystem selected, try one of those provided" && FilesystemSel
     ;;
