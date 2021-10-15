@@ -76,8 +76,8 @@ DiskPartition () {
   mmc) BOOT_PART="$DRIVE"1 && ROOT_PART="$DRIVE"2
   ;;
   esac
-  eval "$PIDSel"_BOOT="$(blkid -s "$PIDSel" -o value $BOOT_PART)"
-  eval "$PIDSel"_ROOT="$(blkid -s "$PIDSel" -o value $ROOT_PART)"
+  eval "$PIDSel"_BOOT="$(blkid -s "$PIDSel" -o value "$BOOT_PART")"
+  eval "$PIDSel"_ROOT="$(blkid -s "$PIDSel" -o value "$ROOT_PART")"
   echo "$BOOT_PART $ROOT_PART $UUID_BOOT $UUID_ROOT"
 }
 
@@ -120,7 +120,7 @@ RootFormat () {
 }
 
 ExternalDriveSetup () {
-  if [[ $(echo "${EXT_DRIVE}" | sed 's/ //g') == "" ]]; then echo 'No secondary drive to setup'
+  if [[ "$EXT_DRIVE" == "" ]]; then echo 'No secondary drive to setup'
   else
   sudo ntfsfix /dev/sda1
   mkdir -p /mnt/media/{internal_hdd,USB}
