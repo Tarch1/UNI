@@ -120,9 +120,12 @@ RootFormat () {
 }
 
 ExternalDriveSetup () {
+  if [[ $(echo "${EXT_DRIVE}" | sed 's/ //g') == "" ]]; then echo 'No secondary drive to setup'
+  else
   sudo ntfsfix /dev/sda1
   mkdir -p /mnt/media/{internal_hdd,USB}
   mount "$EXT_DRIVE" /mnt/media/internal_hdd
+  fi
 }
 
 BaseSystemInstall () {
@@ -184,7 +187,7 @@ PackageConfig () {
 PackageInstall () {
   EssentialPKG=( $dev $fs $net $audio $filemanager $baseutils $media $rcpacks )
   AdditivePKG=( $vulkan $hardwareacceleration $nvidiagraphics $print $apps $bluetooth $android $archive )
-  ExtraPKG=( $xorg )
+  ExtraPKG=( $xorg $filemanager $media )
   "$chroot" /mnt "$pkgmanager" -Syu "$pkgskips" "${EssentialPKG[@]}"
   #"$chroot" /mnt "$pkgmanager" -Syu 
   #cp ../UNI/Conf_files/mkinitcpio.conf /mnt/etc
@@ -261,7 +264,7 @@ BootloaderInstall () {
 
 OperatingSystemSel () {
   echo -en "Enter the distro we are going to setup : 1) Arch 2) Artix 3) Void \n"
-  read  OSSel
+  read -r OSSel
   case $OSSel in
     1|Arch|arch) echo "distro selected : Arch" && OSSel="Arch" ;;
     2|Artix|artix) echo "distro selected : Artix" && OSSel="Artix" ;;
@@ -273,7 +276,7 @@ OperatingSystemSel () {
 DiskSel () {
   echo -en "\n Enter the disk you want to use : \n"
   lsblk -dplnx size -o name,size
-  read  DSel
+  read -r DSel
   YesNoSel "If $DSel is the right disk type y or n for retype it :"
   if [ "$CC" = 1 ]
   then echo "OK, disk selected $DSel"
@@ -283,7 +286,7 @@ DiskSel () {
 
 VoidInstMethod () {
   echo -en "Enter installation type : 1) XBPS 2) ROOTFS \n"
-  read VIMethod
+  read -r VIMethod
   case $VIMethod in
     1|XBPS|xbps) echo "Selected : Arch" && VIMethod="XBPS" ;;
     2|ROOTFS|rootfs) echo "Selected : Artix" && VIMethod="ROOTFS" ;;
@@ -293,7 +296,7 @@ VoidInstMethod () {
 
 LibrarySel () {
   echo -en "Enter base library name : 1) GLIBC 2) MUSL \n"
-  read LibSel
+  read -r LibSel
   case $LibSel in
   1|GLIBC|glibc) echo "Selected : Arch" && LibSel="GLIBC" ;;
   2|MUSL|musl) echo "Selected : Artix" && LibSel="MUSL" ;;
@@ -303,7 +306,7 @@ LibrarySel () {
 
 LocalizationSel () {
   echo -en "Enter localization : 1) en_US.UTF-8 2) en_GB.UTF-8 3) it_IT.UTF-8 \n"
-  read LocSel
+  read -r LocSel
   case $LocSel in
     1|en_US|en_US.UTF-8) echo "Selected : en_US.UTF-8" && LocSel="en_US.UTF-8"
     ;;
@@ -318,7 +321,7 @@ LocalizationSel () {
 
 LanguageSel () {
   echo -en "Enter preferred Language : 1) en_US.UTF-8 2) en_GB.UTF-8 3) it_IT.UTF-8 \n"
-  read LangSel
+  read -r LangSel
   case $LangSel in
     1|en_US|en_US.UTF-8) echo "Selected : en_US.UTF-8" && LangSel="en_US.UTF-8"
     ;;
@@ -332,7 +335,7 @@ LanguageSel () {
 }
 
 HostnameSel () {
-  read -p "Enter preferred hostname : " HNSel
+  read -rp "Enter preferred hostname : " HNSel
   YesNoSel "If [ $HNSel ] is the right hostname type y or n for retype it :"
   if [ "$CC" = 1 ]
   then echo "OK, hostname selected $HNSel"
@@ -341,7 +344,7 @@ HostnameSel () {
 }
 
 UsernameSel () {
-  read -p "Enter preferred username : " UNSel
+  read -rp "Enter preferred username : " UNSel
   YesNoSel "If [ $UNSel ] is the right hostname type y or n for retype it :"
   if [ "$CC" = 1 ]
   then echo "OK, username selected $UNSel"
@@ -351,7 +354,7 @@ UsernameSel () {
 
 TimezoneSel () {
   echo -en " Select Timezone : 1) Europe/Rome \n or type another with the same format "
-  read TZSel
+  read -r TZSel
   case $TZSel in
     1|Europe/Rome|Rome) echo "Selected : Europe/Rome" && TZSel="Europe/Rome"
     ;;
@@ -369,7 +372,7 @@ TimezoneSel () {
 
 PartIDSel () {
   echo -en "Enter partition identifier : 1) UUID 2) PARTUUID 3) LABEL \n"
-  read PIDSel
+  read -r PIDSel
   case $PIDSel in
     1|UUID|uuid) echo "Selected : UUID" && PIDSel="UUID"
     ;;
@@ -384,11 +387,11 @@ PartIDSel () {
 
 FilesystemSel () {
   echo -en "Enter base filesystem : 1) EXT4 2) BTRFS \n"
-  read FSSel
+  read -r FSSel
   case $FSSel in
-    1|EXT4|ext4) echo "Selected : EXT4" && FSSel=BtrfsFormat
+    1|EXT4|ext4) echo "Selected : EXT4" && FSSel=Ext4Format
     ;;
-    2|BTRFS|btrfs) echo "Selected : BTRFS" && FSSel=Ext4Format
+    2|BTRFS|btrfs) echo "Selected : BTRFS" && FSSel=BtrfsFormat
     ;;
     *) echo "Wrong filesystem selected, try one of those provided" && FilesystemSel
     ;;
@@ -397,7 +400,7 @@ FilesystemSel () {
 
 BootloaderSel () {
   echo -en "Enter preferred bootloader : 1) Refind 2) Grub 3) Efistub \n"
-  read BLSel
+  read -r BLSel
   case $BLSel in
     1|REFIND|refind) BLSel="refind" && echo "bootloader selected : refind"
     ;;
@@ -474,14 +477,14 @@ audio='pipewire pipewire-pulse pipewire-alsa pipewire-jack lib32-pipewire lib32-
 android='android-tools android-udev'
 bluetooth='bluez bluez-utils bluez-plugins'
 print='cups cups-pdf system-config-printer avahi'
-##xorg='xorg-server xorg-xinit xorg-xinit light numlockx libinput xorg-xinput xss-lock'
+xorg='xorg-server xorg-xinit xorg-xinit light numlockx libinput xorg-xinput xss-lock'
 apps='telegram-desktop firefox feh calc fd bpytop adriconf' #for netwotk bmon
 nvidiagraphics='nvidia-prime nvidia nvidia-utils lib32-nvidia-utils nvidia-settings'
 hardwareacceleration='libva-mesa-driver mesa-vdpau intel-media-driver'
 vulkan='vulkan-icd-loader lib32-vulkan-icd-loader lib32-mesa vulkan-intel lib32-vulkan-intel vulkan-mesa-layers'
-#filemanager='xed vifm pcmanfm tumbler raw-thumbnailer'
+filemanager='xed vifm pcmanfm tumbler raw-thumbnailer'
 archive='file-roller atool bzip2 cpio gzip lha xz lzop p7zip tar unrar zip unzip'
-#media='celluloid mate-utils pantheon-screenshot simplescreenrecorder'
+media='celluloid mate-utils pantheon-screenshot simplescreenrecorder'
 elogind=''
 rc='ntp-openrc avahi-openrc cups-openrc bluez-openrc networkmanager-openrc'
 
