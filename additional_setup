@@ -64,3 +64,14 @@ GraphicSel () { #{{{
 		esac
 	fi
 }
+
+check_pacman_blocked() { #{{{
+	if [[ -f /var/lib/pacman/db.lck ]]; then
+		echo -e " !!!ERROR!!! Pacman is blocked. \n We try to remove /var/lib/pacman/db.lck."
+		rm /var/lib/pacman/db.lck 
+	elif [[ -f /mnt/var/lib/pacman/db.lck ]]; then 
+		echo -e " !!!ERROR!!! Pacman is blocked. \n We try to remove /mnt/var/lib/pacman/db.lck."
+		rm /mnt/var/lib/pacman/db.lck
+	else echo "No locked database"
+	fi
+}
