@@ -264,9 +264,8 @@ BootloaderInstall () {
 
 VirtualBoxTest () {
   YesNoSel "If this is a Virtualbox installation for test the script, we will skip every choice, \n Type yes or no "
-  if [ "$CC" = 1 ]
-  then echo "OK, skip all check $VBTSel" && VBTSel=TestSteps
-  elif [ "$CC" = q ]; then VBTSel=''
+  if [ "$CC" = 1 ]; then echo "OK, skip all check $VBTSel" && VBTSel=TestSteps
+  elif [ "$CC" = 0 ]; then VBTSel=''
   else echo "Do again please" && VirtualBoxTest
   fi
 }
