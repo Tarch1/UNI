@@ -126,8 +126,9 @@ ExternalDriveSetup () {
 }
 
 BaseSystemInstall () {
+  local BasePKG=( "$linux" "$init" "$btrfsdep" "$elogind" ) 
   "$pkgstrap" /mnt $microcode
-  "$pkgstrap" /mnt $linux $init $btrfsdep $elogind
+  "$pkgstrap" /mnt "${BasePKG[@]}"
   rm /mnt/etc/fstab
   "$fstabgen" -U /mnt >> /mnt/etc/fstab
   cat /mnt/etc/fstab
