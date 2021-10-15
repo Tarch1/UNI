@@ -25,7 +25,7 @@ UEFISel () {
 	fi
 }
 
-GraphicSel () { #{{{
+GraphicSel () {
 	echo " Detecting video chipset "
 	GCard=$(lspci | grep VGA | tr "[:upper:]" "[:lower:]")
 	GCard_length=$(lspci | grep -c VGA)
@@ -65,7 +65,7 @@ GraphicSel () { #{{{
 	fi
 }
 
-check_pacman_blocked() { #{{{
+Pacman_Locked() {
 	if [[ -f /var/lib/pacman/db.lck || /mnt/var/lib/pacman/db.lck ]]; then
 		echo -e " !!!ERROR!!! Pacman is blocked. \n We try to remove /var/lib/pacman/db.lck."
 		rm /var/lib/pacman/db.lck || /mnt/var/lib/pacman/db.lck
