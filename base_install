@@ -6,31 +6,31 @@ DistroChoice () {
 echo "$OSSel selected, then proceed"
   case "$OSSel" in 
   1|Arch|arch)
-    pkgmanager="pacman"
+    pkgmanager=pacman
     pkgskips='--needed --noconfirm'
-    keylayout="KEYMAP=it"
+    keylayout='KEYMAP=it'
     keypath="etc/vconsole.conf"
-    pkgstrap="pacstrap"
-    fstabgen="genfstab"
-    chroot="arch-chroot"
-    initc0="systemctl"
-    initc1="enable"
+    pkgstrap=pacstrap
+    fstabgen=genfstab
+    chroot=arch-chroot
+    initc0=systemctl
+    initc1=enable
     initc2=""
     sed -i 's/lightdm-openrc//' ../UNI/full_setup
     sed -i 's/gdm-openrc//' ../UNI/full_setup
   ;;
   2|Artix|artix)
-    pkgmanager="pacman"
+    pkgmanager=pacman
     pkgskips='--needed --noconfirm'
     keylayout='KEYMAP="it"'
-    keypath="etc/conf.d/keymaps"
-    pkgstrap="basestrap"
-    fstabgen="fstabgen"
-    chroot="artix-chroot"
-    init="openrc"
-    initc0="rc-update"
-    initc1="add"
-    initc2="default"
+    keypath='etc/conf.d/keymaps'
+    pkgstrap=basestrap
+    fstabgen=fstabgen
+    chroot=artix-chroot
+    init=openrc
+    initc0=rc-update
+    initc1=add
+    initc2=default
     rcpacks="$rc"
     elogind="elogind elogind-openrc"
     pacman-key --init
