@@ -386,9 +386,9 @@ FilesystemSel () {
   echo -en "Enter base filesystem : 1) EXT4 2) BTRFS \n"
   read FSSel
   case $FSSel in
-    1|EXT4|ext4) echo "Selected : EXT4" && "$FSSel"=BtrfsFormat
+    1|EXT4|ext4) echo "Selected : EXT4" && FSSel=BtrfsFormat
     ;;
-    2|BTRFS|btrfs) echo "Selected : BTRFS" && "$FSSel"=Ext4Format
+    2|BTRFS|btrfs) echo "Selected : BTRFS" && FSSel=Ext4Format
     ;;
     *) echo "Wrong filesystem selected, try one of those provided" && FilesystemSel
     ;;
