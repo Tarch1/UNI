@@ -92,7 +92,12 @@ BaseSystemInstall () {
   "$pkgstrap" /mnt $microcode
   "$pkgstrap" /mnt "${BasePKG[@]}"
   rm /mnt/etc/fstab
-  "$fstabgen" -U /mnt >> /mnt/etc/fstab
+  case "$PIDSel" in
+  UUID) "$fstabgen" -U /mnt >> /mnt/etc/fstab ;;
+  PARTUUID) "$fstabgen" -t PARTUUID /mnt >> /mnt/etc/fstab ;;
+  LABEL) "$fstabgen" -L /mnt >> /mnt/etc/fstab ;;
+  *) "$fstabgen" -U /mnt >> /mnt/etc/fstab ;;
+  esac
   cat /mnt/etc/fstab
 }
 
