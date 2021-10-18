@@ -61,9 +61,9 @@ AmdSel () {
 }
 
 GSel=( 'NVIDIA' 'Intel' 'Advanced' )
-GDriver=( "NVDriver" "INDriver" "AMDriver" )
-DefaultsDriver=( proprietary mesa amdgpu )
-SeconDriver=( opensource xf86-video-intel ati )
+GDriver=( 'NVDriver' 'INDriver' 'AMDriver' )
+DefaultsDriver=( 'proprietary' 'mesa' 'amdgpu' )
+SeconDriver=( 'opensource' 'xf86-video-intel' 'ati' )
 
 DriverSel () {
 GD=0
