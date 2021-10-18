@@ -4,10 +4,10 @@
 
 CheckAS () {
   if [[ -f "$(pwd)/additional_setup" ]]; then
-	  source additional_setup
+    source additional_setup
   else
-	  echo "Missing file: additional_setup"
-	  exit 1
+    echo "Missing file: additional_setup"
+    exit 1
   fi
 }
 
