@@ -22,12 +22,9 @@ DiskPartition () {
   elif echo "$DRIVE" | grep "^/dev/mmc"; then DEVICE="mmc"
   fi
   case $DEVICE in
-  nvme) BOOT_PART="$DRIVE"p1 && ROOT_PART="$DRIVE"p2
-  ;;
-  sda) BOOT_PART="$DRIVE"1 && ROOT_PART="$DRIVE"2
-  ;;
-  mmc) BOOT_PART="$DRIVE"1 && ROOT_PART="$DRIVE"2
-  ;;
+  nvme) BOOT_PART="$DRIVE"p1 && ROOT_PART="$DRIVE"p2 ;;
+  sda) BOOT_PART="$DRIVE"1 && ROOT_PART="$DRIVE"2 ;;
+  mmc) BOOT_PART="$DRIVE"1 && ROOT_PART="$DRIVE"2 ;;
   esac
   eval "$PIDSel"_BOOT="$(blkid -s "$PIDSel" -o value "$BOOT_PART")"
   eval "$PIDSel"_ROOT="$(blkid -s "$PIDSel" -o value "$ROOT_PART")"
