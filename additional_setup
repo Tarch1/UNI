@@ -19,9 +19,9 @@ UEFISel () {
 		if (mount | grep /sys/firmware/efi/efivars)
 		then mount -t efivarfs efivarfs /sys/firmware/efi/efivars
 		fi
-	Uefi=1 && echo "UEFI Mode detected"
+	UefiMode=1 && echo "UEFI Mode detected"
 	else
-	Uefi=0 && echo "BIOS Mode detected"
+	UefiMode=0 && echo "BIOS Mode detected"
 	fi
 }
 
