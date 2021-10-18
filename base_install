@@ -265,7 +265,7 @@ BootloaderInstall () {
 VirtualBoxTest () {
   YesNoSel "If this is a Virtualbox installation for test the script, we will skip every choice, \n Type yes or no "
   case $CC in
-    1) echo "OK, skip all check $VBTSel" && VBTSel=TestSteps ;;
+    1) echo "OK, skip all check $VBTSel" && VBTSel=1 ;;
     0) echo "OK, now respond a few question" && VBTSel='' ;;
     *) echo "Do again please" && VirtualBoxTest ;;
   esac
@@ -428,7 +428,7 @@ BaseInstallation () {
   local VoidSteps=( 'DistroChoice' 'DiskPartition' 'BootFormat' 'RootFormat' 'ExternalDriveSetup' )
   
   VirtualBoxTest
-  if [ "$VBTSel" = TestSteps ]; then 
+  if [ "$VBTSel" = 1 ]; then 
   SelectionSteps=('OperatingSystemSel')
   LangSel="en_GB.UTF-8" 
   LocSel="en_GB.UTF-8" 
