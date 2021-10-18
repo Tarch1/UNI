@@ -2,6 +2,15 @@
 
 ########## INSTALLATION-SCRIPT ##########
 
+CheckAS () {
+  if [[ -f "$(pwd)/additional_setup" ]]; then
+	  source additional_setup
+  else
+	  echo "Missing file: additional_setup"
+	  exit 1
+  fi
+}
+
 DiskPartition () {
   umount -R /mnt 
   "$pkgmanager" -Sy $pkgskips parted gptfdisk mtools ntfs-3g dialog
