@@ -157,9 +157,9 @@ ServiceEnabler () {
   #"$chroot" /mnt << EOF
   ServiceSel=('NetworkManager' 'cupsd' 'avahi-daemon')
   for c in  "${ServiceSel[@]}"; do
-  "$chroot" /mnt $initc0 $initc1 "$c" $initc2
+  "$chroot" /mnt "$initc0" "$initc1" "$c" "$initc2"
   done
-  #"$chroot" /mnt $initc0 $initc1 keymaps $initc2
+  #keymaps
   #"$chroot" /mnt tlp start || true
 }
 
