@@ -216,7 +216,7 @@ BootloaderInstall () {
 ########## PERSONALIZATION-SCRIPT ##########
 
 VirtualBoxTest () {
-  YesNoSel "If this is a Virtualbox installation for test the script, we will skip every choice, \n Type yes or no "
+  YesNoSel "If this is a Virtualbox installation for test the script, we will skip every choice -- Type yes or no -- "
   case $CC in
     1) echo "OK, skip all check $VBTSel" && VBTSel=1 ;;
     0) echo "OK, now respond a few question" && VBTSel='' ;;
