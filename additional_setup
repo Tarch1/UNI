@@ -26,33 +26,36 @@ UEFISel () {
 
 NvidiaSel () {
   if echo "$GCard" | grep -q "NVIDIA"; then
-  YesNoSel "Install NVIDIA proprietary driver"
-    case "$CC" in
-      1) NVIDIA_DRIVER="nvidia" ;;
-      0) NVIDIA_DRIVER="nouveau" ;;
-      *) NVIDIA_DRIVER="nvidia" ;;
+  echo -e " We found an Nvidia graphics card, type your preferred driver \n 1) Proprietary 2) Opensource"
+  read -r NVIDIAG
+    case "$NVIDIAG" in
+      1) NVDriver="proprietary" ;;
+      0) NVDriver="opensource" ;;
+      *) NVDriver="proprietary" ;;
     esac
   fi
 }
 
 IntelSel () {
   if echo "$GCard" | grep -q "Intel"; then
-  YesNoSel "Install Intel driver"
-    case "$CC" in
-      1) INTEL_DRIVER="mesa" ;;
-      0) INTEL_DRIVER="xf86-video-intel" ;;
-      *) INTEL_DRIVER="mesa" ;;
+  echo -e " We found an Intel graphics card, type your preferred driver \n 1) Mesa 2) Xf86"
+  read -r INTELG
+    case "$INTELG" in
+      1) INDriver="mesa" ;;
+      0) INDriver="xf86-video-intel" ;;
+      *) INDriver="mesa" ;;
     esac
   fi
 }
 
 AmdSel () {
   if echo "$GCard" | grep -q "Advanced"; then
-  YesNoSel "Install AMDGPU driver"
-    case "$CC" in
-      1) AMD_DRIVER="amdgpu" ;;
-      0) AMD_DRIVER="ati" ;;
-      *) AMD_DRIVER="amdgpu" ;;
+  echo -e " We found an AMD graphics card, type your preferred driver \n 1) Amdgpu 2) Ati"
+  read -r AMDG
+    case "$AMDG" in
+      1) AMDriver="amdgpu" ;;
+      0) AMDriver="ati" ;;
+      *) AMDriver="amdgpu" ;;
     esac
   fi
 }
@@ -60,14 +63,17 @@ AmdSel () {
 GraphicSel () {
   echo " Detecting video chipset "
   GCard=$(lspci | grep VGA)
-  GCard_length=$(lspci | grep -c VGA)
+  #GCard_length=$(lspci | grep -c VGA)
   
-  if [[ $GCard_length -eq 2 ]]; then 
-    echo 'Optimus driver'
-    AmdSel
-    IntelSel
-    NvidiaSel
-  fi  
+  AmdSel
+  IntelSel
+  NvidiaSel
+  
+  YesNoSel "Install this driver : $AMDriver $INDriver $NVDriver"
+  case "$CC" in
+    1) echo OK ;;
+    *) echo 'Try to run again' && GraphicSel ;;
+  esac
 }
 
 Pacman_Locked() {
