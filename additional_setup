@@ -60,6 +60,31 @@ AmdSel () {
   fi
 }
 
+GSel=( 'NVIDIA' 'Intel' 'Advanced' )
+GDriver=( "NVDriver" "INDriver" "AMDriver" )
+DefaultsDriver=( proprietary mesa amdgpu )
+SeconDriver=( opensource xf86-video-intel ati )
+
+DriverSel () {
+GD=0
+DD=0
+SD=0
+for i in "${GSel[@]}"; do
+if echo "$GCard" | grep -q "$i"; then
+echo -e " We found an $i graphics card \n Type 1 for ${DefaultsDriver[DD]} driver \n Type 2 for ${DefaultsDriver[SD]}"
+read rr
+case $rr in
+1) eval "${GDriver[GD]}"="${DefaultsDriver[DD]}" ;;
+0) eval "${GDriver[GD]}"="${DefaultsDriver[SD]}" ;;
+*) eval "${GDriver[GD]}"="${DefaultsDriver[DD]}" ;;
+esac
+fi
+GD=($GD+1)
+DD=($DD+1)
+SD=($SD+1)
+done
+}
+
 GraphicSel () {
   echo " Detecting video chipset "
   GCard=$(lspci | grep VGA)
