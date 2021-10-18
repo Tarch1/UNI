@@ -200,7 +200,11 @@ BootloaderInstall () {
     ;;
     2|GRUB|grub)
       "$chroot" /mnt "$pkgmanager" -Sy $pkgskips grub grub-btrfs
-      "$chroot" /mnt grub-install --target=x86_64-efi --efi-directory=/boot bootloader-id=GRUB
+      case "$UefiMode" in
+        1) "$chroot" /mnt grub-install --target=x86_64-efi --efi-directory=/boot bootloader-id=GRUB ;;
+        0) "$chroot" /mnt grub-install --target=i386-pc --recheck --debug /boot ;;
+        *) "$chroot" /mnt grub-install --target=x86_64-efi --efi-directory=/boot bootloader-id=GRUB ;;
+      esac  
       mkdir -p /mnt/boot/grub/themes
       sed -i '$ a\GRUB_THEME="/boot/grub/themes/Grub-Eiffel/theme.txt"' /mnt/etc/default/grub
       "$chroot" /mnt grub-mkconfig -o /boot/grub/themes
