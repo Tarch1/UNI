@@ -62,26 +62,22 @@ AmdSel () {
 
 GSel=( 'NVIDIA' 'Intel' 'Advanced' )
 GDriver=( 'NVDriver' 'INDriver' 'AMDriver' )
-DefaultsDriver=( 'proprietary' 'mesa' 'amdgpu' )
+DefaultDriver=( 'proprietary' 'mesa' 'amdgpu' )
 SeconDriver=( 'opensource' 'xf86-video-intel' 'ati' )
 
 DriverSel () {
-GD=0 #serve solo un contatore
-DD=0
-SD=0
+t=0
 for i in "${GSel[@]}"; do
 if echo "$GCard" | grep -q "$i"; then
-echo -e " We found an $i graphics card \n Type 1 for ${DefaultsDriver[DD]} driver \n Type 2 for ${DefaultsDriver[SD]}"
+echo -e " We found an $i graphics card \n Type 1 for ${DefaultDriver[t]} driver \n Type 2 for ${SeconDriver[t]}"
 read rr
 case $rr in
-1) eval "${GDriver[GD]}"="${DefaultsDriver[DD]}" ;;
-0) eval "${GDriver[GD]}"="${DefaultsDriver[SD]}" ;;
-*) eval "${GDriver[GD]}"="${DefaultsDriver[DD]}" ;;
+1) eval "${GDriver[t]}"="${DefaultDriver[t]}" ;;
+0) eval "${GDriver[t]}"="${DefaultDriver[t]}" ;;
+*) eval "${GDriver[t]}"="${DefaultDriver[t]}" ;;
 esac
 fi
-GD=($GD+1)
-DD=($DD+1)
-SD=($SD+1)
+t=($t+1)
 done
 }
 
