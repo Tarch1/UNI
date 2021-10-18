@@ -442,6 +442,17 @@ BaseInstallation () {
     ;;
   esac 
 }
+FinishInst () {
+  echo "INSTALL COMPLETED"
+  echo -e " A copy of the script will be placed in your user home directory"
+  cp -R "$(pwd)" "${MOUNTPOINT}"/root
+  YesNoSel "Reboot system"
+  case "$CC" in
+    1) umount -R /mnt && reboot ;;
+    0) echo "OK" && exit 0 ;;
+    *) echo "Wrong choice" && YesNoSel "Reboot system" ;;
+  esac
+}
 
 ########## PACKAGE ##########
 
