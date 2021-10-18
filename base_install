@@ -445,7 +445,7 @@ BaseInstallation () {
 FinishInst () {
   echo "INSTALL COMPLETED"
   echo -e " A copy of the script will be placed in your user home directory"
-  cp -R "$(pwd)" "${MOUNTPOINT}"/root
+  cp -R "$(pwd)" /mnt/home/"$UNSel"/
   YesNoSel "Reboot system"
   case "$CC" in
     1) umount -R /mnt && reboot ;;
