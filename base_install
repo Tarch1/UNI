@@ -418,6 +418,15 @@ YesNoSel () {
 }
 
 BaseInstallation () {
+  local SelectionSteps=( 'OperatingSystemSel' 'LocalizationSel' 'LanguageSel' 'TimezoneSel' 
+  'HostnameSel' 'UsernameSel' 'PartIDSel' 'FilesystemSel' 'BootloaderSel' )
+  
+  local ArchTixSteps=( 'DistroChoice' 'DiskPartition' 'BootFormat' 'RootFormat' 'ExternalDriveSetup' 
+  'BaseSystemInstall' 'SyncTime' 'LocaleGen' 'HostConfig' 'PackageConfig' 'PackageInstall' 
+  'ServiceEnabler' 'AudioSetup' 'UserSetup' 'BootloaderInstall' )
+  
+  local VoidSteps=( 'DistroChoice' 'DiskPartition' 'BootFormat' 'RootFormat' 'ExternalDriveSetup' )
+  
   VirtualBoxTest
   if [ "$VBTSel" = TestSteps ]; then 
   SelectionSteps=('OperatingSystemSel')
@@ -429,22 +438,12 @@ BaseInstallation () {
   PIDSel="UUID" 
   FSSel=BtrfsFormat 
   BLSel="refind"
-  else
-  SelectionSteps=( 'OperatingSystemSel' 'LocalizationSel' 'LanguageSel' 'TimezoneSel' 
-  'HostnameSel' 'UsernameSel' 'PartIDSel' 'FilesystemSel' 'BootloaderSel' )
   fi
   
   for s in "${SelectionSteps[@]}"; do
   "$s"
   done
   
-  ArchTixSteps=( 'DistroChoice' 'DiskPartition' 'BootFormat' 'RootFormat' 'ExternalDriveSetup' 
-  'BaseSystemInstall' 'SyncTime' 'LocaleGen' 'HostConfig' 'PackageConfig' 'PackageInstall' 
-  'ServiceEnabler' 'AudioSetup' 'UserSetup' 'BootloaderInstall' )
-  
-  VoidSteps=( 'DistroChoice' 'DiskPartition' 'BootFormat' 'RootFormat' 'ExternalDriveSetup' )
-  
-  echo "$OSSel"
   case "$OSSel" in
     1|Arch|arch) 
     for a in "${ArchTixSteps[@]}"; do "$a"
