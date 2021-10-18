@@ -404,16 +404,9 @@ BootloaderSel () {
 YesNoSel () {
   read -rp "$1 $2 $3 [y/N]" YNS
   case "$YNS" in 
-    [yY] | [yY][eE][sS])
-    eval "$u=1"
-    CC=1
-    ;;
-    [nN] | [nN][oO]) 
-    eval "$u=0"
-    CC=0
-    ;;
-    *) YesNoSel "$1"
-    ;;
+    [yY] | [yY][eE][sS]) CC=1 ;;
+    [nN] | [nN][oO]) CC=0 ;;
+    *) YesNoSel "$1" ;;
   esac
 }
 
