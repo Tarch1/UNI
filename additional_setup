@@ -27,8 +27,8 @@ UEFISel () {
 GraphicSel () {
   echo " Detecting video chipset "
   GCard=$(lspci | grep VGA)
-  #GCard_length=$(lspci | grep -c VGA)
-  
+  GCard_length=$(lspci | grep -c VGA)
+
   GSel=( 'NVIDIA' 'Intel' 'Advanced' )
   GDriver=( 'NVDriver' 'INDriver' 'AMDriver' )
   DefaultDriver=( 'proprietary' 'mesa' 'amdgpu' )
@@ -48,7 +48,7 @@ GraphicSel () {
   t=($t+1)
   done
   
-  YesNoSel "Install this driver : AMD : $AMDriver INTEL : $INDriver NVIDIA : $NVDriver"
+  YesNoSel "Install this driver : [ AMD = $AMDriver ] [ INTEL = $INDriver ] [ NVIDIA = $NVDriver ]"
   case "$CC" in
     1) echo OK ;;
     *) echo 'Try to run again' && GraphicSel ;;
