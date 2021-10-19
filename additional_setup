@@ -24,73 +24,31 @@ UEFISel () {
 	fi
 }
 
-NvidiaSel () {
-  if echo "$GCard" | grep -q "NVIDIA"; then
-  echo -e " We found an Nvidia graphics card, type your preferred driver \n 1) Proprietary 2) Opensource"
-  read -r NVIDIAG
-    case "$NVIDIAG" in
-      1) NVDriver="proprietary" ;;
-      0) NVDriver="opensource" ;;
-      *) NVDriver="proprietary" ;;
-    esac
-  fi
-}
-
-IntelSel () {
-  if echo "$GCard" | grep -q "Intel"; then
-  echo -e " We found an Intel graphics card, type your preferred driver \n 1) Mesa 2) Xf86"
-  read -r INTELG
-    case "$INTELG" in
-      1) INDriver="mesa" ;;
-      0) INDriver="xf86-video-intel" ;;
-      *) INDriver="mesa" ;;
-    esac
-  fi
-}
-
-AmdSel () {
-  if echo "$GCard" | grep -q "Advanced"; then
-  echo -e " We found an AMD graphics card, type your preferred driver \n 1) Amdgpu 2) Ati"
-  read -r AMDG
-    case "$AMDG" in
-      1) AMDriver="amdgpu" ;;
-      0) AMDriver="ati" ;;
-      *) AMDriver="amdgpu" ;;
-    esac
-  fi
-}
-
-GSel=( 'NVIDIA' 'Intel' 'Advanced' )
-GDriver=( 'NVDriver' 'INDriver' 'AMDriver' )
-DefaultDriver=( 'proprietary' 'mesa' 'amdgpu' )
-SeconDriver=( 'opensource' 'xf86-video-intel' 'ati' )
-
-DriverSel () {
-t=0
-for i in "${GSel[@]}"; do
-if echo "$GCard" | grep -q "$i"; then
-echo -e " We found an $i graphics card \n Type 1 for ${DefaultDriver[t]} driver \n Type 2 for ${SeconDriver[t]}"
-read rr
-case $rr in
-1) eval "${GDriver[t]}"="${DefaultDriver[t]}" ;;
-0) eval "${GDriver[t]}"="${SeconDriver[t]}" ;;
-*) eval "${GDriver[t]}"="${DefaultDriver[t]}" ;;
-esac
-fi
-t=($t+1)
-done
-}
-
 GraphicSel () {
   echo " Detecting video chipset "
   GCard=$(lspci | grep VGA)
   #GCard_length=$(lspci | grep -c VGA)
   
-  AmdSel
-  IntelSel
-  NvidiaSel
+  GSel=( 'NVIDIA' 'Intel' 'Advanced' )
+  GDriver=( 'NVDriver' 'INDriver' 'AMDriver' )
+  DefaultDriver=( 'proprietary' 'mesa' 'amdgpu' )
+  SeconDriver=( 'opensource' 'xf86-video-intel' 'ati' )
+
+  t=0
+  for i in "${GSel[@]}"; do
+  if echo "$GCard" | grep -q "$i"; then
+    echo -e " We found an $i graphics card \n Type 1 for ${DefaultDriver[t]} driver \n Type 2 for ${SeconDriver[t]}"
+    read rr
+    case $rr in
+      1) eval "${GDriver[t]}"="${DefaultDriver[t]}" ;;
+      0) eval "${GDriver[t]}"="${SeconDriver[t]}" ;;
+      *) eval "${GDriver[t]}"="${DefaultDriver[t]}" ;;
+    esac
+  fi
+  t=($t+1)
+  done
   
-  YesNoSel "Install this driver : $AMDriver $INDriver $NVDriver"
+  YesNoSel "Install this driver : AMD : $AMDriver INTEL : $INDriver NVIDIA : $NVDriver"
   case "$CC" in
     1) echo OK ;;
     *) echo 'Try to run again' && GraphicSel ;;
