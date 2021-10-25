@@ -2,10 +2,8 @@
 PKGLIST='pkg.ini'
 . "${PKGLIST}"
 
-# List packages in Arch Linux repos
 sudo pacman -Slq system world galaxy extra community multilib | sort > pacman_db
 
-# shellcheck disable=SC2207
 array=($(awk -F'=' '/^pkg/ {print $1}' "${PKGLIST}"))
 
 echo ":: Checking packages in the official repositories..."
@@ -16,7 +14,6 @@ for keys in "${array[@]}"; do
 done
 echo "${all_packages[@]}" | tr ' ' '\n' | sort -u > pkglist
 
-# shellcheck disable=SC2207
 unlisted=($(comm -13 <(cat pacman_db) <(cat pkglist) | grep '^[[:alnum:]].*'))
 #rm pacman_db pkglist
 
