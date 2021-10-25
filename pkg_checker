@@ -1,0 +1,36 @@
+#!/bin/bash
+PKGLIST='pkg.ini'
+. "${PKGLIST}"
+
+# List packages in Arch Linux repos
+sudo pacman -Slq system world galaxy extra community multilib | sort > pacman_db
+
+# shellcheck disable=SC2207
+array=($(awk -F'=' '/^pkg/ {print $1}' "${PKGLIST}"))
+
+echo ":: Checking packages in the official repositories..."
+
+for keys in "${array[@]}"; do
+    temp="${keys}"
+    all_packages+="${!temp}"
+done
+echo "${all_packages[@]}" | tr ' ' '\n' | sort -u > pkglist
+
+# shellcheck disable=SC2207
+unlisted=($(comm -13 <(cat pacman_db) <(cat pkglist) | grep '^[[:alnum:]].*'))
+#rm pacman_db pkglist
+
+echo " TEMP == $temp 
+ALLPKG == $all_packages
+ARRAY == $array 
+PKGLIST == $pkglist 
+UNLISTED == $unlisted"
+
+# Check if unlisted are groups of packages
+for elem in "${unlisted[@]}"; do
+    if ! sudo pacman -Sg "${elem}" 1>/dev/null; then
+        echo "[x] Package not available: ${elem}"
+    fi
+done
+
+echo ":: Ready!" && exit 0
