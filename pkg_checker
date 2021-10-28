@@ -1,33 +1,36 @@
 #!/bin/bash
 PKGLIST='pkg.ini'
 . "${PKGLIST}"
-
-sudo pacman -Slq system world galaxy extra community multilib | sort > pacman_db
+Repo="system world galaxy extra community multilib"
+sudo pacman -Slq $Repo| sort > pacman_db
 
 array=($(awk -F'=' '/^pkg/ {print $1}' "${PKGLIST}"))
 
-echo ":: Checking packages in the official repositories..."
+echo "Checking packages in the official repositories..."
 
-for keys in "${array[@]}"; do
-    temp="${keys}"
-    all_packages+="${!temp}"
+for a in "${array[@]}"; do
+    all_packages+="${!a}"
 done
-echo "${all_packages[@]}" | tr ' ' '\n' | sort -u > pkglist
 
-unlisted=($(comm -13 <(cat pacman_db) <(cat pkglist) | grep '^[[:alnum:]].*'))
+echo "${all_packages[@]}" | tr ' ' '\n' | sort -u  > pkglist
+
+listed=($(comm -12 pacman_db pkglist))
+unlisted=($(comm -13 pacman_db pkglist | grep '^[[:alnum:]].*'))
 #rm pacman_db pkglist
-
-echo " TEMP == $temp 
-ALLPKG == $all_packages
-ARRAY == $array 
-PKGLIST == $pkglist 
-UNLISTED == $unlisted"
 
 # Check if unlisted are groups of packages
 for elem in "${unlisted[@]}"; do
     if ! sudo pacman -Sg "${elem}" 1>/dev/null; then
         echo "[x] Package not available: ${elem}"
+        array_t=" ${all_packages[@]} "
+        all_packages=(${array_t//$elem/})
+        unset array_t
     fi
 done
 
-echo ":: Ready!" && exit 0
+echo " TEMP == $temp" 
+echo -n "ALLPKG == " && echo "${all_packages[@]}"
+echo -n "ARRAY == " && echo "${array[@]}" 
+#echo -n "PKGLIST == " && cat pkglist 
+echo -n "LISTED == " && echo "${listed[@]}"
+echo -n "UNLISTED == " && echo "${unlisted[@]}"
