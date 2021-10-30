@@ -66,9 +66,9 @@ GraphicSel () {
 SelSteps () {
   OSSelection=( '4' 'Enter the distro we are going to setup : 1) Arch 2) Artix 3) Void \n'
                 'OSSel' ''
-                '1|Arch|arch' 'echo "distro selected : Arch" && OSSel="Arch"'
-                '2|Artix|artix' 'echo "distro selected : Artix" && OSSel="Artix"'
-                '3|Void|void' 'echo "distro selected : Void" && OSSel="Void"'
+                '1|Arch|arch' 'distro selected : Arch' 'Arch'
+                '2|Artix|artix' 'distro selected : Artix' 'Artix'
+                '3|Void|void' 'distro selected : Void' 'Void'
                 'echo "Wrong choice, type again" && OperatingSystemSel' )
   
   SelS=( 'OSSelection' 'LocalizationSel' 'LanguageSel' 'TimezoneSel' 
@@ -79,19 +79,19 @@ SelSteps () {
     YesNoSel "${i[3]}"
     case "${i[0]}" in
       2) case "${i[2]}" in
-           "${i[4]}") "${i[5]}" ;;
+           "${i[4]}") echo "${i[5]}" && eval "${i[2]}"="${i[6]}" ;;
            *) "${i[6]}" ;;
          esac ;;
       3) case "${i[2]}" in
-           "${i[4]}") "${i[5]}" ;;
-           "${i[6]}") "${i[7]}" ;;
-           *) "${i[8]}" ;;
+           "${i[4]}") echo "${i[5]}" && eval "${i[2]}"="${i[6]}" ;;
+           "${i[7]}") echo "${i[8]}" && eval "${i[2]}"="${i[9]}" ;;
+           *) "${i[10]}" ;;
          esac ;;
       4) case "${i[2]}" in
-           "${i[4]}") "${i[5]}" ;;
-           "${i[6]}") "${i[7]}" ;;
-           "${i[8]}") "${i[9]}" ;;
-           *) "${i[10]}" ;;
+           "${i[4]}") echo "${i[5]}" && eval "${i[2]}"="${i[6]}" ;;
+           "${i[7]}") echo "${i[8]}" && eval "${i[2]}"="${i[9]}" ;;
+           "${i[10]}") echo "${i[11]}" && eval "${i[2]}"="${i[12]}" ;;
+           *) "${i[13]}" ;;
          esac ;;
       *) ;;
     esac
