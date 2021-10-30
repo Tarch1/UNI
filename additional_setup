@@ -74,12 +74,13 @@ SelSteps () {
   SelS=( 'OSSelection' 'LocalizationSel' 'LanguageSel' 'TimezoneSel' 
   'HostnameSel' 'UsernameSel' 'PartIDSel' 'FilesystemSel' 'BootloaderSel' )
   for i in "${SelS[@]}"; do
+    echo -en "${i[1]}"
+    read -r "${i[2]}"
     case "${i[0]}" in
       1) ;;
       2) ;;
       3) ;;
-      4) echo -en "${i[1]}"
-         read -r "${i[2]}"
+      4) 
          case "${i[2]}" in
            "${i[3]}") "${i[4]}" ;;
            "${i[5]}") "${i[6]}" ;;
