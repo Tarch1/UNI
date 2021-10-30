@@ -24,6 +24,14 @@ UEFISel () {
 	fi
 }
 
+CpuSel () {
+  CPUT=$(lscpu | awk '/Vendor ID:/ {print $3}')
+  case "$CPUT" in
+    GenuineIntel) echo "Installing Intel microcode" && microcode=intel-ucode.img ;;
+    AuthenticAMD) echo "Installing AMD microcode" && microcode=amd-ucode.img ;;
+  esac	
+}
+
 GraphicSel () {
   echo " Detecting video chipset "
   GCard=$(lspci | grep VGA)
