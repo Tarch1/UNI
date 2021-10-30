@@ -67,6 +67,12 @@ SelSteps () {
   SelS=( 'OperatingSystemSel' 'LocalizationSel' 'LanguageSel' 'TimezoneSel' 
   'HostnameSel' 'UsernameSel' 'PartIDSel' 'FilesystemSel' 'BootloaderSel' )
   for i in "${SelS[@]}"; do
+    case "${#[@]}" in
+      1) ;;
+      2) ;;
+      3) ;;
+      4) ;;
+    esac
   done
 }
 
