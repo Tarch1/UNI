@@ -64,10 +64,26 @@ GraphicSel () {
 }
 
 SelSteps () {
+  OperatingSystemSel=( '4' 'Enter the distro we are going to setup : 1) Arch 2) Artix 3) Void \n'
+                       'OSSel' '1|Arch|arch' '2|Artix|artix' '3|Void|void'
+                       'echo "distro selected : Arch" && OSSel="Arch"'
+                       'echo "distro selected : Artix" && OSSel="Artix"'
+                       'echo "distro selected : Void" && OSSel="Void"'
+                       'echo "Wrong choice, type again" && OperatingSystemSel' ) {
+  echo -en "Enter the distro we are going to setup : 1) Arch 2) Artix 3) Void \n"
+  read -r OSSel
+  case $OSSel in
+    1|Arch|arch) echo "distro selected : Arch" && OSSel="Arch" ;;
+    2|Artix|artix) echo "distro selected : Artix" && OSSel="Artix" ;;
+    3|Void|void) echo "distro selected : Void" && OSSel="Void" ;;
+    *) echo "Wrong choice, type again" && OperatingSystemSel ;;
+  esac
+}
+  
   SelS=( 'OperatingSystemSel' 'LocalizationSel' 'LanguageSel' 'TimezoneSel' 
   'HostnameSel' 'UsernameSel' 'PartIDSel' 'FilesystemSel' 'BootloaderSel' )
   for i in "${SelS[@]}"; do
-    case "${#$i[@]}" in
+    case "${i[0]}" in
       1) ;;
       2) ;;
       3) ;;
