@@ -46,7 +46,7 @@ GraphicSel () {
   for i in "${GSel[@]}"; do
   if echo "$GCard" | grep -q "$i"; then
     echo -e " We found an $i graphics card \n Type 1 for ${DefaultDriver[t]} driver \n Type 2 for ${SeconDriver[t]}"
-    read rr
+    read -r rr
     case $rr in
       1) eval "${GDriver[t]}"="${DefaultDriver[t]}" ;;
       0) eval "${GDriver[t]}"="${SeconDriver[t]}" ;;
