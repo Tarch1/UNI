@@ -65,7 +65,7 @@ GraphicSel () {
 
 SelSteps () {
   OSSelection=( '4' 'Enter the distro we are going to setup : 1) Arch 2) Artix 3) Void \n'
-                'OSSel'
+                'OSSel' ''
                 '1|Arch|arch' 'echo "distro selected : Arch" && OSSel="Arch"'
                 '2|Artix|artix' 'echo "distro selected : Artix" && OSSel="Artix"'
                 '3|Void|void' 'echo "distro selected : Void" && OSSel="Void"'
@@ -76,21 +76,22 @@ SelSteps () {
   for i in "${SelS[@]}"; do
     echo -en "${i[1]}"
     read -r "${i[2]}"
+    YesNoSel "${i[3]}"
     case "${i[0]}" in
       2) case "${i[2]}" in
-           "${i[3]}") "${i[4]}" ;;
-           *) "${i[5]}" ;;
+           "${i[4]}") "${i[5]}" ;;
+           *) "${i[6]}" ;;
          esac ;;
       3) case "${i[2]}" in
-           "${i[3]}") "${i[4]}" ;;
-           "${i[5]}") "${i[6]}" ;;
-           *) "${i[7]}" ;;
+           "${i[4]}") "${i[5]}" ;;
+           "${i[6]}") "${i[7]}" ;;
+           *) "${i[8]}" ;;
          esac ;;
       4) case "${i[2]}" in
-           "${i[3]}") "${i[4]}" ;;
-           "${i[5]}") "${i[6]}" ;;
-           "${i[7]}") "${i[8]}" ;;
-           *) "${i[9]}" ;;
+           "${i[4]}") "${i[5]}" ;;
+           "${i[6]}") "${i[7]}" ;;
+           "${i[8]}") "${i[9]}" ;;
+           *) "${i[10]}" ;;
          esac ;;
       *) ;;
     esac
