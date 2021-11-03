@@ -184,7 +184,7 @@ UserSetup () {
   "$chroot" /mnt passwd "$UNSel"
   "$chroot" /mnt echo -n "Type password for root user : "
   "$chroot" /mnt passwd 
-  cp ../UNI/Conf_files/bashrc /mnt/home/"$UNSel"
+  cp ../UNI/Conf_files/bashrc /mnt/home/"$UNSel"/.bashrc
   cp -r ../UNI /mnt/home/"$UNSel"
   touch /mnt/home/"$UNSel"/.profile
   echo 'export MOZ_ENABLE_WAYLAND=1' >> /mnt/home/"$UNSel"/.profile
