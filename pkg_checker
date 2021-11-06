@@ -55,7 +55,7 @@ done
 }
 
 start
-echo 'Present (---)'
+echo 'Package verified ( see above for not verified  )'
 for i in "${y[@]}"; do
   ii=("${!i}")
   echo '---' "[[${i[*]}]]" "${ii[@]}"
