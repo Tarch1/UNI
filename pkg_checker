@@ -41,7 +41,7 @@ done
 testing () {
 var1=("${!var}")
 for i in "${var1[@]}"; do
-echo "$i"
+echo $i
   if ! sudo pacman -Qs "${i}" 1>/dev/null; then
     echo "[x] Package not available: $i"
     array_t="${var1[*]}"
@@ -53,4 +53,3 @@ done
 
 start
 echo "${pkg_microcode[@]}" "${pkg_base[@]}"
-#sudo pacman -Syu ${pkg_microcode[@]} ${pkg_base[@]}
