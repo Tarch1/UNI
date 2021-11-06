@@ -1,6 +1,10 @@
 #!/bin/bash
 
-x=(microcode base ext init dev baseutils fs net audio android bluetooth print xorg apps nvidiagraphics hardwareacceleration filemanager archive media elogind rc)
+y=(pkg_microcode pkg_base pkg_ext pkg_init pkg_dev pkg_baseutils
+   pkg_fs pkg_net pkg_audio pkg_android pkg_bluetooth pkg_print 
+   pkg_xorg pkg_apps pkg_nvidiagraphics pkg_hardwareacceleration
+   pkg_filemanager pkg_archive pkg_media pkg_elogind pkg_rc)
+
 missing=()
 # Defaults
 pkg_microcode=(intel-ucode)
@@ -24,19 +28,20 @@ pkg_archive=(file-roller atool bzip2 cpio gzip lha xz lzop p7zip tar unrar zip u
 pkg_media=(celluloid mate-utils pantheon-screenshot simplescreenrecorder)
 pkg_elogind=()
 pkg_rc=(ntp-openrc avahi-openrc cups-openrc bluez-openrc networkmanager-openrc)
+
 sudo pacman -Slq system world galaxy extra community multilib | sort > pacman_db
 
 start () {
-for c in "${x[@]}"; do
-  var=(pkg_"$c"[@])
-  testing "${var[@]}"
-  unset pkg_"$c"
-  export pkg_"$c"="${test[*]}"
+for c in "${y[@]}"; do
+  var=("$c"[@])
+  var1=("${!var}")
+  testing "${var1[@]}"
+  unset "$c"
+  export "$c"="${test[*]}"
 done
 }
 
 testing () {
-var1=("${!var}")
 for i in "${var1[@]}"; do
   if ! sudo pacman -Qs "${i}" 1>/dev/null; then
     echo "[x] Package not available: $i"
@@ -51,5 +56,9 @@ done
 }
 
 start
-echo "${missing[@]}"
-#echo "${pkg_microcode[@]}" "${pkg_base[@]}" "${pkg_ext[@]}" "${pkg_init[@]}" "${pkg_dev[@]}" "${pkg_baseutils[@]}" "${pkg_fs[@]}" "${pkg_net[@]}" "${pkg_audio[@]}" "${pkg_android[@]}" "${pkg_bluetooth[@]}" "${pkg_print[@]}" "${pkg_xorg[@]}" "${pkg_apps[@]}" "${pkg_nvidiagraphics[@]}" "${pkg_hardwareacceleration[@]}" "${pkg_filemanager[@]}" "${pkg_archive[@]}" "${pkg_media[@]}" "${pkg_elogind[@]}" "${pkg_rc[@]}"
+echo 'Present (---) MISSING (xxx)'
+echo -e '<<<' "${missing[@]}" '>>>'
+for i in "${y[@]}"; do
+  ii=("${!i}")
+  echo '---' "[[${i[@]}]]" "${ii[@]}"
+done
