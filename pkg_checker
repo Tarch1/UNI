@@ -31,6 +31,7 @@ pkg_rc=(ntp-openrc avahi-openrc cups-openrc bluez-openrc networkmanager-openrc)
 sudo pacman -Slq system world galaxy extra community multilib | sort > pacman_db
 
 start () {
+echo 'Wait at least 2 min'
 for c in "${y[@]}"; do
   var=("$c"[@])
   var1=("${!var}")
@@ -42,21 +43,30 @@ done
 
 testing () {
 for i in "${var1[@]}"; do
-  if ! sudo pacman -Qs "${i}" 1>/dev/null; then
+  if ! sudo pacman -Ss "${i}" 1>/dev/null; then
     echo "[x] Package not available: $i"
     missing+=("$i")
     array_t="${var1[*]}"
     test="${array_t//$i/}"
     unset array_t
-    else
+  else
     test="${var1[*]}"
   fi
 done
 }
 
-start
-echo 'Package verified ( see above for not verified  )'
+endings () {
+echo -e '<<<' "${missing[@]}" '>>>'
+echo "${missing[@]}" | tr ' ' '\n' | sort -u > pkglist
+IFS=" " read -r -a unlisted <<< "$(comm -13 pacman_db pkglist)"
+echo "UNL=" "${unlisted[@]}"
+echo 'Present (---)'
+
 for i in "${y[@]}"; do
-  ii=("${!i}")
-  echo '---' "[[${i[*]}]]" "${ii[@]}"
+  local ii=("${!i}")
+  echo '\\\' "${i[@]}" '///' "${ii[@]}"
 done
+}
+
+start
+endings
