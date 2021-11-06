@@ -1,7 +1,7 @@
 #!/bin/bash
 
 x=(microcode base ext init dev baseutils fs net audio android bluetooth print xorg apps nvidiagraphics hardwareacceleration filemanager archive media elogind rc)
-
+missing=()
 # Defaults
 pkg_microcode=(intel-ucode)
 pkg_base=(base base-devel linux linux-firmware)
@@ -28,10 +28,8 @@ sudo pacman -Slq system world galaxy extra community multilib | sort > pacman_db
 
 start () {
 for c in "${x[@]}"; do
-  y=$c
-  var=(pkg_"$y"[@])
+  var=(pkg_"$c"[@])
   testing "${var[@]}"
-  #gggg="${!test}"
   unset pkg_"$c"
   export pkg_"$c"="${test[*]}"
 done
@@ -40,9 +38,9 @@ done
 testing () {
 var1=("${!var}")
 for i in "${var1[@]}"; do
-echo "$i"
   if ! sudo pacman -Qs "${i}" 1>/dev/null; then
     echo "[x] Package not available: $i"
+    missing+=("$i")
     array_t="${var1[*]}"
     test="${array_t//$i/}"
     unset array_t
@@ -53,4 +51,5 @@ done
 }
 
 start
-echo "${pkg_microcode[@]}" "${pkg_base[@]}" "${pkg_ext[@]}" "${pkg_init[@]}" "${pkg_dev[@]}" "${pkg_baseutils[@]}" "${pkg_fs[@]}" "${pkg_net[@]}" "${pkg_audio[@]}" "${pkg_android[@]}" "${pkg_bluetooth[@]}" "${pkg_print[@]}" "${pkg_xorg[@]}" "${pkg_apps[@]}" "${pkg_nvidiagraphics[@]}" "${pkg_hardwareacceleration[@]}" "${pkg_filemanager[@]}" "${pkg_archive[@]}" "${pkg_media[@]}" "${pkg_elogind[@]}" "${pkg_rc[@]}"
+echo "${missing[@]}"
+#echo "${pkg_microcode[@]}" "${pkg_base[@]}" "${pkg_ext[@]}" "${pkg_init[@]}" "${pkg_dev[@]}" "${pkg_baseutils[@]}" "${pkg_fs[@]}" "${pkg_net[@]}" "${pkg_audio[@]}" "${pkg_android[@]}" "${pkg_bluetooth[@]}" "${pkg_print[@]}" "${pkg_xorg[@]}" "${pkg_apps[@]}" "${pkg_nvidiagraphics[@]}" "${pkg_hardwareacceleration[@]}" "${pkg_filemanager[@]}" "${pkg_archive[@]}" "${pkg_media[@]}" "${pkg_elogind[@]}" "${pkg_rc[@]}"
