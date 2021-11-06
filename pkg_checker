@@ -60,5 +60,5 @@ echo 'Present (---) MISSING (xxx)'
 echo -e '<<<' "${missing[@]}" '>>>'
 for i in "${y[@]}"; do
   ii=("${!i}")
-  echo '---' "[[${i[@]}]]" "${ii[@]}"
+  echo '---' "[[${i[*]}]]" "${ii[@]}"
 done
