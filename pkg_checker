@@ -34,22 +34,23 @@ for c in "${x[@]}"; do
   #gggg="${!test}"
   unset pkg_"$c"
   export pkg_"$c"="${test[*]}"
-  echo "GG=" "${pkg_microcode[@]}"
 done
 }
 
 testing () {
 var1=("${!var}")
 for i in "${var1[@]}"; do
-echo $i
+echo "$i"
   if ! sudo pacman -Qs "${i}" 1>/dev/null; then
     echo "[x] Package not available: $i"
     array_t="${var1[*]}"
     test="${array_t//$i/}"
     unset array_t
+    else
+    test="${var1[*]}"
   fi
 done
 }
 
 start
-echo "${pkg_microcode[@]}" "${pkg_base[@]}"
+echo "${pkg_microcode[@]}" "${pkg_base[@]}" "${pkg_ext[@]}" "${pkg_init[@]}" "${pkg_dev[@]}" "${pkg_baseutils[@]}" "${pkg_fs[@]}" "${pkg_net[@]}" "${pkg_audio[@]}" "${pkg_android[@]}" "${pkg_bluetooth[@]}" "${pkg_print[@]}" "${pkg_xorg[@]}" "${pkg_apps[@]}" "${pkg_nvidiagraphics[@]}" "${pkg_hardwareacceleration[@]}" "${pkg_filemanager[@]}" "${pkg_archive[@]}" "${pkg_media[@]}" "${pkg_elogind[@]}" "${pkg_rc[@]}"
