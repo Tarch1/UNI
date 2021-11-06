@@ -1,12 +1,11 @@
 #!/bin/bash
 
+missing=()
 y=(pkg_microcode pkg_base pkg_ext pkg_init pkg_dev pkg_baseutils
    pkg_fs pkg_net pkg_audio pkg_android pkg_bluetooth pkg_print 
    pkg_xorg pkg_apps pkg_nvidiagraphics pkg_hardwareacceleration
    pkg_filemanager pkg_archive pkg_media pkg_elogind pkg_rc)
 
-missing=()
-# Defaults
 pkg_microcode=(intel-ucode)
 pkg_base=(base base-devel linux linux-firmware)
 pkg_ext=(vulkan-icd-loader lib32-vulkan-icd-loader lib32-mesa vulkan-intel lib32-vulkan-intel vulkan-mesa-layers)
