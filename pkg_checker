@@ -35,13 +35,13 @@ echo 'Wait at least 2 min'
 for c in "${y[@]}"; do
   var=("$c"[@])
   var1=("${!var}")
-  testing "${var1[@]}"
+  middle "${var1[@]}"
   unset "$c"
   export "$c"="${test[*]}"
 done
 }
 
-testing () {
+middle () {
 for i in "${var1[@]}"; do
   if ! sudo pacman -Ss "${i}" 1>/dev/null; then
     echo "[x] Package not available: $i"
