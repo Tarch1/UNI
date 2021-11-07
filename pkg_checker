@@ -28,8 +28,9 @@ pkg_media=(celluloid mate-utils pantheon-screenshot simplescreenrecorder)
 pkg_elogind=()
 pkg_rc=(ntp-openrc avahi-openrc cups-openrc bluez-openrc networkmanager-openrc)
 
-#sudo pacman -Slq system world galaxy extra community multilib | sort > pacman_db
+sudo pacman -Slq system world galaxy extra community multilib | sort > pacman_db
 ghb=0
+
 start () {
 echo 'Wait at least 2 min' 
 for c in "${y[@]}"; do
@@ -43,7 +44,8 @@ done
 
 middle () {
 for i in "${var1[@]}"; do
-  if ! sudo pacman -Ss "${i}" 1>/dev/null; then
+  if ! sudo pacman -Ss "${i}" 1>/dev/null
+  then
     echo "[x] Package not available: $i"
     missing+=("$i")
     array_t="${var1[*]}"
@@ -58,7 +60,6 @@ done
 }
 
 endings () {
-echo -e '<<<' "${missing[@]}" '>>>'
 echo "${missing[@]}" | tr ' ' '\n' | sort -u > pkglist
 IFS=" " read -r -a unlisted <<< "$(comm -13 pacman_db pkglist)"
 echo "UNL=" "${unlisted[@]}"
