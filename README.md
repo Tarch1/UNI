@@ -57,7 +57,7 @@ checking that they are properly unset with gsettings list-recursively | grep swi
 
 Pipewire troubleshooting
 
-If /etc/pipewire folder and its contents doesn't exist run
+If /etc/pipewire/ folder and its contents doesn't exist run
 
     cp -r /usr/share/pipewire /etc/
 
@@ -70,13 +70,13 @@ and uncomment these 2 lines at the end of /etc/pipewire/pipewire.conf
     
     #{ path = "/usr/bin/pipewire" args = "-c pipewire-pulse.conf" }
     
- - if you have installed wireplumber
+ - if you have installed pipewire-media-session wireplumber
  
-    { path = "wireplumber"  args = "" }
+       #{ path = "/usr/bin/pipewire-media-session" args = "" }
 
- - else
+ - else if you have installed wireplumber replace the above command with
     
-    #{ path = "/usr/bin/pipewire-media-session" args = "" }
+       { path = "wireplumber"  args = "" }
 
 At the very end if either else not worked in /etc/pulse/client.conf change from yes to no
 
