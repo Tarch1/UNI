@@ -66,15 +66,15 @@ than be sure /home/!!!your username!!!/.config/autostart/pipewire.desktop exist 
     cp -r ~/.UNI/Conf_files/Pipewire/ ~/.config/autostart/
     
 
-last tentatives uncomment these 2 lines at the end of /etc/pipewire/pipewire.conf
+and uncomment these 2 lines at the end of /etc/pipewire/pipewire.conf
     
     #{ path = "/usr/bin/pipewire" args = "-c pipewire-pulse.conf" }
     
-if you have installed wireplumber
-    
+ - if you have installed wireplumber
+ 
     { path = "wireplumber"  args = "" }
 
-else
+ - else
     
     #{ path = "/usr/bin/pipewire-media-session" args = "" }
 
