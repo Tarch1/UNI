@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Exec=/usr/bin/pipewire & /usr/bin/pipewire-pulse & /usr/bin/pipewire-media-session
+Exec=/usr/bin/pipewire & /usr/bin/pipewire-pulse ###& /usr/bin/pipewire-media-session
 Hidden=false
 NoDisplay=false
 X-GNOME-Autostart-enabled=true
