@@ -36,8 +36,9 @@ then personalize with
     bash full_setup
 
 Reboot and Enjoy!
+TROUBLESHOOTIG
 
-PS: if gnome on wayland not start's on machine's with hybrid gpu setup comment 
+If gnome on wayland not start's on machine's with hybrid gpu setup comment 
      
      DRIVER=="nvidia"......
 
