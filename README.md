@@ -63,14 +63,21 @@ If /etc/pipewire/ folder and its contents doesn't exist run
 
 than be sure /home/!!!your username!!!/.config/autostart/pipewire.desktop exist in case copy it :
 
-    cp -r ~/.UNI/Conf_files/Pipewire/ ~/.config/autostart/
+    cp ~/.UNI/Conf_files/Pipewire/pipewire.desktop ~/.config/autostart/
+ 
+ - if you have installed pipewire-media-session
+ 
+       #{ path = "/usr/bin/pipewire-media-session" args = "" }
+
+ - else if you have installed wireplumber replace the above command with
     
+       { path = "wireplumber"  args = "" }
 
 and uncomment these 2 lines at the end of /etc/pipewire/pipewire.conf
     
     #{ path = "/usr/bin/pipewire" args = "-c pipewire-pulse.conf" }
     
- - if you have installed pipewire-media-session wireplumber
+ - if you have installed pipewire-media-session
  
        #{ path = "/usr/bin/pipewire-media-session" args = "" }
 
