@@ -67,13 +67,10 @@ than be sure /home/!!!your username!!!/.config/autostart/pipewire.desktop exist 
 
     cp ~/.UNI/Conf_files/Pipewire/pipewire.desktop ~/.config/autostart/
  
- - if you have installed pipewire-media-session
+ - if you have installed pipewire-media-session comment out at the Exec
  
-       #{ path = "/usr/bin/pipewire-media-session" args = "" }
+       ###& /usr/bin/pipewire-media-session
 
- - else if you have installed wireplumber replace the above command with
-    
-       { path = "wireplumber"  args = "" }
 
 and uncomment these 2 lines at the end of /etc/pipewire/pipewire.conf
     
