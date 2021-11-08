@@ -18,24 +18,24 @@ UEFISel () {
 		if (mount | grep /sys/firmware/efi/efivars)
 		then mount -t efivarfs efivarfs /sys/firmware/efi/efivars
 		fi
-	UefiMode=1 && echo "UEFI Mode detected"
+	export UefiMode=1 && echo "UEFI Mode detected"
 	else
-	UefiMode=0 && echo "BIOS Mode detected"
+	export UefiMode=0 && echo "BIOS Mode detected"
 	fi
 }
 
 CpuSel () {
   CPUT=$(lscpu | awk '/Vendor ID:/ {print $3}')
   case "$CPUT" in
-    GenuineIntel) echo "Installing Intel microcode" && microcode=intel-ucode.img ;;
-    AuthenticAMD) echo "Installing AMD microcode" && microcode=amd-ucode.img ;;
+    GenuineIntel) echo "Installing Intel microcode" && export microcode=intel-ucode.img ;;
+    AuthenticAMD) echo "Installing AMD microcode" && export microcode=amd-ucode.img ;;
   esac	
 }
 
 GraphicSel () {
   echo " Detecting video chipset "
   GCard=$(lspci | grep VGA)
-  GCard_length=$(lspci | grep -c VGA)
+  #GCard_length=$(lspci | grep -c VGA)
 
   GSel=( 'NVIDIA' 'Intel' 'Advanced' )
   GDriver=( 'NVDriver' 'INDriver' 'AMDriver' )
@@ -53,7 +53,7 @@ GraphicSel () {
       *) eval "${GDriver[t]}"="${DefaultDriver[t]}" ;;
     esac
   fi
-  t=($t+1)
+  t=("$t"+1)
   done
   
   YesNoSel "Install this driver : [ AMD = $AMDriver ] [ INTEL = $INDriver ] [ NVIDIA = $NVDriver ]"
@@ -71,30 +71,32 @@ SelSteps () {
                 '3|Void|void' 'distro selected : Void' 'Void'
                 'echo "Wrong choice, type again" && OperatingSystemSel' )
   
-  SelS=( 'OSSelection' 'LocalizationSel' 'LanguageSel' 'TimezoneSel' 
-  'HostnameSel' 'UsernameSel' 'PartIDSel' 'FilesystemSel' 'BootloaderSel' )
+  SelS=( 'OSSelection[@]' ) ## LocalizationSel 'LanguageSel' 'TimezoneSel' 
+  ## 'HostnameSel' 'UsernameSel' 'PartIDSel' 'FilesystemSel' 'BootloaderSel' )
   for i in "${SelS[@]}"; do
-    echo -en "${i[1]}"
-    read -r "${i[2]}"
-    YesNoSel "${i[3]}"
-    case "${i[0]}" in
-      2) case "${i[2]}" in
-           "${i[4]}") echo "${i[5]}" && eval "${i[2]}"="${i[6]}" ;;
-           *) "${i[6]}" ;;
+    var=("${!i}")
+    echo -en "${var[1]}"
+    read -r "${var[2]}"
+    #YesNoSel "${var[3]}"
+    case "${var[2]}" in
+      2) case "${var[2]}" in
+           "${var[4]}") echo "${var[5]}" && eval "${var[2]}"="${var[6]}" ;;
+           *) "${var[6]}" ;;
          esac ;;
-      3) case "${i[2]}" in
-           "${i[4]}") echo "${i[5]}" && eval "${i[2]}"="${i[6]}" ;;
-           "${i[7]}") echo "${i[8]}" && eval "${i[2]}"="${i[9]}" ;;
-           *) "${i[10]}" ;;
+      3) case "${var[2]}" in
+           "${var[4]}") echo "${var[5]}" && eval "${var[2]}"="${var[6]}" ;;
+           "${var[7]}") echo "${var[8]}" && eval "${var[2]}"="${var[9]}" ;;
+           *) "${var[10]}" ;;
          esac ;;
-      4) case "${i[2]}" in
-           "${i[4]}") echo "${i[5]}" && eval "${i[2]}"="${i[6]}" ;;
-           "${i[7]}") echo "${i[8]}" && eval "${i[2]}"="${i[9]}" ;;
-           "${i[10]}") echo "${i[11]}" && eval "${i[2]}"="${i[12]}" ;;
-           *) "${i[13]}" ;;
+      4) case "${var[2]}" in
+           "${var[4]}") echo "${var[5]}" && eval "${var[2]}"="${var[6]}" ;;
+           "${var[7]}") echo "${var[8]}" && eval "${var[2]}"="${var[9]}" ;;
+           "${var[10]}") echo "${var[11]}" && eval "${var[2]}"="${var[12]}" ;;
+           *) "${var[13]}" ;;
          esac ;;
       *) ;;
     esac
+    echo doned ${var[2]}
   done
 }
 
@@ -244,3 +246,17 @@ BootloaderSel () {
     *) echo "Wrong bootloader selected, try one of those provided" && BootloaderSel ;;
   esac
 }
+
+YesNoSel () {
+  read -rp "$1 $2 $3 [y/N] " YNS
+  case "$YNS" in 
+    [yY] | [yY][eE][sS]) CC=1 ;;
+    [nN] | [nN][oO]) CC=0 ;;
+    *) YesNoSel "$1" ;;
+  esac
+}
+
+#UEFISel
+#CPUSel
+#GraphicSel
+SelSteps
