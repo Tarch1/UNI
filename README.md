@@ -55,7 +55,9 @@ An addition for super+($number) navigation use:
 
 checking that they are properly unset with gsettings list-recursively | grep switch-to-application | sort
 
-Pipewire troubleshooting
+
+
+PIPEWIRE TROUBLESHOOTING
 
 If /etc/pipewire/ folder and its contents doesn't exist run
 
