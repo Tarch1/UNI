@@ -57,7 +57,7 @@ TROUBLESHOOTIG
 
 If gnome on wayland not start's on machine's with hybrid gpu setup comment 
      
-     sed -i "/DRIVER=="nvidia"/ s/#//g" /lib/udev/rules.d/61-gdm.rules
+     sed -i s/DRIVER=="nvidia"/#DRIVER=="nvidia"/g" /lib/udev/rules.d/61-gdm.rules
 
 PIPEWIRE TROUBLESHOOTING
 
