@@ -57,7 +57,7 @@ TROUBLESHOOTIG
 
 If gnome on wayland not start's on machine's with hybrid gpu setup comment 
      
-     sed -i "/DRIVER=="nvidia"/ s/#//g" 
+     sed -i "/DRIVER=="nvidia"/ s/#//g" /lib/udev/rules.d/61-gdm.rules
 
 PIPEWIRE TROUBLESHOOTING
 
@@ -72,7 +72,6 @@ than be sure /home/!!!your username!!!/.config/autostart/pipewire.desktop exist 
  - if you have installed pipewire-media-session comment out at the Exec
  
        ###& /usr/bin/pipewire-media-session
-
 
 and uncomment these 2 lines at the end of /etc/pipewire/pipewire.conf
     
