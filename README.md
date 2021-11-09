@@ -57,7 +57,7 @@ TROUBLESHOOTIG
 
 If gnome on wayland not start's on machine's with hybrid gpu setup comment 
      
-     sed -i 's/DRIVER=="nvidia"/#DRIVER=="nvidia"/g' /lib/udev/rules.d/61-gdm.rules
+    sed -i 's/DRIVER=="nvidia"/#DRIVER=="nvidia"/g' /lib/udev/rules.d/61-gdm.rules
 
 PIPEWIRE TROUBLESHOOTING
 
@@ -65,23 +65,23 @@ If /etc/pipewire/ folder and its contents doesn't exist run
 
     cp -r /usr/share/pipewire /etc/
 
-than be sure /home/!!!your username!!!/.config/autostart/pipewire.desktop exist in case copy it :
+    than be sure /home/!!!your username!!!/.config/autostart/pipewire.desktop exist in case copy it :
 
     cp ~/.UNI/Conf_files/Pipewire/pipewire.desktop ~/.config/autostart/
  
- - if you have installed pipewire-media-session comment out at the Exec
+    if you have installed pipewire-media-session comment out at the Exec inside ~/.config/autostart/pipewire.desktop
  
-       ###& /usr/bin/pipewire-media-session
+    ###& /usr/bin/pipewire-media-session
 
 and uncomment these 2 lines at the end of /etc/pipewire/pipewire.conf
     
     #{ path = "/usr/bin/pipewire" args = "-c pipewire-pulse.conf" }
     
- - if you have installed pipewire-media-session
+    - if you have installed pipewire-media-session
  
        #{ path = "/usr/bin/pipewire-media-session" args = "" }
 
- - else if you have installed wireplumber replace the above command with
+    - else if you have installed wireplumber replace the above command with
     
        { path = "wireplumber"  args = "" }
 
