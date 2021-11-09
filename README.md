@@ -36,27 +36,28 @@ then personalize with
     bash full_setup
 
 Reboot and Enjoy!
+
+GNOME SETUP
+
+    Increase volume steps by: (less value = more steps)
+
+     gsettings set org.gnome.settings-daemon.plugins.media-keys volume-step 1
+
+    Add navigation shortcut like super+($number) with: 
+     
+     for i in {1..9}; do gsettings set "org.gnome.shell.keybindings" "switch-to-application-$i" "[]"; done
+
+    checking that they are properly unset with gsettings list-recursively | grep switch-to-application | sort
+
+A list of useful gnome extension: 
+    
+    Blur my Shell - Dynamic Panel Transparency - Sound IO Device Chooser - Unite
+
 TROUBLESHOOTIG
 
 If gnome on wayland not start's on machine's with hybrid gpu setup comment 
      
      DRIVER=="nvidia"......
-
-if not worked at /lib/udev/rules.d/61-gdm.rules if doesn't work, move away   
-
-     sudo mv /usr/share/xsessions/gnome-xorg.desktop /usr/share/xsessions/gnome-xorg.desktop.back
-
-For increasing volume steps: (less value = more steps)
-
-     gsettings set org.gnome.settings-daemon.plugins.media-keys volume-step 1
-
-An addition for super+($number) navigation use: 
-     
-     for i in {1..9}; do gsettings set "org.gnome.shell.keybindings" "switch-to-application-$i" "[]"; done
-
-checking that they are properly unset with gsettings list-recursively | grep switch-to-application | sort
-
-
 
 PIPEWIRE TROUBLESHOOTING
 
