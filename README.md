@@ -53,6 +53,10 @@ A list of useful gnome extension:
     
     Blur my Shell - Dynamic Panel Transparency - Sound IO Device Chooser - Unite
 
+Icons and cursor theme
+    
+    Extract from secondary drive in /OS/Linux/ the theme inside /home/tarch1/.local/share/icons
+
 TROUBLESHOOTIG
 
 If gnome on wayland not start's on machine's with hybrid gpu setup comment 
