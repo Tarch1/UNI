@@ -1,6 +1,4 @@
 # Universal-Installation-Script
-Problems with pacman? Try this :
-pacman-key --populate artix
 
 STEP:
 
@@ -41,13 +39,15 @@ GNOME SETUP
 
     Increase volume steps by: (less value = more steps)
 
-     gsettings set org.gnome.settings-daemon.plugins.media-keys volume-step 1
+        gsettings set org.gnome.settings-daemon.plugins.media-keys volume-step 1
 
     Add navigation shortcut like super+($number) with: 
      
-     for i in {1..9}; do gsettings set "org.gnome.shell.keybindings" "switch-to-application-$i" "[]"; done
+        for i in {1..9}; do gsettings set "org.gnome.shell.keybindings" "switch-to-application-$i" "[]"; done
 
-    checking that they are properly unset with gsettings list-recursively | grep switch-to-application | sort
+    Checking that they are properly unset with:
+    
+        gsettings list-recursively | grep switch-to-application | sort
 
 A list of useful gnome extension: 
     
@@ -57,7 +57,7 @@ TROUBLESHOOTIG
 
 If gnome on wayland not start's on machine's with hybrid gpu setup comment 
      
-     DRIVER=="nvidia"......
+     sed -i "/DRIVER=="nvidia"/ s/#//g" 
 
 PIPEWIRE TROUBLESHOOTING
 
