@@ -8,9 +8,7 @@ Installation () {
   if [[ "$CC" == 1 ]]; then Steps["$CT"]="$i"; else unset "Steps[$CT]"; fi
   CT=$((CT + 1))
   done
-  for i in "${Steps[@]}"; do
-  "$i"
-  done
+  for i in "${Steps[@]}"; do "$i"; done
 }
 
 Snapper () {
@@ -41,15 +39,11 @@ Snapper () {
 #sudo systemctl enable snapper-timeline.timer
 #sudo systemctl enable snapper-cleanup.timer
 #sudo systemctl enable grub-btrfs.path
-
-#rc-update add snapper-timeline.timer default
-#rc-update add snapper-cleanup.timer default
-#rc-update add grub-btrfs.path default
 }
 
 Trizen () {
-  git clone https://aur.archlinux.org/trizen.git ~/trizen
-  cd ~/trizen || Trizen
+  git clone https://aur.archlinux.org/trizen.git
+  cd trizen
   makepkg -si
   trizen -S clapper 
   #bibata-cursor-translucent steamtinkerlaunch
@@ -73,8 +67,7 @@ Environment () {
   
   cp -r /media/internal_hdd/OS/Wallpapers/* ~/.wallpapers
   cp ~/UNI/Conf_files/picom.conf ~/.config/picom.conf
-  cp ~/UNI/Conf_files/Dunst/dunstrc ~/.config/dunst/dunstrc
-  cp ~/UNI/Conf_files/Dunst/dunst-color.sh ~/.config/dunst/dunst-color.sh 
+  cp ~/UNI/Conf_files/Dunst/* ~/.config/dunst/ 
   cp ~/UNI/Conf_files/Script/toggle-touchpad.sh ~/.config/toggle-touchpad.sh
   cp ~/UNI/Conf_files/Script/low-battery.sh ~/.config/low-battery.sh
   cp ~/UNI/Conf_files/config.rasi ~/.config/rofi/config.rasi
@@ -90,11 +83,7 @@ Environment () {
   
   ###################-PERMISSIONS-###################
   
-  chmod +x ~/.xinitrc
-  chmod +x ~/.config/toggle-touchpad.sh
-  chmod +x ~/.config/dunst/dunst-color.sh
-  chmod +x ~/.config/low-battery.sh
-  chmod +x ~/.pfetch
+  chmod +x ~/.xinitrc ~/.config/toggle-touchpad.sh ~/.config/dunst/dunst-color.sh ~/.config/low-battery.sh ~/.pfetch
   
   ###################-EXECUTION-###################
   
@@ -119,8 +108,7 @@ function WindowManager () {
             mkdir ~/.config/{bspwm,sxhkd}
             cp ~/UNI/Conf_files/Bspwm/sxhkdrc ~/.config/sxhkd/sxhkdrc
             cp ~/UNI/Conf_files/Bspwm/bspwmrc ~/.config/bspwm/bspwmrc
-            chmod +x ~/.config/sxhkd/sxhkdrc
-            chmod +x ~/.config/bspwm/bspwmrc
+            chmod +x ~/.config/sxhkd/sxhkdrc ~/.config/bspwm/bspwmrc
     ;;
     gnome ) sudo pacman -Syu gnome-shell gnome-control-center xdg-desktop-portal-gtk gnome-weather gnuchess gnome-chess gnome-calculator gnome-keyring evince nautilus file-roller
             sudo pacman -Syu gdm gdm-openrc
@@ -131,11 +119,8 @@ function WindowManager () {
             cp ~/UNI/Conf_files/Script/pfetch ~/.pfetch
             cp ~/UNI/Conf_files/nanorc ~/.nanorc
             echo 'Xft.dpi: 90' > ~/.Xdefaults
-            #sudo cp ~/UNI/Conf_files/40-libinput.conf /usr/share/X11/xorg.conf.d/40-libinput.conf
-            #sudo ln -s /usr/share/X11/xorg.conf.d/40-libinput.conf /etc/X11/xorg.conf.d/40-libinput.conf
             chmod +x ~/.pfetch
-            sudo mkdir -p /etc/xdg/autostart/
-            cp -r /usr/share/pipewire /etc/
+            #sudo mkdir -p /etc/xdg/autostart/
             #mkdir ~/.config/autostart
             #cp -r ~/UNI/Conf_files/pipewire/ ~/.config/autostart
             sudo rc-update add gdm default
@@ -155,20 +140,15 @@ function WindowManager () {
     polybar ) sudo pacman -S xdotool xorg-xwininfo xorg-xev  --noconfirm
               trizen -S polybar
               mkdir ~/.config/polybar
-              cp ~/UNI/Conf_files/Polybar/hide ~/.config/polybar/hide
-              cp ~/UNI/Conf_files/Polybar/launch.sh ~/.config/polybar/launch.sh
-              cp ~/UNI/Conf_files/Polybar/config ~/.config/polybar/config
-              chmod +x ~/.config/polybar/launch.sh
-              chmod +x ~/.config/polybar/hide
+              cp ~/UNI/Conf_files/Polybar/* ~/.config/polybar/
+              chmod +x ~/.config/polybar/launch.sh ~/.config/polybar/hide
     ;;
     *) echo "Wrong choice, type again" && WindowManager
     ;;
-esac
-YesNoSel "Want another WindowManager?"
-if [ "$CC" = 1 ]
-then WindowManager
-else echo "Nothing"
-fi
+  esac
+
+  YesNoSel "Want another WindowManager?"
+  if [ "$CC" = 1 ]; then WindowManager ; else echo "Nothing" ; fi
 }
 
 YesNoSel () {
