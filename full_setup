@@ -5,12 +5,9 @@ Installation () {
   local CT=0
   for i in "${Part[@]}"; do
   YesNoSel "You need" "$i" "?"
-  if [[ "$i" == "${Part[CT]}" ]] && [[ "$CC" == 1 ]]; then Steps["$CT"]="$i"
-  else unset "Steps[$CT]"
-  fi
+  if [[ "$CC" == 1 ]]; then Steps["$CT"]="$i"; else unset "Steps[$CT]"; fi
   CT=$((CT + 1))
   done
-  
   for i in "${Steps[@]}"; do
   "$i"
   done
@@ -177,12 +174,9 @@ fi
 YesNoSel () {
   read -rp "$1 $2 $3 [y/N] " YNS
   case "$YNS" in 
-  [yY] | [yY][eE][sS] ) CC=1
-  ;;
-  [nN] | [nN][oO] ) CC=0
-  ;;
-  *) echo "Wrong choice, type again" && YesNoSel "$1" "$i"
-  ;;
+  [yY] | [yY][eE][sS] ) CC=1 ;;
+  [nN] | [nN][oO] ) CC=0 ;;
+  *) echo "Wrong choice, type again" && YesNoSel "$1" ;;
   esac
 }
 
