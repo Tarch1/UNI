@@ -3,6 +3,7 @@
 ########## INSTALLATION-SCRIPT ##########
 
 voidnow () {
+echo 'start with void'
   REPO=https://alpha.de.repo.voidlinux.org/current
   ARCH=x86_64
   xbps-install -Su xbps
@@ -47,6 +48,7 @@ CheckAS () {
     echo "Missing file: additional_setup"
     exit 1
   fi
+  echo 'done with addsetup'
 }
 
 DiskPartition () {
@@ -286,7 +288,7 @@ BaseInstallation () {
   'BaseSystemInstall' 'SyncTime' 'LocaleGen' 'HostConfig' 'PackageConfig' 'PackageInstall' 
   'ServiceEnabler' 'AudioSetup' 'UserSetup' 'BootloaderInstall' )
   
-  local VoidSteps=( 'VoidInstMethod' 'DiskPartition' 'BootFormat' 'RootFormat' 'ExternalDriveSetup' )
+  local VoidSteps=( 'VoidInstMethod' 'DiskPartition' 'BootFormat' 'RootFormat' 'voidnow' )
   
   VirtualBoxTest
   if [ "$VBTSel" = 1 ]; then 
