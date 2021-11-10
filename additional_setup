@@ -145,8 +145,8 @@ VoidInstMethod () {
   echo -en "Enter installation type : 1) XBPS 2) ROOTFS \n"
   read -r VIMethod
   case $VIMethod in
-    1|XBPS|xbps) echo "Selected : Arch" && VIMethod="XBPS" ;;
-    2|ROOTFS|rootfs) echo "Selected : Artix" && VIMethod="ROOTFS" ;;
+    1|XBPS|xbps) echo 'Selected : XBPS install' && VIMethod="XBPS" ;;
+    2|ROOTFS|rootfs) echo 'Selected : ROOTFS install' && VIMethod="ROOTFS" ;;
     *) echo "Wrong choice, type again" && VoidInstMethod ;;
   esac
 }
