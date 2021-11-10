@@ -80,16 +80,12 @@ DiskPartition () {
   BOOT_PART="$DRIVE"1 && ROOT_PART="$DRIVE"2
   DEVICE="mmc"
   fi
-  
-  #case $DEVICE in
-  #nvme) BOOT_PART="$DRIVE"p1 && ROOT_PART="$DRIVE"p2 ;;
-  #sda) BOOT_PART="$DRIVE"1 && ROOT_PART="$DRIVE"2 ;;
-  #mmc) BOOT_PART="$DRIVE"1 && ROOT_PART="$DRIVE"2 ;;
-  #esac
+
   eval "$PIDSel"_BOOT="$(blkid -s "$PIDSel" -o value "$BOOT_PART")"
   eval "$PIDSel"_ROOT="$(blkid -s "$PIDSel" -o value "$ROOT_PART")"
-  echo "$BOOT_PART $ROOT_PART UUID_BOOT= $UUID_BOOT" "$PIDSel"_ROOT= "$UUID_ROOT"
-  #$PIDSel"_BOOT "$PIDSel"_ROOT"
+  echo "BOOT_PART= $BOOT_PART ROOT_PART= $ROOT_PART"
+  echo "$PIDSel"= "$UUID_BOOT"
+  echo "$PIDSel"_ROOT= "$UUID_ROOT"
 }
 
 BootFormat () {
