@@ -278,6 +278,7 @@ YesNoSel () {
 }
 
 BaseInstallation () {
+  CheckAS
   local SelectionSteps=( 'OperatingSystemSel' 'LocalizationSel' 'LanguageSel' 'TimezoneSel' 
   'HostnameSel' 'UsernameSel' 'PartIDSel' 'FilesystemSel' 'BootloaderSel' )
   
