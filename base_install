@@ -7,7 +7,7 @@ echo 'start with void'
   REPO=https://alpha.de.repo.voidlinux.org/current
   ARCH=x86_64
   xbps-install -Su xbps
-  XBPS_ARCH=$ARCH xbps-install -S -r /mnt -R "$REPO" base-devel nano base-system linux linux-firmware $btrfsdep
+  XBPS_ARCH=$ARCH xbps-install -S -r /mnt -R "$REPO" nano base-system linux linux-firmware $btrfsdep
   mount --rbind /sys /mnt/sys && mount --make-rslave /mnt/sys
   mount --rbind /dev /mnt/dev && mount --make-rslave /mnt/dev
   mount --rbind /proc /mnt/proc && mount --make-rslave /mnt/proc
@@ -28,6 +28,8 @@ EOF
   UUID=$UUID_bOOT /boot/efi vfat defaults,noatime 0 2
   tmpfs /tmp tmpfs defaults,noatime,mode=1777 0 0
 EOF
+  chroot /mnt useradd -mG wheel,video,storage tarch1
+  chroot /mnt sed -i '/%wheel ALL=(ALL) ALL/ s/# //' /mnt/etc/sudoers
   chroot /mnt passwd
   chroot /mnt passwd tarch1
   chroot /mnt xbps-install refind
