@@ -12,22 +12,22 @@ voidnow () {
   mount --rbind /dev /mnt/dev && mount --make-rslave /mnt/dev
   mount --rbind /proc /mnt/proc && mount --make-rslave /mnt/proc
   mount -t devpts pts /mnt/dev/pts
-  chroot /mnt /bin/bash cat <<EOF > /etc/rc.rc.conf
+  chroot /mnt /bin/bash cat <<'EOF' > /etc/rc.rc.conf
   # /etc/rc.conf - system configuration for void
   HOSTNAME="tarch1"
   HARDWARECLOCK="UTC"
   TIMEZONE="Europe/Rome"
   KEYMAP="it"
-  EOF
+EOF
   chroot /mnt /bin/bash echo 'en_US.UTF-8 UTF-8' > /etc/default/libc-locales
   chroot /mnt /bin/bash echo LANG=en_US.UTF-8 > /etc/locale.conf
-  cat <<EOF > /etc/fstab
+  cat <<EOF > /mnt/etc/fstab
   UUID=$UUID_ROOT / btrfs rw,noatime,ssd,compress=lzo,space_cache=v2,commit=60,subvol=@ 0 1
   UUID=$UUID_ROOT /home btrfs rw,noatime,ssd,compress=lzo,space_cache=v2,commit=60,subvol=@home 0 2
   UUID=$UUID_ROOT /.snapshots btrfs rw,noatime,ssd,compress=lzo,space_cache=v2,commit=60,subvol=@snapshots 0 2
   UUID=$UUID_bOOT /boot/efi vfat defaults,noatime 0 2
   tmpfs /tmp tmpfs defaults,noatime,mode=1777 0 0
-  EOF
+EOF
   chroot /mnt /bin/bash passwd
   chroot /mnt /bin/bash passwd tarch1
   chroot /mnt /bin/bash xbps-install refind
