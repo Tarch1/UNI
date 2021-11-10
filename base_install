@@ -56,7 +56,7 @@ CheckAS () {
 
 DiskPartition () {
   umount -R /mnt 
-  "$pkgmanager" -Sy $pkgskips parted gptfdisk mtools ntfs-3g dialog
+  "$pkgmanager" -Sy "${pkgskips[@]}" parted gptfdisk mtools ntfs-3g dialog
   devicelist="$(lsblk -dplnx size -o name,size | grep -Ev "boot|rpmb|loop" | tac)"
   DRIVE="$(dialog --stdout --menu "Select disk for installation" 0 0 0 ${devicelist} || exit 1)"
   EXT_DRIVE="$(dialog --stdout --menu "Select EXTERNAL disk" 0 0 0 ${devicelist} || exit 1)"
@@ -179,13 +179,13 @@ PackageConfig () {
   echo "$OSSel"
   case "$OSSel" in
     1|Arch|arch)
-      "$chroot" /mnt pacman -Syu $pkgskips
+      "$chroot" /mnt pacman -Syu "${pkgskips[@]}"
       "$chroot" /mnt pacman-key --init
       "$chroot" /mnt pacman-key --populate archlinux
       sed -i '/\[multilib],/mirrorlist/ s/#//' /mnt/etc/pacman.conf
     ;;
     2|Artix|artix)
-      "$chroot" /mnt pacman -Syu $pkgskips artix-archlinux-support
+      "$chroot" /mnt pacman -Syu "${pkgskips[@]}" artix-archlinux-support
       "$chroot" /mnt pacman-key --populate archlinux
       RepoList=( '[extra]' 'Include = /etc/pacman.d/mirrorlist-arch'
                  '[community]' 'Include = /etc/pacman.d/mirrorlist-arch'
@@ -208,7 +208,7 @@ PackageInstall () {
   EssentialPKG=( $dev $fs $net $audio $filemanager $baseutils $media $rcpacks )
   AdditivePKG=( $vulkan $hardwareacceleration $nvidiagraphics $print $apps $bluetooth $android $archive )
   ExtraPKG=( $xorg $filemanager $media )
-  "$chroot" /mnt "$pkgmanager" -Syu $pkgskips "${EssentialPKG[@]}"
+  "$chroot" /mnt "$pkgmanager" -Syu "${pkgskips[@]}" "${EssentialPKG[@]}"
   #"$chroot" /mnt "$pkgmanager" -Syu 
   #cp ../UNI/Conf_files/mkinitcpio.conf /mnt/etc
   sed -i "/MODULES/ s/()/($modules)/" /mnt/etc/mkinitcpio.conf
@@ -250,7 +250,7 @@ BootloaderInstall () {
   echo "$BLSel"
   case $BLSel in
     1|REFIND|refind)
-      "$chroot" /mnt "$pkgmanager" -Sy $pkgskips refind
+      "$chroot" /mnt "$pkgmanager" -Sy "${pkgskips[@]}" refind
       "$chroot" /mnt refind-install
       mkdir /mnt/boot/EFI/refind/themes
       mv /mnt/boot/EFI/refind/refind.conf /mnt/boot/EFI/refind/backup-refind.conf
@@ -260,7 +260,7 @@ BootloaderInstall () {
       cp -r ../UNI/Bootloader/Refind/themes/* /mnt/boot/EFI/refind/themes/
     ;;
     2|GRUB|grub)
-      "$chroot" /mnt "$pkgmanager" -Sy $pkgskips grub grub-btrfs
+      "$chroot" /mnt "$pkgmanager" -Sy "${pkgskips[@]}" grub grub-btrfs
       case "$UefiMode" in
         1) "$chroot" /mnt grub-install --target=x86_64-efi --efi-directory=/boot bootloader-id=GRUB ;;
         0) "$chroot" /mnt grub-install --target=i386-pc --recheck --debug /boot ;;
@@ -326,7 +326,7 @@ BaseInstallation () {
   case "$OSSel" in
     1|Arch|arch) 
     pkgmanager=pacman
-    pkgskips='--needed --noconfirm'
+    pkgskips=(--needed --noconfirm)
     keylayout='KEYMAP=it'
     keypath="etc/vconsole.conf"
     pkgstrap=pacstrap
@@ -342,7 +342,7 @@ BaseInstallation () {
     ;;
     2|Artix|artix)
     pkgmanager=pacman
-    pkgskips='--needed --noconfirm'
+    pkgskips=(--needed --noconfirm)
     keylayout='KEYMAP=it'
     keypath='etc/conf.d/keymaps'
     pkgstrap=basestrap
@@ -356,7 +356,7 @@ BaseInstallation () {
     elogind='elogind elogind-openrc'
     pacman-key --init
     pacman-key --populate artix
-    pacman -Sy $pkgskips artix-archlinux-support #lib32-artix-archlinux-support
+    pacman -Sy "${pkgskips[@]}" artix-archlinux-support #lib32-artix-archlinux-support
     for a in "${ArchTixSteps[@]}"; do "$a"
     done
     ;;
