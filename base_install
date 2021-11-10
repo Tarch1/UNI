@@ -12,6 +12,7 @@ echo 'start with void'
   mount --rbind /dev /mnt/dev && mount --make-rslave /mnt/dev
   mount --rbind /proc /mnt/proc && mount --make-rslave /mnt/proc
   mount -t devpts pts /mnt/dev/pts
+  cp /etc/resolv.conf /mnt/etc/
   chroot /mnt cat <<'EOF' > /etc/rc.rc.conf
   # /etc/rc.conf - system configuration for void
   HOSTNAME="tarch1"
