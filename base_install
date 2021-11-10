@@ -41,6 +41,7 @@ EOF
   cp ../UNI/Bootloader/Refind/refind.conf /mnt/boot/EFI/refind/refind.conf
   cp ../UNI/Bootloader/Refind/refind_linux.conf /mnt/boot/refind_linux.conf
   cp -r ../UNI/Bootloader/Refind/themes/* /mnt/boot/EFI/refind/themes/
+  xbps-reconfigure -fa
 }
 
 CheckAS () {
