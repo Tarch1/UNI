@@ -57,7 +57,7 @@ CheckAS () {
 DiskPartition () {
   umount -R /mnt 
   "$pkgmanager" -Sy $pkgskips parted gptfdisk mtools ntfs-3g dialog
-  devicelist="$(lsblk -dplnx size -o name,size | grep -Ev "boot|rpmb|loop" | tac)"
+  local devicelist="$(lsblk -dplnx size -o name,size | grep -Ev "boot|rpmb|loop" | tac)"
   DRIVE="$(dialog --stdout --menu "Select disk for installation" 0 0 0 ${devicelist} || exit 1)"
   EXT_DRIVE="$(dialog --stdout --menu "Select EXTERNAL disk" 0 0 0 ${devicelist} || exit 1)"
   ##parted -s "mklabel gpt mkpart ESP fat32 1MiB 512MiB mkpart root ext4 512MiB 100% set 1 esp on"
@@ -69,15 +69,23 @@ DiskPartition () {
   --new=2:0:0 --typecode=2:8300 \
   "$DRIVE"
   sgdisk --verify "$DRIVE"
-  if echo "$DRIVE" | grep "^/dev/[a-z]d[a-z]"; then DEVICE="sda"
-  elif echo "$DRIVE" | grep "^/dev/nvme"; then DEVICE="nvme"
-  elif echo "$DRIVE" | grep "^/dev/mmc"; then DEVICE="mmc"
+  
+  if echo "$DRIVE" | grep "^/dev/[a-z]d[a-z]"; then 
+  BOOT_PART="$DRIVE"1 && ROOT_PART="$DRIVE"2
+  DEVICE="sda"
+  elif echo "$DRIVE" | grep "^/dev/nvme"; then 
+  BOOT_PART="$DRIVE"p1 && ROOT_PART="$DRIVE"p2
+  DEVICE="nvme0n1"
+  elif echo "$DRIVE" | grep "^/dev/mmc"; then 
+  BOOT_PART="$DRIVE"1 && ROOT_PART="$DRIVE"2
+  DEVICE="mmc"
   fi
-  case $DEVICE in
-  nvme) BOOT_PART="$DRIVE"p1 && ROOT_PART="$DRIVE"p2 ;;
-  sda) BOOT_PART="$DRIVE"1 && ROOT_PART="$DRIVE"2 ;;
-  mmc) BOOT_PART="$DRIVE"1 && ROOT_PART="$DRIVE"2 ;;
-  esac
+  
+  #case $DEVICE in
+  #nvme) BOOT_PART="$DRIVE"p1 && ROOT_PART="$DRIVE"p2 ;;
+  #sda) BOOT_PART="$DRIVE"1 && ROOT_PART="$DRIVE"2 ;;
+  #mmc) BOOT_PART="$DRIVE"1 && ROOT_PART="$DRIVE"2 ;;
+  #esac
   eval "$PIDSel"_BOOT="$(blkid -s "$PIDSel" -o value "$BOOT_PART")"
   eval "$PIDSel"_ROOT="$(blkid -s "$PIDSel" -o value "$ROOT_PART")"
   echo "$BOOT_PART $ROOT_PART $UUID_BOOT $UUID_ROOT"
@@ -123,7 +131,9 @@ RootFormat () {
 
 ExternalDriveSetup () {
   case "$EXT_DRIVE" in
-  "$DRIVE") echo 'ERROR you cannot use the same disk as for the primary' ;;
+  "$DRIVE") echo 'ERROR you cannot use the same disk as for the primary' 
+            EXT_DRIVE="$(dialog --stdout --menu "Select EXTERNAL disk" 0 0 0 ${devicelist} || exit 1)"
+            ExternalDriveSetup ;;
   '') echo 'No secondary drive to setup' ;;
   *) echo 'yes' 
   sudo ntfsfix /dev/sda1
