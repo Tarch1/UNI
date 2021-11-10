@@ -1,10 +1,10 @@
 #!/bin/bash
 
 missing=()
-y=(pkg_microcode pkg_base pkg_ext pkg_init pkg_dev pkg_baseutils
+y="pkg_microcode pkg_base pkg_ext pkg_init pkg_dev pkg_baseutils
    pkg_fs pkg_net pkg_audio pkg_android pkg_bluetooth pkg_print 
    pkg_xorg pkg_apps pkg_nvidiagraphics pkg_hardwareacceleration
-   pkg_filemanager pkg_archive pkg_media pkg_elogind pkg_rc)
+   pkg_filemanager pkg_archive pkg_media pkg_elogind pkg_rc"
 
 pkg_microcode=(intel-ucode)
 pkg_base=(base base-devel linux linux-firmware)
@@ -27,48 +27,38 @@ pkg_archive=(file-roller atool bzip2 cpio gzip lha xz lzop p7zip tar unrar zip u
 pkg_media=(celluloid mate-utils pantheon-screenshot simplescreenrecorder)
 pkg_elogind=()
 pkg_rc=(ntp-openrc avahi-openrc cups-openrc bluez-openrc networkmanager-openrc)
-
 sudo pacman -Slq system world galaxy extra community multilib | sort > pacman_db
 ghb=0
 
-start () {
-echo 'Wait at least 2 min' 
-for c in "${y[@]}"; do
-  var=("$c"[@])
-  var1=("${!var}")
-  middle "${var1[@]}"
-  unset "$c"
-  export "$c"="${test[*]}"
-done
-}
-
-middle () {
-for i in "${var1[@]}"; do
-  if ! sudo pacman -Ss "${i}" 1>/dev/null
-  then
-    echo "[x] Package not available: $i"
-    missing+=("$i")
-    array_t="${var1[*]}"
-    test="${array_t//$i/}"
-    unset array_t
-  else
-    test="${var1[*]}"
-  fi
-  ghb=$((ghb+1))
-  echo -ne '['"$ghb"'%]\r'
-done
-}
-
-endings () {
-echo "${missing[@]}" | tr ' ' '\n' | sort -u > pkglist
+AnotherCheck () {
+echo "${miss[@]}" | tr ' ' '\n' | sort -u > pkglist
 IFS=" " read -r -a unlisted <<< "$(comm -13 pacman_db pkglist)"
-echo "UNL=" "${unlisted[@]}"
-echo 'Present (---)'
-for i in "${y[@]}"; do
-  local ii=("${!i}")
-  echo '\\\' "${i[@]}" '///' "${ii[@]}"
+echo 'Unlisted' "${unlisted[@]}"
+}
+
+PkgCheck () {
+for a in $y; do
+  var="$a"'[@]'   #the y element with a [@] to be like an array
+  temp=${!var}  #splitting the every y[@] element inside temp to simulate a subarray
+  for b in $temp; do   #for every element of subarr temp  
+    if ! pacman -Ss "$b" 1>/dev/null; then  #check if doesn't exist
+      echo "[x] Package not available: $b from $var"
+      miss+=("$b")    #add missing element to new array miss
+    else new+=("$b")
+    fi
+    ghb=$((ghb+1))
+    echo -ne '['"$ghb"'%]\r'
+  done
+  unset "$a"
+  declare "$a"="${new[*]}"
+  unset new
+done
+echo 'miss=' "${miss[@]}"
+for c in $y; do
+  local d="$c"'[@]'
+  echo "$c=""${!d}"
 done
 }
 
-start
-endings
+PkgCheck
+AnotherCheck ###bugged
