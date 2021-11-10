@@ -62,14 +62,14 @@ DiskPartition () {
   EXT_DRIVE="$(dialog --stdout --menu "Select EXTERNAL disk" 0 0 0 ${devicelist} || exit 1)"
   ##parted -s "mklabel gpt mkpart ESP fat32 1MiB 512MiB mkpart root ext4 512MiB 100% set 1 esp on"
   #parted -s "$DRIVE" mklabel gpt mkpart "EFI system partition" 0% 1% set 1 esp on mkpart "root partition" 1% 100% set 1 esp on
-  echo "$DRIVE"
+  #echo "$DRIVE"
   sgdisk --zap-all \
   --clear \
   --new=1:0:+550M --typecode=1:ef00 \
   --new=2:0:0 --typecode=2:8300 \
   "$DRIVE"
   sgdisk --verify "$DRIVE"
-  
+  echo test
   if echo "$DRIVE" | grep "^/dev/[a-z]d[a-z]"; then 
   BOOT_PART="$DRIVE"1 && ROOT_PART="$DRIVE"2
   DEVICE="sda"
@@ -83,8 +83,9 @@ DiskPartition () {
 
   eval "$PIDSel"_BOOT="$(blkid -s "$PIDSel" -o value "$BOOT_PART")"
   eval "$PIDSel"_ROOT="$(blkid -s "$PIDSel" -o value "$ROOT_PART")"
-  echo "BOOT_PART= $BOOT_PART ROOT_PART= $ROOT_PART"
-  echo "$PIDSel"= "$UUID_BOOT"
+  echo "BOOT_PART= $BOOT_PART"
+  echo "ROOT_PART= $ROOT_PART"
+  echo "$PIDSel"_BOOT= "$UUID_BOOT"
   echo "$PIDSel"_ROOT= "$UUID_ROOT"
 }
 
