@@ -35,6 +35,11 @@ then personalize with
 
 Reboot and Enjoy!
 
+DISABLING INTEL TURBO BOOST
+
+https://wiki.archlinux.org/title/CPU_frequency_scaling#Disabling_Turbo_Boost
+
+
 GNOME SETUP
 
     Increase volume steps by: (less value = more steps)
