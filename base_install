@@ -12,15 +12,15 @@ echo 'start with void'
   mount --rbind /dev /mnt/dev && mount --make-rslave /mnt/dev
   mount --rbind /proc /mnt/proc && mount --make-rslave /mnt/proc
   mount -t devpts pts /mnt/dev/pts
-  chroot /mnt /bin/bash cat <<'EOF' > /etc/rc.rc.conf
+  chroot /mnt cat <<'EOF' > /etc/rc.rc.conf
   # /etc/rc.conf - system configuration for void
   HOSTNAME="tarch1"
   HARDWARECLOCK="UTC"
   TIMEZONE="Europe/Rome"
   KEYMAP="it"
 EOF
-  chroot /mnt /bin/bash echo 'en_US.UTF-8 UTF-8' > /etc/default/libc-locales
-  chroot /mnt /bin/bash echo LANG=en_US.UTF-8 > /etc/locale.conf
+  chroot /mnt echo 'en_US.UTF-8 UTF-8' > /etc/default/libc-locales
+  chroot /mnt echo LANG=en_US.UTF-8 > /etc/locale.conf
   cat <<EOF > /mnt/etc/fstab
   UUID=$UUID_ROOT / btrfs rw,noatime,ssd,compress=lzo,space_cache=v2,commit=60,subvol=@ 0 1
   UUID=$UUID_ROOT /home btrfs rw,noatime,ssd,compress=lzo,space_cache=v2,commit=60,subvol=@home 0 2
@@ -28,10 +28,10 @@ EOF
   UUID=$UUID_bOOT /boot/efi vfat defaults,noatime 0 2
   tmpfs /tmp tmpfs defaults,noatime,mode=1777 0 0
 EOF
-  chroot /mnt /bin/bash passwd
-  chroot /mnt /bin/bash passwd tarch1
-  chroot /mnt /bin/bash xbps-install refind
-  chroot /mnt /bin/bash refind-install
+  chroot /mnt passwd
+  chroot /mnt passwd tarch1
+  chroot /mnt xbps-install refind
+  chroot /mnt refind-install
   mkdir /mnt/boot/EFI/refind/themes
   mv /mnt/boot/EFI/refind/refind.conf /mnt/boot/EFI/refind/backup-refind.conf
   mv /mnt/boot/refind_linux.conf /mnt/boot/backup-refind_linux.conf
