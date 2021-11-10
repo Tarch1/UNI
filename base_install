@@ -195,7 +195,7 @@ PackageInstall () {
   EssentialPKG=( $dev $fs $net $audio $filemanager $baseutils $media $rcpacks )
   AdditivePKG=( $vulkan $hardwareacceleration $nvidiagraphics $print $apps $bluetooth $android $archive )
   ExtraPKG=( $xorg $filemanager $media )
-  "$chroot" /mnt "$pkgmanager" -Syu "$pkgskips" "${EssentialPKG[@]}"
+  "$chroot" /mnt "$pkgmanager" -Syu $pkgskips "${EssentialPKG[@]}"
   #"$chroot" /mnt "$pkgmanager" -Syu 
   #cp ../UNI/Conf_files/mkinitcpio.conf /mnt/etc
   sed -i "/MODULES/ s/()/($modules)/" /mnt/etc/mkinitcpio.conf
