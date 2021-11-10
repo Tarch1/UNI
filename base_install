@@ -88,7 +88,8 @@ DiskPartition () {
   #esac
   eval "$PIDSel"_BOOT="$(blkid -s "$PIDSel" -o value "$BOOT_PART")"
   eval "$PIDSel"_ROOT="$(blkid -s "$PIDSel" -o value "$ROOT_PART")"
-  echo "$BOOT_PART $ROOT_PART $UUID_BOOT $UUID_ROOT "$PIDSel"_BOOT "$PIDSel"_ROOT"
+  echo "$BOOT_PART $ROOT_PART UUID_BOOT= $UUID_BOOT" "$PIDSel"_ROOT= "$UUID_ROOT"
+  #$PIDSel"_BOOT "$PIDSel"_ROOT"
 }
 
 BootFormat () {
