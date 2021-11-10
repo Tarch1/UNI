@@ -29,7 +29,7 @@ EOF
   tmpfs /tmp tmpfs defaults,noatime,mode=1777 0 0
 EOF
   chroot /mnt useradd -mG wheel,video,storage tarch1
-  chroot /mnt sed -i '/%wheel ALL=(ALL) ALL/ s/# //' /mnt/etc/sudoers
+  sed -i '/%wheel ALL=(ALL) ALL/ s/# //' /mnt/etc/sudoers
   chroot /mnt passwd
   chroot /mnt passwd tarch1
   chroot /mnt xbps-install refind
