@@ -250,11 +250,19 @@ BootloaderInstall () {
       cp -r ../UNI/Bootloader/Refind/themes/* /mnt/boot/EFI/refind/themes/
     ;;
     2|GRUB|Grub|grub)
-      "$chroot" /mnt "$pkgmanager" -Sy "${pkgskips[@]}" grub grub-btrfs
       case "$UefiMode" in
-        1) "$chroot" /mnt grub-install --target=x86_64-efi --efi-directory=/boot bootloader-id=GRUB ;;
-        0) "$chroot" /mnt grub-install --target=i386-pc --recheck --debug /boot ;;
-        *) "$chroot" /mnt grub-install --target=x86_64-efi --efi-directory=/boot bootloader-id=GRUB ;;
+        1) 
+        "$chroot" /mnt "$pkgmanager" -Sy "${pkgskips[@]}" grub-x86_64-efi grub-btrfs
+        "$chroot" /mnt grub-install --target=x86_64-efi --efi-directory=/boot bootloader-id=GRUB
+        ;;
+        0)
+        "$chroot" /mnt "$pkgmanager" -Sy "${pkgskips[@]}" grub grub-btrfs
+        "$chroot" /mnt grub-install --target=i386-pc --recheck --debug /boot
+        ;;
+        *) 
+        "$chroot" /mnt "$pkgmanager" -Sy "${pkgskips[@]}" grub-x86_64-efi grub-btrfs
+        "$chroot" /mnt grub-install --target=x86_64-efi --efi-directory=/boot bootloader-id=GRUB
+        ;;
       esac  
       mkdir -p /mnt/boot/grub/themes
       sed -i '$ a\GRUB_THEME="/boot/grub/themes/Grub-Eiffel/theme.txt"' /mnt/etc/default/grub
