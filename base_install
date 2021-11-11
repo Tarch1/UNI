@@ -37,7 +37,7 @@ EOF
   chroot /mnt passwd tarch1
   chroot /mnt xbps-install refind
   mkdir -p /mnt/boot/EFI/refind/{drivers_x64,themes}
-  cp -r /mnt/usr/share/refind/drivers_x64/ /mnt/boot/EFI/refind/
+  cp /mnt/usr/share/refind/drivers_x64/btrfs* /mnt/boot/EFI/refind/drivers_x64/
   chroot /mnt refind-install
   mv /mnt/boot/EFI/refind/refind.conf /mnt/boot/EFI/refind/backup-refind.conf
   mv /mnt/boot/refind_linux.conf /mnt/boot/backup-refind_linux.conf
