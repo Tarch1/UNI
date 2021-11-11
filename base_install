@@ -25,6 +25,7 @@ EOF
   chroot /mnt echo 'en_US.UTF-8 UTF-8' > /etc/default/libc-locales
   chroot /mnt echo LANG=en_US.UTF-8 > /etc/locale.conf
   cat <<EOF > /mnt/etc/fstab
+  # <file system>	<dir>	<type>	<options>		<dump>	<pass>
   UUID=$ROOTID / btrfs rw,noatime,ssd,compress=lzo,space_cache=v2,subvol=@ 0 0
   UUID=$ROOTID /home btrfs rw,noatime,ssd,compress=lzo,space_cache=v2,subvol=@home 0 0
   UUID=$ROOTID /.snapshots btrfs rw,noatime,ssd,compress=lzo,space_cache=v2,subvol=@snapshots 0 0
