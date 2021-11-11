@@ -59,6 +59,3 @@ for c in $y; do
   echo "$c=""${!d}"
 done
 }
-
-PkgCheck
-AnotherCheck ###bugged
