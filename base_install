@@ -355,7 +355,7 @@ BaseInstallation () {
     chroot='chroot'
     for a in "${VoidSteps[@]}"; do "$a"
     done
-    xbps-reconfigure -fa
+    "$chroot" /mnt xbps-reconfigure -fa
     ;;
     *) echo "Wrong choice, type again" && OperatingSystemSel
     ;;
