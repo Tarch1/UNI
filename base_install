@@ -34,19 +34,6 @@ EOF
   UUID=$BOOTID /boot vfat rw,defaults,noatime 0 2
   tmpfs /tmp tmpfs defaults,noatime,mode=1777 0 0
 EOF
-  chroot /mnt useradd -mG wheel,video,storage tarch1
-  sed -i '/%wheel ALL=(ALL) ALL/ s/# //' /mnt/etc/sudoers
-  chroot /mnt passwd
-  chroot /mnt passwd tarch1
-  chroot /mnt xbps-install refind
-  mkdir -p /mnt/boot/EFI/refind/{drivers_x64,themes}
-  cp /mnt/usr/share/refind/drivers_x64/btrfs* /mnt/boot/EFI/refind/drivers_x64/
-  chroot /mnt refind-install
-  mv /mnt/boot/EFI/refind/refind.conf /mnt/boot/EFI/refind/backup-refind.conf
-  mv /mnt/boot/refind_linux.conf /mnt/boot/backup-refind_linux.conf
-  cp ../UNI/Bootloader/Refind/refind.conf /mnt/boot/EFI/refind/refind.conf
-  cp ../UNI/Bootloader/Refind/refind_linux.conf /mnt/boot/refind_linux.conf
-  cp -r ../UNI/Bootloader/Refind/themes/* /mnt/boot/EFI/refind/themes/
   xbps-reconfigure -fa
 }
 
@@ -240,13 +227,13 @@ AudioSetup () {
 UserSetup () {
   "$chroot" /mnt useradd -mG wheel,video,storage "$UNSel" #,input,lp,scanner,power
   sed -i '/%wheel ALL=(ALL) ALL/ s/# //' /mnt/etc/sudoers
-  sed -i 's/"us"/"it"/' /etc/conf.d/keymaps
+  #sed -i 's/"us"/"it"/' /etc/conf.d/keymaps
   "$chroot" /mnt echo -n "Type password for $UNSel : "
   "$chroot" /mnt passwd "$UNSel"
   "$chroot" /mnt echo -n "Type password for root user : "
   "$chroot" /mnt passwd 
-  cp ../UNI/Conf_files/bashrc /mnt/home/"$UNSel"/.bashrc
-  cp -r ../UNI /mnt/home/"$UNSel"
+  cp "$(pwd)"/Conf_files/bashrc /mnt/home/"$UNSel"/.bashrc
+  cp -r "$(pwd)" /mnt/home/"$UNSel"
   touch /mnt/home/"$UNSel"/.profile
   echo 'export MOZ_ENABLE_WAYLAND=1' >> /mnt/home/"$UNSel"/.profile
 }
@@ -308,7 +295,8 @@ BaseInstallation () {
   'BaseSystemInstall' 'SyncTime' 'LocaleGen' 'HostConfig' 'PackageConfig' 'PackageInstall' 
   'ServiceEnabler' 'AudioSetup' 'UserSetup' 'BootloaderInstall' )
   
-  local VoidSteps=( 'VoidInstMethod' 'DiskPartition' 'BootFormat' 'RootFormat' 'voidnow' )
+  local VoidSteps=( 'VoidInstMethod' 'DiskPartition' 'BootFormat' 'RootFormat' 'voidnow' 
+                    'BootloaderInstall' 'UserSetup' )
   
   VirtualBoxTest
   if [ "$VBTSel" = 1 ]; then 
@@ -366,6 +354,8 @@ BaseInstallation () {
     ;;
     3|Void|void) 
     pkgmanager="xbps-install"
+    BLSel=Grub
+    chroot=chroot
     for a in "${VoidSteps[@]}"; do "$a"
     done
     ;;
