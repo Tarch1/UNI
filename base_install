@@ -2,7 +2,7 @@
 
 ########## INSTALLATION-SCRIPT ##########
 
-voidnow () {
+VoidPreChroot () {
   echo 'start with void'
   for dir in dev proc sys run; do 
     mkdir -p /mnt/$dir
@@ -14,6 +14,9 @@ voidnow () {
   ARCH=x86_64
   xbps-install -Su xbps
   XBPS_ARCH=$ARCH xbps-install -S -r /mnt -R "$REPO" nano base-system linux linux-firmware $btrfsdep
+}
+
+VoidInChroot () {
   chroot /mnt xbps-install -Sy void-repo-nonfree void-repo-multilib void-repo-multilib-nonfree
   chroot /mnt xbps-install -S intel-ucode
   cp /etc/resolv.conf /mnt/etc/
@@ -292,8 +295,8 @@ BaseInstallation () {
   'BaseSystemInstall' 'SyncTime' 'LocaleGen' 'HostConfig' 'PackageConfig' 'PackageInstall' 
   'ServiceEnabler' 'AudioSetup' 'UserSetup' 'BootloaderInstall' )
   
-  local VoidSteps=( 'VoidInstMethod' 'DiskPartition' 'BootFormat' 'RootFormat' 'voidnow' 
-                    'BootloaderInstall' 'UserSetup' )
+  local VoidSteps=( 'VoidInstMethod' 'DiskPartition' 'BootFormat' 'RootFormat' 'VoidPreChroot' 
+                    'VoidInChroot' 'UserSetup' 'BootloaderInstall' )
   
   VirtualBoxTest
   if [ "$VBTSel" = 1 ]; then 
