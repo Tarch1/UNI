@@ -34,7 +34,6 @@ EOF
   UUID=$BOOTID /boot vfat rw,defaults,noatime 0 2
   tmpfs /tmp tmpfs defaults,noatime,mode=1777 0 0
 EOF
-  xbps-reconfigure -fa
 }
 
 CheckAS () {
@@ -231,11 +230,7 @@ UserSetup () {
   "$chroot" /mnt echo -n "Type password for $UNSel : "
   "$chroot" /mnt passwd "$UNSel"
   "$chroot" /mnt echo -n "Type password for root user : "
-  "$chroot" /mnt passwd 
-  cp "$(pwd)"/Conf_files/bashrc /mnt/home/"$UNSel"/.bashrc
-  cp -r "$(pwd)" /mnt/home/"$UNSel"
-  touch /mnt/home/"$UNSel"/.profile
-  echo 'export MOZ_ENABLE_WAYLAND=1' >> /mnt/home/"$UNSel"/.profile
+  "$chroot" /mnt passwd
 }
 
 BootloaderInstall () {
@@ -269,7 +264,9 @@ BootloaderInstall () {
       echo "efibootmgr -b lastnumber -B" #delete previous boot entries
     ;;
     *)
-      echo "Wrong bootloader selected, try another" && BootLoaderSel && BootloaderInstall
+      echo "Wrong bootloader selected, try another"
+      BootLoaderSel
+      BootloaderInstall
       echo "done"
     ;;
     esac
@@ -354,19 +351,25 @@ BaseInstallation () {
     ;;
     3|Void|void) 
     pkgmanager="xbps-install"
-    BLSel=Grub
-    chroot=chroot
+    BLSel='Grub'
+    chroot='chroot'
     for a in "${VoidSteps[@]}"; do "$a"
     done
+    xbps-reconfigure -fa
     ;;
     *) echo "Wrong choice, type again" && OperatingSystemSel
     ;;
-  esac 
+  esac
+  FinishInst
 }
+
 FinishInst () {
   echo "INSTALL COMPLETED"
   echo -e " A copy of the script will be placed in your user home directory"
-  cp -R "$(pwd)" /mnt/home/"$UNSel"/
+  cp "$(pwd)"/Conf_files/bashrc /mnt/home/"$UNSel"/.bashrc
+  cp -r "$(pwd)" /mnt/home/"$UNSel"/
+  touch /mnt/home/"$UNSel"/.profile
+  echo 'export MOZ_ENABLE_WAYLAND=1' >> /mnt/home/"$UNSel"/.profile
   YesNoSel "Reboot system"
   case "$CC" in
     1) umount -R /mnt && reboot ;;
