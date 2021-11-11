@@ -236,7 +236,7 @@ UserSetup () {
 BootloaderInstall () {
   echo "$BLSel"
   case $BLSel in
-    1|REFIND|refind)
+    1|REFIND|Refind|refind)
       "$chroot" /mnt "$pkgmanager" -Sy "${pkgskips[@]}" refind
       "$chroot" /mnt refind-install
       mkdir /mnt/boot/EFI/refind/themes
@@ -246,7 +246,7 @@ BootloaderInstall () {
       cp ../UNI/Bootloader/Refind/refind_linux.conf /mnt/boot/refind_linux.conf
       cp -r ../UNI/Bootloader/Refind/themes/* /mnt/boot/EFI/refind/themes/
     ;;
-    2|GRUB|grub)
+    2|GRUB|Grub|grub)
       "$chroot" /mnt "$pkgmanager" -Sy "${pkgskips[@]}" grub grub-btrfs
       case "$UefiMode" in
         1) "$chroot" /mnt grub-install --target=x86_64-efi --efi-directory=/boot bootloader-id=GRUB ;;
@@ -258,7 +258,7 @@ BootloaderInstall () {
       "$chroot" /mnt grub-mkconfig -o /boot/grub/themes
       cp -r ../UNI/Bootloader/Grub-Eiffel /mnt/boot/grub/themes/
     ;;
-    3|EFISTUB|efistub)
+    3|EFISTUB|Efistub|efistub)
       BFlags="\'rw root=$PIDSel=$ROOTID rootflags=subvol=@ initrd=\intel-ucode.img initrd=\initramfs-linux.img\'"
       "$chroot" /mnt efibootmgr -c -d "$BOOT_PART" -p 1 -L "$OSSel" -l /vmlinuz-linux -u "$BFlags" --verbose
       echo "efibootmgr -b lastnumber -B" #delete previous boot entries
