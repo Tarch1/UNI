@@ -362,6 +362,7 @@ BaseInstallation () {
     ;;
     3|Void|void) 
     pkgmanager="xbps-install"
+    FSSel=Ext4Format
     BLSel='Grub'
     chroot='chroot'
     keylayout='KEYMAP=it'
