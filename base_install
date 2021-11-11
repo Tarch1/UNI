@@ -25,10 +25,10 @@ EOF
   chroot /mnt echo 'en_US.UTF-8 UTF-8' > /etc/default/libc-locales
   chroot /mnt echo LANG=en_US.UTF-8 > /etc/locale.conf
   cat <<EOF > /mnt/etc/fstab
-  UUID=$UUID_ROOT / btrfs rw,noatime,ssd,compress=lzo,space_cache=v2,commit=60,subvol=@ 0 1
-  UUID=$UUID_ROOT /home btrfs rw,noatime,ssd,compress=lzo,space_cache=v2,commit=60,subvol=@home 0 2
-  UUID=$UUID_ROOT /.snapshots btrfs rw,noatime,ssd,compress=lzo,space_cache=v2,commit=60,subvol=@snapshots 0 2
-  UUID=$UUID_bOOT /boot/efi vfat defaults,noatime 0 2
+  UUID=$ROOTID / btrfs rw,noatime,ssd,compress=lzo,space_cache=v2,commit=60,subvol=@ 0 1
+  UUID=$ROOTID /home btrfs rw,noatime,ssd,compress=lzo,space_cache=v2,commit=60,subvol=@home 0 2
+  UUID=$ROOTID /.snapshots btrfs rw,noatime,ssd,compress=lzo,space_cache=v2,commit=60,subvol=@snapshots 0 2
+  UUID=$BOOTID /boot/efi vfat defaults,noatime 0 2
   tmpfs /tmp tmpfs defaults,noatime,mode=1777 0 0
 EOF
   chroot /mnt useradd -mG wheel,video,storage tarch1
@@ -83,12 +83,12 @@ DiskPartition () {
   DEVICE="mmc"
   fi
 
-  eval "$PIDSel"_BOOT="$(blkid -s "$PIDSel" -o value "$BOOT_PART")"
-  eval "$PIDSel"_ROOT="$(blkid -s "$PIDSel" -o value "$ROOT_PART")"
+  BOOTID="$(blkid -s "$PIDSel" -o value "$BOOT_PART")"
+  ROOTID="$(blkid -s "$PIDSel" -o value "$ROOT_PART")"
   echo "BOOT_PART= $BOOT_PART"
   echo "ROOT_PART= $ROOT_PART"
-  echo "$PIDSel"_BOOT= "$UUID_BOOT"
-  echo "$PIDSel"_ROOT= "$UUID_ROOT"
+  echo "$PIDSel"_BOOT= "$BOOTID"
+  echo "$PIDSel"_ROOT= "$BOOTID"
 }
 
 BootFormat () {
@@ -274,9 +274,8 @@ BootloaderInstall () {
       cp -r ../UNI/Bootloader/Grub-Eiffel /mnt/boot/grub/themes/
     ;;
     3|EFISTUB|efistub)
-      uuid="$(blkid -s "$PIDSel" -o value "$ROOT_PART")"
-      BFlags="\'rw root=$PIDSel=$uuid rootflags=subvol=@ initrd=\intel-ucode.img initrd=\initramfs-linux.img\'"
-      "$chroot" /mnt efibootmgr -c -d "$BOOT_PART" -p 1 -L "$OSSel" -l /vmlinuz-linux -u "$BFlags"--verbose
+      BFlags="\'rw root=$PIDSel=$ROOTID rootflags=subvol=@ initrd=\intel-ucode.img initrd=\initramfs-linux.img\'"
+      "$chroot" /mnt efibootmgr -c -d "$BOOT_PART" -p 1 -L "$OSSel" -l /vmlinuz-linux -u "$BFlags" --verbose
       echo "efibootmgr -b lastnumber -B" #delete previous boot entries
     ;;
     *)
