@@ -17,23 +17,23 @@ voidnow () {
   chroot /mnt xbps-install -Sy void-repo-nonfree void-repo-multilib void-repo-multilib-nonfree
   chroot /mnt xbps-install -S intel-ucode
   cp /etc/resolv.conf /mnt/etc/
-  chroot /mnt cat <<'EOF' > /etc/rc.rc.conf
-  # /etc/rc.conf - system configuration for void
-  HOSTNAME="tarch1"
-  HARDWARECLOCK="UTC"
-  TIMEZONE="Europe/Rome"
-  KEYMAP="it"
-EOF
+ 
+  echo -e "# /etc/rc.conf - system configuration for void
+HOSTNAME=$UNSel
+HARDWARECLOCK=UTC
+TIMEZONE=$TZSel
+KEYMAP=it" >> /etc/rc.rc.conf
+  
   chroot /mnt echo 'en_US.UTF-8 UTF-8' > /etc/default/libc-locales
   chroot /mnt echo LANG=en_US.UTF-8 > /etc/locale.conf
-  cat <<EOF > /mnt/etc/fstab
-  # <file system>	<dir>	<type>	<options>		<dump>	<pass>
-  UUID=$ROOTID / btrfs rw,noatime,ssd,compress=lzo,space_cache=v2,subvol=@ 0 0
-  UUID=$ROOTID /home btrfs rw,noatime,ssd,compress=lzo,space_cache=v2,subvol=@home 0 0
-  UUID=$ROOTID /.snapshots btrfs rw,noatime,ssd,compress=lzo,space_cache=v2,subvol=@snapshots 0 0
-  UUID=$BOOTID /boot vfat rw,defaults,noatime 0 2
-  tmpfs /tmp tmpfs defaults,noatime,mode=1777 0 0
-EOF
+  echo -e "#
+#<file system>	<dir>	<type>	<options>		<dump>	<pass>
+#
+$PIDSel=$ROOTID / btrfs rw,noatime,ssd,compress=lzo,space_cache=v2,subvol=@ 0 0
+$PIDSel=$ROOTID /home btrfs rw,noatime,ssd,compress=lzo,space_cache=v2,subvol=@home 0 0
+$PIDSel=$ROOTID /.snapshots btrfs rw,noatime,ssd,compress=lzo,space_cache=v2,subvol=@snapshots 0 0
+$PIDSel=$BOOTID /boot vfat rw,defaults,noatime 0 2
+$PIDSel /tmp tmpfs defaults,noatime,mode=1777 0 0" >> /mnt/etc/fstab
 }
 
 CheckAS () {
