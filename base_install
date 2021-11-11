@@ -40,8 +40,9 @@ $PIDSel /tmp tmpfs defaults,noatime,mode=1777 0 0" >> /mnt/etc/fstab
 }
 
 CheckAS () {
-  if [[ -f "$(pwd)/additional_setup" ]]; then
+  if [[ -f "$(pwd)/additional_setup" && -f "$(pwd)/pkg_checker" ]]; then
     source additional_setup
+    source pkg_checker
   else
     echo "Missing file: additional_setup"
     exit 1
@@ -100,6 +101,7 @@ RootFormat () {
     BtrfsFormat)
     mkfs.btrfs -f -L "$rootlabel" "$ROOT_PART"
     btrfsdep="snapper btrfs-progs"
+    grub_pkg=grub-btrfs
     modules="btrfs"
     #btrfs filesystem label "$ROOT_PART" "$rootlabel"
     mount "$ROOT_PART" /mnt
@@ -252,15 +254,15 @@ BootloaderInstall () {
     2|GRUB|Grub|grub)
       case "$UefiMode" in
         1) 
-        "$chroot" /mnt "$pkgmanager" -Sy "${pkgskips[@]}" grub-x86_64-efi grub-btrfs
+        "$chroot" /mnt "$pkgmanager" -Sy "${pkgskips[@]}" grub-x86_64-efi "$grub_pkg"
         "$chroot" /mnt grub-install --target=x86_64-efi --efi-directory=/boot bootloader-id=GRUB
         ;;
         0)
-        "$chroot" /mnt "$pkgmanager" -Sy "${pkgskips[@]}" grub grub-btrfs
+        "$chroot" /mnt "$pkgmanager" -Sy "${pkgskips[@]}" grub "$grub_pkg"
         "$chroot" /mnt grub-install --target=i386-pc --recheck --debug /boot
         ;;
         *) 
-        "$chroot" /mnt "$pkgmanager" -Sy "${pkgskips[@]}" grub-x86_64-efi grub-btrfs
+        "$chroot" /mnt "$pkgmanager" -Sy "${pkgskips[@]}" grub-x86_64-efi "$grub_pkg"
         "$chroot" /mnt grub-install --target=x86_64-efi --efi-directory=/boot bootloader-id=GRUB
         ;;
       esac  
