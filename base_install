@@ -255,7 +255,6 @@ BootloaderInstall () {
       "$chroot" /mnt "$pkgmanager" -Sy "${pkgskips[@]}" refind
       "$chroot" /mnt refind-install
       mkdir /mnt/boot/EFI/refind/themes
-      cp -r /mnt/usr/share/refind/drivers_x64/ /mnt/boot/EFI/refind/
       mv /mnt/boot/EFI/refind/refind.conf /mnt/boot/EFI/refind/backup-refind.conf
       mv /mnt/boot/refind_linux.conf /mnt/boot/backup-refind_linux.conf
       cp ../UNI/Bootloader/Refind/refind.conf /mnt/boot/EFI/refind/refind.conf
