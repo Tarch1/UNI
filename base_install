@@ -94,7 +94,7 @@ BootFormat () {
 RootFormat () {
   case "$FSSel" in
     Ext4Format)
-    mkfs.ext4 "$ROOT_PART" "$rootlabel"
+    mkfs.ext4 "$ROOT_PART" -L "$rootlabel"
     #e2label "$ROOT_PART" "$rootlabel"
     mount "$ROOT_PART" /mnt
     ;;
