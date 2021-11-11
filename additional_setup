@@ -256,7 +256,7 @@ YesNoSel () {
   esac
 }
 
-#UEFISel
+UEFISel
 #CPUSel
 #GraphicSel
 #SelSteps
