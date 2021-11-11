@@ -22,7 +22,7 @@ voidnow () {
 HOSTNAME=$UNSel
 HARDWARECLOCK=UTC
 TIMEZONE=$TZSel
-KEYMAP=it" >> /etc/rc.rc.conf
+$keylayout" >> /etc/rc.rc.conf
   
   chroot /mnt echo 'en_US.UTF-8 UTF-8' > /etc/default/libc-locales
   chroot /mnt echo LANG=en_US.UTF-8 > /etc/locale.conf
@@ -353,6 +353,7 @@ BaseInstallation () {
     pkgmanager="xbps-install"
     BLSel='Grub'
     chroot='chroot'
+    keylayout='KEYMAP=it'
     for a in "${VoidSteps[@]}"; do "$a"
     done
     "$chroot" /mnt xbps-reconfigure -fa
