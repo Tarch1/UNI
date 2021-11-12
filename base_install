@@ -216,7 +216,11 @@ PackageInstall () {
   EssentialPKG=( $dev $fs $net $audio $filemanager $baseutils $media $rcpacks )
   AdditivePKG=( $vulkan $hardwareacceleration $nvidiagraphics $print $apps $bluetooth $android $archive )
   ExtraPKG=( $xorg $filemanager $media )
+  if [ "$VBTSel" = 1 ]; then
   "$chroot" /mnt "$pkgmanager" -Syu "${pkgskips[@]}" "${EssentialPKG[@]}"
+  else
+  "$chroot" /mnt "$pkgmanager" -Syu "${pkgskips[@]}" "${EssentialPKG[@]}" "${AdditivePKG[@]}"
+  fi
   #"$chroot" /mnt "$pkgmanager" -Syu 
   #cp ../UNI/Conf_files/mkinitcpio.conf /mnt/etc
   sed -i "/MODULES/ s/()/($modules)/" /mnt/etc/mkinitcpio.conf
