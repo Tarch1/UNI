@@ -28,6 +28,9 @@ pkg_media=(celluloid mate-utils pantheon-screenshot simplescreenrecorder)
 pkg_elogind=()
 pkg_rc=(ntp-openrc avahi-openrc cups-openrc bluez-openrc networkmanager-openrc)
 
+ghb=0
+
+PkgDatabase () {
 pacman -Sy "${pkgskips[@]}" artix-archlinux-support
 pacman-key --populate archlinux
 RepoList=( '[extra]' 'Include = /etc/pacman.d/mirrorlist-arch'
@@ -36,8 +39,9 @@ RepoList=( '[extra]' 'Include = /etc/pacman.d/mirrorlist-arch'
 for p in "${RepoList[@]}"; do
    echo "$p" >> /etc/pacman.conf
 done
+pacman -Sy
 pacman -Slq system world galaxy extra community multilib | sort > pacman_db
-ghb=0
+}
 
 AnotherCheck () {
 echo "${miss[@]}" | tr ' ' '\n' | sort -u > pkglist
