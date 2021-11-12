@@ -416,7 +416,7 @@ linux='base base-devel linux linux-firmware'
 init=''
 dev='wget git ntp linux-headers'
 baseutils='man bash-completion kitty vim nano'
-fs='efibootmgr os-prober mtools parted dosfstools sbsigntools ntfs-3g gvfs-mtp'
+fs='efibootmgr os-prober mtools parted dosfstools sbsigntools ntfs-3g gvfs-mtp fwupd'
 net='networkmanager network-manager-applet'
 audio='pipewire pipewire-pulse pipewire-alsa pipewire-jack lib32-pipewire lib32-pipewire-jack wireplumber' #void bluetooth = libspa-bluetooth'  #pulseaudio pulseaudio-bluetooth pavucontrol ##pulseaudio-alsa alsa-utils , for wine use (lib32-libpulse lib32-alsa-plugins)
 android='android-tools android-udev'
