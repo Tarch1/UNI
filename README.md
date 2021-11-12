@@ -46,11 +46,11 @@ GNOME SETUP
 
         gsettings set org.gnome.settings-daemon.plugins.media-keys volume-step 1
 
-    Add navigation shortcut like super+($number) with: 
+   Remove shortcut that coz with super+($number) with: 
      
         for i in {1..9}; do gsettings set "org.gnome.shell.keybindings" "switch-to-application-$i" "[]"; done
 
-    Checking that they are properly unset with:
+    and check that they are properly unset with:
     
         gsettings list-recursively | grep switch-to-application | sort
 
