@@ -17,10 +17,9 @@ VoidPreChroot () {
 }
 
 VoidInChroot () {
+  cp /etc/resolv.conf /mnt/etc/
   chroot /mnt xbps-install -Sy void-repo-nonfree void-repo-multilib void-repo-multilib-nonfree
   chroot /mnt xbps-install -S intel-ucode
-  cp /etc/resolv.conf /mnt/etc/
- 
   echo -e "# /etc/rc.conf - system configuration for void
 HOSTNAME=$UNSel
 HARDWARECLOCK=UTC
