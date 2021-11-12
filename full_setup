@@ -114,7 +114,7 @@ function WindowManager () {
             cp ~/UNI/Conf_files/Bspwm/bspwmrc ~/.config/bspwm/bspwmrc
             chmod +x ~/.config/sxhkd/sxhkdrc ~/.config/bspwm/bspwmrc
     ;;
-    gnome ) sudo pacman -Syu gnome-shell gnome-control-center xdg-desktop-portal-gtk gnome-weather gnuchess gnome-chess gnome-calculator gnome-keyring evince nautilus file-roller
+    gnome ) sudo pacman -Syu gnome-shell gnome-control-center gnome-firmware xdg-desktop-portal-gtk gnome-weather gnuchess gnome-chess gnome-calculator gnome-keyring evince nautilus file-roller
             sudo pacman -Syu gdm gdm-openrc
             trizen -Syu chrome-gnome-shell
             mkdir -p ~/{.wallpapers,.config/kitty}
