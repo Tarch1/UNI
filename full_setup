@@ -42,8 +42,8 @@ Snapper () {
 }
 
 Trizen () {
-  git clone https://aur.archlinux.org/trizen.git
-  cd trizen
+  git clone https://aur.archlinux.org/trizen.git /home/tarch1/Trizen
+  cd /home/tarch1/Trizen
   makepkg -si
   trizen -S clapper 
   #bibata-cursor-translucent steamtinkerlaunch
