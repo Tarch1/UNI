@@ -345,6 +345,7 @@ BaseInstallation () {
     initc0=systemctl
     initc1=enable
     initc2=""
+    grub_pkg='grub'
     sed -i 's/lightdm-openrc//' ../UNI/full_setup
     sed -i 's/gdm-openrc//' ../UNI/full_setup
     for a in "${ArchTixSteps[@]}"; do "$a"
@@ -364,6 +365,7 @@ BaseInstallation () {
     initc2=default
     rcpacks="$rc"
     elogind='elogind elogind-openrc'
+    grub_pkg='grub'
     pacman-key --init
     pacman-key --populate artix
     pacman -Sy "${pkgskips[@]}" artix-archlinux-support #lib32-artix-archlinux-support
