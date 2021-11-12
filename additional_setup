@@ -205,7 +205,7 @@ TimezoneSel () {
   echo -en " Select Timezone : 1) Europe/Rome \n or type another with the same format "
   read -r TZSel
   case $TZSel in
-    1|Europe/Rome|Rome) echo "Selected : Europe/Rome" && TZSel="Europe/Rome" ;;
+    1|Europe/Rome|Rome|'') echo "Selected : Europe/Rome" && TZSel="Europe/Rome" ;;
     q|quit|exit) TZSel="" ;;
     *) YesNoSel "Want this for timezone : $TZSel ?"
        case $CC in
