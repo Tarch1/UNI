@@ -82,6 +82,7 @@ DiskPartition () {
   echo "ROOT_PART= $ROOT_PART"
   echo "$PIDSel"_BOOT= "$BOOTID"
   echo "$PIDSel"_ROOT= "$ROOTID"
+  lsblk -f
 }
 
 BootFormat () {
