@@ -106,7 +106,7 @@ RootFormat () {
     done
     umount /mnt
     mount -o noatime,compress=lzo,space_cache=v2,subvol=@ "$ROOT_PART" /mnt
-    mkdir -p /mnt/{home,.snapshots}
+    mkdir -p /mnt/{home,snapshots}
     mount -o noatime,compress=lzo,space_cache=v2,subvol=@home "$ROOT_PART" /mnt/home
     mount -o noatime,compress=lzo,space_cache=v2,discard=async,subvol=@snapshots "$ROOT_PART" /mnt/snapshots
     FstabType='btrfs'
