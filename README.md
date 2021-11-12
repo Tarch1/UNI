@@ -76,7 +76,7 @@ If /etc/pipewire/ folder and its contents doesn't exist run
 
     than be sure /home/!!!your username!!!/.config/autostart/pipewire.desktop exist in case copy it :
 
-    cp ~/.UNI/Conf_files/Pipewire/pipewire.desktop ~/.config/autostart/
+    cp ~/UNI/Conf_files/Pipewire/pipewire.desktop ~/.config/autostart/
  
     if you have installed pipewire-media-session comment out at the Exec inside ~/.config/autostart/pipewire.desktop
  
