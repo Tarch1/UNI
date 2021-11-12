@@ -29,14 +29,7 @@ $keylayout" >> /etc/rc.rc.conf
   
   chroot /mnt echo 'en_US.UTF-8 UTF-8' > /etc/default/libc-locales
   chroot /mnt echo LANG=en_US.UTF-8 > /etc/locale.conf
-  echo -e "#
-#<file system>	<dir>	<type>	<options>		<dump>	<pass>
-#
-$PIDSel=$ROOTID / btrfs rw,noatime,ssd,compress=lzo,space_cache=v2,subvol=@ 0 0
-$PIDSel=$ROOTID /home btrfs rw,noatime,ssd,compress=lzo,space_cache=v2,subvol=@home 0 0
-$PIDSel=$ROOTID /.snapshots btrfs rw,noatime,ssd,compress=lzo,space_cache=v2,subvol=@snapshots 0 0
-$PIDSel=$BOOTID /boot vfat rw,defaults,noatime 0 2
-$PIDSel /tmp tmpfs defaults,noatime,mode=1777 0 0" >> /mnt/etc/fstab
+  
 }
 
 CheckAS () {
@@ -98,23 +91,29 @@ RootFormat () {
     mkfs.ext4 "$ROOT_PART" -L "$rootlabel"
     #e2label "$ROOT_PART" "$rootlabel"
     mount "$ROOT_PART" /mnt
+    FstabType='ext4'
+    FstabOptions=''
     ;;
     BtrfsFormat)
     mkfs.btrfs -f -L "$rootlabel" "$ROOT_PART"
     btrfsdep="snapper btrfs-progs"
-    grub_pkg=grub-btrfs
+    grub-btrfs_pkg=grub-btrfs
     modules="btrfs"
-    #btrfs filesystem label "$ROOT_PART" "$rootlabel"
     mount "$ROOT_PART" /mnt
-    SubVol=('@' '@home' '@snapshots')
+    SubVol=('' 'home' 'snapshots')
     for b in "${SubVol[@]}"; do
-      btrfs su cr /mnt/"$b"
+      btrfs su cr /mnt/@"$b"
     done
     umount /mnt
     mount -o noatime,compress=lzo,space_cache=v2,subvol=@ "$ROOT_PART" /mnt
     mkdir -p /mnt/{home,.snapshots}
     mount -o noatime,compress=lzo,space_cache=v2,subvol=@home "$ROOT_PART" /mnt/home
-    mount -o noatime,compress=lzo,space_cache=v2,discard=async,subvol=@snapshots "$ROOT_PART" /mnt/.snapshots
+    mount -o noatime,compress=lzo,space_cache=v2,discard=async,subvol=@snapshots "$ROOT_PART" /mnt/snapshots
+    FstabType='btrfs'
+    FstabOptions="rw,noatime,ssd,compress=lzo,space_cache=v2,subvol="
+    for f in "${SubVol[@]}"; do
+      echo -e "$PIDSel=$ROOTID /$f $FstabType $FstabOptions@$f 0 0" >> UNIfstab
+    done
     ;;
     *)
     ;;
@@ -122,11 +121,12 @@ RootFormat () {
   mkdir /mnt/boot
   mount "$BOOT_PART" /mnt/boot
   lsblk -f
+  echo -e "$PIDSel=$BOOTID /boot vfat rw,defaults 0 2" >> UNIfstab
 }
 
 ExternalDriveSetup () {
   case "$EXT_DRIVE" in
-  "$DRIVE") echo 'ERROR you cannot use the same disk as for the primary' 
+  "$DRIVE") echo 'ERROR you cannot use the same disk as for the primary, choose it right' 
             EXT_DRIVE="$(dialog --stdout --menu "Select EXTERNAL disk" 0 0 0 ${devicelist} || exit 1)"
             ExternalDriveSetup ;;
   '') echo 'No secondary drive to setup' ;;
@@ -142,12 +142,23 @@ BaseSystemInstall () {
   local BasePKG=( $linux $init $btrfsdep $elogind ) 
   "$pkgstrap" /mnt $microcode
   "$pkgstrap" /mnt "${BasePKG[@]}"
+}
+
+FstabGen () {
   rm /mnt/etc/fstab
-  case "$PIDSel" in
-  UUID) "$fstabgen" -U /mnt >> /mnt/etc/fstab ;;
-  PARTUUID) "$fstabgen" -t PARTUUID /mnt >> /mnt/etc/fstab ;;
-  LABEL) "$fstabgen" -L /mnt >> /mnt/etc/fstab ;;
-  *) "$fstabgen" -U /mnt >> /mnt/etc/fstab ;;
+  case "$OSSel" in
+    1|Arch|arch|2|Artix|artix)
+      case "$PIDSel" in
+        UUID) "$fstabgen" -U /mnt >> /mnt/etc/fstab ;;
+        PARTUUID) "$fstabgen" -t PARTUUID /mnt >> /mnt/etc/fstab ;;
+        LABEL) "$fstabgen" -L /mnt >> /mnt/etc/fstab ;;
+        *) "$fstabgen" -U /mnt >> /mnt/etc/fstab ;;
+      esac
+    ;;
+    3|Void|void) cp UNIfstab /mnt/etc/fstab
+    ;;
+    *) echo "Wrong distro selected, try again" && OperatingSystemSel && FstabGen
+    ;;
   esac
   cat /mnt/etc/fstab
 }
@@ -254,16 +265,12 @@ BootloaderInstall () {
     ;;
     2|GRUB|Grub|grub)
       case "$UefiMode" in
-        1) 
-        "$chroot" /mnt "$pkgmanager" -Sy "${pkgskips[@]}" grub-x86_64-efi "$grub_pkg"
-        "$chroot" /mnt grub-install --target=x86_64-efi --efi-directory=/boot bootloader-id=GRUB
-        ;;
         0)
-        "$chroot" /mnt "$pkgmanager" -Sy "${pkgskips[@]}" grub "$grub_pkg"
+        "$chroot" /mnt "$pkgmanager" -Sy "${pkgskips[@]}" grub "$grub-btrfs_pkg"
         "$chroot" /mnt grub-install --target=i386-pc --recheck --debug /boot
         ;;
         *) 
-        "$chroot" /mnt "$pkgmanager" -Sy "${pkgskips[@]}" grub-x86_64-efi "$grub_pkg"
+        "$chroot" /mnt "$pkgmanager" -Sy "${pkgskips[@]}" "$grub_pkg" "$grub-btrfs_pkg"
         "$chroot" /mnt grub-install --target=x86_64-efi --efi-directory=/boot bootloader-id=GRUB
         ;;
       esac  
@@ -303,7 +310,7 @@ BaseInstallation () {
   'HostnameSel' 'UsernameSel' 'PartIDSel' 'FilesystemSel' 'BootloaderSel' )
   
   local ArchTixSteps=( 'DiskPartition' 'BootFormat' 'RootFormat' 'ExternalDriveSetup' 
-  'BaseSystemInstall' 'SyncTime' 'LocaleGen' 'HostConfig' 'PackageConfig' 'PackageInstall' 
+  'BaseSystemInstall' 'FstabGen' 'SyncTime' 'LocaleGen' 'HostConfig' 'PackageConfig' 'PackageInstall' 
   'ServiceEnabler' 'AudioSetup' 'UserSetup' 'BootloaderInstall' )
   
   local VoidSteps=( 'VoidInstMethod' 'DiskPartition' 'BootFormat' 'RootFormat' 'VoidPreChroot' 
@@ -367,6 +374,7 @@ BaseInstallation () {
     pkgmanager="xbps-install"
     FSSel=Ext4Format
     BLSel='Grub'
+    grub_pkg='grub-x86_64-efi'
     chroot='chroot'
     keylayout='KEYMAP=it'
     for a in "${VoidSteps[@]}"; do "$a"
