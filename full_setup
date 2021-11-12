@@ -5,7 +5,11 @@ Installation () {
   local CT=0
   for i in "${Part[@]}"; do
   YesNoSel "You need" "$i" "?"
-  if [[ "$CC" == 1 ]]; then Steps["$CT"]="$i"; else unset "Steps[$CT]"; fi
+  case "$CC" in
+  1) Steps["$CT"]="$i";;
+  0) unset "Steps[$CT]";;
+  *) echo wrong && Installation;;
+  esac
   CT=$((CT + 1))
   done
   for i in "${Steps[@]}"; do "$i"; done
@@ -43,7 +47,7 @@ Snapper () {
 
 Trizen () {
   git clone https://aur.archlinux.org/trizen.git /home/tarch1/Trizen
-  cd /home/tarch1/Trizen
+  cd /home/tarch1/Trizen || exit
   makepkg -si
   trizen -S clapper 
   #bibata-cursor-translucent steamtinkerlaunch
