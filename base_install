@@ -97,7 +97,7 @@ RootFormat () {
     BtrfsFormat)
     mkfs.btrfs -f -L "$rootlabel" "$ROOT_PART"
     btrfsdep="snapper btrfs-progs"
-    grub-btrfs_pkg=grub-btrfs
+    btrfsgrub_pkg='grub-btrfs'
     modules="btrfs"
     mount "$ROOT_PART" /mnt
     SubVol=('' 'home' 'snapshots')
@@ -266,11 +266,11 @@ BootloaderInstall () {
     2|GRUB|Grub|grub)
       case "$UefiMode" in
         0)
-        "$chroot" /mnt "$pkgmanager" -Sy "${pkgskips[@]}" grub "$grub-btrfs_pkg"
+        "$chroot" /mnt "$pkgmanager" -Sy "${pkgskips[@]}" grub "$btrfsgrub_pkg"
         "$chroot" /mnt grub-install --target=i386-pc --recheck --debug /boot
         ;;
         *) 
-        "$chroot" /mnt "$pkgmanager" -Sy "${pkgskips[@]}" "$grub_pkg" "$grub-btrfs_pkg"
+        "$chroot" /mnt "$pkgmanager" -Sy "${pkgskips[@]}" "$grub_pkg" "$btrfsgrub_pkg"
         "$chroot" /mnt grub-install --target=x86_64-efi --efi-directory=/boot bootloader-id=GRUB
         ;;
       esac  
