@@ -56,7 +56,7 @@ GNOME SETUP
 
 A list of useful gnome extension: 
     
-    Blur my Shell - Dynamic Panel Transparency - Sound IO Device Chooser - Unite - Night Theme Switcher
+    Blur my Shell - Desktop Cube - Sound IO Device Chooser - Unite - Night Theme Switcher Dynamic Panel Transparency
 
 Icons and cursor theme
     
