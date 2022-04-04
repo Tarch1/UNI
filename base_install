@@ -177,6 +177,7 @@ LocaleGen () {
   "$chroot" /mnt locale-gen
   echo "LANG=$LangSel" >> /mnt/etc/locale.conf
   echo "$keylayout" >> /mnt/"$keypath"
+  echo "$keylayout" >> /mnt/etc/vconsole.conf
 }
 
 HostConfig () {
