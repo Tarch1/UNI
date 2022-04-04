@@ -125,8 +125,8 @@ function WindowManager () {
             echo 'Xft.dpi: 90' > ~/.Xdefaults
             chmod +x ~/.pfetch
             #sudo mkdir -p /etc/xdg/autostart/
-            #mkdir ~/.config/autostart
-            #cp -r ~/UNI/Conf_files/pipewire/ ~/.config/autostart
+            mkdir ~/.config/autostart
+            cp -r ~/UNI/Conf_files/pipewire/ ~/.config/autostart
             sudo rc-update add gdm default
             sudo systemctl enable gdm
             echo "MOZ_ENABLE_WAYLAND=1" | sudo tee -a /etc/environment > /dev/null
