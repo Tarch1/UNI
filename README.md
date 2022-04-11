@@ -35,10 +35,9 @@ then personalize with
 
 Reboot and Enjoy!
 
-DISABLING INTEL TURBO BOOST
+DISABLING INTEL TURBO BOOST - https://wiki.archlinux.org/title/CPU_frequency_scaling#Disabling_Turbo_Boost
 
-https://wiki.archlinux.org/title/CPU_frequency_scaling#Disabling_Turbo_Boost
-
+    echo 1 > /sys/devices/system/cpu/intel_pstate/no_turbo
 
 GNOME SETUP
 
