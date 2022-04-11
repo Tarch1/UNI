@@ -62,6 +62,8 @@ Icons and cursor theme
     
     Extract from secondary drive in /OS/Linux/ the theme inside /home/tarch1/.local/share/icons
 
+Install Bottles from Flatpak for managing Windows apps. 
+
 TROUBLESHOOTIG
 
 If gnome on wayland not start's on machine's with hybrid gpu setup comment 
