@@ -112,7 +112,7 @@ RootFormat () {
     FstabType='btrfs'
     FstabOptions="rw,noatime,ssd,compress=lzo,space_cache=v2,subvol="
     for f in "${SubVol[@]}"; do
-      echo -e "$PIDSel=$ROOTID /$f $FstabType $FstabOptions@$f 0 0" >> UNIfstab
+      echo -e "$PIDSel=$ROOTID /$f $FstabType $FstabOptions@/$f 0 0" >> UNIfstab
     done
     ;;
     *)
