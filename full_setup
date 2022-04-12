@@ -55,7 +55,7 @@ Trizen () {
 }
 
 Environment () {
-  sudo pacman -S ttf-roboto rofi sxiv feh python-pywal lxappearance imagemagick pacman-contrib slock dunst tcl tk --noconfirm
+  sudo pacman -S ttf-roboto rofi sxiv feh python-pywal lxappearance kalgebra imagemagick pacman-contrib slock dunst tcl tk --noconfirm
   mkdir -p ~/{.wallpapers,.config/{kitty,polybar,rofi,dunst}}
   
   sudo ntpd -qg
