@@ -39,7 +39,9 @@ DISABLING INTEL TURBO BOOST - https://wiki.archlinux.org/title/CPU_frequency_sca
 
     echo 1 > /sys/devices/system/cpu/intel_pstate/no_turbo
 
-GNOME SETUP
+# GNOME SETUP
+
+In case of error with gdm use Ctrl+Alt+F2
 
     Increase volume steps by: (less value = more steps)
 
