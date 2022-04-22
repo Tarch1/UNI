@@ -127,7 +127,7 @@ RootFormat () {
 ExternalDriveSetup () {
   case "$EXT_DRIVE" in
   "$DRIVE") echo 'ERROR you cannot use the same disk as for the primary, choose it right' 
-            EXT_DRIVE="$(dialog --stdout --menu "Select EXTERNAL disk" 0 0 0 ${devicelist} || exit 1)"
+            EXT_DRIVE="$(dialog --stdout --menu "Select EXTERNAL disk" 0 0 0 ${devicelist[@]} || exit 1)"
             ExternalDriveSetup ;;
   '') echo 'No secondary drive to setup' ;;
   *) echo 'yes' 
