@@ -34,6 +34,7 @@ pkg_rc=(ntp-openrc avahi-openrc cups-openrc bluez-openrc networkmanager-openrc)
 ghb=0
 
 PkgDatabase () {
+sed -i '/\[lib32],/mirrorlist/ s/#//' /mnt/etc/pacman.conf
 pacman-key --init
 pacman-key --populate artix
 pacman -Sy "${pkgskips[@]}" artix-archlinux-support #lib32-artix-archlinux-support
