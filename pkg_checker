@@ -47,7 +47,8 @@ pacman -Slq system world galaxy extra community multilib | sort > pacman_db
 
 AnotherCheck () {
 echo "${miss[@]}" | tr ' ' '\n' | sort -u > pkglist
-IFS=" " read -r -a unlisted <<< "$(comm -13 pacman_db pkglist)"
+mapfile -t unlisted < <(comm -13 pacman_db pkglist)
+#IFS=" " read -r -a unlisted <<< "$(comm -13 pacman_db pkglist)"
 echo "Unlisted=${unlisted[@]}"
 }
 
