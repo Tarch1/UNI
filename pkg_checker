@@ -73,3 +73,5 @@ for c in $y; do
   echo "$c=""${!d}"
 done
 }
+PkgDatabase
+PkgCheck
