@@ -46,10 +46,10 @@ CheckAS () {
 DiskPartition () {
   umount -R /mnt 
   "$pkgmanager" -Sy "${pkgskips[@]}" parted gptfdisk mtools ntfs-3g dialog
-  mapfile -t devicelist < <(lsblk -dplnx size -o name,size | grep -Ev "boot|rpmb|loop" | tac)
-  DRIVE="$(dialog --stdout --menu "Select disk for installation" 0 0 0 "${devicelist[0]}" 0 "${devicelist[1]}" 0 || exit 1)"
-  DRIVE="$(dialog --stdout --menu "Select disk for installation" 0 0 0 ${devicelist[@]} || exit 1)"
-  EXT_DRIVE="$(dialog --stdout --menu "Select EXTERNAL disk" 0 0 0 ${devicelist[@]} || exit 1)"
+  mapfile -t devicelist < <(lsblk -dplnx size -o name | grep -Ev "boot|rpmb|loop" | tac)
+  mapfile -t devicesize < <(lsblk -dplnx size -o size | grep -Ev "boot|rpmb|loop" | tac)
+  DRIVE="$(dialog --stdout --menu "Select DEFAULT disk for installation" 0 0 0 "${devicelist[0]}" "${devicesize[0]}" "${devicelist[1]}" "${devicesize[1]}" || exit 1)"
+  EXT_DRIVE="$(dialog --stdout --menu "Select EXTERNAL disk" 0 0 0 "${devicelist[0]}" "${devicesize[0]}" "${devicelist[1]}" "${devicesize[1]}" || exit 1)"
   ##parted -s "mklabel gpt mkpart ESP fat32 1MiB 512MiB mkpart root ext4 512MiB 100% set 1 esp on"
   #parted -s "$DRIVE" mklabel gpt mkpart "EFI system partition" 0% 1% set 1 esp on mkpart "root partition" 1% 100% set 1 esp on
   #echo "$DRIVE"
@@ -128,7 +128,7 @@ RootFormat () {
 ExternalDriveSetup () {
   case "$EXT_DRIVE" in
   "$DRIVE") echo 'ERROR you cannot use the same disk as for the primary, choose it right' 
-            EXT_DRIVE="$(dialog --stdout --menu "Select EXTERNAL disk" 0 0 0 ${devicelist[@]} || exit 1)"
+            EXT_DRIVE="$(dialog --stdout --menu "Select EXTERNAL disk" 0 0 0 "${devicelist[0]}" "${devicesize[0]}" "${devicelist[1]}" "${devicesize[1]}" || exit 1)"
             ExternalDriveSetup ;;
   '') echo 'No secondary drive to setup' ;;
   *) echo 'yes' 
