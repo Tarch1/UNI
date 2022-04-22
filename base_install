@@ -193,7 +193,7 @@ PackageConfig () {
       "$chroot" /mnt pacman -Syu "${pkgskips[@]}"
       "$chroot" /mnt pacman-key --init
       "$chroot" /mnt pacman-key --populate archlinux
-      sed -i '/\[multilib],/mirrorlist/ s/#//' /mnt/etc/pacman.conf
+      sed -i '/\[multilib]/,/mirrorlist/ s/#//' /mnt/etc/pacman.conf
     ;;
     2|Artix|artix)
       "$chroot" /mnt pacman -Syu "${pkgskips[@]}" artix-archlinux-support
@@ -204,7 +204,7 @@ PackageConfig () {
       for p in "${RepoList[@]}"; do
         echo "$p" >> /mnt/etc/pacman.conf
       done
-      #sed -i '/\[lib32]/,/mirrorlist/ s/#//' /mnt/etc/pacman.conf
+      sed -i '/\[lib32]/,/mirrorlist/ s/#//' /mnt/etc/pacman.conf
     ;;
     3|Void|void)
       echo -e "nothing"
@@ -377,6 +377,7 @@ BaseInstallation () {
     rcpacks="$rc"
     elogind='elogind elogind-openrc'
     grub_pkg='grub'
+    sed -i '/\[lib32]/,/mirrorlist/ s/#//' /mnt/etc/pacman.conf
     pacman-key --init
     pacman-key --populate artix
     pacman -Sy artix-archlinux-support #lib32-artix-archlinux-support
