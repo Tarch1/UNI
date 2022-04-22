@@ -34,7 +34,6 @@ pkg_rc=(ntp-openrc avahi-openrc cups-openrc bluez-openrc networkmanager-openrc)
 ghb=0
 
 PkgDatabase () {
-sed -i '/\[multilib],/mirrorlist/ s/#//' /mnt/etc/pacman.conf
 pacman-key --init
 pacman-key --populate artix
 pacman -Sy "${pkgskips[@]}" artix-archlinux-support #lib32-artix-archlinux-support
@@ -52,7 +51,6 @@ echo 'Unlisted' "${unlisted[@]}"
 }
 
 PkgCheck () {
-sed -i '/\[multilib],/mirrorlist/ s/#//' /mnt/etc/pacman.conf
 for a in $y; do
   var="$a"'[@]'   #the y element with a [@] to be like an array
   temp=${!var}  #splitting the every y[@] element inside temp to simulate a subarray
