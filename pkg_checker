@@ -34,11 +34,12 @@ pkg_rc=(ntp-openrc avahi-openrc cups-openrc bluez-openrc networkmanager-openrc)
 ghb=0
 
 PkgDatabase () {
-pacman -Sy "${pkgskips[@]}" artix-archlinux-support
-pacman-key --populate archlinux
-for p in "${RepoList[@]}"; do
-   echo "$p" >> /etc/pacman.conf
-done
+pacman-key --init
+pacman-key --populate artix
+pacman -Sy "${pkgskips[@]}" artix-archlinux-support #lib32-artix-archlinux-support
+#for p in "${RepoList[@]}"; do
+#   echo "$p" >> /etc/pacman.conf
+#done
 pacman -Sy
 pacman -Slq system world galaxy extra community multilib | sort > pacman_db
 }
