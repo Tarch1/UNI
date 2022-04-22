@@ -141,7 +141,7 @@ ExternalDriveSetup () {
 }
 
 BaseSystemInstall () {
-  local BasePKG=( $linux $init "${btrfsdep[@]}" $elogind ) 
+  local BasePKG=( "${linux[@]}" "${init[@]}" "${btrfsdep[@]}" "${elogind[@]}" ) 
   "$pkgstrap" /mnt $microcode
   "$pkgstrap" /mnt "${BasePKG[@]}"
 }
