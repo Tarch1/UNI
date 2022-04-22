@@ -69,6 +69,7 @@ DiskPartition () {
   BOOT_PART="$DRIVE"1 && ROOT_PART="$DRIVE"2
   DEVICE="mmc"
   fi
+  echo "$DEVICE"
 
   BOOTID="$(blkid -s "$PIDSel" -o value "$BOOT_PART")"
   ROOTID="$(blkid -s "$PIDSel" -o value "$ROOT_PART")"
