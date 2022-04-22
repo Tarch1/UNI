@@ -35,7 +35,7 @@ $keylayout" >> /etc/rc.rc.conf
 CheckAS () {
   if [[ -f "$(pwd)/additional_setup" && -f "$(pwd)/pkg_checker" ]]; then
     source additional_setup
-    source pkg_checker
+    #source pkg_checker
   else
     echo "Missing file: additional_setup"
     exit 1
@@ -357,6 +357,8 @@ BaseInstallation () {
     grub_pkg='grub'
     sed -i 's/lightdm-openrc//' ../UNI/full_setup
     sed -i 's/gdm-openrc//' ../UNI/full_setup
+    pacman -Slq system world galaxy extra community multilib | sort > pacman_db
+    PkgCheck
     for a in "${ArchTixSteps[@]}"; do "$a"
     done
     ;;
@@ -378,6 +380,8 @@ BaseInstallation () {
     pacman-key --init
     pacman-key --populate artix
     pacman -Sy "${pkgskips[@]}" artix-archlinux-support #lib32-artix-archlinux-support
+    pacman -Slq system world galaxy extra community multilib | sort > pacman_db
+    PkgCheck
     for a in "${ArchTixSteps[@]}"; do "$a"
     done
     ;;
@@ -415,26 +419,65 @@ FinishInst () {
 
 ########## PACKAGE ##########
 
-microcode='intel-ucode'
-linux='base base-devel linux linux-firmware'
-init=''
-dev='wget git ntp linux-headers'
-baseutils='man bash-completion kitty vim nano'
-fs='efibootmgr os-prober mtools parted dosfstools sbsigntools ntfs-3g gvfs-mtp fwupd'
-net='networkmanager network-manager-applet'
-audio='pipewire pipewire-pulse pipewire-alsa pipewire-jack lib32-pipewire lib32-pipewire-jack wireplumber' #void bluetooth = libspa-bluetooth'  #pulseaudio pulseaudio-bluetooth pavucontrol ##pulseaudio-alsa alsa-utils , for wine use (lib32-libpulse lib32-alsa-plugins)
-android='android-tools android-udev'
-bluetooth='bluez bluez-utils bluez-plugins'
-print='cups cups-pdf system-config-printer avahi'
-xorg='xorg-server xorg-xinit xorg-xinit light numlockx libinput xorg-xinput xss-lock'
-apps='telegram-desktop firefox feh calc fd bpytop adriconf' #for netwotk bmon
-nvidiagraphics='nvidia-prime nvidia nvidia-utils lib32-nvidia-utils nvidia-settings'
-hardwareacceleration='libva-mesa-driver mesa-vdpau intel-media-driver'
-vulkan='vulkan-icd-loader lib32-vulkan-icd-loader lib32-mesa vulkan-intel lib32-vulkan-intel vulkan-mesa-layers'
-filemanager='xed vifm pcmanfm tumbler raw-thumbnailer'
-archive='file-roller bzip2 cpio gzip lha xz lzop p7zip tar unrar zip unzip' # atool moved on Aur
-media='celluloid mate-utils pantheon-screenshot simplescreenrecorder'
-elogind=''
-rc='ntp-openrc avahi-openrc cups-openrc bluez-openrc networkmanager-openrc'
+microcode=(intel-ucode)
+linux=(base base-devel linux linux-firmware)
+init=()
+dev=(wget git ntp linux-headers)
+baseutils=(man bash-completion kitty vim nano)
+fs=(efibootmgr os-prober mtools parted dosfstools sbsigntools ntfs-3g gvfs-mtp fwupd)
+net=(networkmanager network-manager-applet)
+audio=(pipewire pipewire-pulse pipewire-alsa pipewire-jack lib32-pipewire lib32-pipewire-jack wireplumber) #void bluetooth = libspa-bluetooth  #pulseaudio pulseaudio-bluetooth pavucontrol ##pulseaudio-alsa alsa-utils , for wine use (lib32-libpulse lib32-alsa-plugins)
+android=(android-tools android-udev)
+bluetooth=(bluez bluez-utils bluez-plugins)
+print=(cups cups-pdf system-config-printer avahi)
+xorg=(xorg-server xorg-xinit xorg-xinit light numlockx libinput xorg-xinput xss-lock)
+apps=(telegram-desktop firefox feh calc fd bpytop adriconf) #for netwotk bmon
+nvidiagraphics=(nvidia-prime nvidia nvidia-utils lib32-nvidia-utils nvidia-settings)
+hardwareacceleration=(libva-mesa-driver mesa-vdpau intel-media-driver)
+vulkan=(vulkan-icd-loader lib32-vulkan-icd-loader lib32-mesa vulkan-intel lib32-vulkan-intel vulkan-mesa-layers)
+filemanager=(xed vifm pcmanfm tumbler raw-thumbnailer)
+archive=(file-roller bzip2 cpio gzip lha xz lzop p7zip tar unrar zip unzip) # atool moved on Aur
+media=(celluloid mate-utils pantheon-screenshot simplescreenrecorder)
+elogind=()
+rc=(ntp-openrc avahi-openrc cups-openrc bluez-openrc networkmanager-openrc)
+
+missing=()
+y="microcode linux init dev baseutils fs net
+   audio android bluetooth print xorg apps 
+   nvidiagraphics hardwareacceleration vulkan 
+   filemanager archive media elogind rc"
+
+ProgressBar=0
+
+AnotherCheck () {
+echo "${miss[@]}" | tr ' ' '\n' | sort -u > pkglist
+mapfile -t unlisted < <(comm -13 pacman_db pkglist)
+#IFS=" " read -r -a unlisted <<< "$(comm -13 pacman_db pkglist)"
+echo "Unlisted" = "${unlisted[@]}"
+}
+
+PkgCheck () {
+for a in $y; do
+  var="$a"'[@]'   #the y element with a [@] to be like an array
+  temp=${!var}  #splitting the every y[@] element inside temp to simulate a subarray
+  for b in $temp; do   #for every element of subarr temp  
+    if ! pacman -Ss "$b" 1>/dev/null; then  #check if doesn't exist
+      echo "[x] Package not available: $b from $var"
+      miss+=("$b")    #add missing element to new array miss
+    else new+=("$b")
+    fi
+    ProgressBar=$((ProgressBar+1))
+    echo -ne '['"$ProgressBar"'%]\r'
+  done
+  unset "$a"
+  declare "$a"="${new[*]}"
+  unset new
+done
+echo 'miss=' "${miss[@]}"
+for c in $y; do
+  local d="$c"'[@]'
+  echo "$c=""${!d}"
+done
+}
 
 BaseInstallation 
