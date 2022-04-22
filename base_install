@@ -379,7 +379,7 @@ BaseInstallation () {
     grub_pkg='grub'
     pacman-key --init
     pacman-key --populate artix
-    pacman -Sy "${pkgskips[@]}" artix-archlinux-support #lib32-artix-archlinux-support
+    pacman -Sy artix-archlinux-support #lib32-artix-archlinux-support
     pacman -Slq system world galaxy extra community multilib | sort > pacman_db
     PkgCheck
     for a in "${ArchTixSteps[@]}"; do "$a"
