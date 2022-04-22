@@ -481,4 +481,14 @@ for c in $y; do
 done
 }
 
+PkgMissed () {
+  echo "${miss[@]}" 
+  YesNoSel "Those packages are important for the installation process? \n If not we save this list in a file tha will be copied in your /home/*user*/UNI after installation \n  -- Type yes or no -- "
+  case $CC in
+    1) echo "OK, we break the installation, edit packages at the end of this file" && break ;;
+    0) echo "OK, skip those packages and proceed with the installation";;
+    *) echo "Do again please" && PkgMissed ;;
+  esac
+}
+
 BaseInstallation 
