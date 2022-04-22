@@ -46,7 +46,7 @@ CheckAS () {
 DiskPartition () {
   umount -R /mnt 
   "$pkgmanager" -Sy "${pkgskips[@]}" parted gptfdisk mtools ntfs-3g dialog
-  devicelist=( $(lsblk -dplnx size -o name,size | grep -Ev "boot|rpmb|loop" | tac) )
+  mapfile -t devicelist < <(lsblk -dplnx size -o name,size | grep -Ev "boot|rpmb|loop" | tac)
   DRIVE="$(dialog --stdout --menu "Select disk for installation" 0 0 0 ${devicelist[@]} || exit 1)"
   EXT_DRIVE="$(dialog --stdout --menu "Select EXTERNAL disk" 0 0 0 ${devicelist[@]} || exit 1)"
   ##parted -s "mklabel gpt mkpart ESP fat32 1MiB 512MiB mkpart root ext4 512MiB 100% set 1 esp on"
