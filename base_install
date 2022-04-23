@@ -377,7 +377,7 @@ BaseInstallation () {
     rcpacks="$rc"
     elogind=( elogind elogind-openrc )
     grub_pkg=( grub )
-    sed -i '/\[lib32]/,/mirrorlist/ s/#//' /mnt/etc/pacman.conf
+    sed -i '/\[lib32]/,/mirrorlist/ s/#//' /etc/pacman.conf
     pacman-key --init
     pacman-key --populate artix
     pacman -Sy artix-archlinux-support #lib32-artix-archlinux-support
