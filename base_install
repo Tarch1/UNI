@@ -389,7 +389,7 @@ BaseInstallation () {
       echo "$p" >> /etc/pacman.conf
     done
     pacman -Sylq system world galaxy extra community multilib | sort > pacman_db
-    #PkgCheck
+    PkgCheck
     for a in "${ArchTixSteps[@]}"; do "$a"
     done
     ;;
@@ -478,7 +478,7 @@ for a in $y; do
     echo -ne '['"$ProgressBar"'%]\r'
   done
   unset "$a"
-  declare "$a"="${new[*]}"
+  IFS=" " read -r -a $a <<< "${new[*]}"
   unset new
 done
 echo 'miss=' "${miss[@]}"
