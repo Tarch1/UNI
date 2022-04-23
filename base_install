@@ -141,8 +141,8 @@ ExternalDriveSetup () {
 }
 
 BaseSystemInstall () {
-  echo MADONNAPUTTANALINIT $init
-  local BasePKG=( "${linux[@]}" "${init[@]}" "${btrfsdep[@]}" "${elogind[@]}" ) 
+  local BasePKG=( "${linux[@]}" "${init[@]}" "${btrfsdep[@]}" "${elogind[@]}" )
+  echo "${BasePKG[@]}"
   "$pkgstrap" /mnt "${microcode[@]}"
   "$pkgstrap" /mnt "${BasePKG[@]}"
 }
@@ -371,8 +371,7 @@ BaseInstallation () {
     pkgstrap=basestrap
     fstabgen=fstabgen
     chroot='artix-chroot'
-    init=( openrc )
-    echo MADONNAPUTTANALINIT $init
+    init=(openrc)
     initc0='rc-update'
     initc1=add
     initc2=default
