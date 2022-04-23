@@ -384,6 +384,9 @@ BaseInstallation () {
     RepoList=( '[extra]' 'Include = /etc/pacman.d/mirrorlist-arch'
                  '[community]' 'Include = /etc/pacman.d/mirrorlist-arch'
                  '[multilib]' 'Include = /etc/pacman.d/mirrorlist-arch')
+    for p in "${RepoList[@]}"; do
+      echo "$p" >> /mnt/etc/pacman.conf
+    done
     pacman -Slq system world galaxy extra community multilib | sort > pacman_db
     PkgCheck
     for a in "${ArchTixSteps[@]}"; do "$a"
