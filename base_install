@@ -387,7 +387,7 @@ BaseInstallation () {
     for p in "${RepoList[@]}"; do
       echo "$p" >> /etc/pacman.conf
     done
-    pacman -Slq system world galaxy extra community multilib | sort > pacman_db
+    pacman -Sylq system world galaxy extra community multilib | sort > pacman_db
     PkgCheck
     for a in "${ArchTixSteps[@]}"; do "$a"
     done
