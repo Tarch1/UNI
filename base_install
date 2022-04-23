@@ -442,7 +442,6 @@ media=(celluloid mate-utils pantheon-screenshot simplescreenrecorder)
 elogind=()
 rc=(ntp-openrc avahi-openrc cups-openrc bluez-openrc networkmanager-openrc)
 
-missing=()
 y="microcode linux init dev baseutils fs net
    audio android bluetooth print xorg apps 
    nvidiagraphics hardwareacceleration vulkan 
