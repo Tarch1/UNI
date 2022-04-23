@@ -63,43 +63,6 @@ GraphicSel () {
   esac
 }
 
-SelSteps () {
-  OSSelection=( '4' 'Enter the distro we are going to setup : 1) Arch 2) Artix 3) Void \n'
-                'OSSel' ''
-                '1|Arch|arch' 'distro selected : Arch' 'Arch'
-                '2|Artix|artix' 'distro selected : Artix' 'Artix'
-                '3|Void|void' 'distro selected : Void' 'Void'
-                'echo "Wrong choice, type again" && OperatingSystemSel' )
-  
-  SelS=( 'OSSelection[@]' ) ## LocalizationSel 'LanguageSel' 'TimezoneSel' 
-  ## 'HostnameSel' 'UsernameSel' 'PartIDSel' 'FilesystemSel' 'BootloaderSel' )
-  for i in "${SelS[@]}"; do
-    var=("${!i}")
-    echo -en "${var[1]}"
-    read -r "${var[2]}"
-    #YesNoSel "${var[3]}"
-    case "${var[2]}" in
-      2) case "${var[2]}" in
-           "${var[4]}") echo "${var[5]}" && eval "${var[2]}"="${var[6]}" ;;
-           *) "${var[6]}" ;;
-         esac ;;
-      3) case "${var[2]}" in
-           "${var[4]}") echo "${var[5]}" && eval "${var[2]}"="${var[6]}" ;;
-           "${var[7]}") echo "${var[8]}" && eval "${var[2]}"="${var[9]}" ;;
-           *) "${var[10]}" ;;
-         esac ;;
-      4) case "${var[2]}" in
-           "${var[4]}") echo "${var[5]}" && eval "${var[2]}"="${var[6]}" ;;
-           "${var[7]}") echo "${var[8]}" && eval "${var[2]}"="${var[9]}" ;;
-           "${var[10]}") echo "${var[11]}" && eval "${var[2]}"="${var[12]}" ;;
-           *) "${var[13]}" ;;
-         esac ;;
-      *) ;;
-    esac
-    echo doned "${var[2]}"
-  done
-}
-
 Pacman_Locked() {
 	if [[ -f $(/var/lib/pacman/db.lck || /mnt/var/lib/pacman/db.lck) ]]; then
 		echo -e " !!!ERROR!!! Pacman is blocked. \n We try to remove /var/lib/pacman/db.lck."
@@ -259,4 +222,3 @@ YesNoSel () {
 UEFISel
 #CPUSel
 #GraphicSel
-#SelSteps
