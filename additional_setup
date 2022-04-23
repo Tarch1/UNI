@@ -96,7 +96,7 @@ SelSteps () {
          esac ;;
       *) ;;
     esac
-    echo doned ${var[2]}
+    echo doned "${var[2]}"
   done
 }
 
