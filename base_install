@@ -275,11 +275,11 @@ BootloaderInstall () {
     2|GRUB|Grub|grub)
       case "$UefiMode" in
         0)
-        "$chroot" /mnt "$pkgmanager" -Sy "${pkgskips[@]}" grub "$btrfsgrub_pkg"
+        "$chroot" /mnt "$pkgmanager" -Sy "${pkgskips[@]}" grub "${btrfsgrub_pkg[@]}"
         "$chroot" /mnt grub-install --target=i386-pc --recheck --debug /boot
         ;;
         *) 
-        "$chroot" /mnt "$pkgmanager" -Sy "${pkgskips[@]}" "$grub_pkg" $btrfsgrub_pkg
+        "$chroot" /mnt "$pkgmanager" -Sy "${pkgskips[@]}" "${grub_pkg[@]}" "${btrfsgrub_pkg[@]}"
         "$chroot" /mnt grub-install --target=x86_64-efi --efi-directory=/boot bootloader-id=GRUB
         ;;
       esac  
@@ -354,7 +354,7 @@ BaseInstallation () {
     initc0=systemctl
     initc1=enable
     initc2=""
-    grub_pkg='grub'
+    grub_pkg=( grub )
     sed -i 's/lightdm-openrc//' ../UNI/full_setup
     sed -i 's/gdm-openrc//' ../UNI/full_setup
     pacman -Slq system world galaxy extra community multilib | sort > pacman_db
@@ -370,13 +370,13 @@ BaseInstallation () {
     pkgstrap=basestrap
     fstabgen=fstabgen
     chroot='artix-chroot'
-    init=openrc
+    init=( openrc )
     initc0='rc-update'
     initc1=add
     initc2=default
     rcpacks="$rc"
-    elogind='elogind elogind-openrc'
-    grub_pkg='grub'
+    elogind=( elogind elogind-openrc )
+    grub_pkg=( grub )
     sed -i '/\[lib32]/,/mirrorlist/ s/#//' /mnt/etc/pacman.conf
     pacman-key --init
     pacman-key --populate artix
