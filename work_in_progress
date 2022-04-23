@@ -1,3 +1,4 @@
+#!/bin/bash
 SelSteps () {
   OSSelection=( '4' 'Enter the distro we are going to setup : 1) Arch 2) Artix 3) Void \n'
                 'OSSel' ''
