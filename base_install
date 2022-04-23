@@ -450,6 +450,7 @@ y="microcode linux init dev baseutils fs net
 ProgressBar=0
 
 AnotherCheck () {
+pacman -Sylq system world galaxy extra community multilib | sort > pacman_db
 echo "${miss[@]}" | tr ' ' '\n' | sort -u > pkglist
 mapfile -t unlisted < <(comm -13 pacman_db pkglist)
 #IFS=" " read -r -a unlisted <<< "$(comm -13 pacman_db pkglist)"
