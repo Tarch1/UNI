@@ -33,7 +33,7 @@ $keylayout" >> /etc/rc.rc.conf
 }
 
 CheckAS () {
-  if [[ -f "$(pwd)/additional_setup" && -f "$(pwd)/pkg_checker" ]]; then
+  if [[ -f "$(pwd)/additional_setup" ]]; then #&& -f "$(pwd)/pkg_checker" ]]; then
     source additional_setup
     #source pkg_checker
   else
