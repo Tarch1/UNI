@@ -375,7 +375,7 @@ BaseInstallation () {
     initc0='rc-update'
     initc1=add
     initc2=default
-    rcpacks="$rc"
+    rcpacks="${rc[@]}"
     elogind=( elogind elogind-openrc )
     grub_pkg=( grub )
     sed -i '/\[lib32]/,/mirrorlist/ s/#//' /etc/pacman.conf
