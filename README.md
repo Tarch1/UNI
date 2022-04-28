@@ -57,7 +57,7 @@ In case of error with gdm use Ctrl+Alt+F2
 
 A list of useful gnome extension: 
     
-    Blur my Shell - Desktop Cube - Sound IO Device Chooser - Unite - Night Theme Switcher Dynamic Panel Transparency
+    Blur my Shell - Desktop Cube - Sound IO Device Chooser - Unite - Night Theme Switcher Dynamic Panel Transparency Vitals
 
 Icons and cursor theme
     
