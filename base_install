@@ -252,7 +252,7 @@ AudioSetup () {
 UserSetup () {
   "$chroot" /mnt useradd -mG wheel,video,storage,input "$UNSel" #,lp,scanner,power
   sed -i '/%wheel ALL=(ALL) ALL/ s/# //' /mnt/etc/sudoers
-  sed -i '/%wheel ALL=(ALL:ALL) ALL/ s/# //' /mnt/etc/sudoers
+  sed -i '/%wheel ALL=(ALL:ALL) ALL/ s/#//' /mnt/etc/sudoers
   #sed -i 's/"us"/"it"/' /etc/conf.d/keymaps
   "$chroot" /mnt echo -n "Type password for $UNSel : "
   "$chroot" /mnt passwd "$UNSel"
