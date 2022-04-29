@@ -482,7 +482,7 @@ for a in $y; do
     echo -ne '['"$ProgressBar"'%]\r'
   done
   unset "$a"
-  IFS=" " read -r -a "$a" <<< "${new[@]}"
+  IFS=" " read -r -a "${a?}" <<< "${new[@]}"
   unset new
 done
 echo 'miss=' "${miss[@]}"
