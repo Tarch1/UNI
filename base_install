@@ -206,6 +206,9 @@ PackageConfig () {
         echo "$p" >> /mnt/etc/pacman.conf
       done
       sed -i '/\[lib32]/,/mirrorlist/ s/#//' /mnt/etc/pacman.conf
+      sed -i '/Color/ s/#//' /mnt/etc/pacman.conf
+      echo "ILoveCandy" >> /mnt/etc/pacman.conf
+      
     ;;
     3|Void|void)
       echo -e "nothing"
