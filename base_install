@@ -43,15 +43,32 @@ VoidTest () {
 	BTRFS_OPTS=$BTRFS_OPTS PS1=(chroot) chroot /mnt/ /bin/bash /mnt passwd tarch1
 	BTRFS_OPTS=$BTRFS_OPTS PS1=(chroot) chroot /mnt/ /bin/bash /mnt echo -n "Type password for root user : "
 	BTRFS_OPTS=$BTRFS_OPTS PS1=(chroot) chroot /mnt/ /bin/bash /mnt passwd
-	BTRFS_OPTS=$BTRFS_OPTS PS1=(chroot) chroot /mnt/ /bin/bash
-	BTRFS_OPTS=$BTRFS_OPTS PS1=(chroot) chroot /mnt/ /bin/bash
-	BTRFS_OPTS=$BTRFS_OPTS PS1=(chroot) chroot /mnt/ /bin/bash
-	BTRFS_OPTS=$BTRFS_OPTS PS1=(chroot) chroot /mnt/ /bin/bash
-	BTRFS_OPTS=$BTRFS_OPTS PS1=(chroot) chroot /mnt/ /bin/bash
-	BTRFS_OPTS=$BTRFS_OPTS PS1=(chroot) chroot /mnt/ /bin/bash
-	BTRFS_OPTS=$BTRFS_OPTS PS1=(chroot) chroot /mnt/ /bin/bash
-	BTRFS_OPTS=$BTRFS_OPTS PS1=(chroot) chroot /mnt/ /bin/bash
-	BTRFS_OPTS=$BTRFS_OPTS PS1=(chroot) chroot /mnt/ /bin/bash
+	BTRFS_OPTS=$BTRFS_OPTS PS1=(chroot) chroot /mnt/ /bin/bash UEFI_UUID=$(blkid -s UUID -o value /dev/sda1)
+	BTRFS_OPTS=$BTRFS_OPTS PS1=(chroot) chroot /mnt/ /bin/bash GRUB_UUID=$(blkid -s UUID -o value /dev/sda2)
+	BTRFS_OPTS=$BTRFS_OPTS PS1=(chroot) chroot /mnt/ /bin/bash ROOT_UUID=$(blkid -s UUID -o value /dev/mapper/cryptroot)
+	BTRFS_OPTS=$BTRFS_OPTS PS1=(chroot) chroot /mnt/ /bin/bash cat <<EOF > /etc/fstab
+UUID=$ROOT_UUID / btrfs $BTRFS_OPTS,subvol=@ 0 1
+UUID=$UEFI_UUID /efi vfat defaults,noatime 0 2
+UUID=$GRUB_UUID /boot ext2 defaults,noatime 0 2
+UUID=$ROOT_UUID /home btrfs $BTRFS_OPTS,subvol=@home 0 2
+UUID=$ROOT_UUID /.snapshots btrfs $BTRFS_OPTS,subvol=@snapshots 0 2
+tmpfs /tmp tmpfs defaults,nosuid,nodev 0 0
+EOF
+	BTRFS_OPTS=$BTRFS_OPTS PS1=(chroot) chroot /mnt/ /bin/bash echo hostonly=yes >> /etc/dracut.conf
+	BTRFS_OPTS=$BTRFS_OPTS PS1=(chroot) chroot /mnt/ /bin/bash xbps-install -Su void-repo-nonfree intel-ucode
+	BTRFS_OPTS=$BTRFS_OPTS PS1=(chroot) chroot /mnt/ /bin/bash xbps-install grub-x86_64-efi
+	BTRFS_OPTS=$BTRFS_OPTS PS1=(chroot) chroot /mnt/ /bin/bash grub-install --target=x86_64-efi --efi-directory=/efi --bootloader-id="Void Linux"
+	BTRFS_OPTS=$BTRFS_OPTS PS1=(chroot) chroot /mnt/ /bin/bash btrfs subvolume create /var/swap
+	BTRFS_OPTS=$BTRFS_OPTS PS1=(chroot) chroot /mnt/ /bin/bash truncate -s 0 /var/swap/swapfile
+	BTRFS_OPTS=$BTRFS_OPTS PS1=(chroot) chroot /mnt/ /bin/bash chattr +C /var/swap/swapfile
+	BTRFS_OPTS=$BTRFS_OPTS PS1=(chroot) chroot /mnt/ /bin/bash btrfs property set /var/swap/swapfile compression none
+	BTRFS_OPTS=$BTRFS_OPTS PS1=(chroot) chroot /mnt/ /bin/bash chmod 600 /var/swap/swapfile
+	BTRFS_OPTS=$BTRFS_OPTS PS1=(chroot) chroot /mnt/ /bin/bash dd if=/dev/zero of=/var/swap/swapfile bs=1G count=16 status=progress
+	BTRFS_OPTS=$BTRFS_OPTS PS1=(chroot) chroot /mnt/ /bin/bash mkswap /var/swap/swapfile
+	BTRFS_OPTS=$BTRFS_OPTS PS1=(chroot) chroot /mnt/ /bin/bash swapon /var/swap/swapfile
+	BTRFS_OPTS=$BTRFS_OPTS PS1=(chroot) chroot /mnt/ /bin/bash 
+	BTRFS_OPTS=$BTRFS_OPTS PS1=(chroot) chroot /mnt/ /bin/bash 
+	BTRFS_OPTS=$BTRFS_OPTS PS1=(chroot) chroot /mnt/ /bin/bash 
 	
 	
 }
