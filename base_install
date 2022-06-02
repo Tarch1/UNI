@@ -32,9 +32,17 @@ VoidTest () {
 	XBPS_ARCH=$ARCH xbps-install -S -R "$REPO" -r /mnt base-system btrfs-progs cryptsetup
 	for dir in dev proc sys run; do mount --rbind /$dir /mnt/$dir; mount --make-rslave /mnt/$dir; done
 	cp /etc/resolv.conf /mnt/etc/
-	BTRFS_OPTS=$BTRFS_OPTS PS1=(chroot) chroot /mnt/ /bin/bash
-	BTRFS_OPTS=$BTRFS_OPTS PS1=(chroot) chroot /mnt/ /bin/bash
-	BTRFS_OPTS=$BTRFS_OPTS PS1=(chroot) chroot /mnt/ /bin/bash
+	echo "$keylayout" >> /mnt/etc/rc.conf
+	echo -e " $HNSel \n 127.0.0.1 localhost \n ::1 localhost \n 127.0.1.1 $HNSel.localdomain $HNSel" >> /mnt/etc/hostname
+	sed -i "/$LocSel/ s/#//g" /mnt/etc/default/libc-locales
+	BTRFS_OPTS=$BTRFS_OPTS PS1=(chroot) chroot /mnt/ /bin/bash xbps-reconfigure -f glibc-locales
+	BTRFS_OPTS=$BTRFS_OPTS PS1=(chroot) chroot /mnt/ /bin/bash /mnt useradd -mG wheel,video,storage,input tarch1
+	sed -i '/%wheel ALL=(ALL) ALL/ s/# //' /mnt/etc/sudoers
+	sed -i '/%wheel ALL=(ALL:ALL) ALL/ s/#//' /mnt/etc/sudoers
+	BTRFS_OPTS=$BTRFS_OPTS PS1=(chroot) chroot /mnt/ /bin/bash /mnt echo -n "Type password for tarch1 : "
+	BTRFS_OPTS=$BTRFS_OPTS PS1=(chroot) chroot /mnt/ /bin/bash /mnt passwd tarch1
+	BTRFS_OPTS=$BTRFS_OPTS PS1=(chroot) chroot /mnt/ /bin/bash /mnt echo -n "Type password for root user : "
+	BTRFS_OPTS=$BTRFS_OPTS PS1=(chroot) chroot /mnt/ /bin/bash /mnt passwd
 	BTRFS_OPTS=$BTRFS_OPTS PS1=(chroot) chroot /mnt/ /bin/bash
 	BTRFS_OPTS=$BTRFS_OPTS PS1=(chroot) chroot /mnt/ /bin/bash
 	BTRFS_OPTS=$BTRFS_OPTS PS1=(chroot) chroot /mnt/ /bin/bash
