@@ -4,6 +4,12 @@
 if [ "$(id -u)" -ne 0 ]; then echo 'Please run as root.' >&2; exit 1; fi
 
 VoidTest () {
+	sgdisk --zap-all \
+	 --clear \
+	--new=1:0:+550M --typecode=1:ef00 \
+	--new=2:0:0 --typecode=2:8300 \
+	/dev/sda
+	sgdisk --verify /dev/sda
 	mkfs.vfat -n BOOT -F32 /dev/sda1
 	mkfs.ext2 -L grub /dev/sda2
 	cryptsetup luksFormat --type=luks -s=512 /dev/sda3
