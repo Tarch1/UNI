@@ -35,7 +35,7 @@ VoidTest () {
 	mkdir /mnt/{efi,boot}
 	mount -o rw,noatime /dev/sda1 /mnt/efi
 	mount -o rw,noatime /dev/sda2 /mnt/boot
-	REPO=https://alpha.ud.repo.voidlinux.org/current
+	REPO=https://alpha.de.repo.voidlinux.org/current
 	ARCH=x86_64
 	XBPS_ARCH=$ARCH xbps-install -S -R "$REPO" -r /mnt base-system btrfs-progs cryptsetup
 	for dir in dev proc sys run; do mount --rbind /$dir /mnt/$dir; mount --make-rslave /mnt/$dir; done
