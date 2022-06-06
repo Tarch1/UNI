@@ -256,7 +256,7 @@ SyncTime () {
 LocaleGen () {
   sed -i "/$LocSel/ s/#//g" /mnt/etc/locale.gen
   "$chroot" /mnt locale-gen
-  echo "LANG=$LangSel" >> /mnt/etc/locale.conf
+  echo -e "LANG=$LangSel \nLC_TIME=it_IT.UTF-8" >> /mnt/etc/locale.conf
   echo "$keylayout" >> /mnt/"$keypath"
   echo "$keylayout" >> /mnt/etc/vconsole.conf
 }
