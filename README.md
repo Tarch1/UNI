@@ -1,37 +1,23 @@
 # Universal-Installation-Script
 
-STEP:
-
-Find your interface with: 
-
-    ip a
-    rfkill unblock all
-    ip link interface up
-
-then use connmanctl:
-
+**Wifi-setup**
+`ip a
+rfkill unblock all
+ip link interface up
+connmanctl
     scan wifi
     services
     agent on
     connect wifi_***_psk
     quit
-After setup yout connecction run
+git clone https://github.com/Tarch1/Arch-tix
+cd Arch-tix/`
+**Adjust packages at the end of base_install**
+bash base_install
 
-    git clone https://github.com/Tarch1/Arch-tix
-    cd Arch-tix/
-  
-adjust packages at the end of base_install
+First setup use nmtui to connect on your network then personalize with
 
-    chmod +x base_install
-    bash base_install
-
-then reboot
-
-Use nmtui to connect on your network 
-then personalize with 
-
-    chmod +x full_setup
-    bash full_setup
+bash full_setup
 
 Reboot and Enjoy!
 
