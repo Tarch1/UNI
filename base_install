@@ -32,15 +32,15 @@ DiskPartition () {
 	if echo "$DRIVE" | grep "^/dev/[a-z]d[a-z]"; then
 	BOOT_PART="$DRIVE"1 && ROOT_PART="$DRIVE"2 && DEVICE="${DRIVE#/*/}"
 	elif echo "$DRIVE" | grep "^/dev/nvme"; then
-	BOOT_PART="$DRIVE"p1 && ROOT_PART="$DRIVE"p2 && DEVICE="${DRIVE#/*/}"
+	BOOT_PART="$DRIVE"p1 && ROOT_PART="$DRIVE"p2 && DEVICE="${DRIVE#/*/}" #printf -v BOOT_PART "%sp1" "$DRIVE"
 	elif echo "$DRIVE" | grep "^/dev/mmc"; then
 	BOOT_PART="$DRIVE"1 && ROOT_PART="$DRIVE"2 && DEVICE="${DRIVE#/*/}"
 	fi
 	echo DRIVE="$DRIVE" DEVICE="$DEVICE" && if [[ -z $DRIVE || -z $DEVICE ]]; then Show_error ;
 	else echo 'We can proceed with the formatting of file system' ; fi
-	BOOTID="$(blkid -s "$PIDSel" -o value "BOOT_PART")"
-	ROOTID="$(blkid -s "$PIDSel" -o value "ROOT_PART")"
+	BOOTID="$(blkid -s "$PIDSel" -o value "$BOOT_PART")"
+	ROOTID="$(blkid -s "$PIDSel" -o value "$ROOT_PART")"
 	echo BP="$BOOT_PART" RP="$ROOT_PART" PID="$PIDSel"
-	echo "$PIDSel"_BOOT="$BOOTID"
-	echo "$PIDSel"_ROOT="$ROOTID"
+	echo "$PIDSel"_BOOT="$BOOTID" "$PIDSel"_ROOT="$ROOTID" 
+	lsblk -f
 }
