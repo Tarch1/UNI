@@ -49,4 +49,13 @@ DiskPartition () {
 FileSystemFormat () {
 	BootLabel='EFI'
 	RootLabel='ROOT'
+	mkfs.fat -F32 -n "$BootLabel" "$BOOT_PART"
+	case "$FSSel" in
+	Ext4)
+		mkfs.ext4 -L "$RootLabel" "$ROOT_PART"
+		mount "$ROOT_PART" /mnt
+		FstabType='ext4'
+		FstabOptions=''
+	;;
+	esac
 }
