@@ -28,7 +28,8 @@ DiskPartition () {
 	mapfile -t devicesize < <(lsblk -dplnx size -o size | grep -Ev "boot|rpmb|loop" | tac)
 	DRIVE="$(dialog --stdout --menu "Select OS INSTALLATION disk" 0 0 0 "${devicelist[0]}" "${devicesize[0]}" "${devicelist[1]}" "${devicesize[1]}" || exit 1)"
 	EXT_DRIVE="$(dialog --stdout --menu "Select NOT REGARDING OF OS INSTALLATION disk" 0 0 0 "${devicelist[0]}" "${devicesize[0]}" "${devicelist[1]}" "${devicesize[1]}" || exit 1)"
-	parted -sf "$DRIVE" mktable gpt mkpart "ESP" 0% 1% mkpart "ROOT" 1% 100% set 1 esp on set 2 linux-home on
+	dd if=/dev/zero of=/dev/sdX bs=4096 status=progress
+	parted -sf "$DRIVE" mktable gpt mkpart "ESP" 0% 1% mkpart "LINUX-HOME" 1% 100% set 1 esp on set 2 linux-home on
 	if echo "$DRIVE" | grep "^/dev/[a-z]d[a-z]"; then
 	BOOT_PART="$DRIVE"1 && ROOT_PART="$DRIVE"2 && DEVICE="${DRIVE#/*/}"
 	elif echo "$DRIVE" | grep "^/dev/nvme"; then
@@ -43,4 +44,9 @@ DiskPartition () {
 	echo BP="$BOOT_PART" RP="$ROOT_PART" PID="$PIDSel"
 	echo "$PIDSel"_BOOT="$BOOTID" "$PIDSel"_ROOT="$ROOTID" 
 	lsblk -f
+}
+
+FileSystemFormat () {
+	BootLabel='EFI'
+	RootLabel='ROOT'
 }
