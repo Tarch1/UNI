@@ -9,7 +9,7 @@ Show_error () {
 
 Check_required_files () {
 	local file_needed=( additional_setup full_setup Bootloader/Refind/{refind.conf,refind_linux.conf,themes/Blur-theme/theme.conf}
-					Bootloader/Grub-Eiffel/{theme.txt,select_c.png,select_e.png,select_w.png,eiffel_tower_under_construction.png,icons/arch.png} )
+			Bootloader/Grub-Eiffel/{theme.txt,select_c.png,select_e.png,select_w.png,eiffel_tower_under_construction.png,icons/arch.png} )
 	for a in "${file_needed[@]}"; do 
 		if [[ -f "$(pwd)/$a" ]]; then  echo "File checked: $a"; else
 		echo "Missing required file: $a"
