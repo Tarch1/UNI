@@ -28,4 +28,19 @@ DiskPartition () {
 	mapfile -t devicesize < <(lsblk -dplnx size -o size | grep -Ev "boot|rpmb|loop" | tac)
 	DRIVE="$(dialog --stdout --menu "Select OS INSTALLATION disk" 0 0 0 "${devicelist[0]}" "${devicesize[0]}" "${devicelist[1]}" "${devicesize[1]}" || exit 1)"
 	EXT_DRIVE="$(dialog --stdout --menu "Select NOT REGARDING OF OS INSTALLATION disk" 0 0 0 "${devicelist[0]}" "${devicesize[0]}" "${devicelist[1]}" "${devicesize[1]}" || exit 1)"
+	parted -sf "$DRIVE" mktable gpt mkpart "ESP" 0% 1% mkpart "ROOT" 1% 100% set 1 esp on set 2 linux-home on
+	if echo "$DRIVE" | grep "^/dev/[a-z]d[a-z]"; then
+	BOOT_PART="$DRIVE"1 && ROOT_PART="$DRIVE"2 && DEVICE="${DRIVE#/*/}"
+	elif echo "$DRIVE" | grep "^/dev/nvme"; then
+	BOOT_PART="$DRIVE"p1 && ROOT_PART="$DRIVE"p2 && DEVICE="${DRIVE#/*/}"
+	elif echo "$DRIVE" | grep "^/dev/mmc"; then
+	BOOT_PART="$DRIVE"1 && ROOT_PART="$DRIVE"2 && DEVICE="${DRIVE#/*/}"
+	fi
+	echo DRIVE="$DRIVE" DEVICE="$DEVICE" && if [[ -z $DRIVE || -z $DEVICE ]]; then Show_error ;
+	else echo 'We can proceed with the formatting of file system' ; fi
+	BOOTID="$(blkid -s "$PIDSel" -o value "BOOT_PART")"
+	ROOTID="$(blkid -s "$PIDSel" -o value "ROOT_PART")"
+	echo BP="$BOOT_PART" RP="$ROOT_PART" PID="$PIDSel"
+	echo "$PIDSel"_BOOT="$BOOTID"
+	echo "$PIDSel"_ROOT="$ROOTID"
 }
