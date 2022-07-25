@@ -135,8 +135,8 @@ PackageConfig () {
 	1|arch|Arch)	sed -i '/\[multilib]/,/mirrorlist/ s/#//' /mnt/etc/pacman.conf ;;
 	2|artix|Artix)	sed -i '/\[lib32]/,/mirrorlist/ s/#//' /mnt/etc/pacman.conf;;
 	3|void|Void)	;;
-	*)	echo "No distro selected, there is a problem with additional_setup, exiting..." && 
-Show_error ;;
+	*)	echo "No distro selected, there is a problem with additional_setup, exiting..." && Show_error ;;
+	esac
 	sed -i '/Color/ s/#//' /mnt/etc/pacman.conf
 	echo "ILoveCandy" >> /mnt/etc/pacman.conf
 }
