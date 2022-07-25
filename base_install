@@ -140,3 +140,15 @@ PackageConfig () {
 	sed -i '/Color/ s/#//' /mnt/etc/pacman.conf
 	echo "ILoveCandy" >> /mnt/etc/pacman.conf
 }
+
+PackageInstall () {
+	local EssentialPKG=(  )
+	local AdditionalPKG=(  )
+	local ExtraPKG=(  )
+	if [[ "$VBTSel" = 1 ]]; then 
+		"$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${EssentialPKG[@]}"
+	else
+		"$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${EssentialPKG[@]}" "${AdditionalPKG[@]}"
+	fi
+	sed -i "/MODULES/ s/()/($modules)/" /mnt/etc/mkinitcpio.conf
+}
