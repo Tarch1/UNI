@@ -23,11 +23,11 @@ Check_required_files () {
 DiskPartition () {
 	swapoff -a
 	umount -R /mnt
-	"$pkgmanager" -Sy "${pkgskips[@]}" parted gptfdisk mtools ntfs-3g dialog || Show_error
+	"$PKGmanager" -Sy "${pkgskips[@]}" parted gptfdisk mtools ntfs-3g dialog || Show_error
 	mapfile -t devicelist < <(lsblk -dplnx size -o name | grep -Ev "boot|rpmb|loop" | tac)
 	mapfile -t devicesize < <(lsblk -dplnx size -o size | grep -Ev "boot|rpmb|loop" | tac)
-	DRIVE="$(dialog --stdout --menu "Select OS INSTALLATION disk" 0 0 0 "${devicelist[0]}" "${devicesize[0]}" "${devicelist[1]}" "${devicesize[1]}" || exit 1)"
-	EXT_DRIVE="$(dialog --stdout --menu "Select NOT REGARDING OF OS INSTALLATION disk" 0 0 0 "${devicelist[0]}" "${devicesize[0]}" "${devicelist[1]}" "${devicesize[1]}" || exit 1)"
+	DRIVE="$(dialog --stdout --menu "Select OS INSTALLATION drive" 0 0 0 "${devicelist[0]}" "${devicesize[0]}" "${devicelist[1]}" "${devicesize[1]}" || exit 1)"
+	ADDITIONAL_DRIVE="$(dialog --stdout --menu "Select ADDITIONAL drive" 0 0 0 "${devicelist[0]}" "${devicesize[0]}" "${devicelist[1]}" "${devicesize[1]}" || exit 1)"
 	wipefs -a "$DRIVE" #for erase all block (but very slower) use dd if=/dev/zero of="$DRIVE" bs=4096 status=progress
 	parted -sf "$DRIVE" mktable gpt mkpart "ESP" 0% 1% mkpart "LINUX-HOME" 1% 100% set 1 esp on set 2 linux-home on
 	if echo "$DRIVE" | grep "^/dev/[a-z]d[a-z]"; then
@@ -57,5 +57,86 @@ FileSystemFormat () {
 		FstabType='ext4'
 		FstabOptions=''
 	;;
+	Btrfs)
+		modules='btrfs'
+		btrfs=( snapper btrfs-progs )
+		btrfsgrub_pkg=( grub-btrfs )
+		SubVol=( '' 'home' 'var_log' 'snapshots' )
+		Btrfs_mount_options='noatime,compress=lzo,space_cache=v2'
+		FStabOption="default,$Btrfs_mount_options" #default use the default options: rw, suid, dev, exec, auto, nouser, and async.
+		
+		mkfs.btrfs -L "$RootLabel" "$ROOT_PART" #-f option to force overwrite filesystem
+		mount "$ROOT_PART" /mnt
+		for b in "${SubVol[@]}"; do btrfs su cr /mnt/@"$b" ; done
+		mount -o "$Btrfs_mount_options",subvol=@ "$ROOT_PART" /mnt
+		for c in "${SubVol[@]}"; do
+			if [[ "$c" == snapshots ]]; then
+				mkdir -p /mnt/"$c"
+				mount -o "$Btrfs_mount_options",discard=async,subvol=@"$c" "$ROOT_PART" /mnt/."$c"
+			elif [[ "$c" == var_log ]]; then 
+				mkdir -p /mnt/var/log
+				mount -o "$Btrfs_mount_options",subvol=@"$c" "$ROOT_PART" /mnt/var/log
+			else
+				mkdir -p /mnt/"$c"
+				mount -o "$Btrfs_mount_options",subvol=@"$c" "$ROOT_PART" /mnt/"$c"
+			fi
+			echo -e "$PIDSel=$ROOTID /$c $modules $FStabOption,subvol=@$c 0 0" >> UNIfstab
+		done
+	;;
+	*)	Show_error
+	;;
 	esac
+}
+
+AdditionalDriveSetup () {
+	ntfsfix "$ADDITIONAL_DRIVE"
+	mkdir -p /mnt/run/"$HNSel"/media/{HDD,USB}
+	mount "$ADDITIONAL_DRIVE" /mnt/run/"$HNSel"/media/HDD
+}
+
+BaseSystemInstall () {
+	local BasePKG=( "${linux[@]}" "${init[@]}" "${btrfsdep[@]}" "${elogind[@]}" )
+	echo "${BasePKG[@]}"
+	"PKGstrap" /mnt "${microcode[@]}" "${BasePKG[@]}"
+}
+
+FStabGen () {
+	mv -f /mnt/etc/fstab /mnt/etc/old-fstab
+	case "$OSSel" in
+	1|arch|Arch|2|artix|Artix)
+		case "$PIDSel" in
+		UUID)	"$fstabgen" -U /mnt >> /mnt/etc/fstab ;;
+		PARTUUID)	"$fstabgen" -t /mnt >> /mnt/etc/fstab ;;
+		LABEL)	"$fstabgen" -L /mnt >> /mnt/etc/fstab ;;
+		*)	echo "No Partition ID selected, using UUID" && "$fstabgen" -U /mnt >> /mnt/etc/fstab ;;
+		esac
+	;;
+	3)	cp UNIfstab /mnt/etc/fstab ;;
+	*)	echo "No distro selected, there is a problem with additional_setup, exiting..." && 
+Show_error
+	;;
+	esac
+	cat /mnt/etc/fstab
+}
+
+SetupEnvironment () {
+	sed -i "/$LocSel/ s/#//g" /mnt/etc/locale.gen
+	echo -e "LANG=$LangSel \nLENGUAGE=en_GB.UTF.8 \nLC_TIME=$LangSel \nLC_ADDRESS=$LangSel \nLC_MESSAGES=en_GB.UTF-8" >> /mnt/etc/locale.conf
+	echo "$keylayout" | tee /mnt/"$keypath" /mnt/etc/vconsole.conf >&2	
+	"chroot" /mnt ln -sf /usr/share/zoneinfo/"$TZSel" /etc/localtime && hwclock --systohc --utc && locale-gen
+	#echo -e "HARDWARECLOCK=$HARDWARECLOCK \nKEYMAP=$KEYMAP \nFONT=$FONT \nTTYS=$TTYS" >> /mnt/etc/rc.conf
+	ehco "$HNSel" >> /mnt/etc/hostname
+	echo -e " $HNSel \n 127.0.0.1 localhost \n ::1 localhost \n 127.0.1.1 $HNSel.localdomain $HNSel" >> /mnt/etc/hosts
+}
+
+PackageConfig () {
+	"$chroot" /mnt "$PKGmanager" -Sy
+	case "$OSSel" in
+	1|arch|Arch)	sed -i '/\[multilib]/,/mirrorlist/ s/#//' /mnt/etc/pacman.conf ;;
+	2|artix|Artix)	sed -i '/\[lib32]/,/mirrorlist/ s/#//' /mnt/etc/pacman.conf;;
+	3|void|Void)	;;
+	*)	echo "No distro selected, there is a problem with additional_setup, exiting..." && 
+Show_error ;;
+	sed -i '/Color/ s/#//' /mnt/etc/pacman.conf
+	echo "ILoveCandy" >> /mnt/etc/pacman.conf
 }
