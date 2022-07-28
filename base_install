@@ -178,6 +178,7 @@ BootloaderSetup () {
 	1|REFIND|Refind|refind)
 		"$chroot" /mnt "$PKGmanager" -Sy "${pkgskips[@]}" refind
 		"$chroot" /mnt refind-install
+		sed -i '/ucode.img/ s/ucode/$microcodepkg/g' ../UNI/Bootloader/Refind/refind_linux.conf
 		mkdir /mnt/boot/EFI/refind/themes
 		mv /mnt/boot/EFI/refind/refind.conf /mnt/boot/EFI/refind/backup-refind.conf
 		mv /mnt/boot/refind_linux.conf /mnt/boot/backup-refind_linux.conf
@@ -203,7 +204,7 @@ BootloaderSetup () {
 		cp -r ../UNI/Bootloader/Grub-Eiffel /mnt/boot/grub/themes/
 	;;
 	3|EFISTUB|Efistub|efistub)
-		BLflags="\'rw root=$PIDsel=$ROOTID rootflags=subvol=@ initrd=\intel-ucode.img initrd=\initramfs-linux.img\'"
+		BLflags="\'rw root=$PIDsel=$ROOTID rootflags=subvol=@ initrd=\$microcodepkg.img initrd=\initramfs-linux.img\'"
 		"$chroot" /mnt efibootmgr -c -d "$BOOT_PART" -p 1 -L "$OSsel" -l /vmlinuz-linux -u "$BLflags" --verbose
 		echo "efibootmgr -b lastnumber -B" #delete previous boot entries
 	;;
