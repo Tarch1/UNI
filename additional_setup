@@ -217,6 +217,6 @@ YesNoSel () {
   esac
 }
 
-UEFISel
+UEFIsel
 CPUsel
 GPUsel
