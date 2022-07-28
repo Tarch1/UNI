@@ -102,7 +102,7 @@ BaseSystemInstall () {
 
 FStabGen () {
 	mv -f /mnt/etc/fstab /mnt/etc/old-fstab
-	case "$OSSel" in
+	case "$OSsel" in
 	1|arch|Arch|2|artix|Artix)
 		case "$PIDsel" in
 		UUID)	"$fstabgen" -U /mnt >> /mnt/etc/fstab ;;
@@ -131,7 +131,7 @@ SetupEnvironment () {
 
 PackageConfig () {
 	"$chroot" /mnt "$PKGmanager" -Sy
-	case "$OSSel" in
+	case "$OSsel" in
 	1|arch|Arch)	sed -i '/\[multilib]/,/mirrorlist/ s/#//' /mnt/etc/pacman.conf ;;
 	2|artix|Artix)	sed -i '/\[lib32]/,/mirrorlist/ s/#//' /mnt/etc/pacman.conf;;
 	3|void|Void)	;;
@@ -161,12 +161,12 @@ AudioSetup () {
 
 ServiceSetup () {
 	Services=( 'NetworkManager' 'cupsd' 'avahi-daemon' )
-	for s in "${Services[@]}"; do "$chroot" /mnt "$initc0" "$initc1" "$c" "$initc2" ; done
+	for s in "${Services[@]}"; do "$chroot" /mnt "$initc0" "$initc1" "$c" ; done
 }
 
 UserSetup () {
 	"$chroot" /mnt useradd -mG wheel,video,storage,input "$UNSel" #,lp,scanner,power
-	sed '/%wheel ALL=(ALL) ALL/ /%wheel ALL=(ALL:ALL) ALL/ s/#//' /mnt/etc/sudoers
+	sed -i '/%wheel ALL=(ALL) ALL/ /%wheel ALL=(ALL:ALL) ALL/ s/#//' /mnt/etc/sudoers
 	"%chroot" /mnt echo -n "Type password for $UNSel -->>"
 	"%chroot" /mnt passwd "$UNSel"
 	"%chroot" /mnt echo -n "Type password for root -->>"
@@ -204,7 +204,7 @@ BootloaderSetup () {
 	;;
 	3|EFISTUB|Efistub|efistub)
 		BFlags="\'rw root=$PIDSel=$ROOTID rootflags=subvol=@ initrd=\intel-ucode.img initrd=\initramfs-linux.img\'"
-		"$chroot" /mnt efibootmgr -c -d "$BOOT_PART" -p 1 -L "$OSSel" -l /vmlinuz-linux -u "$BFlags" --verbose
+		"$chroot" /mnt efibootmgr -c -d "$BOOT_PART" -p 1 -L "$OSsel" -l /vmlinuz-linux -u "$BFlags" --verbose
 		echo "efibootmgr -b lastnumber -B" #delete previous boot entries
 	;;
 	*)	Show_error
@@ -234,32 +234,133 @@ InstallationSetup () {
 	#VoidSteps=(  )
 	
 	
+	case "$OSsel" in
+	1|Arch|arch)
+		PKGmanager=pacman
+		pkgskips=( --needed --no-confirm )
+		keylayout='KEYMAP=it'
+		kaypath='etc/vconsole.conf'
+		PKGstrap=pacstrap
+		fstabgen=genfstab
+		chroot='arch-chroot'
+		initc0=systemctl
+		initc1=enable
+		grub_pkg=( grub )
+		sed -i 's/-openrc//g' ../UNI/full_setup
+		sed -i '/\[multilib]/,/mirrorlist/ s/#//' /etc/pacman.conf
+		pacman -Slq core extra community multilib | sort > pacman_db
+		PKGcheck
+		for a in "${ArchTixSteps[@]}"; do "$a" ; done
+	;;
+	2|Artix|artix)
+		PKGmanager=pacman
+		pkgskips=( --needed --no-confirm )
+		keylayout='KEYMAP=it'
+		kaypath='etc/conf.d/keymaps'
+		PKGstrap=basestrap
+		fstabgen=fstabgen
+		chroot='artix-chroot'
+		initc0='rc-update'
+		initc1=add
+		grub_pkg=( grub )
+		rcpacks=("${rc[@]}")
+		elogind=( elogind elogind-openrc )
+		sed -i '/\[lib32]/,/mirrorlist/ s/#//' /etc/pacman.conf
+		pacman -Slq system world galaxy lib32 | sort > pacman_db
+		PKGcheck
+		for a in "${ArchTixSteps[@]}"; do "$a" ; done
+	;;
+	3|Void|void)
+		echo 'nothing here'
+	;;
+	*)
+	;;
+	esac
+	FinishInst
 }
 
+FinishInst () {
+	echo -e " INSTALLATION COMPLETED \n A copy of the script will be placed in your user home directory"
+	cp "$(pwd)"/Conf_files/bashrc /mnt/home/"$UNsel"/.bashrc
+	cp -r "$(pwd)" /mnt/home/"$UNSel"/
+	echo 'export MOZ_ENABLE_WAYLAND=1' > /mnt/home/"$UNsel"/.profile
+	YesNoSel "Reboot system"
+	case "$CC" in
+	1)	umount -R /mnt && reboot ;;
+	2)	echo 'OK' && exit 0 ;;
+	*)	echo 'Not a good answer' && YesNoSel "Reboot system" ;;
+	esac
+}
 
+########## PACKAGES ##########
 
+microcode=(intel-ucode)
+linux=(base base-devel linux linux-firmware)
+init=()
+dev=(wget git ntp linux-headers)
+baseutils=(man bash-completion kitty vim nano)
+fs=(efibootmgr os-prober mtools parted dosfstools sbsigntools ntfs-3g gvfs-mtp fwupd)
+net=(networkmanager network-manager-applet)
+audio=(pipewire pipewire-pulse pipewire-alsa pipewire-jack lib32-pipewire lib32-pipewire-jack wireplumber) #void bluetooth = libspa-bluetooth  #pulseaudio pulseaudio-bluetooth pavucontrol ##pulseaudio-alsa alsa-utils , for wine use (lib32-libpulse lib32-alsa-plugins)
+android=(android-tools android-udev)
+bluetooth=(bluez bluez-utils bluez-plugins)
+print=(cups cups-pdf system-config-printer avahi)
+xorg=(xorg-server xorg-xinit xorg-xinit light numlockx libinput xorg-xinput xss-lock)
+apps=(telegram-desktop firefox feh calc fd bpytop adriconf) #for netwotk bmon
+nvidiagraphics=(nvidia-prime nvidia nvidia-utils lib32-nvidia-utils nvidia-settings)
+hardwareacceleration=(libva-mesa-driver mesa-vdpau intel-media-driver)
+vulkan=(vulkan-icd-loader lib32-vulkan-icd-loader lib32-mesa vulkan-intel lib32-vulkan-intel vulkan-mesa-layers)
+filemanager=(xed vifm pcmanfm tumbler raw-thumbnailer)
+archive=(file-roller bzip2 cpio gzip lha xz lzop p7zip tar unrar zip unzip) # atool moved on Aur
+media=(celluloid mate-utils pantheon-screenshot simplescreenrecorder)
+elogind=()
+rc=(ntp-openrc avahi-openrc cups-openrc bluez-openrc networkmanager-openrc)
 
+ProgressBar=0
+y=" microcode linux init dev baseutils fs net audio android bluetooth print xorg apps
+		nvidiagraphics hardwareacceleration vulkan filemanager archive media elogind rc "
 
+AnotherCheck () {
+pacman -Sylq system world galaxy extra community multilib | sort > pacman_db
+echo "${miss[@]}" | tr ' ' '\n' | sort -u > pkglist
+mapfile -t unlisted < <(comm -13 pacman_db pkglist)
+#IFS=" " read -r -a unlisted <<< "$(comm -13 pacman_db pkglist)"
+echo "Unlisted" = "${unlisted[@]}"
+}
 
+PkgCheck () {
+for a in $y; do
+	var="$a"'[@]'   #the y element with a [@] to be like an array
+	temp=${!var}  #splitting the every y[@] element inside temp to simulate a subarray
+	for b in $temp; do   #for every element of subarr temp  
+		if ! pacman -Ss "$b" 1>/dev/null; then  #check if doesn't exist
+			echo "[x] Package not available: $b from $var"
+			miss+=("$b")    #add missing element to new array miss
+		else new+=("$b")
+		fi
+		ProgressBar=$((ProgressBar+1))
+		echo -ne '['"$ProgressBar"'%]\r'
+	done
+	unset "$a"
+	IFS=" " read -r -a "${a?}" <<< "${new[@]}"
+	unset new
+done
+echo 'miss=' "${miss[@]}"
+for c in $y; do
+	local d="$c"'[@]'
+	echo "$c=""${!d}"
+done
+echo "${miss[@]}" | tr ' ' '\n' | sort -u > pkglist
+}
 
+PkgMissed () {
+	echo "${miss[@]}"
+	YesNoSel "Those packages are important for the installation process? \n If not we save this list in a file tha will be copied in your /home/*user*/UNI after installation \n  -- Type yes or no -- "
+	case $CC in
+	1) echo "OK, we break the installation, edit packages at the end of this file" && exit 0 ;;
+	0) echo "OK, skip those packages and proceed with the installation";;
+	*) echo "Do again please" && PkgMissed ;;
+	esac
+}
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+InstallationSetup
