@@ -238,7 +238,7 @@ InstallationSetup () {
 	fi
 	
 	local Personalization=( 'OperatingSystemSel' 'LocalizationSel' 'LanguageSel' 'TimezoneSel' 'HostnameSel' 'UsernameSel' 'PartIDSel' 'FilesystemSel' 'BootloaderSel' )
-	ArchTixSteps=( 'DiskPartition' 'BootFormat' 'RootFormat' 'AdditionalDriveSetup' 'BaseSystemInstall' 'FstabGen' 'SyncTime' 'LocaleGen' 'HostConfig' 'PackageConfig' 'PackageInstall' 'ServiceEnabler' 'AudioSetup' 'UserSetup' 'BootloaderInstall' )
+	ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' 'AdditionalDriveSetup' 'BaseSystemInstall' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'AudioSetup' 'ServiceEnabler' 'UserSetup' 'BootloaderSetup' )
 	#VoidSteps=(  )
 	
 	for s in "${Personalization[@]}"; do "$s" ; done
