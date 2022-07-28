@@ -61,7 +61,7 @@ GPUsel () {
 Pacman_Locked() {
 	if [[ -f $(/var/lib/pacman/db.lck || /mnt/var/lib/pacman/db.lck) ]]; then
 		echo -e " !!!ERROR!!! Pacman is blocked. \n We try to remove /var/lib/pacman/db.lck."
-		rm /var/lib/pacman/db.lck || /mnt/var/lib/pacman/db.lck
+		rm -f /var/lib/pacman/db.lck || /mnt/var/lib/pacman/db.lck
 	else echo "No locked database"
 	fi
 }
@@ -71,103 +71,92 @@ Pacman_Locked() {
 VirtualBoxTest () {
   YesNoSel "If this is a Virtualbox installation for test the script, we will skip every choice -- Type yes or no -- "
   case $CC in
-    1) echo "OK, skip all check $VBTSel" && VBTSel=1 ;;
-    0) echo "OK, now respond a few question" && VBTSel='' ;;
+    1) echo "OK, skip all check $VBTSel" && VBTsel=1 ;;
+    0) echo "OK, now respond a few question" && VBTsel='' ;;
     *) echo "Do again please" && VirtualBoxTest ;;
   esac
 }
 
 OperatingSystemSel () {
   echo -en "Enter the distro we are going to setup : 1) Arch 2) Artix 3) Void \n"
-  read -r OSSel
-  case $OSSel in
-    1|Arch|arch) echo "distro selected : Arch" && OSSel="Arch" ;;
-    2|Artix|artix) echo "distro selected : Artix" && OSSel="Artix" ;;
-    3|Void|void) echo "distro selected : Void" && OSSel="Void" ;;
+  read -r OSsel
+  case $OSsel in
+    1|Arch|arch) echo "distro selected : Arch" && OSsel="Arch" ;;
+    2|Artix|artix) echo "distro selected : Artix" && OSsel="Artix" ;;
+    3|Void|void) echo "distro selected : Void" && OSsel="Void" ;;
     *) echo "Wrong choice, type again" && OperatingSystemSel ;;
-  esac
-}
-
-DiskSel () {
-  echo -en "\n Enter the disk you want to use : \n"
-  lsblk -dplnx size -o name,size
-  read -r DSel
-  YesNoSel "If $DSel is the right disk type y or n for retype it : "
-  case $CC in
-    1) echo "OK, disk selected $DSel" ;;
-    *) echo "Then again" && DiskSel ;;
   esac
 }
 
 VoidInstMethod () {
   echo -en "Enter installation type : 1) XBPS 2) ROOTFS \n"
-  read -r VIMethod
-  case $VIMethod in
-    1|XBPS|xbps) echo 'Selected : XBPS install' && VIMethod="XBPS" ;;
-    2|ROOTFS|rootfs) echo 'Selected : ROOTFS install' && VIMethod="ROOTFS" ;;
+  read -r VImethod
+  case $VImethod in
+    1|XBPS|xbps) VImethod="XBPS" && echo 'Selected : XBPS install' ;;
+    2|ROOTFS|rootfs) VImethod="ROOTFS" && echo 'Selected : ROOTFS install' ;;
     *) echo "Wrong choice, type again" && VoidInstMethod ;;
   esac
 }
 
 LibrarySel () {
   echo -en "Enter base library name : 1) GLIBC 2) MUSL \n"
-  read -r LibSel
-  case $LibSel in
-  1|GLIBC|glibc) echo "Selected : Arch" && LibSel="GLIBC" ;;
-  2|MUSL|musl) echo "Selected : Artix" && LibSel="MUSL" ;;
+  read -r LIBsel
+  case $LIBsel in
+  1|GLIBC|glibc) LIBsel="GLIBC" && echo "Selected : GLIBC" ;;
+  2|MUSL|musl) LIBsel="MUSL" && echo "Selected : MUSL" ;;
   *) echo "Wrong choice, type again" && LibrarySel ;;
   esac
 }
 
 LocalizationSel () {
   echo -en "Enter localization : 1) en_US.UTF-8 2) en_GB.UTF-8 3) it_IT.UTF-8 \n"
-  read -r LocSel
+  read -r LOCsel
   case $LocSel in
-    1|en_US|en_US.UTF-8) echo "Selected : en_US.UTF-8" && LocSel="en_US.UTF-8" ;;
-    2|en_GB|en_GB.UTF-8) echo "Selected : en_GB.UTF-8" && LocSel="en_GB.UTF-8" ;;
-    3|it_IT|it_IT.UTF-8) echo "Selected : it_IT.UTF-8" && LocSel="it_IT.UTF-8" ;;
+    1|en_US|en_US.UTF-8) LOCsel="en_US.UTF-8" && echo "Selected : en_US.UTF-8" ;;
+    2|en_GB|en_GB.UTF-8) LOCsel="en_GB.UTF-8" && echo "Selected : en_GB.UTF-8" ;;
+    3|it_IT|it_IT.UTF-8) LOCsel="it_IT.UTF-8" && echo "Selected : it_IT.UTF-8" ;;
     *) echo "Wrong choice, type again" && LocalizationSel ;;
   esac
 }
 
 LanguageSel () {
   echo -en "Enter preferred Language : 1) en_US.UTF-8 2) en_GB.UTF-8 3) it_IT.UTF-8 \n"
-  read -r LangSel
+  read -r LANGsel
   case $LangSel in
-    1|en_US|en_US.UTF-8) echo "Selected : en_US.UTF-8" && LangSel="en_US.UTF-8" ;;
-    2|en_GB|en_GB.UTF-8) echo "Selected : en_GB.UTF-8" && LangSel="en_GB.UTF-8" ;;
-    3|it_IT|it_IT.UTF-8) echo "Selected : it_IT.UTF-8" && LangSel="it_IT.UTF-8" ;;
+    1|en_US|en_US.UTF-8) LANGsel="en_US.UTF-8" && echo "Selected : en_US.UTF-8" ;;
+    2|en_GB|en_GB.UTF-8) LANGsel="en_GB.UTF-8" && echo "Selected : en_GB.UTF-8" ;;
+    3|it_IT|it_IT.UTF-8) LANGsel="it_IT.UTF-8" && echo "Selected : it_IT.UTF-8" ;;
     *) echo "Wrong choice, type again" && LanguageSel ;;
   esac
 }
 
 HostnameSel () {
-  read -rp "Enter preferred hostname : " HNSel
-  YesNoSel "If [ $HNSel ] is the right hostname type y or n for retype it :"
+  read -rp "Enter preferred hostname : " HNsel
+  YesNoSel "If << $HNsel >> is the right hostname type y or n for retype it :"
   case $CC in
-    1) echo "OK, hostname selected $HNSel" ;;
+    1) echo "OK, hostname selected $HNsel" ;;
     *) echo "Then again" && HostnameSel ;;
   esac
 }
 
 UsernameSel () {
-  read -rp "Enter preferred username : " UNSel
-  YesNoSel "If [ $UNSel ] is the right hostname type y or n for retype it :"
+  read -rp "Enter preferred username : " UNsel
+  YesNoSel "If << $UNsel >> is the right hostname type y or n for retype it :"
   case $CC in
-    1) echo "OK, username selected $UNSel" ;;
+    1) echo "OK, username selected $UNsel" ;;
     *) echo "Then again" && UsernameSel ;;
   esac
 }
 
 TimezoneSel () {
   echo -en " Select Timezone : 1) Europe/Rome \n or type another with the same format "
-  read -r TZSel
-  case $TZSel in
-    1|Europe/Rome|Rome|'') echo "Selected : Europe/Rome" && TZSel="Europe/Rome" ;;
+  read -r TZsel
+  case "$TZsel" in
+    1|Europe/Rome|Rome) TZsel="Europe/Rome" && echo "Selected : Europe/Rome" ;;
     q|quit|exit) TZSel="" ;;
-    *) YesNoSel "Want this for timezone : $TZSel ?"
+    *) YesNoSel "Want this for timezone : $TZsel ?"
        case $CC in
-         1) echo "OK, timezone selected $TZSel" ;;
+         1) echo "OK, timezone selected $TZsel" ;;
          *) echo "Then again" && TimezoneSel ;;
        esac ;;
   esac
@@ -175,32 +164,32 @@ TimezoneSel () {
 
 PartIDSel () {
   echo -en "Enter partition identifier : 1) UUID 2) PARTUUID 3) LABEL \n"
-  read -r PIDSel
-  case $PIDSel in
-    1|UUID|uuid) echo "Selected : UUID" && PIDSel=UUID ;;
-    2|PARTUUID|partuuid) echo "Selected : PARTUUID" && PIDSel=PARTUUID ;;
-    3|LABEL|label) echo "Selected : LABEL" && PIDSel=LABEL ;;
+  read -r PIDsel
+  case $PIDsel in
+    1|UUID|uuid) PIDsel=UUID && echo "Selected : UUID" ;;
+    2|PARTUUID|partuuid) PIDsel=PARTUUID && echo "Selected : PARTUUID" ;;
+    3|LABEL|label) PIDsel=LABEL && echo "Selected : LABEL" ;;
     *) echo "Wrong choice, type again" && PartIDSel ;;
   esac
 }
 
 FilesystemSel () {
   echo -en "Enter base filesystem : 1) EXT4 2) BTRFS \n"
-  read -r FSSel
-  case $FSSel in
-    1|EXT4|ext4) echo "Selected : EXT4" && FSSel=Ext4Format ;;
-    2|BTRFS|btrfs) echo "Selected : BTRFS" && FSSel=BtrfsFormat ;;
+  read -r FSsel
+  case $FSsel in
+    1|EXT4|ext4) FSsel=Ext4Format && echo "Selected : EXT4" ;;
+    2|BTRFS|btrfs) FSsel=BtrfsFormat && echo "Selected : BTRFS" ;;
     *) echo "Wrong filesystem selected, try one of those provided" && FilesystemSel ;;
   esac
 }
 
 BootloaderSel () {
   echo -en "Enter preferred bootloader : 1) Refind 2) Grub 3) Efistub \n"
-  read -r BLSel
-  case $BLSel in
-    1|REFIND|refind) BLSel="refind" && echo "bootloader selected : refind" ;;
-    2|GRUB|grub) BLSel="grub" && echo "bootloader selected : grub" ;;
-    3|EFISTUB|efistub) BLSel="efistub" && echo "bootloader selected : efistub" ;;
+  read -r BLsel
+  case $BLsel in
+    1|REFIND|refind) BLsel="refind" && echo "bootloader selected : refind" ;;
+    2|GRUB|grub) BLsel="grub" && echo "bootloader selected : grub" ;;
+    3|EFISTUB|efistub) BLsel="efistub" && echo "bootloader selected : efistub" ;;
     *) echo "Wrong bootloader selected, try one of those provided" && BootloaderSel ;;
   esac
 }
