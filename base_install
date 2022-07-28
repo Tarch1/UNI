@@ -165,10 +165,10 @@ ServiceSetup () {
 }
 
 UserSetup () {
-	"$chroot" /mnt useradd -mG wheel,video,storage,input "$UNSel" #,lp,scanner,power
+	"$chroot" /mnt useradd -mG wheel,video,storage,input "$UNsel" #,lp,scanner,power
 	sed -i '/%wheel ALL=(ALL) ALL/ /%wheel ALL=(ALL:ALL) ALL/ s/#//' /mnt/etc/sudoers
-	"%chroot" /mnt echo -n "Type password for $UNSel -->>"
-	"%chroot" /mnt passwd "$UNSel"
+	"%chroot" /mnt echo -n "Type password for $UNsel -->>"
+	"%chroot" /mnt passwd "$UNsel"
 	"%chroot" /mnt echo -n "Type password for root -->>"
 	"%chroot" /mnt passwd
 }
@@ -203,8 +203,8 @@ BootloaderSetup () {
 		cp -r ../UNI/Bootloader/Grub-Eiffel /mnt/boot/grub/themes/
 	;;
 	3|EFISTUB|Efistub|efistub)
-		BFlags="\'rw root=$PIDSel=$ROOTID rootflags=subvol=@ initrd=\intel-ucode.img initrd=\initramfs-linux.img\'"
-		"$chroot" /mnt efibootmgr -c -d "$BOOT_PART" -p 1 -L "$OSsel" -l /vmlinuz-linux -u "$BFlags" --verbose
+		BLflags="\'rw root=$PIDsel=$ROOTID rootflags=subvol=@ initrd=\intel-ucode.img initrd=\initramfs-linux.img\'"
+		"$chroot" /mnt efibootmgr -c -d "$BOOT_PART" -p 1 -L "$OSsel" -l /vmlinuz-linux -u "$BLflags" --verbose
 		echo "efibootmgr -b lastnumber -B" #delete previous boot entries
 	;;
 	*)	Show_error
@@ -229,9 +229,9 @@ InstallationSetup () {
 	VirtualBoxTest
 	if [[ "$VBTsel" = 1 ]]; then
 		SelectionSteps=( OperatingSystemSel )
-		LangSel='en_GB.UTF-8' && LocSel='en_GB.UTF-8'
+		LANGsel='en_GB.UTF-8' && LocSel='en_GB.UTF-8'
 		HNsel=tarch1 && UNsel=tarch1
-		TZSel='Europe/Rome'
+		TZsel='Europe/Rome'
 		PIDsel=UUID &&	FSsel=BtrfsFormat
 		BLsel=refind
 	fi
@@ -247,7 +247,7 @@ InstallationSetup () {
 		PKGmanager=pacman
 		pkgskips=( --needed --no-confirm )
 		keylayout='KEYMAP=it'
-		kaypath='etc/vconsole.conf'
+		keypath='etc/vconsole.conf'
 		PKGstrap=pacstrap
 		fstabgen=genfstab
 		chroot='arch-chroot'
@@ -264,7 +264,7 @@ InstallationSetup () {
 		PKGmanager=pacman
 		pkgskips=( --needed --no-confirm )
 		keylayout='KEYMAP=it'
-		kaypath='etc/conf.d/keymaps'
+		keypath='etc/conf.d/keymaps'
 		PKGstrap=basestrap
 		fstabgen=fstabgen
 		chroot='artix-chroot'
@@ -290,7 +290,7 @@ InstallationSetup () {
 FinishInst () {
 	echo -e " INSTALLATION COMPLETED \n A copy of the script will be placed in your user home directory"
 	cp "$(pwd)"/Conf_files/bashrc /mnt/home/"$UNsel"/.bashrc
-	cp -r "$(pwd)" /mnt/home/"$UNSel"/
+	cp -r "$(pwd)" /mnt/home/"$UNsel"/
 	echo 'export MOZ_ENABLE_WAYLAND=1' > /mnt/home/"$UNsel"/.profile
 	YesNoSel "Reboot system"
 	case "$CC" in
