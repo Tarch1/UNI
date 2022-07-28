@@ -120,7 +120,7 @@ Show_error
 }
 
 SetupEnvironment () {
-	sed -i "/$LocSel/ s/#//g" /mnt/etc/locale.gen
+	sed -i "/$LOCsel/ s/#//g" /mnt/etc/locale.gen
 	echo -e "LANG=$LANGsel \nLANGUAGE=en_GB.UTF.8 \nLC_TIME=$LANGsel \nLC_ADDRESS=$LANGsel \nLC_MESSAGES=en_GB.UTF-8" >> /mnt/etc/locale.conf
 	echo "$keylayout" | tee /mnt/"$keypath" /mnt/etc/vconsole.conf >&2	
 	"chroot" /mnt ln -sf /usr/share/zoneinfo/"$TZsel" /etc/localtime && hwclock --systohc --utc && locale-gen
@@ -230,7 +230,7 @@ InstallationSetup () {
 	VirtualBoxTest
 	if [[ "$VBTsel" = 1 ]]; then
 		SelectionSteps=( OperatingSystemSel )
-		LANGsel='en_GB.UTF-8' && LocSel='en_GB.UTF-8'
+		LANGsel='en_GB.UTF-8' && LOCsel='en_GB.UTF-8'
 		HNsel=tarch1 && UNsel=tarch1
 		TZsel='Europe/Rome'
 		PIDsel=UUID &&	FSsel=BtrfsFormat
@@ -238,7 +238,7 @@ InstallationSetup () {
 	fi
 	
 	local Personalization=( 'OperatingSystemSel' 'LocalizationSel' 'LanguageSel' 'TimezoneSel' 'HostnameSel' 'UsernameSel' 'PartIDSel' 'FilesystemSel' 'BootloaderSel' )
-	ArchTixSteps=( 'DiskPartition' 'BootFormat' 'RootFormat' 'ExternalDriveSetup' 'BaseSystemInstall' 'FstabGen' 'SyncTime' 'LocaleGen' 'HostConfig' 'PackageConfig' 'PackageInstall' 'ServiceEnabler' 'AudioSetup' 'UserSetup' 'BootloaderInstall' )
+	ArchTixSteps=( 'DiskPartition' 'BootFormat' 'RootFormat' 'AdditionalDriveSetup' 'BaseSystemInstall' 'FstabGen' 'SyncTime' 'LocaleGen' 'HostConfig' 'PackageConfig' 'PackageInstall' 'ServiceEnabler' 'AudioSetup' 'UserSetup' 'BootloaderInstall' )
 	#VoidSteps=(  )
 	
 	for s in "${Personalization[@]}"; do "$s" ; done
