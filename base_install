@@ -42,7 +42,7 @@ DiskPartition () {
 	BOOTID="$(blkid -s "$PIDSel" -o value "$BOOT_PART")"
 	ROOTID="$(blkid -s "$PIDSel" -o value "$ROOT_PART")"
 	echo BP="$BOOT_PART" RP="$ROOT_PART" PID="$PIDSel"
-	echo "$PIDSel"_BOOT="$BOOTID" "$PIDSel"_ROOT="$ROOTID" 
+	echo "$PIDsel"_BOOT="$BOOTID" "$PIDsel"_ROOT="$ROOTID" 
 	lsblk -f
 }
 
@@ -80,7 +80,7 @@ FileSystemFormat () {
 				mkdir -p /mnt/"$c"
 				mount -o "$Btrfs_mount_options",subvol=@"$c" "$ROOT_PART" /mnt/"$c"
 			fi
-			echo -e "$PIDSel=$ROOTID /$c $modules $FStabOption,subvol=@$c 0 0" >> UNIfstab
+			echo -e "$PIDsel=$ROOTID /$c $modules $FStabOption,subvol=@$c 0 0" >> UNIfstab
 		done
 	;;
 	*)	Show_error
@@ -90,8 +90,8 @@ FileSystemFormat () {
 
 AdditionalDriveSetup () {
 	ntfsfix "$ADDITIONAL_DRIVE"
-	mkdir -p /mnt/run/"$HNSel"/media/{HDD,USB}
-	mount "$ADDITIONAL_DRIVE" /mnt/run/"$HNSel"/media/HDD
+	mkdir -p /mnt/run/"$HNsel"/media/{HDD,USB}
+	mount "$ADDITIONAL_DRIVE" /mnt/run/"$HNsel"/media/HDD
 }
 
 BaseSystemInstall () {
@@ -104,7 +104,7 @@ FStabGen () {
 	mv -f /mnt/etc/fstab /mnt/etc/old-fstab
 	case "$OSSel" in
 	1|arch|Arch|2|artix|Artix)
-		case "$PIDSel" in
+		case "$PIDsel" in
 		UUID)	"$fstabgen" -U /mnt >> /mnt/etc/fstab ;;
 		PARTUUID)	"$fstabgen" -t /mnt >> /mnt/etc/fstab ;;
 		LABEL)	"$fstabgen" -L /mnt >> /mnt/etc/fstab ;;
@@ -121,12 +121,12 @@ Show_error
 
 SetupEnvironment () {
 	sed -i "/$LocSel/ s/#//g" /mnt/etc/locale.gen
-	echo -e "LANG=$LangSel \nLENGUAGE=en_GB.UTF.8 \nLC_TIME=$LangSel \nLC_ADDRESS=$LangSel \nLC_MESSAGES=en_GB.UTF-8" >> /mnt/etc/locale.conf
+	echo -e "LANG=$LANGsel \nLANGUAGE=en_GB.UTF.8 \nLC_TIME=$LANGsel \nLC_ADDRESS=$LANGsel \nLC_MESSAGES=en_GB.UTF-8" >> /mnt/etc/locale.conf
 	echo "$keylayout" | tee /mnt/"$keypath" /mnt/etc/vconsole.conf >&2	
-	"chroot" /mnt ln -sf /usr/share/zoneinfo/"$TZSel" /etc/localtime && hwclock --systohc --utc && locale-gen
+	"chroot" /mnt ln -sf /usr/share/zoneinfo/"$TZsel" /etc/localtime && hwclock --systohc --utc && locale-gen
 	#echo -e "HARDWARECLOCK=$HARDWARECLOCK \nKEYMAP=$KEYMAP \nFONT=$FONT \nTTYS=$TTYS" >> /mnt/etc/rc.conf
-	ehco "$HNSel" >> /mnt/etc/hostname
-	echo -e " $HNSel \n 127.0.0.1 localhost \n ::1 localhost \n 127.0.1.1 $HNSel.localdomain $HNSel" >> /mnt/etc/hosts
+	ehco "$HNsel" >> /mnt/etc/hostname
+	echo -e " $HNsel \n 127.0.0.1 localhost \n ::1 localhost \n 127.0.1.1 $HNsel.localdomain $HNsel" >> /mnt/etc/hosts
 }
 
 PackageConfig () {
@@ -145,10 +145,121 @@ PackageInstall () {
 	local EssentialPKG=(  )
 	local AdditionalPKG=(  )
 	local ExtraPKG=(  )
-	if [[ "$VBTSel" = 1 ]]; then 
+	if [[ "$VBTsel" = 1 ]]; then 
 		"$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${EssentialPKG[@]}"
 	else
 		"$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${EssentialPKG[@]}" "${AdditionalPKG[@]}"
 	fi
 	sed -i "/MODULES/ s/()/($modules)/" /mnt/etc/mkinitcpio.conf
 }
+
+AudioSetup () {
+	echo -e "options nvidia-drm modeset=1\noptions nvidia NVreg_UsePageAttributeTable=1\noptions nvidia NVreg_EnablePCIeGen3=1" >> /mnt/etc/modprobe.d/nvidia.conf
+	echo "options snd-intel-dspcfg dsp_driver=1" >> /mnt/etc/modprobe.d/dsp.conf
+	cp -r /mnt/usr/share/pipewire /mnt/etc/
+}
+
+ServiceSetup () {
+	Services=( 'NetworkManager' 'cupsd' 'avahi-daemon' )
+	for s in "${Services[@]}"; do "$chroot" /mnt "$initc0" "$initc1" "$c" "$initc2" ; done
+}
+
+UserSetup () {
+	"$chroot" /mnt useradd -mG wheel,video,storage,input "$UNSel" #,lp,scanner,power
+	sed '/%wheel ALL=(ALL) ALL/ /%wheel ALL=(ALL:ALL) ALL/ s/#//' /mnt/etc/sudoers
+	"%chroot" /mnt echo -n "Type password for $UNSel -->>"
+	"%chroot" /mnt passwd "$UNSel"
+	"%chroot" /mnt echo -n "Type password for root -->>"
+	"%chroot" /mnt passwd
+}
+
+BootloaderSetup () {
+	case "$BLSetup" in
+	1|REFIND|Refind|refind)
+		"$chroot" /mnt "$PKGmanager" -Sy "${pkgskips[@]}" refind
+		"$chroot" /mnt refind-install
+		mkdir /mnt/boot/EFI/refind/themes
+		mv /mnt/boot/EFI/refind/refind.conf /mnt/boot/EFI/refind/backup-refind.conf
+		mv /mnt/boot/refind_linux.conf /mnt/boot/backup-refind_linux.conf
+		cp ../UNI/Bootloader/Refind/refind.conf /mnt/boot/EFI/refind/refind.conf
+		cp ../UNI/Bootloader/Refind/refind_linux.conf /mnt/boot/refind_linux.conf
+		cp -r ../UNI/Bootloader/Refind/themes/* /mnt/boot/EFI/refind/themes/
+		echo '!!!Refind config and theme changed!!!'
+	;;
+	2|GRUN|Grub|grub)
+		case "$UefiMode" in
+		0)
+			"$chroot" /mnt "$PKGmanager" -Sy "${pkgskips[@]}" grub "${btrfsgrub_pkg[@]}"
+			"$chroot" /mnt grub-install --target=i386-pc --recheck --debug /boot
+		;;
+		*)
+			"$chroot" /mnt "$PKGmanager" -Sy "${pkgskips[@]}" "${grub_pkg[@]}" "${btrfsgrub_pkg[@]}"
+			"$chroot" /mnt grub-install --target=x86_64-efi --efi-directory=/boot bootloader-id=GRUB
+		;;
+		esac
+		mkdir -p /mnt/boot/grub/themes
+		sed -i '$ a\GRUB_THEME="/boot/grub/themes/Grub-Eiffel/theme.txt"' /mnt/etc/default/grub
+		"$chroot" /mnt grub-mkconfig -o /boot/grub/grub.cfg
+		cp -r ../UNI/Bootloader/Grub-Eiffel /mnt/boot/grub/themes/
+	;;
+	3|EFISTUB|Efistub|efistub)
+		BFlags="\'rw root=$PIDSel=$ROOTID rootflags=subvol=@ initrd=\intel-ucode.img initrd=\initramfs-linux.img\'"
+		"$chroot" /mnt efibootmgr -c -d "$BOOT_PART" -p 1 -L "$OSSel" -l /vmlinuz-linux -u "$BFlags" --verbose
+		echo "efibootmgr -b lastnumber -B" #delete previous boot entries
+	;;
+	*)	Show_error
+	;;
+	esac
+}
+
+
+########## INSTALLATION-PROCESS ##########
+
+YesNoSel () {
+	read -rp "$1 $2 $3 [y/N]" YNS
+	case "$YNS" in
+	[yY] | [yY][eE][sS]) CC=1 ;;
+	[nN] | [nN][oO]) CC=0 ;;
+	*) YesNoSel "$1" ;;
+	esac
+}
+
+InstallationSetup () {
+	Check_required_files
+	if [[ "$VBTsel" = 1 ]]; then
+	
+	fi
+	local Personalization=( 'OperatingSystemSel' 'LocalizationSel' 'LanguageSel' 'TimezoneSel' 'HostnameSel' 'UsernameSel' 'PartIDSel' 'FilesystemSel' 'BootloaderSel' )
+	ArchTixSteps=( 'DiskPartition' 'BootFormat' 'RootFormat' 'ExternalDriveSetup' 'BaseSystemInstall' 'FstabGen' 'SyncTime' 'LocaleGen' 'HostConfig' 'PackageConfig' 'PackageInstall' 'ServiceEnabler' 'AudioSetup' 'UserSetup' 'BootloaderInstall' )
+	#VoidSteps=(  )
+	
+	
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
