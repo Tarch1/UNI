@@ -33,7 +33,7 @@ GPUsel () {
 	#GCard="$(lspci | grep VGA)"
 	t=0
 	for i in "${Gsel[@]}"; do
-		if "$(lspci | grep VGA)" | grep -q "$i"; then
+		if lspci | grep VGA | grep -q "$i"; then
 			YesNoSel " We found an $i graphics card wanna install relative the driver?"
 			case $CC in
 			1)
