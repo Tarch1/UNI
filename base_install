@@ -142,7 +142,7 @@ PackageConfig () {
 }
 
 PackageInstall () {
-	local EssentialPKG=(  )
+	local EssentialPKG=( "${dev[@]}" "${fs[@]}" "${net[@]}" "${audio[@]}" "${filemanager[@]}" "${baseutils[@]}" "${media[@]}" "${rcpacks[@]}" )
 	local AdditionalPKG=(  )
 	local ExtraPKG=(  )
 	if [[ "$VBTsel" = 1 ]]; then 
@@ -303,13 +303,12 @@ FinishInst () {
 
 ########## PACKAGES ##########
 
-microcode=("$microcodepkg")
-linux=(base base-devel linux linux-firmware)
 init=()
-dev=(wget git ntp linux-headers)
-baseutils=(man bash-completion kitty vim nano)
+microcode=("$microcodepkg")
+baselinux=(base base-devel linux linux-firmware linux-headers)
+baseutils=(man bash-completion kitty vim nano wget git)
 fs=(efibootmgr os-prober mtools parted dosfstools sbsigntools ntfs-3g gvfs-mtp fwupd)
-net=(networkmanager network-manager-applet)
+net=(networkmanager iwd chrony)
 audio=(pipewire pipewire-pulse pipewire-alsa pipewire-jack lib32-pipewire lib32-pipewire-jack wireplumber) #void bluetooth = libspa-bluetooth  #pulseaudio pulseaudio-bluetooth pavucontrol ##pulseaudio-alsa alsa-utils , for wine use (lib32-libpulse lib32-alsa-plugins)
 android=(android-tools android-udev)
 bluetooth=(bluez bluez-utils bluez-plugins)
@@ -326,7 +325,7 @@ elogind=()
 rc=(ntp-openrc avahi-openrc cups-openrc bluez-openrc networkmanager-openrc)
 
 ProgressBar=0
-y=" microcode linux init dev baseutils fs net audio android bluetooth print xorg apps vulkan
+y=" microcode linux init baseutils fs net audio android bluetooth print xorg apps vulkan
 		amdgraphics nvidiagraphics hardwareacceleration filemanager archive media elogind rc "
 
 AnotherCheck () {
