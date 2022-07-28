@@ -48,7 +48,7 @@ GraphicSel () {
 			esac
 		else
 			echo "No $i graphics card, skipping"
-			eval "${GDriver[t]}"='' ;;
+			eval "${GDriver[t]}"=''
 		fi
 		t=("$t"+1)
 	done
