@@ -39,9 +39,9 @@ DiskPartition () {
 	fi
 	echo DRIVE="$DRIVE" DEVICE="$DEVICE" && if [[ -z $DRIVE || -z $DEVICE ]]; then Show_error ;
 	else echo 'We can proceed with the formatting of file system' ; fi
-	BOOTID="$(blkid -s "$PIDSel" -o value "$BOOT_PART")"
-	ROOTID="$(blkid -s "$PIDSel" -o value "$ROOT_PART")"
-	echo BP="$BOOT_PART" RP="$ROOT_PART" PID="$PIDSel"
+	BOOTID="$(blkid -s "$PIDsel" -o value "$BOOT_PART")"
+	ROOTID="$(blkid -s "$PIDsel" -o value "$ROOT_PART")"
+	echo BP="$BOOT_PART" RP="$ROOT_PART" PID="$PIDsel"
 	echo "$PIDsel"_BOOT="$BOOTID" "$PIDsel"_ROOT="$ROOTID" 
 	lsblk -f
 }
@@ -50,7 +50,7 @@ FileSystemFormat () {
 	BootLabel='EFI'
 	RootLabel='ROOT'
 	mkfs.fat -F32 -n "$BootLabel" "$BOOT_PART"
-	case "$FSSel" in
+	case "$FSsel" in
 	Ext4)
 		mkfs.ext4 -L "$RootLabel" "$ROOT_PART"
 		mount "$ROOT_PART" /mnt
@@ -174,7 +174,7 @@ UserSetup () {
 }
 
 BootloaderSetup () {
-	case "$BLSetup" in
+	case "$BLsel" in
 	1|REFIND|Refind|refind)
 		"$chroot" /mnt "$PKGmanager" -Sy "${pkgskips[@]}" refind
 		"$chroot" /mnt refind-install
@@ -226,13 +226,21 @@ YesNoSel () {
 
 InstallationSetup () {
 	Check_required_files
+	VirtualBoxTest
 	if [[ "$VBTsel" = 1 ]]; then
-	
+		SelectionSteps=( OperatingSystemSel )
+		LangSel='en_GB.UTF-8' && LocSel='en_GB.UTF-8'
+		HNsel=tarch1 && UNsel=tarch1
+		TZSel='Europe/Rome'
+		PIDsel=UUID &&	FSsel=BtrfsFormat
+		BLsel=refind
 	fi
+	
 	local Personalization=( 'OperatingSystemSel' 'LocalizationSel' 'LanguageSel' 'TimezoneSel' 'HostnameSel' 'UsernameSel' 'PartIDSel' 'FilesystemSel' 'BootloaderSel' )
 	ArchTixSteps=( 'DiskPartition' 'BootFormat' 'RootFormat' 'ExternalDriveSetup' 'BaseSystemInstall' 'FstabGen' 'SyncTime' 'LocaleGen' 'HostConfig' 'PackageConfig' 'PackageInstall' 'ServiceEnabler' 'AudioSetup' 'UserSetup' 'BootloaderInstall' )
 	#VoidSteps=(  )
 	
+	for s in "${Personalization[@]}"; do "$s" ; done
 	
 	case "$OSsel" in
 	1|Arch|arch)
