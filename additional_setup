@@ -28,13 +28,12 @@ CPUsel () {
 
 GPUsel () {
 	echo " Detecting video chipset "
-	Gsel=( 'NVIDIA' 'Intel' 'AMD' )
-	
-	#GCard="$(lspci | grep VGA)"
+	Gsel=( VM NVIDIA Intel AMD )
 	t=0
+
 	for i in "${Gsel[@]}"; do
 		if lspci | grep VGA | grep -q "$i"; then
-			YesNoSel " We found an $i graphics card wanna install relative the driver?"
+			YesNoSel " We found an $i graphics card wanna install the relative driver?"
 			case $CC in
 			1)
 				echo 'OK, we install it during the installation'
