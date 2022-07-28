@@ -178,7 +178,7 @@ BootloaderSetup () {
 	1|REFIND|Refind|refind)
 		"$chroot" /mnt "$PKGmanager" -Sy "${pkgskips[@]}" refind
 		"$chroot" /mnt refind-install
-		sed -i '/ucode.img/ s/ucode/$microcodepkg/g' ../UNI/Bootloader/Refind/refind_linux.conf
+		sed -i "/ucode.img/ s/ucode/$microcodepkg/g" ../UNI/Bootloader/Refind/refind_linux.conf
 		mkdir /mnt/boot/EFI/refind/themes
 		mv /mnt/boot/EFI/refind/refind.conf /mnt/boot/EFI/refind/backup-refind.conf
 		mv /mnt/boot/refind_linux.conf /mnt/boot/backup-refind_linux.conf
@@ -316,7 +316,7 @@ bluetooth=(bluez bluez-utils bluez-plugins)
 print=(cups cups-pdf system-config-printer avahi)
 xorg=(xorg-server xorg-xinit xorg-xinit light numlockx libinput xorg-xinput xss-lock)
 apps=(telegram-desktop firefox feh calc fd bpytop adriconf) #for netwotk bmon
-nvidiagraphics=(nvidia-prime nvidia nvidia-utils lib32-nvidia-utils nvidia-settings)
+#nvidiagraphics=(nvidia-prime nvidia nvidia-utils lib32-nvidia-utils nvidia-settings)
 hardwareacceleration=(libva-mesa-driver mesa-vdpau intel-media-driver)
 vulkan=(vulkan-icd-loader lib32-vulkan-icd-loader lib32-mesa vulkan-intel lib32-vulkan-intel vulkan-mesa-layers)
 filemanager=(xed vifm pcmanfm tumbler raw-thumbnailer)
@@ -326,14 +326,14 @@ elogind=()
 rc=(ntp-openrc avahi-openrc cups-openrc bluez-openrc networkmanager-openrc)
 
 ProgressBar=0
-y=" microcode linux init dev baseutils fs net audio android bluetooth print xorg apps
-		nvidiagraphics hardwareacceleration vulkan filemanager archive media elogind rc "
+y=" microcode linux init dev baseutils fs net audio android bluetooth print xorg apps vulkan
+		amdgraphics nvidiagraphics hardwareacceleration filemanager archive media elogind rc "
 
 AnotherCheck () {
 pacman -Sylq system world galaxy extra community multilib | sort > pacman_db
-echo "${miss[@]}" | tr ' ' '\n' | sort -u > pkglist
-mapfile -t unlisted < <(comm -13 pacman_db pkglist)
-#IFS=" " read -r -a unlisted <<< "$(comm -13 pacman_db pkglist)"
+echo "${miss[@]}" | tr ' ' '\n' | sort -u > pkg_missed
+mapfile -t unlisted < <(comm -13 pacman_db pkg_missed)
+#IFS=" " read -r -a unlisted <<< "$(comm -13 pacman_db pkg_missed)"
 echo "Unlisted" = "${unlisted[@]}"
 }
 
@@ -359,17 +359,18 @@ for c in $y; do
 	local d="$c"'[@]'
 	echo "$c=""${!d}"
 done
-echo "${miss[@]}" | tr ' ' '\n' | sort -u > pkglist
-}
-
-PkgMissed () {
-	echo "${miss[@]}"
+echo "${miss[@]}" | tr ' ' '\n' | sort -u > pkg_missed
+echo "${miss[@]}"
 	YesNoSel "Those packages are important for the installation process? \n If not we save this list in a file tha will be copied in your /home/*user*/UNI after installation \n  -- Type yes or no -- "
 	case $CC in
 	1) echo "OK, we break the installation, edit packages at the end of this file" && exit 0 ;;
-	0) echo "OK, skip those packages and proceed with the installation";;
+	0) echo "OK, skip those packages and proceed with the installation" ;;
 	*) echo "Do again please" && PkgMissed ;;
 	esac
+}
+
+PkgMissed () {
+	echo 000000000000000000000000000
 }
 
 InstallationSetup
