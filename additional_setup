@@ -1,66 +1,60 @@
 #!/bin/bash
+
 ArchitectureSel () {
 	case "$(uname -m)" in
-		aarch64) ;;
-		i686) ;;
-		x86_64) ;;
+	aarch64)	;;
+	i686)	;;
+	x86_64)	;;
 	esac
 }
 
-
-UEFISel () {
-	if [[ "$(cat /sys/class/dmi/id/sys_vendor)" == 'Apple Inc.' ]] || [[ "$(cat /sys/class/dmi/id/sys_vendor)" == 'Apple Computer, Inc.' ]]
-	then modprobe -r -q efivars || true # if MAC
-	else	modprobe -q efivarfs # all others
-	fi
-	
+UEFIsel () {
 	if [[ -d "/sys/firmware/efi/" ]]; then	## Mount efivarfs if it is not already mounted
 		if (mount | grep /sys/firmware/efi/efivars)
 		then mount -t efivarfs efivarfs /sys/firmware/efi/efivars
 		fi
-	export UefiMode=1 && echo "UEFI Mode detected"
-	else
-	export UefiMode=0 && echo "BIOS Mode detected"
+		export UefiMode=1 && echo 'UEFI Mode detected'
+	else export UefiMode=0 && echo 'BIOS Mode detected'
 	fi
 }
 
 CpuSel () {
-  CPUT=$(lscpu | awk '/Vendor ID:/ {print $3}')
-  case "$CPUT" in
-    GenuineIntel) echo "Installing Intel microcode" && export microcode=intel-ucode.img ;;
-    AuthenticAMD) echo "Installing AMD microcode" && export microcode=amd-ucode.img ;;
-  esac	
+	CPUT="$(lscpu | awk '/Vendor ID:/ {print $3}')"
+	case "$CPUT" in
+	GenuineIntel) echo 'Installing Intel microcode' && export microcodepkg='intel-ucode' ;;
+	AuthenticAMD) echo 'Installing AMD microcode' && export microcodepkg='amd-ucode' ;;
+	esac	
 }
 
 GraphicSel () {
-  echo " Detecting video chipset "
-  GCard=$(lspci | grep VGA)
-  #GCard_length=$(lspci | grep -c VGA)
+	echo " Detecting video chipset "
+	GCard="$(lspci | grep VGA)"
+	#GCard_length=$(lspci | grep -c VGA)
 
-  GSel=( 'NVIDIA' 'Intel' 'Advanced' )
-  GDriver=( 'NVDriver' 'INDriver' 'AMDriver' )
-  DefaultDriver=( 'proprietary' 'mesa' 'amdgpu' )
-  SeconDriver=( 'opensource' 'xf86-video-intel' 'ati' )
+	Gsel=( 'NVIDIA' 'Intel' 'Advanced' )
+	GDriver=( 'NVDriver' 'INDriver' 'AMDriver' )
+	DefaultDriver=( 'proprietary' 'mesa' 'amdgpu' )
+	SeconDriver=( 'opensource' 'xf86-video-intel' 'ati' )
 
-  t=0
-  for i in "${GSel[@]}"; do
-  if echo "$GCard" | grep -q "$i"; then
-    echo -e " We found an $i graphics card \n Type 1 for ${DefaultDriver[t]} driver \n Type 2 for ${SeconDriver[t]}"
-    read -r rr
-    case $rr in
-      1) eval "${GDriver[t]}"="${DefaultDriver[t]}" ;;
-      0) eval "${GDriver[t]}"="${SeconDriver[t]}" ;;
-      *) eval "${GDriver[t]}"="${DefaultDriver[t]}" ;;
-    esac
-  fi
-  t=("$t"+1)
-  done
-  
-  YesNoSel "Install this driver : [ AMD = $AMDriver ] [ INTEL = $INDriver ] [ NVIDIA = $NVDriver ]"
-  case "$CC" in
-    1) echo OK ;;
-    *) echo 'Try to run again' && GraphicSel ;;
-  esac
+	t=0
+	for i in "${Gsel[@]}"; do
+		if echo "$GCard" | grep -q "$i"; then
+			echo -e " We found an $i graphics card \n Type 1 for ${DefaultDriver[t]} driver \n Type 2 for ${SeconDriver[t]}"
+			read -r rr
+			case $rr in
+			1) eval "${GDriver[t]}"="${DefaultDriver[t]}" ;;
+			0) eval "${GDriver[t]}"="${SeconDriver[t]}" ;;
+			*) eval "${GDriver[t]}"="${DefaultDriver[t]}" ;;
+			esac
+		fi
+	t=("$t"+1)
+	done
+
+	YesNoSel "Install this driver : [ AMD = $AMDriver ] [ INTEL = $INDriver ] [ NVIDIA = $NVDriver ]"
+	case "$CC" in
+	1) echo OK ;;
+	*) echo 'Try to run again' && GraphicSel ;;
+	esac
 }
 
 Pacman_Locked() {
