@@ -29,28 +29,32 @@ CpuSel () {
 GraphicSel () {
 	echo " Detecting video chipset "
 	GCard="$(lspci | grep VGA)"
-	#GCard_length=$(lspci | grep -c VGA)
+	nvidiagraphics=(nvidia-prime nvidia nvidia-utils lib32-nvidia-utils nvidia-settings)
 
-	Gsel=( 'NVIDIA' 'Intel' 'Advanced' )
-	GDriver=( 'NVDriver' 'INDriver' 'AMDriver' )
+	Gsel=( 'NVIDIA' 'Intel' 'AMD' )
+	GDriver=( 'NVGPUdriver' 'INTELdriver' 'AMDGPUdriver' )
 	DefaultDriver=( 'proprietary' 'mesa' 'amdgpu' )
-	SeconDriver=( 'opensource' 'xf86-video-intel' 'ati' )
+	AlternativeDriver=( 'opensource' 'xf86-video-intel' 'ati' )
 
 	t=0
 	for i in "${Gsel[@]}"; do
 		if echo "$GCard" | grep -q "$i"; then
-			echo -e " We found an $i graphics card \n Type 1 for ${DefaultDriver[t]} driver \n Type 2 for ${SeconDriver[t]}"
+			echo -e " We found an $i graphics card \n Type 1 for ${DefaultDriver[t]} driver \n Type 2 for ${AlternativeDriver[t]}"
 			read -r rr
-			case $rr in
+			case "$rr" in
 			1) eval "${GDriver[t]}"="${DefaultDriver[t]}" ;;
-			0) eval "${GDriver[t]}"="${SeconDriver[t]}" ;;
+			0) eval "${GDriver[t]}"="${AlternativeDriver[t]}" ;;
 			*) eval "${GDriver[t]}"="${DefaultDriver[t]}" ;;
 			esac
+		else
+			echo "No $i graphics card, skipping"
+			eval "${GDriver[t]}"='' ;;
 		fi
-	t=("$t"+1)
+		t=("$t"+1)
 	done
 
-	YesNoSel "Install this driver : [ AMD = $AMDriver ] [ INTEL = $INDriver ] [ NVIDIA = $NVDriver ]"
+
+	YesNoSel "Install this driver : [ AMD = $AMDGPUdriver ] [ INTEL = $INDriver ] [ NVIDIA = $NVGPUdriver ]"
 	case "$CC" in
 	1) echo OK ;;
 	*) echo 'Try to run again' && GraphicSel ;;
