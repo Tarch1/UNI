@@ -302,7 +302,7 @@ FinishInst () {
 
 ########## PACKAGES ##########
 
-microcode=(intel-ucode)
+microcode=("$microcodepkg")
 linux=(base base-devel linux linux-firmware)
 init=()
 dev=(wget git ntp linux-headers)
