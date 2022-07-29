@@ -265,7 +265,7 @@ InstallationSetup () {
 		initc1=add
 		sed -i '/\[lib32]/,/mirrorlist/ s/#//' /etc/pacman.conf
 		pacman -Sylq system world galaxy lib32 | sort > pacman_db
-		PKGcheck
+		#PKGcheck
 		for a in "${ArchTixSteps[@]}"; do "$a" ; done
 	;;
 	3|Void|void)
