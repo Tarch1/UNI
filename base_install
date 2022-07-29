@@ -255,7 +255,7 @@ InstallationSetup () {
 		grub_pkg=( grub )
 		sed -i 's/-openrc//g' ../UNI/full_setup
 		sed -i '/\[multilib]/,/mirrorlist/ s/#//' /etc/pacman.conf
-		pacman -Slq core extra community multilib | sort > pacman_db
+		pacman -Sylq core extra community multilib | sort > pacman_db
 		PKGcheck
 		for a in "${ArchTixSteps[@]}"; do "$a" ; done
 	;;
@@ -273,7 +273,7 @@ InstallationSetup () {
 		rcpacks=("${rc[@]}")
 		elogind=( elogind elogind-openrc )
 		sed -i '/\[lib32]/,/mirrorlist/ s/#//' /etc/pacman.conf
-		pacman -Slq system world galaxy lib32 | sort > pacman_db
+		pacman -Sylq system world galaxy lib32 | sort > pacman_db
 		PKGcheck
 		for a in "${ArchTixSteps[@]}"; do "$a" ; done
 	;;
@@ -334,7 +334,7 @@ mapfile -t unlisted < <(comm -13 pacman_db pkg_missed)
 echo "Unlisted" = "${unlisted[@]}"
 }
 
-PkgCheck () {
+PKGcheck () {
 for a in $y; do
 	var="$a"'[@]'   #the y element with a [@] to be like an array
 	temp=${!var}  #splitting the every y[@] element inside temp to simulate a subarray
