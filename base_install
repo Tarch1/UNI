@@ -1,6 +1,7 @@
 #!/bin/bash
 
 ########## INSTALLATION-SCRIPT ##########
+
 if [ "$(id -u)" -ne 0 ]; then echo 'Please run as root.' >&2; exit 1; fi
 
 Show_error () {
@@ -8,15 +9,11 @@ Show_error () {
 }
 
 Check_required_files () {
-	local file_needed=( additional_setup full_setup Bootloader/Refind/{refind.conf,refind_linux.conf,themes/Blur-theme/theme.conf}
+	local files=( additional_setup full_setup Bootloader/Refind/{refind.conf,refind_linux.conf,themes/Blur-theme/theme.conf}
 			Bootloader/Grub-Eiffel/{theme.txt,select_c.png,select_e.png,select_w.png,eiffel_tower_under_construction.png,icons/arch.png} )
-	for a in "${file_needed[@]}"; do 
-		if [[ -f "$(pwd)/$a" ]]; then  echo "File checked: $a"; else
-		echo "Missing required file: $a"
-		miss+=("$a") ; fi
+	for a in "${files[@]}"; do if [ ! -f "$(pwd)/$a" ]; then echo "Missing required file: $a" && miss+=("$a"); fi
 	done
-	if [[ -v miss ]]; then 
-	echo 'Required file(s) for the good work of installation:' "${miss[@]}" && Show_error
+	if [[ -v miss ]]; then echo 'Required file(s):' "${miss[@]}" && Show_error
 	else source additional_setup ; fi
 }
 
