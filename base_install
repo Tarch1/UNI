@@ -25,6 +25,7 @@ DiskPartition () {
 	mapfile -t devicesize < <(lsblk -dplnx size -o size | grep -Ev "boot|rpmb|loop" | tac)
 	DRIVE="$(dialog --stdout --menu "Select OS INSTALLATION drive" 0 0 0 "${devicelist[0]}" "${devicesize[0]}" "${devicelist[1]}" "${devicesize[1]}" || exit 1)"
 	ADDITIONAL_DRIVE="$(dialog --stdout --menu "Select ADDITIONAL drive" 0 0 0 "${devicelist[0]}" "${devicesize[0]}" "${devicelist[1]}" "${devicesize[1]}" || exit 1)"
+	umount "$DRIVE"?*
 	#sgdisk -ozZ "$DRIVE"
 	parted -sf "$DRIVE" mktable gpt mkpart "ESP" 0% 1% mkpart "LINUX-HOME" 1% 100% set 1 esp on set 2 linux-home on
 	if echo "$DRIVE" | grep "^/dev/[a-z]d[a-z]"; then
@@ -284,7 +285,7 @@ FinishInst () {
 	echo 'export MOZ_ENABLE_WAYLAND=1' > /mnt/home/"$UNsel"/.profile
 	YesNoSel "Reboot system"
 	case "$CC" in
-	1)	umount -R "$DRIVE"?* && reboot ;;
+	1)	umount "$DRIVE"?* && reboot ;;
 	2)	echo 'OK' && exit 0 ;;
 	*)	echo 'Not a good answer' && YesNoSel "Reboot system" ;;
 	esac
