@@ -227,17 +227,15 @@ YesNoSel () {
 
 InstallationSetup () {
 	Check_required_files
-	#VirtualBoxTest
 	if [[ "$VBTsel" = 1 ]]; then
-		SelectionSteps=( OperatingSystemSel )
+		Personalization=( OperatingSystemSel )
 		LANGsel='en_GB.UTF-8' && LOCsel='en_GB.UTF-8'
 		HNsel=tarch1 && UNsel=tarch1
 		TZsel='Europe/Rome'
 		PIDsel=UUID &&	FSsel=BtrfsFormat
 		BLsel=refind
+	else local Personalization=( 'OperatingSystemSel' 'LocalizationSel' 'LanguageSel' 'TimezoneSel' 'HostnameSel' 'UsernameSel' 'PartIDSel' 'FilesystemSel' 'BootloaderSel' )
 	fi
-	
-	local Personalization=( 'OperatingSystemSel' 'LocalizationSel' 'LanguageSel' 'TimezoneSel' 'HostnameSel' 'UsernameSel' 'PartIDSel' 'FilesystemSel' 'BootloaderSel' )
 	ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' 'AdditionalDriveSetup' 'BaseSystemInstall' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'AudioSetup' 'ServiceEnabler' 'UserSetup' 'BootloaderSetup' )
 	#VoidSteps=(  )
 	
