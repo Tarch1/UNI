@@ -1,4 +1,5 @@
 #!/bin/bash
+media=(celluloid mate-utils pantheon-screenshot simplescreenrecorder)
 Installation () {
   local Part=( 'Snapper' 'Trizen' 'Environment' 'DisplayManager' 'WindowManager' )
   local Steps=()
