@@ -23,7 +23,7 @@ Check_required_files () {
 DiskPartition () {
 	swapoff -a
 	umount -R /mnt
-	"$PKGmanager" -Sy "${pkgskips[@]}" parted gptfdisk mtools ntfs-3g dialog || Show_error
+	"$PKGmanager" -Sy "${pkgskips[@]}" "${fs[@]}" || Show_error
 	mapfile -t devicelist < <(lsblk -dplnx size -o name | grep -Ev "boot|rpmb|loop" | tac)
 	mapfile -t devicesize < <(lsblk -dplnx size -o size | grep -Ev "boot|rpmb|loop" | tac)
 	DRIVE="$(dialog --stdout --menu "Select OS INSTALLATION drive" 0 0 0 "${devicelist[0]}" "${devicesize[0]}" "${devicelist[1]}" "${devicesize[1]}" || exit 1)"
@@ -59,8 +59,8 @@ FileSystemFormat () {
 	;;
 	Btrfs)
 		modules='btrfs'
-		btrfs=( snapper btrfs-progs )
-		btrfsgrub_pkg=( grub-btrfs )
+		btrfspkg=("${btrfsutility[@]}")
+		btrfsgrubpkg=("${grubbtrfs[@]}")
 		SubVol=( '' 'home' 'var_log' 'snapshots' )
 		Btrfs_mount_options='noatime,compress=lzo,space_cache=v2'
 		FStabOption="default,$Btrfs_mount_options" #default use the default options: rw, suid, dev, exec, auto, nouser, and async.
@@ -95,7 +95,7 @@ AdditionalDriveSetup () {
 }
 
 BaseSystemInstall () {
-	local BasePKG=( "${linux[@]}" "${init[@]}" "${btrfsdep[@]}" "${elogind[@]}" )
+	local BasePKG=( "${linux[@]}" "${btrfsdep[@]}" "${elogind[@]}" )
 	echo "${BasePKG[@]}"
 	"PKGstrap" /mnt "${microcode[@]}" "${BasePKG[@]}"
 }
@@ -142,9 +142,9 @@ PackageConfig () {
 }
 
 PackageInstall () {
-	local EssentialPKG=( "${dev[@]}" "${fs[@]}" "${net[@]}" "${audio[@]}" "${filemanager[@]}" "${baseutils[@]}" "${media[@]}" "${rcpacks[@]}" )
-	local AdditionalPKG=(  )
-	local ExtraPKG=(  )
+	local EssentialPKG=( "${[@]}" "${[@]}" "${[@]}" "${[@]}" "${[@]}" "${[@]}" "${[@]}" "${[@]}" )
+	local AdditionalPKG=( "${[@]}" "${[@]}" "${[@]}" "${[@]}" "${[@]}" "${[@]}" "${[@]}" "${[@]}" )
+	local ExtraPKG=( "${[@]}" "${[@]}" "${[@]}" "${[@]}" "${[@]}" "${[@]}" "${[@]}" "${[@]}" )
 	if [[ "$VBTsel" = 1 ]]; then 
 		"$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${EssentialPKG[@]}"
 	else
@@ -176,7 +176,7 @@ UserSetup () {
 BootloaderSetup () {
 	case "$BLsel" in
 	1|REFIND|Refind|refind)
-		"$chroot" /mnt "$PKGmanager" -Sy "${pkgskips[@]}" refind
+		"$chroot" /mnt "$PKGmanager" -Sy "${pkgskips[@]}" "${refindpkg[@]}"
 		"$chroot" /mnt refind-install
 		sed -i "/ucode.img/ s/ucode/$microcodepkg/g" ../UNI/Bootloader/Refind/refind_linux.conf
 		mkdir /mnt/boot/EFI/refind/themes
@@ -190,11 +190,11 @@ BootloaderSetup () {
 	2|GRUN|Grub|grub)
 		case "$UefiMode" in
 		0)
-			"$chroot" /mnt "$PKGmanager" -Sy "${pkgskips[@]}" grub "${btrfsgrub_pkg[@]}"
+			"$chroot" /mnt "$PKGmanager" -Sy "${pkgskips[@]}" "${grubpkg[@]}" "${btrfsgrubpkg[@]}"
 			"$chroot" /mnt grub-install --target=i386-pc --recheck --debug /boot
 		;;
 		*)
-			"$chroot" /mnt "$PKGmanager" -Sy "${pkgskips[@]}" "${grub_pkg[@]}" "${btrfsgrub_pkg[@]}"
+			"$chroot" /mnt "$PKGmanager" -Sy "${pkgskips[@]}" "${grubpkg[@]}" "${btrfsgrubpkg[@]}"
 			"$chroot" /mnt grub-install --target=x86_64-efi --efi-directory=/boot bootloader-id=GRUB
 		;;
 		esac
@@ -252,7 +252,6 @@ InstallationSetup () {
 		chroot='arch-chroot'
 		initc0=systemctl
 		initc1=enable
-		grub_pkg=( grub )
 		sed -i 's/-openrc//g' ../UNI/full_setup
 		sed -i '/\[multilib]/,/mirrorlist/ s/#//' /etc/pacman.conf
 		pacman -Sylq core extra community multilib | sort > pacman_db
@@ -269,9 +268,7 @@ InstallationSetup () {
 		chroot='artix-chroot'
 		initc0='rc-update'
 		initc1=add
-		grub_pkg=( grub )
 		rcpacks=("${rc[@]}")
-		elogind=( elogind elogind-openrc )
 		sed -i '/\[lib32]/,/mirrorlist/ s/#//' /etc/pacman.conf
 		pacman -Sylq system world galaxy lib32 | sort > pacman_db
 		PKGcheck
@@ -301,29 +298,43 @@ FinishInst () {
 
 ########## PACKAGES ##########
 
-init=()
+microcode amdgraphics nvidiagraphics
+baselinux baseutils fs net audio
+bluetooth
+
+parted gptfdisk mtools ntfs-3g dialog
+
 microcode=("$microcodepkg")
+amdgraphics=("${amddrivers[@]}")
+nvidiagraphics=("${nvidiadrivers[@]}")
 baselinux=(base base-devel linux linux-firmware linux-headers)
 baseutils=(man bash-completion kitty vim nano wget git)
-fs=(efibootmgr os-prober mtools parted dosfstools sbsigntools ntfs-3g gvfs-mtp fwupd)
-net=(networkmanager iwd chrony)
+fs=(dialog mtools parted gptfdisk dosfstools ntfs-3g gvfs-mtp)
+bootloaderutility=(efibootmgr os-prober sbsigntools)
+elogind=(elogind elogind-openrc)
+btrfsutility=(snapper btrfs-progs)
+grubbtrfs=(grub-btrfs)
+grubpkg=(grub)
+refindpkg=(refind)
+net=(networkmanager iwd chrony chrony-openrc networkmanager-openrc)
 audio=(pipewire pipewire-pulse pipewire-alsa pipewire-jack lib32-pipewire lib32-pipewire-jack wireplumber) #void bluetooth = libspa-bluetooth  #pulseaudio pulseaudio-bluetooth pavucontrol ##pulseaudio-alsa alsa-utils , for wine use (lib32-libpulse lib32-alsa-plugins)
 android=(android-tools android-udev)
-bluetooth=(bluez bluez-utils bluez-plugins)
-print=(cups cups-pdf system-config-printer avahi)
+bluetooth=(bluez bluez-utils bluez-plugins bluez-openrc)
+print=(cups cups-pdf system-config-printer avahi avahi-openrc cups-openrc)
 xorg=(xorg-server xorg-xinit xorg-xinit light numlockx libinput xorg-xinput xss-lock)
-apps=(telegram-desktop firefox feh calc fd bpytop adriconf) #for netwotk bmon
-#nvidiagraphics=(nvidia-prime nvidia nvidia-utils lib32-nvidia-utils nvidia-settings)
+apps=(telegram-desktop firefox)
+utility=(feh calc fd bpytop adriconf fwupd) #for netwotk test bmon
 hardwareacceleration=(libva-mesa-driver mesa-vdpau intel-media-driver)
-vulkan=(vulkan-icd-loader lib32-vulkan-icd-loader lib32-mesa vulkan-intel lib32-vulkan-intel vulkan-mesa-layers)
-filemanager=(xed vifm pcmanfm tumbler raw-thumbnailer)
-archive=(file-roller bzip2 cpio gzip lha xz lzop p7zip tar unrar zip unzip) # atool moved on Aur
+vulkan=(vulkan-icd-loader vulkan-intel vulkan-mesa-layers)
+vulkanlib32=(lib32-vulkan-icd-loader lib32-mesa lib32-vulkan-intel)
+filemanager=(xed vifm pcmanfm tumbler raw-thumbnailer file-roller)
+archive=(bzip2 cpio gzip xz lzop p7zip tar unrar zip unzip) # Moved on Aur: atool lha
 media=(celluloid mate-utils pantheon-screenshot simplescreenrecorder)
 elogind=()
-rc=(ntp-openrc avahi-openrc cups-openrc bluez-openrc networkmanager-openrc)
+#rc=(chrony-openrc avahi-openrc cups-openrc bluez-openrc networkmanager-openrc)
 
 ProgressBar=0
-y=" microcode linux init baseutils fs net audio android bluetooth print xorg apps vulkan
+y=" microcode linux init baseutils fs net audio android bluetooth print xorg apps vulkan vulkanlib32
 		amdgraphics nvidiagraphics hardwareacceleration filemanager archive media elogind rc "
 
 AnotherCheck () {
