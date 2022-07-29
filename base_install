@@ -26,7 +26,7 @@ DiskPartition () {
 	DRIVE="$(dialog --stdout --menu "Select OS INSTALLATION drive" 0 0 0 "${devicelist[0]}" "${devicesize[0]}" "${devicelist[1]}" "${devicesize[1]}" || exit 1)"
 	ADDITIONAL_DRIVE="$(dialog --stdout --menu "Select ADDITIONAL drive" 0 0 0 "${devicelist[0]}" "${devicesize[0]}" "${devicelist[1]}" "${devicesize[1]}" || exit 1)"
 	umount "$DRIVE"?*
-	#sgdisk -ozZ "$DRIVE"
+	sgdisk -ozZ "$DRIVE"
 	parted -sf "$DRIVE" mktable gpt mkpart "ESP" 0% 1% mkpart "LINUX-HOME" 1% 100% set 1 esp on set 2 linux-home on
 	if echo "$DRIVE" | grep "^/dev/[a-z]d[a-z]"; then
 	BOOT_PART="$DRIVE"1 && ROOT_PART="$DRIVE"2 && DEVICE="${DRIVE#/*/}"
@@ -60,23 +60,30 @@ FileSystemFormat () {
 		modules='btrfs'
 		btrfspkg=("${btrfsutility[@]}")
 		btrfsgrubpkg=("${grubbtrfs[@]}")
-		SubVol=( '' 'home' 'var_log' 'snapshots' )
-		local options='noatime,compress=lzo,space_cache=v2'
-		FStabOptions="default,$options" #default use the default options: rw, suid, dev, exec, auto, nouser, and async.
+		SubVol=( 'home' 'var_log' 'snapshots' )
+		local options='noatime,compress=lzo,space_cache=v2' #default use the default options: rw, suid, dev, exec, auto, nouser, and async.
+		mkfs.btrfs -fL "$RootLabel" "$ROOT_PART" #-f option to force overwrite filesystem
 		
-		mkfs.btrfs -L "$RootLabel" "$ROOT_PART" #-f option to force overwrite filesystem
 		mount "$ROOT_PART" /mnt
-		local i=1
-		for b in "${SubVol[@]}"; do
-		btrfs su cr /mnt/@"$b"
+		btrfs su cr /mnt/@
+		for b in "${SubVol[@]}"; do	btrfs su cr /mnt/@"$b"; done
+		umount /mnt
+		mount -o defaults,"$options",subvol=@ "$ROOT_PART" /mnt
+		echo -e "$PIDsel=$ROOTID / $modules $options,subvol=@$c 0 0" >> UNIfstab
 		for c in "${SubVol[@]}"; do
-			if [[ "$c" == "$i" ]]; then	mkdir -p /mnt/"$c" &&	mount -o "$options",discard=async,subvol=@"$c" "$ROOT_PART" /mnt/."$c"
-			elif [[ "$c" == "$i" ]]; then mkdir -p /mnt/var/log && mount -o "$options",subvol=@"$c" "$ROOT_PART" /mnt/var/log
-			else mkdir -p /mnt/"$c" && mount -o "$options",subvol=@"$c" "$ROOT_PART" /mnt/"$c"
+			if [[ "$c" == "$snapshots" ]]; then
+				mkdir -p /mnt/"$c"
+				mount -o "$options",discard=async,subvol=@"$c" "$ROOT_PART" /mnt/."$c"
+				echo -e "$PIDsel=$ROOTID /.$c $modules "$options",discard=async,subvol=@"$c" 0 0" >> UNIfstab
+			elif [[ "$c" == "$var_log" ]]; then
+				mkdir -p /mnt/var/log
+				mount -o "$options",subvol=@"$c" "$ROOT_PART" /mnt/var/log
+				echo -e "$PIDsel=$ROOTID /var/log $modules $options,subvol=@$c 0 0" >> UNIfstab
+			else
+				mkdir -p /mnt/"$c" && mount -o defaults,"$options",subvol=@"$c" "$ROOT_PART" /mnt/"$c"
 			fi
-			echo -e "$PIDsel=$ROOTID /$c $modules $FStabOptions,subvol=@$c 0 0" >> UNIfstab
+			echo -e "$PIDsel=$ROOTID /$c $modules $options,subvol=@$c 0 0" >> UNIfstab
 		done
-		i=$((i+1)); done
 	;;
 	*)	Show_error
 	;;
