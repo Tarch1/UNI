@@ -50,38 +50,35 @@ FileSystemFormat () {
 	BootLabel='EFI'
 	RootLabel='ROOT'
 	mkfs.fat -F32 -n "$BootLabel" "$BOOT_PART"
+	echo -e "$PIDsel=$BOOTID /boot vfat defaults 0 2" > UNIfstab
+	
 	case "$FSsel" in
 	Ext4)
 		mkfs.ext4 -L "$RootLabel" "$ROOT_PART"
 		mount "$ROOT_PART" /mnt
-		FstabType='ext4'
+		echo -e "$PIDsel=$ROOTID / ext4 defaults 0 1" >> UNIfstab
 	;;
 	Btrfs)
 		modules='btrfs'
 		btrfspkg=("${btrfsutility[@]}")
 		btrfsgrubpkg=("${grubbtrfs[@]}")
 		SubVol=( '' 'home' 'var_log' 'snapshots' )
-		Btrfs_mount_options='noatime,compress=lzo,space_cache=v2'
-		FStabOptions="default,$Btrfs_mount_options" #default use the default options: rw, suid, dev, exec, auto, nouser, and async.
+		local options='noatime,compress=lzo,space_cache=v2'
+		FStabOptions="default,$options" #default use the default options: rw, suid, dev, exec, auto, nouser, and async.
 		
 		mkfs.btrfs -L "$RootLabel" "$ROOT_PART" #-f option to force overwrite filesystem
 		mount "$ROOT_PART" /mnt
-		
-		for b in "${SubVol[@]}"; do btrfs su cr /mnt/@"$b" ; done
-		mount -o "$Btrfs_mount_options",subvol=@ "$ROOT_PART" /mnt
+		local i=1
+		for b in "${SubVol[@]}"; do
+		btrfs su cr /mnt/@"$b"
 		for c in "${SubVol[@]}"; do
-			if [[ "$c" == snapshots ]]; then
-				mkdir -p /mnt/"$c"
-				mount -o "$Btrfs_mount_options",discard=async,subvol=@"$c" "$ROOT_PART" /mnt/."$c"
-			elif [[ "$c" == var_log ]]; then 
-				mkdir -p /mnt/var/log
-				mount -o "$Btrfs_mount_options",subvol=@"$c" "$ROOT_PART" /mnt/var/log
-			else
-				mkdir -p /mnt/"$c"
-				mount -o "$Btrfs_mount_options",subvol=@"$c" "$ROOT_PART" /mnt/"$c"
+			if [[ "$c" == "$i" ]]; then	mkdir -p /mnt/"$c" &&	mount -o "$options",discard=async,subvol=@"$c" "$ROOT_PART" /mnt/."$c"
+			elif [[ "$c" == "$i" ]]; then mkdir -p /mnt/var/log && mount -o "$options",subvol=@"$c" "$ROOT_PART" /mnt/var/log
+			else mkdir -p /mnt/"$c" && mount -o "$options",subvol=@"$c" "$ROOT_PART" /mnt/"$c"
 			fi
 			echo -e "$PIDsel=$ROOTID /$c $modules $FStabOptions,subvol=@$c 0 0" >> UNIfstab
 		done
+		i=$((i+1)); done
 	;;
 	*)	Show_error
 	;;
