@@ -227,7 +227,7 @@ YesNoSel () {
 
 InstallationSetup () {
 	Check_required_files
-	VirtualBoxTest
+	#VirtualBoxTest
 	if [[ "$VBTsel" = 1 ]]; then
 		SelectionSteps=( OperatingSystemSel )
 		LANGsel='en_GB.UTF-8' && LOCsel='en_GB.UTF-8'
