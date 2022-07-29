@@ -55,7 +55,6 @@ FileSystemFormat () {
 		mkfs.ext4 -L "$RootLabel" "$ROOT_PART"
 		mount "$ROOT_PART" /mnt
 		FstabType='ext4'
-		FstabOptions=''
 	;;
 	Btrfs)
 		modules='btrfs'
@@ -63,10 +62,11 @@ FileSystemFormat () {
 		btrfsgrubpkg=("${grubbtrfs[@]}")
 		SubVol=( '' 'home' 'var_log' 'snapshots' )
 		Btrfs_mount_options='noatime,compress=lzo,space_cache=v2'
-		FStabOption="default,$Btrfs_mount_options" #default use the default options: rw, suid, dev, exec, auto, nouser, and async.
+		FStabOptions="default,$Btrfs_mount_options" #default use the default options: rw, suid, dev, exec, auto, nouser, and async.
 		
 		mkfs.btrfs -L "$RootLabel" "$ROOT_PART" #-f option to force overwrite filesystem
 		mount "$ROOT_PART" /mnt
+		
 		for b in "${SubVol[@]}"; do btrfs su cr /mnt/@"$b" ; done
 		mount -o "$Btrfs_mount_options",subvol=@ "$ROOT_PART" /mnt
 		for c in "${SubVol[@]}"; do
@@ -80,7 +80,7 @@ FileSystemFormat () {
 				mkdir -p /mnt/"$c"
 				mount -o "$Btrfs_mount_options",subvol=@"$c" "$ROOT_PART" /mnt/"$c"
 			fi
-			echo -e "$PIDsel=$ROOTID /$c $modules $FStabOption,subvol=@$c 0 0" >> UNIfstab
+			echo -e "$PIDsel=$ROOTID /$c $modules $FStabOptions,subvol=@$c 0 0" >> UNIfstab
 		done
 	;;
 	*)	Show_error
@@ -97,7 +97,7 @@ AdditionalDriveSetup () {
 BaseSystemInstall () {
 	local BasePKG=( "${baselinux[@]}"  "${elogind[@]}" "${btrfspkg[@]}" )
 	echo "${BasePKG[@]}"
-	"PKGstrap" /mnt "${microcode[@]}" "${BasePKG[@]}"
+	"$PKGstrap" /mnt "${microcode[@]}" "${BasePKG[@]}"
 }
 
 FStabGen () {
@@ -142,19 +142,11 @@ PackageConfig () {
 }
 
 PackageInstall () {
-
- bluetooth android print apps utility 
-hardwareacceleration vulkan vulkanlib32 
-
-filemanager archive xorg
-	local EssentialPKG=( "${microcode[@]}"  "${baseutils[@]}" "${bootloaderutility[@]}" "${fs[@]}"
-											"${amdgraphics[@]}" "${nvidiagraphics[@]}"  "${net[@]}" )
-	local AdditionalPKG=( "${audio[@]}" "${[@]}" "${[@]}" "${[@]}" "${[@]}" "${[@]}" "${[@]}" "${[@]}" )
-	local ExtraPKG=( "${[@]}" "${[@]}" "${[@]}" "${[@]}" "${[@]}" "${[@]}" "${[@]}" "${[@]}" )
-	if [[ "$VBTsel" = 1 ]]; then 
-		"$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${EssentialPKG[@]}"
-	else
-		"$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${EssentialPKG[@]}" "${AdditionalPKG[@]}"
+	local EssentialPKG=( "${microcode[@]}"  "${baseutils[@]}" "${bootloaderutility[@]}" "${fs[@]}" "${amdgraphics[@]}" "${nvidiagraphics[@]}"  "${net[@]}" )
+	local AdditionalPKG=( "${audio[@]}" "${bluetooth[@]}" "${android[@]}" "${print[@]}" "${utility[@]}" "${hardwareacceleration[@]}" "${vulkan[@]}" "${vulkanlib32[@]}" "${apps[@]}" )
+	local ExtraPKG=( "${filemanager[@]}" "${archive[@]}" "${xorg[@]}" )
+	if [[ "$VBTsel" = 1 ]]; then "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${EssentialPKG[@]}"
+	else "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${EssentialPKG[@]}" "${AdditionalPKG[@]}"
 	fi
 	sed -i "/MODULES/ s/()/($modules)/" /mnt/etc/mkinitcpio.conf
 }
@@ -330,9 +322,9 @@ filemanager=(xed vifm pcmanfm tumbler raw-thumbnailer file-roller)
 archive=(bzip2 cpio gzip xz lzop p7zip tar unrar zip unzip) # Moved on Aur: atool lha
 
 ProgressBar=0
-y=" microcode amdgraphics nvidiagraphics baselinux baseutils fs net bootloaderutility
-		elogind audio bluetooth android print apps utility hardwareacceleration vulkan vulkanlib32 
-		filemanager archive xorg btrfsutility grubbtrfs grubpkg refindpkg "
+y=" microcode amdgraphics nvidiagraphics baselinux baseutils fs net bootloaderutility	elogind
+	audio bluetooth android print apps utility hardwareacceleration vulkan vulkanlib32 
+	filemanager	archive xorg btrfsutility grubbtrfs grubpkg refindpkg "
 
 AnotherCheck () {
 pacman -Sylq system world galaxy extra community multilib | sort > pacman_db
@@ -372,10 +364,6 @@ echo "${miss[@]}"
 	0) echo "OK, skip those packages and proceed with the installation" ;;
 	*) echo "Do again please" && PkgMissed ;;
 	esac
-}
-
-PkgMissed () {
-	echo 000000000000000000000000000
 }
 
 InstallationSetup
