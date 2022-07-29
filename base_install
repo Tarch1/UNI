@@ -275,7 +275,7 @@ InstallationSetup () {
 	*)
 	;;
 	esac
-	FinishInst
+	#FinishInst
 }
 
 FinishInst () {
@@ -285,8 +285,8 @@ FinishInst () {
 	echo 'export MOZ_ENABLE_WAYLAND=1' > /mnt/home/"$UNsel"/.profile
 	YesNoSel "Reboot system"
 	case "$CC" in
-	1)	umount "$DRIVE"?* && reboot ;;
-	2)	echo 'OK' && exit 0 ;;
+	0)	umount "$DRIVE"?* && reboot ;;
+	1)	echo 'OK' && exit 0 ;;
 	*)	echo 'Not a good answer' && YesNoSel "Reboot system" ;;
 	esac
 }
