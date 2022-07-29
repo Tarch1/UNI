@@ -224,7 +224,7 @@ InstallationSetup () {
 		LANGsel='en_GB.UTF-8' && LOCsel='en_GB.UTF-8'
 		HNsel=tarch1 && UNsel=tarch1
 		TZsel='Europe/Rome'
-		PIDsel=UUID &&	FSsel=BtrfsFormat
+		PIDsel=UUID &&	FSsel=Btrfs
 		BLsel=refind
 	else local Personalization=( 'OperatingSystemSel' 'LocalizationSel' 'LanguageSel' 'TimezoneSel' 'HostnameSel' 'UsernameSel' 'PartIDSel' 'FilesystemSel' 'BootloaderSel' )
 	fi
