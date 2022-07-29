@@ -24,7 +24,7 @@ DiskPartition () {
 	mapfile -t devicelist < <(lsblk -dplnx size -o name | grep -Ev "boot|rpmb|loop" | tac)
 	mapfile -t devicesize < <(lsblk -dplnx size -o size | grep -Ev "boot|rpmb|loop" | tac)
 	DRIVE="$(dialog --stdout --menu "Select OS INSTALLATION drive" 0 0 0 "${devicelist[0]}" "${devicesize[0]}" "${devicelist[1]}" "${devicesize[1]}" || exit 1)"
-	ADDITIONAL_DRIVE="$(dialog --stdout --menu "Select ADDITIONAL drive" 0 0 0 "${devicelist[0]}" "${devicesize[0]}" "${devicelist[1]}" "${devicesize[1]}" || exit 1)"
+	[[ "$VBTsel" = 0 ]] && ADDITIONAL_DRIVE="$(dialog --stdout --menu "Select ADDITIONAL drive" 0 0 0 "${devicelist[0]}" "${devicesize[0]}" "${devicelist[1]}" "${devicesize[1]}" || exit 1)"
 	umount "$DRIVE"?*
 	sgdisk -ozZ "$DRIVE"
 	parted -sf "$DRIVE" mktable gpt mkpart "ESP" 0% 1% mkpart "LINUX-HOME" 1% 100% set 1 esp on set 2 linux-home on
