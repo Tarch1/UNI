@@ -5,7 +5,7 @@
 if [ "$(id -u)" -ne 0 ]; then echo 'Please run as root.' >&2; exit 1; fi
 
 Show_error () {
-	echo "Error in function= ${FUNCNAME[1]}" >&2 && exit 1
+	echo "Error in function >> ${FUNCNAME[1]} <<" >&2 && exit 1
 }
 
 Check_required_files () {
@@ -236,7 +236,7 @@ InstallationSetup () {
 	case "$OSsel" in
 	1|Arch|arch)
 		PKGmanager=pacman
-		pkgskips=( --needed --no-confirm )
+		pkgskips=( --needed --noconfirm )
 		keylayout='KEYMAP=it'
 		keypath='etc/vconsole.conf'
 		PKGstrap=pacstrap
@@ -252,7 +252,7 @@ InstallationSetup () {
 	;;
 	2|Artix|artix)
 		PKGmanager=pacman
-		pkgskips=( --needed --no-confirm )
+		pkgskips=( --needed --noconfirm )
 		keylayout='KEYMAP=it'
 		keypath='etc/conf.d/keymaps'
 		PKGstrap=basestrap
