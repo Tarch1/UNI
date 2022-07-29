@@ -237,9 +237,11 @@ InstallationSetup () {
 		TZsel='Europe/Rome'
 		PIDsel=UUID &&	FSsel=Btrfs
 		BLsel=refind
-	else local Personalization=( 'OperatingSystemSel' 'LocalizationSel' 'LanguageSel' 'TimezoneSel' 'HostnameSel' 'UsernameSel' 'PartIDSel' 'FilesystemSel' 'BootloaderSel' )
+		ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' 'BaseSystemInstall' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'AudioSetup' 'ServiceEnabler' 'UserSetup' 'BootloaderSetup' )
+	else
+		local Personalization=( 'OperatingSystemSel' 'LocalizationSel' 'LanguageSel' 'TimezoneSel' 'HostnameSel' 'UsernameSel' 'PartIDSel' 'FilesystemSel' 'BootloaderSel' )
+		ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' 'AdditionalDriveSetup' 'BaseSystemInstall' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'AudioSetup' 'ServiceEnabler' 'UserSetup' 'BootloaderSetup' )
 	fi
-	ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' 'AdditionalDriveSetup' 'BaseSystemInstall' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'AudioSetup' 'ServiceEnabler' 'UserSetup' 'BootloaderSetup' )
 	#VoidSteps=(  )
 	
 	for s in "${Personalization[@]}"; do "$s" ; done
