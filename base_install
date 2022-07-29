@@ -25,7 +25,7 @@ DiskPartition () {
 	mapfile -t devicesize < <(lsblk -dplnx size -o size | grep -Ev "boot|rpmb|loop" | tac)
 	DRIVE="$(dialog --stdout --menu "Select OS INSTALLATION drive" 0 0 0 "${devicelist[0]}" "${devicesize[0]}" "${devicelist[1]}" "${devicesize[1]}" || exit 1)"
 	ADDITIONAL_DRIVE="$(dialog --stdout --menu "Select ADDITIONAL drive" 0 0 0 "${devicelist[0]}" "${devicesize[0]}" "${devicelist[1]}" "${devicesize[1]}" || exit 1)"
-	dd if=/dev/zero of="$DRIVE" bs=1M count=2 status=progress #sgdisk -ozZ "$DRIVE" #for erase all block (but very slower) use dd if=/dev/zero of="$DRIVE" bs=4096 status=progress
+	dd if=/dev/urandom of="$DRIVE" bs=1M count=2 status=progress #sgdisk -ozZ "$DRIVE" #for erase all block (but very slower) use dd if=/dev/zero of="$DRIVE" bs=4096 status=progress
 	parted -sf "$DRIVE" mktable gpt mkpart "ESP" 0% 1% mkpart "LINUX-HOME" 1% 100% set 1 esp on set 2 linux-home on
 	if echo "$DRIVE" | grep "^/dev/[a-z]d[a-z]"; then
 	BOOT_PART="$DRIVE"1 && ROOT_PART="$DRIVE"2 && DEVICE="${DRIVE#/*/}"
@@ -80,6 +80,9 @@ FileSystemFormat () {
 	*)	Show_error
 	;;
 	esac
+	mkdir /mnt/boot
+	mount "$BOOT_PART" /mnt/boot
+	lsblk -f
 }
 
 AdditionalDriveSetup () {
