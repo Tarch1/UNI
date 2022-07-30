@@ -111,7 +111,7 @@ OperatingSystemSel () {
 }
 
 ArchRepoSel () {
-	YesNoSel "If this is a Virtualbox installation for test the script, we will skip every choice -- Type yes or no -- "
+	YesNoSel "You want Arch repositories as well as Artix repositories -- Type yes or no -- "
   case $CC in
     1) ARCHrepo=1 && echo "OK, setupping arch repository $ARCHrepo" ;;
     0) ARCHrepo='' && echo "Well" ;;
