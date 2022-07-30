@@ -1,27 +1,5 @@
 #!/bin/bash
 if [ "$(id -u)" -ne 0 ]; then echo 'Please run as root.' >&2; exit 1; fi
-
-ArchRepo () {
-	local UNIVERSErepo=( '[universe]'
-		'Server = https://universe.artixlinux.org/$arch'
-		'Server = https://mirror1.artixlinux.org/universe/$arch'
-		'Server = https://mirror.pascalpuffke.de/artix-universe/$arch'
-		'Server = https://artixlinux.qontinuum.space/artixlinux/universe/os/$arch'
-		'Server = https://mirror1.cl.netactuate.com/artix/universe/$arch'
-		'Server = https://ftp.crifo.org/artix-universe/' )
-	local ARCHrepo=( '# Arch' '[extra]' 'Include = /etc/pacman.d/mirrorlist-arch'
-		'[community]' 'Include = /etc/pacman.d/mirrorlist-arch'
-		'[multilib]' 'Include = /etc/pacman.d/mirrorlist-arch' )
-		
-	for UR in "${UNIVERSErepo[@]}"; do echo "$UR" >> "$1" ; done
-	if [ "$1" = /mnt/etc/pacman.conf ]
-	then "$chroot" /mnt "$PKGmanager" -Sy "${pkgskips[@]}" artix-archlinux-support
-	else "$PKGmanager" -Sy "${pkgskips[@]}" artix-archlinux-support
-	fi
-	for AR in "${ARCHrepo[@]}"; do echo "$AR" >> "$1" ; done
-	"$PKGmanager"-key --populate archlinux
-	"$PKGmanager" -Sy
-}
  
 Show_error () {
 	echo "Error in function >> ${FUNCNAME[1]} <<" >&2 && exit 1
@@ -158,7 +136,9 @@ PackageConfig () {
 	"$chroot" /mnt "$PKGmanager" -Sy
 	case "$OSsel" in
 	1|arch|Arch)	sed -i '/\[multilib]/,/mirrorlist/ s/#//' /mnt/etc/pacman.conf ;;
-	2|artix|Artix)	sed -i '/\[lib32]/,/mirrorlist/ s/#//' /mnt/etc/pacman.conf;;
+	2|artix|Artix)	sed -i '/\[lib32]/,/mirrorlist/ s/#//' /mnt/etc/pacman.conf
+		if [ "$ARCHrepo" = 1 ]; then ArchRepoSetup /mnt/etc/pacman.conf ; fi
+	;;
 	3|void|Void)	;;
 	*)	echo "No distro selected, there is a problem with additional_setup, exiting..." && Show_error ;;
 	esac
@@ -251,7 +231,7 @@ YesNoSel () {
 InstallationSetup () {
 	Check_required_files
 	if [[ "$VBTsel" = 1 ]]; then
-		Personalization=( OperatingSystemSel )
+		Personalization=( OperatingSystemSel ArchRepoSel )
 		LANGsel='en_GB.UTF-8' && LOCsel='en_GB.UTF-8'
 		HNsel=tarch1 && UNsel=tarch1
 		TZsel='Europe/Rome'
@@ -259,7 +239,7 @@ InstallationSetup () {
 		BLsel=refind
 		ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' 'BaseSystemInstall' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'AudioSetup' 'ServiceSetup' 'UserSetup' 'BootloaderSetup' )
 	else
-		local Personalization=( 'OperatingSystemSel' 'LocalizationSel' 'LanguageSel' 'TimezoneSel' 'HostnameSel' 'UsernameSel' 'PartIDSel' 'FilesystemSel' 'BootloaderSel' )
+		local Personalization=( 'OperatingSystemSel' 'ArchRepoSel' 'LocalizationSel' 'LanguageSel' 'TimezoneSel' 'HostnameSel' 'UsernameSel' 'PartIDSel' 'FilesystemSel' 'BootloaderSel' )
 		ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' 'AdditionalDriveSetup' 'BaseSystemInstall' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'AudioSetup' 'ServiceSetup' 'UserSetup' 'BootloaderSetup' )
 	fi
 	#VoidSteps=(  )
@@ -294,8 +274,12 @@ InstallationSetup () {
 		initc0='rc-update'
 		initc1=add
 		sed -i '/\[lib32]/,/mirrorlist/ s/#//' /etc/pacman.conf
-		pacman -Sylq system world galaxy lib32 | sort > pacman_db
-		#PKGcheck
+		if [ "$ARCHrepo" = 1 ]; then
+		ArchRepoSetup /etc/pacman.conf
+		pacman -Sylq system world galaxy lib32 universe extra community multilib | sort > pacman_db
+		else pacman -Sylq system world galaxy lib32 | sort > pacman_db
+		fi
+		PKGcheck
 		for a in "${ArchTixSteps[@]}"; do "$a" ; done
 	;;
 	3|Void|void)
