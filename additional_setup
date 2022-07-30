@@ -94,7 +94,7 @@ VirtualBoxTest () {
   YesNoSel "If this is a Virtualbox installation for test the script, we will skip every choice -- Type yes or no -- "
   case $CC in
     1) VBTsel=1 && echo "OK, skip all check $VBTSel" ;;
-    0) echo "OK, now respond a few question" && VBTsel='' ;;
+    0) VBTsel='' && echo "OK, now respond a few question" ;;
     *) echo "Do again please" && VirtualBoxTest ;;
   esac
 }
@@ -103,9 +103,9 @@ OperatingSystemSel () {
   echo -en "Enter the distro we are going to setup : 1) Arch 2) Artix 3) Void \n"
   read -r OSsel
   case $OSsel in
-    1|Arch|arch) echo "distro selected : Arch" && OSsel="Arch" ;;
-    2|Artix|artix) echo "distro selected : Artix" && OSsel="Artix" ;;
-    3|Void|void) echo "distro selected : Void" && OSsel="Void" ;;
+    1|Arch|arch) OSsel="Arch" && echo "distro selected : Arch" ;;
+    2|Artix|artix) OSsel="Artix" && echo "distro selected : Artix" ;;
+    3|Void|void) OSsel="Void" && echo "distro selected : Void" ;;
     *) echo "Wrong choice, type again" && OperatingSystemSel ;;
   esac
 }
