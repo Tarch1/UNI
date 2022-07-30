@@ -13,9 +13,12 @@ ArchRepo () {
 		'[community]' 'Include = /etc/pacman.d/mirrorlist-arch'
 		'[multilib]' 'Include = /etc/pacman.d/mirrorlist-arch' )
 		
-	for UR in "${UNIVERSErepo[@]}"; do sed -i "$a $UR" "$1" ; done
-	"$2" "$PKGmanager" -Sy artix-archlinux-support
-	for AR in "${ARCHrepo[@]}"; do sed -i "$a $AR" "$1" ; done
+	for UR in "${UNIVERSErepo[@]}"; do echo "$UR" >> "$1" ; done
+	if [ "$1" = /mnt/etc/pacman.conf ]
+	then "$chroot" /mnt "$PKGmanager" -Sy "${pkgskips[@]}" artix-archlinux-support
+	else "$PKGmanager" -Sy "${pkgskips[@]}" artix-archlinux-support
+	fi
+	for AR in "${ARCHrepo[@]}"; do echo "$AR" >> "$1" ; done
 	"$PKGmanager"-key --populate archlinux
 	"$PKGmanager" -Sy
 }
