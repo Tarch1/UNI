@@ -12,7 +12,6 @@ Check_required_files () {
 	done
 	if [[ -v miss ]]; then echo 'Required file(s):' "${miss[@]}" && Show_error
 	else source additional_setup ; fi
-	echo GRAPHICS== "$microcodepkg" "$VBTsel"
 }
 
 DiskPartition () {
