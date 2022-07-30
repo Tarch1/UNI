@@ -286,7 +286,7 @@ InstallationSetup () {
 	*)
 	;;
 	esac
-	#FinishInst
+	FinishInst
 }
 
 FinishInst () {
