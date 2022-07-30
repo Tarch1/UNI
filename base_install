@@ -127,7 +127,8 @@ Show_error
 SetupEnvironment () {
 	sed -i "/$LOCsel/ s/#//g" /mnt/etc/locale.gen
 	echo -e "LANG=$LANGsel \nLANGUAGE=en_GB.UTF.8 \nLC_TIME=$LANGsel \nLC_ADDRESS=$LANGsel \nLC_MESSAGES=en_GB.UTF-8" >> /mnt/etc/locale.conf
-	echo "$keylayout" | tee /mnt/"$keypath" /mnt/etc/vconsole.conf >&2	
+	#echo "$keylayout" | tee /mnt/"$keypath" /mnt/etc/vconsole.conf >&2
+	sed -i "$keylayout" /mnt/"$keypath" /mnt/etc/vconsole.conf
 	"chroot" /mnt ln -sf /usr/share/zoneinfo/"$TZsel" /etc/localtime && hwclock --systohc --utc && locale-gen
 	#echo -e "HARDWARECLOCK=$HARDWARECLOCK \nKEYMAP=$KEYMAP \nFONT=$FONT \nTTYS=$TTYS" >> /mnt/etc/rc.conf
 	ehco "$HNsel" >> /mnt/etc/hostname
@@ -142,8 +143,8 @@ PackageConfig () {
 	3|void|Void)	;;
 	*)	echo "No distro selected, there is a problem with additional_setup, exiting..." && Show_error ;;
 	esac
-	sed -i '/Color/ s/#//' /mnt/etc/pacman.conf
-	echo "ILoveCandy" >> /mnt/etc/pacman.conf
+	sed -i '/\(Color\|ParallelDownloads\)/ s/#//' /mnt/etc/pacman.conf
+	sed -i '/ParallelDownloads/a ILoveCandy' /mnt/etc/pacman.conf
 }
 
 PackageInstall () {
@@ -169,7 +170,7 @@ ServiceSetup () {
 
 UserSetup () {
 	"$chroot" /mnt useradd -mG wheel,video,storage,input "$UNsel" #,lp,scanner,power
-	sed -i '/%wheel ALL=(ALL) ALL/ /%wheel ALL=(ALL:ALL) ALL/ s/#//' /mnt/etc/sudoers
+	sed -i '/%wheel ALL=(ALL:ALL) ALL/ s/#//' /mnt/etc/sudoers #it's possible to use the username instead of %wheel
 	"%chroot" /mnt echo -n "Type password for $UNsel -->>"
 	"%chroot" /mnt passwd "$UNsel"
 	"%chroot" /mnt echo -n "Type password for root -->>"
@@ -237,10 +238,10 @@ InstallationSetup () {
 		TZsel='Europe/Rome'
 		PIDsel=UUID &&	FSsel=Btrfs
 		BLsel=refind
-		ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' 'BaseSystemInstall' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'AudioSetup' 'ServiceEnabler' 'UserSetup' 'BootloaderSetup' )
+		ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' 'BaseSystemInstall' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'AudioSetup' 'ServiceSetup' 'UserSetup' 'BootloaderSetup' )
 	else
 		local Personalization=( 'OperatingSystemSel' 'LocalizationSel' 'LanguageSel' 'TimezoneSel' 'HostnameSel' 'UsernameSel' 'PartIDSel' 'FilesystemSel' 'BootloaderSel' )
-		ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' 'AdditionalDriveSetup' 'BaseSystemInstall' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'AudioSetup' 'ServiceEnabler' 'UserSetup' 'BootloaderSetup' )
+		ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' 'AdditionalDriveSetup' 'BaseSystemInstall' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'AudioSetup' 'ServiceSetup' 'UserSetup' 'BootloaderSetup' )
 	fi
 	#VoidSteps=(  )
 	
