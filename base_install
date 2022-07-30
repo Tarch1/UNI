@@ -1,6 +1,25 @@
 #!/bin/bash
 if [ "$(id -u)" -ne 0 ]; then echo 'Please run as root.' >&2; exit 1; fi
 
+ArchRepo () {
+	local UNIVERSErepo=( '[universe]'
+		'Server = https://universe.artixlinux.org/$arch'
+		'Server = https://mirror1.artixlinux.org/universe/$arch'
+		'Server = https://mirror.pascalpuffke.de/artix-universe/$arch'
+		'Server = https://artixlinux.qontinuum.space/artixlinux/universe/os/$arch'
+		'Server = https://mirror1.cl.netactuate.com/artix/universe/$arch'
+		'Server = https://ftp.crifo.org/artix-universe/' )
+	local ARCHrepo=( '# Arch' '[extra]' 'Include = /etc/pacman.d/mirrorlist-arch'
+		'[community]' 'Include = /etc/pacman.d/mirrorlist-arch'
+		'[multilib]' 'Include = /etc/pacman.d/mirrorlist-arch' )
+		
+	for UR in "${UNIVERSErepo[@]}"; do sed -i "$a $UR" "$1" ; done
+	"$2" "$PKGmanager" -Sy artix-archlinux-support
+	for AR in "${ARCHrepo[@]}"; do sed -i "$a $AR" "$1" ; done
+	"$PKGmanager"-key --populate archlinux
+	"$PKGmanager" -Sy
+}
+ 
 Show_error () {
 	echo "Error in function >> ${FUNCNAME[1]} <<" >&2 && exit 1
 }
