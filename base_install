@@ -12,6 +12,7 @@ Check_required_files () {
 	done
 	if [[ -v miss ]]; then echo 'Required file(s):' "${miss[@]}" && Show_error
 	else source additional_setup ; fi
+	echo "$UEFImode"
 }
 
 DiskPartition () {
@@ -189,7 +190,7 @@ BootloaderSetup () {
 		echo '!!!Refind config and theme changed!!!'
 	;;
 	2|GRUN|Grub|grub)
-		case "$UefiMode" in
+		case "$UEFImode" in
 		0)
 			"$chroot" /mnt "$PKGmanager" -Sy "${pkgskips[@]}" "${grubpkg[@]}" "${btrfsgrubpkg[@]}"
 			"$chroot" /mnt grub-install --target=i386-pc --recheck --debug /boot
