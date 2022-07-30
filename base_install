@@ -171,10 +171,10 @@ ServiceSetup () {
 UserSetup () {
 	"$chroot" /mnt useradd -mG wheel,video,storage,input "$UNsel" #,lp,scanner,power
 	sed -i '/%wheel ALL=(ALL:ALL) ALL/ s/#//' /mnt/etc/sudoers #it's possible to use the username instead of %wheel
-	"%chroot" /mnt echo -n "Type password for $UNsel -->>"
-	"%chroot" /mnt passwd "$UNsel"
-	"%chroot" /mnt echo -n "Type password for root -->>"
-	"%chroot" /mnt passwd
+	"$chroot" /mnt echo -n "Type password for $UNsel -->>"
+	"$chroot" /mnt passwd "$UNsel"
+	"$chroot" /mnt echo -n "Type password for root -->>"
+	"$chroot" /mnt passwd
 }
 
 BootloaderSetup () {
