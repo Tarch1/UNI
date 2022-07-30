@@ -8,7 +8,7 @@ Show_error () {
 Check_required_files () {
 	local files=( additional_setup full_setup Bootloader/Refind/{refind.conf,refind_linux.conf,themes/Blur-theme/theme.conf}
 			Bootloader/Grub-Eiffel/{theme.txt,select_c.png,select_e.png,select_w.png,eiffel_tower_under_construction.png,icons/arch.png} )
-	for a in "${files[@]}"; do if [ ! -f "$(pwd)/$a" ]; then echo "Missing required file: $a" && miss+=("$a"); fi
+	for a in "${files[@]}"; do if [ ! -f "$(pwd)/$a" ]; then echo "Missing required file: $a" && local miss+=("$a"); fi
 	done
 	if [[ -v miss ]]; then echo 'Required file(s):' "${miss[@]}" && Show_error
 	else source additional_setup ; fi
@@ -168,9 +168,9 @@ ServiceSetup () {
 UserSetup () {
 	"$chroot" /mnt useradd -mG wheel,video,storage,input "$UNsel" #,lp,scanner,power
 	sed -i '/%wheel ALL=(ALL:ALL) ALL/ s/#//' /mnt/etc/sudoers #it's possible to use the username instead of %wheel
-	"$chroot" /mnt echo -n "Type password for $UNsel -->>"
+	"$chroot" /mnt echo -n "Type $UNsel "
 	"$chroot" /mnt passwd "$UNsel"
-	"$chroot" /mnt echo -n "Type password for root -->>"
+	"$chroot" /mnt echo -n "Type root "
 	"$chroot" /mnt passwd
 }
 
@@ -235,7 +235,7 @@ InstallationSetup () {
 		TZsel='Europe/Rome'
 		PIDsel=UUID &&	FSsel=Btrfs
 		BLsel=refind
-		ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' 'BaseSystemInstall' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'AudioSetup' 'ServiceSetup' 'UserSetup' 'BootloaderSetup' )
+		ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' 'BaseSystemInstall' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'ServiceSetup' 'UserSetup' 'BootloaderSetup' )
 	else
 		local Personalization=( 'OperatingSystemSel' 'ArchRepoSel' 'LocalizationSel' 'LanguageSel' 'TimezoneSel' 'HostnameSel' 'UsernameSel' 'PartIDSel' 'FilesystemSel' 'BootloaderSel' )
 		ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' 'AdditionalDriveSetup' 'BaseSystemInstall' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'AudioSetup' 'ServiceSetup' 'UserSetup' 'BootloaderSetup' )
@@ -334,43 +334,45 @@ y=" microcode amdgraphics nvidiagraphics baselinux baseutils fs net bootloaderut
 	filemanager	archive xorg btrfsutility grubbtrfs grubpkg refindpkg "
 
 AnotherCheck () {
-pacman -Sylq system world galaxy extra community multilib | sort > pacman_db
-echo "${miss[@]}" | tr ' ' '\n' | sort -u > pkg_missed
-mapfile -t unlisted < <(comm -13 pacman_db pkg_missed)
-#IFS=" " read -r -a unlisted <<< "$(comm -13 pacman_db pkg_missed)"
-echo "Unlisted" = "${unlisted[@]}"
+	pacman -Sylq system world galaxy extra community multilib | sort > pacman_db
+	echo "${miss[@]}" | tr ' ' '\n' | sort -u > pkg_missed
+	mapfile -t unlisted < <(comm -13 pacman_db pkg_missed)
+	#IFS=" " read -r -a unlisted <<< "$(comm -13 pacman_db pkg_missed)"
+	echo "Unlisted" = "${unlisted[@]}"
 }
 
 PKGcheck () {
-for a in $y; do
-	var="$a"'[@]'   #the y element with a [@] to be like an array
-	temp=${!var}  #splitting the every y[@] element inside temp to simulate a subarray
-	for b in $temp; do   #for every element of subarr temp  
-		if ! pacman -Ss "$b" 1>/dev/null; then  #check if doesn't exist
-			echo "[x] Package not available: $b from $var"
-			miss+=("$b")    #add missing element to new array miss
-		else new+=("$b")
-		fi
-		ProgressBar=$((ProgressBar+1))
-		echo -ne '['"$ProgressBar"'%]\r'
+	for a in $y; do
+		var="$a"'[@]'   #the y element with a [@] to be like an array
+		temp=${!var}  #splitting the every y[@] element inside temp to simulate a subarray
+		for b in $temp; do   #for every element of subarr temp  
+			if ! pacman -Ss "$b" 1>/dev/null; then  #check if doesn't exist
+				echo "[x] Package not available: $b from $var"
+				miss+=("$b")    #add missing element to new array miss
+			else new+=("$b")
+			fi
+			ProgressBar=$((ProgressBar+1))
+			echo -ne '['"$ProgressBar"'%]\r'
+		done
+		unset "$a"
+		IFS=" " read -r -a "${a?}" <<< "${new[@]}"
+		unset new
 	done
-	unset "$a"
-	IFS=" " read -r -a "${a?}" <<< "${new[@]}"
-	unset new
-done
-echo 'miss=' "${miss[@]}"
-for c in $y; do
-	local d="$c"'[@]'
-	echo "$c=""${!d}"
-done
-echo "${miss[@]}" | tr ' ' '\n' | sort -u > pkg_missed
-echo "${miss[@]}"
-	YesNoSel "Are these packages important to the installation process? We will make a copy of it in /home/*user*/UNI after installation   -- Type yes or no -- "
-	case $CC in
-	1) echo "OK, we break the installation, edit packages at the end of this file" && exit 0 ;;
-	0) echo "OK, skip those packages and proceed with the installation" ;;
-	*) echo "Do again please" && PkgMissed ;;
-	esac
+	echo 'miss=' "${miss[@]}"
+	for c in $y; do
+		local d="$c"'[@]'
+		echo "$c=""${!d}"
+	done
+	if [[ -v "$miss" ]]; then
+		echo "${miss[@]}" | tr ' ' '\n' | sort -u > pkg_missed
+		echo "${miss[@]}"
+		YesNoSel "Are these packages important to the installation process? We will make a copy of it in /home/*user*/UNI after installation   -- Type yes or no -- "
+		case $CC in
+		1) echo "OK, we break the installation, edit packages at the end of this file" && exit 0 ;;
+		0) echo "OK, skip those packages and proceed with the installation" ;;
+		*) echo "Do again please" && PkgMissed ;;
+		esac
+	fi
 }
 
 InstallationSetup
