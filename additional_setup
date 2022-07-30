@@ -66,12 +66,34 @@ Pacman_Locked() {
 	fi
 }
 
+ArchRepoSetup () {
+	local UNIVERSErepo=( '[universe]'
+		'Server = https://universe.artixlinux.org/$arch'
+		'Server = https://mirror1.artixlinux.org/universe/$arch'
+		'Server = https://mirror.pascalpuffke.de/artix-universe/$arch'
+		'Server = https://artixlinux.qontinuum.space/artixlinux/universe/os/$arch'
+		'Server = https://mirror1.cl.netactuate.com/artix/universe/$arch'
+		'Server = https://ftp.crifo.org/artix-universe/' )
+	local ArchRepo=( '# Arch' '[extra]' 'Include = /etc/pacman.d/mirrorlist-arch'
+		'[community]' 'Include = /etc/pacman.d/mirrorlist-arch'
+		'[multilib]' 'Include = /etc/pacman.d/mirrorlist-arch' )
+		
+	for UR in "${UNIVERSErepo[@]}"; do echo "$UR" >> "$1" ; done
+	if [ "$1" = /mnt/etc/pacman.conf ]
+	then "$chroot" /mnt "$PKGmanager" -Sy "${pkgskips[@]}" artix-archlinux-support
+	else "$PKGmanager" -Sy "${pkgskips[@]}" artix-archlinux-support
+	fi
+	for AR in "${ArchRepo[@]}"; do echo "$AR" >> "$1" ; done
+	"$PKGmanager"-key --populate archlinux
+	"$PKGmanager" -Sy
+}
+
 ########## PERSONALIZATION-SCRIPT ##########
 
 VirtualBoxTest () {
   YesNoSel "If this is a Virtualbox installation for test the script, we will skip every choice -- Type yes or no -- "
   case $CC in
-    1) echo "OK, skip all check $VBTSel" && VBTsel=1 ;;
+    1) VBTsel=1 && echo "OK, skip all check $VBTSel" ;;
     0) echo "OK, now respond a few question" && VBTsel='' ;;
     *) echo "Do again please" && VirtualBoxTest ;;
   esac
@@ -85,6 +107,15 @@ OperatingSystemSel () {
     2|Artix|artix) echo "distro selected : Artix" && OSsel="Artix" ;;
     3|Void|void) echo "distro selected : Void" && OSsel="Void" ;;
     *) echo "Wrong choice, type again" && OperatingSystemSel ;;
+  esac
+}
+
+ArchRepoSel () {
+	YesNoSel "If this is a Virtualbox installation for test the script, we will skip every choice -- Type yes or no -- "
+  case $CC in
+    1) ARCHrepo=1 && echo "OK, setupping arch repository $ARCHrepo" ;;
+    0) ARCHrepo='' && echo "Well" ;;
+    *) echo "Do again please" && ArchRepoSel ;;
   esac
 }
 
