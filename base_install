@@ -48,12 +48,12 @@ FileSystemFormat () {
 	echo -e "$PIDsel=$BOOTID /boot vfat defaults 0 2" > UNIfstab
 	
 	case "$FSsel" in
-	Ext4)
+	ext4)
 		mkfs.ext4 -L "$RootLabel" "$ROOT_PART"
 		mount "$ROOT_PART" /mnt
 		echo -e "$PIDsel=$ROOTID / ext4 defaults 0 1" >> UNIfstab
 	;;
-	Btrfs)
+	btrfs)
 		modules='btrfs'
 		btrfspkg=("${btrfsutility[@]}")
 		btrfsgrubpkg=("${grubbtrfs[@]}")
