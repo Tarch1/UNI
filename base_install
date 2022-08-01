@@ -70,7 +70,7 @@ FileSystemFormat () {
 		echo -e "$PIDsel=$ROOTID / $modules $options,subvol=@$c 0 0" >> UNIfstab
 		for c in "${SUBVolumes[@]}"; do
 			if [[ "$c" == snapshots ]]; then
-				mkdir -p /mnt/"$c"
+				mkdir -p /mnt/."$c"
 				mount -o "$options",discard=async,subvol=@"$c" "$ROOT_PART" /mnt/."$c"
 				echo -e "$PIDsel=$ROOTID /.$c $modules $options,discard=async,subvol=@$c 0 0" >> UNIfstab
 			elif [[ "$c" == var_log ]]; then
