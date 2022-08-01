@@ -142,7 +142,7 @@ LibrarySel () {
 LocalizationSel () {
   echo -en "Enter localization : 1) en_US.UTF-8 2) en_GB.UTF-8 3) it_IT.UTF-8 \n"
   read -r LOCsel
-  case $LocSel in
+  case $LOCsel in
     1|en_US|en_US.UTF-8) LOCsel="en_US.UTF-8" && echo "Selected : en_US.UTF-8" ;;
     2|en_GB|en_GB.UTF-8) LOCsel="en_GB.UTF-8" && echo "Selected : en_GB.UTF-8" ;;
     3|it_IT|it_IT.UTF-8) LOCsel="it_IT.UTF-8" && echo "Selected : it_IT.UTF-8" ;;
@@ -153,7 +153,7 @@ LocalizationSel () {
 LanguageSel () {
   echo -en "Enter preferred Language : 1) en_US.UTF-8 2) en_GB.UTF-8 3) it_IT.UTF-8 \n"
   read -r LANGsel
-  case $LangSel in
+  case $LANGsel in
     1|en_US|en_US.UTF-8) LANGsel="en_US.UTF-8" && echo "Selected : en_US.UTF-8" ;;
     2|en_GB|en_GB.UTF-8) LANGsel="en_GB.UTF-8" && echo "Selected : en_GB.UTF-8" ;;
     3|it_IT|it_IT.UTF-8) LANGsel="it_IT.UTF-8" && echo "Selected : it_IT.UTF-8" ;;
