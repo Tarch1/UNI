@@ -37,7 +37,7 @@ DiskPartition () {
 	BOOTID="$(blkid -s "$PIDsel" -o value "$BOOT_PART")"
 	ROOTID="$(blkid -s "$PIDsel" -o value "$ROOT_PART")"
 	echo BP="$BOOT_PART" RP="$ROOT_PART" PID="$PIDsel"
-	echo "$PIDsel"_BOOT="$BOOTID" "$PIDsel"_ROOT="$ROOTID" 
+	echo "${PIDsel}"_BOOT="$BOOTID" "${PIDsel}"_ROOT="$ROOTID" 
 	lsblk -f
 }
 
@@ -68,11 +68,11 @@ FileSystemFormat () {
 		mount -o defaults,"$options",subvol=@ "$ROOT_PART" /mnt
 		echo -e "$PIDsel=$ROOTID / $modules $options,subvol=@$c 0 0" >> UNIfstab
 		for c in "${SUBVolumes[@]}"; do
-			if [[ "$c" == "$snapshots" ]]; then
+			if [[ "$c" == snapshots ]]; then
 				mkdir -p /mnt/"$c"
 				mount -o "$options",discard=async,subvol=@"$c" "$ROOT_PART" /mnt/."$c"
 				echo -e "$PIDsel=$ROOTID /.$c $modules $options,discard=async,subvol=@$c 0 0" >> UNIfstab
-			elif [[ "$c" == "$var_log" ]]; then
+			elif [[ "$c" == var_log ]]; then
 				mkdir -p /mnt/var/log
 				mount -o "$options",subvol=@"$c" "$ROOT_PART" /mnt/var/log
 				echo -e "$PIDsel=$ROOTID /var/log $modules $options,subvol=@$c 0 0" >> UNIfstab
