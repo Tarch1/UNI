@@ -200,9 +200,9 @@ BootloaderSetup () {
 		;;
 		esac
 		mkdir -p /mnt/boot/grub/themes
-		sed -i '$ a\GRUB_THEME="/boot/grub/themes/Grub-Eiffel/theme.txt"' /mnt/etc/default/grub
+		sed -i '$ a\GRUB_THEME="/boot/grub/themes/Grub-Sekiro/theme.txt"' /mnt/etc/default/grub
 		"$chroot" /mnt grub-mkconfig -o /boot/grub/grub.cfg
-		cp -r ../UNI/Bootloader/Grub-Eiffel /mnt/boot/grub/themes/
+		cp -r ../UNI/Bootloader/Grub-Sekiro /mnt/boot/grub/themes/
 	;;
 	3|EFISTUB|Efistub|efistub)
 		BLflags="\'rw root=$PIDsel=$ROOTID rootflags=subvol=@ initrd=\$microcodepkg.img initrd=\initramfs-linux.img\'"
