@@ -105,20 +105,10 @@ BaseSystemInstall () {
 
 FStabGen () {
 	mv -f /mnt/etc/fstab /mnt/etc/old-fstab
-	case "$OSsel" in
-	1|arch|Arch|2|artix|Artix)
-		case "$PIDsel" in
-		UUID)	"$fstabgen" -U /mnt >> /mnt/etc/fstab ;;
-		PARTUUID)	"$fstabgen" -t /mnt >> /mnt/etc/fstab ;;
-		LABEL)	"$fstabgen" -L /mnt >> /mnt/etc/fstab ;;
-		*)	echo "No Partition ID selected, using UUID" && "$fstabgen" -U /mnt >> /mnt/etc/fstab ;;
-		esac
-	;;
-	3)	cp UNIfstab /mnt/etc/fstab ;;
-	*)	echo "No distro selected, there is a problem with additional_setup, exiting..." && 
-Show_error
-	;;
-	esac
+	if [[ "$OSsel" = Void ]]; then cp UNIfstab /mnt/etc/fstab
+	elif [ -v "$PIDsel" ]; then "$fstabgen" -t "$PIDsel" /mnt >> /mnt/etc/fstab
+	else ShowError
+	fi
 	cat /mnt/etc/fstab
 }
 
