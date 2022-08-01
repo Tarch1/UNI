@@ -350,7 +350,7 @@ PKGcheck () {
 		local d="$c"'[@]'
 		echo "$c=""${!d}"
 	done
-	if [[ "${miss[*]}" =~ ${value} ]]; then
+	if [[ -v miss ]]; then
 		echo "${miss[@]}" | tr ' ' '\n' | sort -u > pkg_missed
 		local i=0 ; while (( "$i" < "${#miss[@]}" )); do echo "${miss[i]}" && i="$((i+1))"; done
 		YesNoSel "Are these packages important to the installation process? We will make a copy of it in /home/*user*/UNI after installation   -- Type yes or no -- "
