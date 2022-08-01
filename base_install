@@ -363,9 +363,9 @@ PKGcheck () {
 		local d="$c"'[@]'
 		echo "$c=""${!d}"
 	done
-	if [[ -v "$miss" ]]; then
+	if [[ "${miss[*]}" =~ "${value}" ]]; then
 		echo "${miss[@]}" | tr ' ' '\n' | sort -u > pkg_missed
-		echo "${miss[@]}"
+		echo "Missed packages --> ${miss[@]} <<"
 		YesNoSel "Are these packages important to the installation process? We will make a copy of it in /home/*user*/UNI after installation   -- Type yes or no -- "
 		case $CC in
 		1) echo "OK, we break the installation, edit packages at the end of this file" && exit 0 ;;
