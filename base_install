@@ -297,8 +297,8 @@ FinishInst () {
 	echo 'export MOZ_ENABLE_WAYLAND=1' > /mnt/home/"$UNsel"/.profile
 	YesNoSel "Reboot system"
 	case "$CC" in
-	0)	umount "$DRIVE"?* && reboot ;;
-	1)	echo 'OK' && exit 0 ;;
+	1)	umount "$DRIVE"?* && reboot ;;
+	0)	echo 'OK' && exit 0 ;;
 	*)	echo 'Not a good answer' && YesNoSel "Reboot system" ;;
 	esac
 }
