@@ -55,6 +55,7 @@ FileSystemFormat () {
 	;;
 	btrfs)
 		modules='btrfs'
+		#########binaries='BINARIES="/usr/bin/btrfsck"'###############
 		btrfspkg=("${btrfsutility[@]}")
 		btrfsgrubpkg=("${grubbtrfs[@]}")
 		local SUBVolumes=( 'home' 'var_log' 'snapshots' )
