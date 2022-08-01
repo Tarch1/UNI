@@ -55,7 +55,7 @@ FileSystemFormat () {
 	;;
 	btrfs)
 		modules='btrfs'
-		#########binaries='BINARIES="/usr/bin/btrfsck"'###############
+		binaries='/usr/bin/btrfsck'
 		btrfspkg=("${btrfsutility[@]}")
 		btrfsgrubpkg=("${grubbtrfs[@]}")
 		local SUBVolumes=( 'home' 'var_log' 'snapshots' )
@@ -154,6 +154,8 @@ PackageInstall () {
 	else "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${EssentialPKG[@]}" "${AdditionalPKG[@]}"
 	fi
 	sed -i "/MODULES/ s/()/($modules)/" /mnt/etc/mkinitcpio.conf
+	sed -i "/BINARIES/ s/()/($binaries)/" /mnt/etc/mkinitcpio.conf
+	
 }
 
 AudioSetup () {
