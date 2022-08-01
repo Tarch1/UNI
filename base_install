@@ -240,7 +240,7 @@ InstallationSetup () {
 		LANGsel='en_GB.UTF-8' && LOCsel='en_GB.UTF-8'
 		HNsel=tarch1 && UNsel=tarch1
 		TZsel='Europe/Rome'
-		PIDsel=UUID &&	FSsel=Btrfs
+		PIDsel=UUID &&	FSsel=btrfs
 		BLsel=refind
 		ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' 'BaseSystemInstall' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'ServiceSetup' 'UserSetup' 'BootloaderSetup' )
 	else
