@@ -207,8 +207,9 @@ BootloaderSetup () {
 		cp -r ../UNI/Bootloader/Grub-Sekiro /mnt/{boot/grub/themes/,/usr/share/grub/themes}
 	;;
 	3|EFISTUB|Efistub|efistub)
-		BLflags="\'rw root=$PIDsel=$ROOTID rootflags=subvol=@ initrd=\$microcodepkg.img initrd=\initramfs-linux.img\'"
-		"$chroot" /mnt efibootmgr -c -d "$BOOT_PART" -p 1 -L "$OSsel" -l /vmlinuz-linux -u "$BLflags" --verbose
+		BLflags="\'rw root=$PIDsel=$ROOTID rootflags=subvol=@ initrd=\$microcodepkg.img initrd=\initramfs-linux.img\ quiet loglevel=3 rd.udev.log_priority=0'"
+		"$chroot" /mnt efibootmgr -d "$BOOT_PART" -p 1 -c -L "$OSsel" -l /vmlinuz-linux -u "root=$PIDsel=$ROOTID resume=PARTUUID= initrd=/intel-ucode.img initrd=/initramfs-linux.img rw console=tty2 quiet loglevel=3 rd.udev.log_priority=0" --verbose
+		"$chroot" /mnt efibootmgr -d "$BOOT_PART" -p 1 -c -L "$OSsel" -l /vmlinuz-linux -u "$BLflags" --verbose
 		echo "efibootmgr -b lastnumber -B" #delete previous boot entries
 	;;
 	*)	Show_error
