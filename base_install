@@ -350,10 +350,7 @@ PKGcheck () {
 			if ! pacman -Ss ^"$b"$ 1>/dev/null; then  #check if doesn't exist
 				echo "[x] Package not available: $b from $var"
 				miss+=("$b")    #add missing element to new array miss
-			else
-				echo "$b"
-				new+=("$b")
-				echo "${new[@]}"
+			else new+=("$b")
 			fi
 			ProgressBar=$((ProgressBar+1))
 			echo -ne '['"$ProgressBar"'%]\r'
