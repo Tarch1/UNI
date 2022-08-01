@@ -208,8 +208,8 @@ FilesystemSel () {
   echo -en "Enter base filesystem : 1) EXT4 2) BTRFS \n"
   read -r FSsel
   case $FSsel in
-    1|EXT4|ext4) FSsel=Ext4Format && echo "Selected : EXT4" ;;
-    2|BTRFS|btrfs) FSsel=BtrfsFormat && echo "Selected : BTRFS" ;;
+    1|EXT4|ext4) FSsel=ext4 && echo "Selected : EXT4" ;;
+    2|BTRFS|btrfs) FSsel=btrfs && echo "Selected : BTRFS" ;;
     *) echo "Wrong filesystem selected, try one of those provided" && FilesystemSel ;;
   esac
 }
