@@ -226,12 +226,12 @@ BootloaderSel () {
 }
 
 YesNoSel () {
-  read -rp "$1 $2 $3 [y/N] " YNS
-  case "$YNS" in 
-    [yY] | [yY][eE][sS]) CC=1 ;;
-    [nN] | [nN][oO]) CC=0 ;;
-    *) YesNoSel "$1" ;;
-  esac
+	read -rp "$1 $2 $3 [y/N]" YNS
+	case "$YNS" in
+	[yY] | [yY][eE][sS]) CC=1 ;;
+	[nN] | [nN][oO]) CC=0 ;;
+	*) YesNoSel "$1" ;;
+	esac
 }
 
 UEFIsel
