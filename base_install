@@ -106,7 +106,7 @@ BaseSystemInstall () {
 FStabGen () {
 	mv -f /mnt/etc/fstab /mnt/etc/old-fstab
 	if [[ "$OSsel" = Void ]]; then cp UNIfstab /mnt/etc/fstab
-	elif [ -v "$PIDsel" ]; then "$fstabgen" -t "$PIDsel" /mnt >> /mnt/etc/fstab
+	elif [ -v PIDsel ]; then "$fstabgen" -t "$PIDsel" /mnt >> /mnt/etc/fstab
 	else Show_error
 	fi
 	cat /mnt/etc/fstab
