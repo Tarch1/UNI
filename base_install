@@ -91,9 +91,10 @@ FileSystemFormat () {
 }
 
 AdditionalDriveSetup () {
-	ntfsfix "$ADDITIONAL_DRIVE"
+	if [ -v "$ADDITIONAL_DRIVE" ]; then
 	mkdir -p /mnt/run/"$HNsel"/media/{HDD,USB}
 	mount "$ADDITIONAL_DRIVE" /mnt/run/"$HNsel"/media/HDD
+	fi
 }
 
 BaseSystemInstall () {
