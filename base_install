@@ -211,6 +211,7 @@ BootloaderSetup () {
 ########## INSTALLATION-PROCESS ##########
 
 InstallationSetup () {
+	echo 'List of all errors during the installation progress:' > Errors
 	Check_required_files
 	if [[ "$VBTsel" = 1 ]]; then
 		Personalization=( OperatingSystemSel ArchRepoSel )
