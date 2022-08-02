@@ -247,7 +247,7 @@ InstallationSetup () {
 		sed -i '/\[multilib]/,/mirrorlist/ s/#//' /etc/pacman.conf
 		pacman -Sylq core extra community multilib | sort > pacman_db
 		PKGcheck
-		for a in "${ArchTixSteps[@]}"; do "$a" || Show_error ; done
+		for a in "${ArchTixSteps[@]}"; do "$a" || echo "$a" >> Errors  ; done
 	;;
 	2|Artix|artix)
 		PKGmanager=pacman
@@ -266,7 +266,7 @@ InstallationSetup () {
 		else pacman -Sylq system world galaxy lib32 | sort > pacman_db
 		fi
 		PKGcheck
-		for a in "${ArchTixSteps[@]}"; do "$a" || echo "Error in function >> $a <<" ; done
+		for a in "${ArchTixSteps[@]}"; do "$a" || echo "$a" >> Errors ; done
 	;;
 	3|Void|void)
 		echo 'nothing here'
@@ -364,3 +364,4 @@ PKGcheck () {
 }
 
 InstallationSetup
+cat "$Errors"
