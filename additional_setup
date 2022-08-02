@@ -88,6 +88,14 @@ ArchRepoSetup () {
 	"$PKGmanager" -Sy
 }
 
+AnotherCheck () {
+	pacman -Sylq system world galaxy extra community multilib | sort > pacman_db
+	echo "${miss[@]}" | tr ' ' '\n' | sort -u > pkg_missed
+	mapfile -t unlisted < <(comm -13 pacman_db pkg_missed)
+	#IFS=" " read -r -a unlisted <<< "$(comm -13 pacman_db pkg_missed)"
+	echo "Unlisted" = "${unlisted[@]}"
+}
+
 ########## PERSONALIZATION-SCRIPT ##########
 
 VirtualBoxTest () {
