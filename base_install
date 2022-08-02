@@ -56,7 +56,7 @@ FileSystemFormat () {
 	;;
 	btrfs)
 		modules='btrfs'
-		binaries='/usr/bin/btrfsck'
+		binaries='\/usr\/bin\/btrfsck'
 		btrfspkg=("${btrfsutility[@]}")
 		btrfsgrubpkg=("${grubbtrfs[@]}")
 		local SUBVolumes=( 'home' 'var_log' 'snapshots' )
@@ -266,7 +266,7 @@ InstallationSetup () {
 		else pacman -Sylq system world galaxy lib32 | sort > pacman_db
 		fi
 		PKGcheck
-		for a in "${ArchTixSteps[@]}"; do "$a" || Show_error ; done
+		for a in "${ArchTixSteps[@]}"; do "$a" || echo "Error in function >> $a <<" ; done
 	;;
 	3|Void|void)
 		echo 'nothing here'
