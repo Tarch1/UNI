@@ -279,6 +279,7 @@ FinishInst () {
 	cp "$(pwd)"/Conf_files/bashrc /mnt/home/"$UNsel"/.bashrc
 	cp -r "$(pwd)" /mnt/home/"$UNsel"/
 	echo 'export MOZ_ENABLE_WAYLAND=1' > /mnt/home/"$UNsel"/.profile
+	cat Errors
 	YesNoSel "Reboot system"
 	case "$CC" in
 	1)	umount "$DRIVE"?* && reboot ;;
@@ -361,4 +362,4 @@ PKGcheck () {
 }
 
 InstallationSetup
-cat "$Errors"
+cat Errors
