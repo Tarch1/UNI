@@ -213,6 +213,7 @@ BootloaderSetup () {
 InstallationSetup () {
 	echo 'List of all errors during the installation progress:' > Errors
 	Check_required_files
+	PKGcheck
 	if [[ "$VBTsel" = 1 ]]; then
 		Personalization=( OperatingSystemSel ArchRepoSel )
 		LANGsel='en_GB.UTF-8' && LOCsel='en_GB.UTF-8'
