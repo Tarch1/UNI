@@ -192,7 +192,7 @@ BootloaderSetup () {
 		;;
 		esac
 		mkdir -p /mnt/boot/grub/themes
-		sed -i "/OS_PROBER/ s/#//g" /mnt/etc/default/grub
+		sed -i "/GRUB_DISABLE_OS_PROBER=/ s/#//g" /mnt/etc/default/grub
 		sed -i '/GRUB_THEME=/c GRUB_THEME="/boot/grub/themes/Grub-Sekiro/theme.txt"' /mnt/etc/default/grub
 		"$chroot" /mnt grub-mkconfig -o /boot/grub/grub.cfg
 		cp -r ../UNI/Bootloader/Grub-Sekiro /mnt/{boot/grub/themes/,/usr/share/grub/themes}
