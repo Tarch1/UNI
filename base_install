@@ -1,23 +1,19 @@
 #!/bin/bash
 if [ "$(id -u)" -ne 0 ]; then echo 'Please run as root.' >&2; exit 1; fi
 
-Show_error () {
-	echo "Error in function $1 >> ${FUNCNAME[1]} <<" >&2 && exit 1
-}
-
 Check_required_files () {
 	local files=( additional_setup full_setup Bootloader/Refind/{refind.conf,refind_linux.conf,themes/Blur-theme/theme.conf}
 			Bootloader/Grub-Eiffel/{theme.txt,select_c.png,select_e.png,select_w.png,eiffel_tower_under_construction.png,icons/arch.png} )
 	for a in "${files[@]}"; do if [ ! -f "$(pwd)/$a" ]; then echo "Missing required file: $a" && local miss+=("$a"); fi
 	done
-	if [[ -v miss ]]; then echo 'Required file(s):' "${miss[@]}" && Show_error
+	if [[ -v miss ]]; then echo 'Required file(s):' "${miss[@]}"
 	else source additional_setup ; fi
 }
 
 DiskPartition () {
 	swapoff -a
 	umount -R /mnt
-	"$PKGmanager" -Sy "${pkgskips[@]}" "${fs[@]}" || Show_error
+	"$PKGmanager" -Sy "${pkgskips[@]}" "${fs[@]}"
 	mapfile -t devicelist < <(lsblk -dplnx size -o name | grep -Ev "boot|rpmb|loop" | tac)
 	mapfile -t devicesize < <(lsblk -dplnx size -o size | grep -Ev "boot|rpmb|loop" | tac)
 	DRIVE="$(dialog --stdout --menu "Select OS INSTALLATION drive" 0 0 0 "${devicelist[0]}" "${devicesize[0]}" "${devicelist[1]}" "${devicesize[1]}" || exit 1)"
@@ -32,7 +28,7 @@ DiskPartition () {
 	elif echo "$DRIVE" | grep "^/dev/mmc"; then
 	BOOT_PART="$DRIVE"1 && ROOT_PART="$DRIVE"2 && DEVICE="${DRIVE#/*/}"
 	fi
-	echo DRIVE="$DRIVE" DEVICE="$DEVICE" && if [[ -z $DRIVE || -z $DEVICE ]]; then Show_error ;
+	echo DRIVE="$DRIVE" DEVICE="$DEVICE" && if [[ -z $DRIVE || -z $DEVICE ]]; then exit 1 ;
 	else echo 'We can proceed with the formatting of file system' ; fi
 	BOOTID="$(blkid -s "$PIDsel" -o value "$BOOT_PART")"
 	ROOTID="$(blkid -s "$PIDsel" -o value "$ROOT_PART")"
@@ -84,7 +80,7 @@ FileSystemFormat () {
 			echo -e "$PIDsel=$ROOTID /$c $modules $options,subvol=@$c 0 0" >> UNIfstab
 		done
 	;;
-	*)	Show_error
+	*)	echo boh
 	;;
 	esac
 	mkdir /mnt/boot
@@ -108,7 +104,7 @@ FStabGen () {
 	mv -f /mnt/etc/fstab /mnt/etc/old-fstab
 	if [[ "$OSsel" = Void ]]; then cp UNIfstab /mnt/etc/fstab
 	elif [ -v PIDsel ]; then "$fstabgen" -t "$PIDsel" /mnt >> /mnt/etc/fstab
-	else Show_error
+	else exit 1
 	fi
 	cat /mnt/etc/fstab
 }
@@ -132,7 +128,7 @@ PackageConfig () {
 		if [ "$ARCHrepo" = 1 ]; then ArchRepoSetup /mnt/etc/pacman.conf ; fi
 	;;
 	3|void|Void)	;;
-	*)	echo "No distro selected, there is a problem with additional_setup, exiting..." && Show_error ;;
+	*)	echo "No distro selected, there is a problem with additional_setup, exiting..." && exit 1 ;;
 	esac
 	sed -i '/\(Color\|ParallelDownloads\)/ s/#//' /mnt/etc/pacman.conf
 	sed -i '/ParallelDownloads/a ILoveCandy' /mnt/etc/pacman.conf
@@ -207,7 +203,7 @@ BootloaderSetup () {
 		"$chroot" /mnt efibootmgr -d "$BOOT_PART" -p 1 -c -L "$OSsel" -l /vmlinuz-linux -u "$BLflags" --verbose
 		echo "efibootmgr -b lastnumber -B" #delete previous boot entries
 	;;
-	*)	Show_error
+	*)	exit 1
 	;;
 	esac
 }
@@ -230,7 +226,7 @@ InstallationSetup () {
 	fi
 	#VoidSteps=(  )
 	
-	for s in "${Personalization[@]}"; do "$s" || Show_error ; done
+	for s in "${Personalization[@]}"; do "$s" ||  echo "$s" >> Errors ; done
 	
 	case "$OSsel" in
 	1|Arch|arch)
