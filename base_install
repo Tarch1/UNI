@@ -173,12 +173,14 @@ UserSetup () {
 	"$chroot" /mnt passwd
 	mkdir -p /mnt/home/"$UNsel"/.config
 	cp -r /mnt/usr/share/pipewire /mnt/home/"$UNsel"/.config
+	sed 's/#{ path = "/usr/bin/pipewire-media-session" args = "" }/{ path = "wireplumber"  args = "" }/' /mnt/home/"$UNsel"/.config
+	sed '/#{ path = "/usr/bin/pipewire" args = "-c pipewire-pulse.conf" }/ s/#//' /mnt/home/"$UNsel"/.config/pipewire/pipewire.conf
 }
 
 AudioSetup () {
 	echo -e "options nvidia-drm modeset=1\noptions nvidia NVreg_UsePageAttributeTable=1\noptions nvidia NVreg_EnablePCIeGen3=1" >> /mnt/etc/modprobe.d/nvidia.conf
 	echo "options snd-intel-dspcfg dsp_driver=1" >> /mnt/etc/modprobe.d/dsp.conf
-	cp -r /mnt/usr/share/pipewire /mnt/etc/
+	#cp -r /mnt/usr/share/pipewire /mnt/etc/
 }
 
 BootloaderSetup () {
@@ -243,7 +245,7 @@ InstallationSetup () {
 	fi
 	#VoidSteps=(  )
 	
-	for s in "${Personalization[@]}"; do "$s" ||  echo "$s" >> Errors ; done
+	for s in "${Personalization[@]}"; do "$s" || SHOWerror "$s" ; done
 	
 	case "$OSsel" in
 	1|Arch|arch)
@@ -260,7 +262,7 @@ InstallationSetup () {
 		sed -i '/\[multilib]/,/mirrorlist/ s/#//' /etc/pacman.conf
 		pacman -Sylq core extra community multilib | sort > pacman_db
 		PKGcheck
-		for a in "${ArchTixSteps[@]}"; do "$a" || SHOWerror  ; done
+		for a in "${ArchTixSteps[@]}"; do "$a" || SHOWerror "$a" ; done
 	;;
 	2|Artix|artix)
 		PKGmanager=pacman
@@ -279,7 +281,7 @@ InstallationSetup () {
 		else pacman -Sylq system world galaxy lib32 | sort > pacman_db
 		fi
 		PKGcheck
-		for a in "${ArchTixSteps[@]}"; do "$a" || SHOWerror ; done
+		for a in "${ArchTixSteps[@]}"; do "$a" || SHOWerror "$a" ; done
 	;;
 	3|Void|void)
 		echo 'nothing here'
