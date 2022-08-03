@@ -1,6 +1,15 @@
 #!/bin/bash
 if [ "$(id -u)" -ne 0 ]; then echo 'Please run as root.' >&2; exit 1; fi
 
+SHOWerror () {
+	echo "$1" >> Errors 
+	YesNoSel "Found an error in $1 would you like to continue the installation?"
+	case $CC in
+	1) echo "OK, still going, see Errors file in this directory" ;;
+	*) echo "OK, then exit" && exit 1 ;;
+	esac
+}
+
 Check_required_files () {
 	local files=( additional_setup full_setup Bootloader/Refind/{refind.conf,refind_linux.conf,themes/Blur-theme/theme.conf}
 			Bootloader/Grub-Eiffel/{theme.txt,select_c.png,select_e.png,select_w.png,eiffel_tower_under_construction.png,icons/arch.png} )
@@ -157,7 +166,7 @@ AudioSetup () {
 }
 
 ServiceSetup () {
-	Services=( 'NetworkManager' 'cupsd' 'avahi-daemon' )
+	Services=( NetworkManager openrc-settingsd cupsd avahi-daemon )
 	for s in "${Services[@]}"; do "$chroot" /mnt "$initc0" "$initc1" "$s" ; done
 }
 
@@ -249,7 +258,7 @@ InstallationSetup () {
 		sed -i '/\[multilib]/,/mirrorlist/ s/#//' /etc/pacman.conf
 		pacman -Sylq core extra community multilib | sort > pacman_db
 		PKGcheck
-		for a in "${ArchTixSteps[@]}"; do "$a" || echo "$a" >> Errors  ; done
+		for a in "${ArchTixSteps[@]}"; do "$a" || SHOWerror  ; done
 	;;
 	2|Artix|artix)
 		PKGmanager=pacman
@@ -268,7 +277,7 @@ InstallationSetup () {
 		else pacman -Sylq system world galaxy lib32 | sort > pacman_db
 		fi
 		PKGcheck
-		for a in "${ArchTixSteps[@]}"; do "$a" || echo "$a" >> Errors ; done
+		for a in "${ArchTixSteps[@]}"; do "$a" || SHOWerror ; done
 	;;
 	3|Void|void)
 		echo 'nothing here'
@@ -301,7 +310,7 @@ PKGcheck () {
 	baseutils=(man bash-completion kitty vim nano wget git)
 	fs=(dialog mtools parted gptfdisk dosfstools ntfs-3g gvfs-mtp)
 	bootloaderutility=(efibootmgr os-prober sbsigntools)
-	elogind=(elogind elogind-openrc)
+	elogind=(elogind elogind-openrc openrc-settingsd)
 	btrfsutility=(snapper btrfs-progs)
 	grubbtrfs=(grub-btrfs)
 	grubpkg=(grub)
