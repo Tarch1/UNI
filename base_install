@@ -159,24 +159,26 @@ PackageInstall () {
 	mkinitcpio -p linux
 }
 
-AudioSetup () {
-	echo -e "options nvidia-drm modeset=1\noptions nvidia NVreg_UsePageAttributeTable=1\noptions nvidia NVreg_EnablePCIeGen3=1" >> /mnt/etc/modprobe.d/nvidia.conf
-	echo "options snd-intel-dspcfg dsp_driver=1" >> /mnt/etc/modprobe.d/dsp.conf
-	cp -r /mnt/usr/share/pipewire /mnt/etc/
-}
-
 ServiceSetup () {
 	Services=( NetworkManager openrc-settingsd cupsd avahi-daemon )
 	for s in "${Services[@]}"; do "$chroot" /mnt "$initc0" "$initc1" "$s" ; done
 }
 
 UserSetup () {
-	"$chroot" /mnt useradd -mG wheel,video,storage,input "$UNsel" #,lp,scanner,power
+	"$chroot" /mnt useradd -mG wheel,video,audio,storage,input "$UNsel" #,lp,scanner,power
 	sed -i '/%wheel ALL=(ALL:ALL) ALL/ s/#//' /mnt/etc/sudoers #it's possible to use the username instead of %wheel
 	"$chroot" /mnt echo -n "Type $UNsel "
 	"$chroot" /mnt passwd "$UNsel"
 	"$chroot" /mnt echo -n "Type root "
 	"$chroot" /mnt passwd
+	mkdir -p /mnt/home/"$UNsel"/.config
+	cp -r /mnt/usr/share/pipewire /mnt/home/"$UNsel"/.config
+}
+
+AudioSetup () {
+	echo -e "options nvidia-drm modeset=1\noptions nvidia NVreg_UsePageAttributeTable=1\noptions nvidia NVreg_EnablePCIeGen3=1" >> /mnt/etc/modprobe.d/nvidia.conf
+	echo "options snd-intel-dspcfg dsp_driver=1" >> /mnt/etc/modprobe.d/dsp.conf
+	cp -r /mnt/usr/share/pipewire /mnt/etc/
 }
 
 BootloaderSetup () {
@@ -237,7 +239,7 @@ InstallationSetup () {
 		ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' 'BaseSystemInstall' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'ServiceSetup' 'UserSetup' 'BootloaderSetup' )
 	else
 		local Personalization=( 'OperatingSystemSel' 'ArchRepoSel' 'LocalizationSel' 'LanguageSel' 'TimezoneSel' 'HostnameSel' 'UsernameSel' 'PartIDSel' 'FilesystemSel' 'BootloaderSel' )
-		ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' 'AdditionalDriveSetup' 'BaseSystemInstall' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'AudioSetup' 'ServiceSetup' 'UserSetup' 'BootloaderSetup' )
+		ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' 'AdditionalDriveSetup' 'BaseSystemInstall' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'ServiceSetup' 'UserSetup' 'AudioSetup' 'BootloaderSetup' )
 	fi
 	#VoidSteps=(  )
 	
