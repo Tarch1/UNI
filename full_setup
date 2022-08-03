@@ -116,7 +116,7 @@ function WindowManager () {
             chmod +x ~/.config/sxhkd/sxhkdrc ~/.config/bspwm/bspwmrc
     ;;
     gnome ) #sudo pacman -Syu gnome-shell gnome-control-center gnome-firmware baobab gnome-system-monitor xdg-desktop-portal-gtk gnome-weather gnuchess gnome-chess gnome-calculator gnome-keyring gnome-software gnome-software-packagekit-plugin flatpak evince nautilus xdg-desktop-portal xdg-desktop-portal-gnome xdg-desktop-portal-wlr xdg-desktop-portal-gtk file-roller
-            sudo pacman -Syu gnome gdm gdm-openrc
+            sudo pacman -Syu gnome gdm gdm-openrc gst-libav #gnome-extra
             trizen -Syu chrome-gnome-shell
             mkdir -p ~/{.wallpapers,.config/kitty}
             cp -r /media/internal_hdd/OS/Wallpapers/* ~/.wallpapers
