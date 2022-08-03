@@ -51,7 +51,7 @@ FileSystemFormat () {
 		echo -e "$PIDsel=$ROOTID / ext4 defaults 0 1" >> UNIfstab
 	;;
 	btrfs)
-		modules='btrfs'
+		modules=(btrfs)
 		binaries='\/usr\/bin\/btrfsck'
 		btrfspkg=("${btrfsutility[@]}")
 		btrfsgrubpkg=("${grubbtrfs[@]}")
@@ -64,20 +64,20 @@ FileSystemFormat () {
 		for b in "${SUBVolumes[@]}"; do	btrfs su cr /mnt/@"$b"; done
 		umount /mnt
 		mount -o defaults,"$options",subvol=@ "$ROOT_PART" /mnt
-		echo -e "$PIDsel=$ROOTID / $modules $options,subvol=@$c 0 0" >> UNIfstab
+		echo -e "$PIDsel=$ROOTID / btrfs $options,subvol=@$c 0 0" >> UNIfstab
 		for c in "${SUBVolumes[@]}"; do
 			if [[ "$c" == snapshots ]]; then
 				mkdir -p /mnt/."$c"
 				mount -o "$options",discard=async,subvol=@"$c" "$ROOT_PART" /mnt/."$c"
-				echo -e "$PIDsel=$ROOTID /.$c $modules $options,discard=async,subvol=@$c 0 0" >> UNIfstab
+				echo -e "$PIDsel=$ROOTID /.$c btrfs $options,discard=async,subvol=@$c 0 0" >> UNIfstab
 			elif [[ "$c" == var_log ]]; then
 				mkdir -p /mnt/var/log
 				mount -o "$options",subvol=@"$c" "$ROOT_PART" /mnt/var/log
-				echo -e "$PIDsel=$ROOTID /var/log $modules $options,subvol=@$c 0 0" >> UNIfstab
+				echo -e "$PIDsel=$ROOTID /var/log btrfs $options,subvol=@$c 0 0" >> UNIfstab
 			else
 				mkdir -p /mnt/"$c" && mount -o defaults,"$options",subvol=@"$c" "$ROOT_PART" /mnt/"$c"
 			fi
-			echo -e "$PIDsel=$ROOTID /$c $modules $options,subvol=@$c 0 0" >> UNIfstab
+			echo -e "$PIDsel=$ROOTID /$c btrfs $options,subvol=@$c 0 0" >> UNIfstab
 		done
 	;;
 	*)	echo boh
@@ -141,9 +141,13 @@ PackageInstall () {
 	if [[ "$VBTsel" = 1 ]]; then "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${EssentialPKG[@]}"
 	else "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${EssentialPKG[@]}" "${AdditionalPKG[@]}"
 	fi
-	sed -i "/MODULES/ s/()/($modules)/" /mnt/etc/mkinitcpio.conf
+	if [[ -v nvidiadrivers ]]; then 
+		ln -s /dev/null /etc/udev/rules.d/61-gdm.rules
+		modules+=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)
+	fi
+	sed -i "/MODULES/ s/()/(${modules[@]})/" /mnt/etc/mkinitcpio.conf
 	sed -i "/BINARIES/ s/()/($binaries)/" /mnt/etc/mkinitcpio.conf
-	
+	mkinitcpio -p linux
 }
 
 AudioSetup () {
