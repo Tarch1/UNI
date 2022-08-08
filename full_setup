@@ -66,6 +66,9 @@ GNOME () {
 	echo 'Xft.dpi: 90' > ~/.Xdefaults
 	chmod +x ~/.pfetch
 	#sudo mkdir -p /etc/xdg/autostart/
+	cp -r /mnt/usr/share/pipewire /mnt/home/"$UNsel"/.config
+	sed 's/#{ path = "/usr/bin/pipewire-media-session" args = "" }/{ path = "wireplumber"  args = "" }/' /mnt/home/"$UNsel"/.config
+	sed '/#{ path = "/usr/bin/pipewire" args = "-c pipewire-pulse.conf" }/ s/#//' /mnt/home/"$UNsel"/.config/pipewire/pipewire.conf
 	mkdir ~/.config/autostart
 	cp -r ~/UNI/Conf_files/pipewire/ ~/.config/autostart
 	sudo rc-update add gdm default
@@ -74,6 +77,10 @@ GNOME () {
 }
 
 Environment () {
+	cp -r /mnt/usr/share/pipewire /mnt/home/"$UNsel"/.config
+	sed 's/#{ path = "/usr/bin/pipewire-media-session" args = "" }/{ path = "wireplumber"  args = "" }/' /mnt/home/"$UNsel"/.config
+	sed '/#{ path = "/usr/bin/pipewire" args = "-c pipewire-pulse.conf" }/ s/#//' /mnt/home/"$UNsel"/.config/pipewire/pipewire.conf
+
   sudo pacman -S ttf-roboto rofi sxiv feh python-pywal lxappearance kalgebra imagemagick pacman-contrib slock dunst tcl tk --noconfirm
   mkdir -p ~/{.wallpapers,.config/{kitty,polybar,rofi,dunst}}
   
