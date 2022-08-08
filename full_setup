@@ -25,9 +25,8 @@ Snapper () {
 	chmod 750 /.snapshots
 	"
 	sudo -- bash -c "
-	sed -i '/\(TIMELINE_LIMIT_HOURLY\|TIMELINE_LIMIT_DAILY\|TIMELINE_LIMIT_MONTHLY\|TIMELINE_LIMIT_YEARLY\|TIMELINE_LIMIT_WEEKLY\)/ s/=\"[0-9]\"*$/=\"1\"/g' /etc/snapper/configs/root
+	sed -i '/\(TIMELINE_LIMIT_HOURLY\|TIMELINE_LIMIT_DAILY\|TIMELINE_LIMIT_WEEKLY\|TIMELINE_LIMIT_MONTHLY\|TIMELINE_LIMIT_YEARLY\)/ s/=\"[0-9]\"*$/=\"1\"/g' /etc/snapper/configs/root
 	sed -i '/ALLOW_USERS=\"\"/ALLOW_USERS=\"tarch1\"/' /etc/snapper/configs/root
-	sed -i '/TIMELINE_LIMIT_WEEKLY=\"0\"/ s/0/1/' /etc/snapper/configs/root
 	"
 	sudo -- bash -c "
 	chmod a+rx /.snapshots
