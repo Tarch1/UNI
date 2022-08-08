@@ -1,17 +1,17 @@
 #!/bin/bash
 media=(celluloid mate-utils pantheon-screenshot simplescreenrecorder)
+
 Installation () {
-	local Part=( 'Snapper' 'Trizen' 'Environment' 'DisplayManager' 'WindowManager' )
-	local Steps=()
-	local CT=0
-	for i in "${Part[@]}"; do
-		YesNoSel "You need" "$i" "?"
+	local Steps=( 'Snapper' 'Trizen' 'Environment' 'DisplayManager' 'WindowManager' )
+	T=0
+	for i in "${Steps[@]}"; do
+		YesNoSel want "$i"
 		case "$CC" in
-		1) Steps["$CT"]="$i";;
-		0) unset "Steps[$CT]";;
-		*) echo wrong && Installation;;
+		1) echo yes ;;
+		0) echo "Skipping $i" && unset 'Steps[T]' ;;
+		*) echo 'Wrong choice' && Installation ;;
 		esac
-		CT=$((CT + 1))
+		T=$((T+1))
 	done
 	for i in "${Steps[@]}"; do "$i"; done
 }
@@ -25,13 +25,9 @@ Snapper () {
 	chmod 750 /.snapshots
 	"
 	sudo -- bash -c "
-	sed -i '/\(TIMELINE_LIMIT_HOURLY\|TIMELINE_LIMIT_DAILY\|TIMELINE_LIMIT_MONTHLY\|TIMELINE_LIMIT_YEARLY\)/ s/*/1/' /etc/pacman.conf
+	sed -i '/\(TIMELINE_LIMIT_HOURLY\|TIMELINE_LIMIT_DAILY\|TIMELINE_LIMIT_MONTHLY\|TIMELINE_LIMIT_YEARLY\)/ s/="[0-9]"*$/="1"/g' /etc/snapper/configs/root
 	sed -i '/ALLOW_USERS=""/ALLOW_USERS="tarch1"/' /etc/snapper/configs/root
-	#sed -i '/TIMELINE_LIMIT_HOURLY="10"/ s/10/3/' /etc/snapper/configs/root
-	#sed -i '/TIMELINE_LIMIT_DAILY="10"/ s/10/2/' /etc/snapper/configs/root
 	sed -i '/TIMELINE_LIMIT_WEEKLY="0"/ s/0/1/' /etc/snapper/configs/root
-	#sed -i '/TIMELINE_LIMIT_MONTHLY="10"/ s/10/1/' /etc/snapper/configs/root
-	#sed -i '/TIMELINE_LIMIT_YEARLY="10"/ s/10/1/' /etc/snapper/configs/root
 	"
 	sudo -- bash -c "
 	chmod a+rx /.snapshots
@@ -49,9 +45,7 @@ Trizen () {
   git clone https://aur.archlinux.org/trizen.git /home/tarch1/Trizen
   cd /home/tarch1/Trizen || exit
   makepkg -si
-  trizen -S clapper phinger-cursors
-  #bibata-cursor-translucent steamtinkerlaunch
-  #picom-ibhagwan-git gllock-git xidlehook wpgtk-git font-manager ttf-font-awesome betterlockscreen bibata-rainbow-cursor-theme
+  #clapper phinger-cursors bibata-cursor-translucent steamtinkerlaunch betterlockscreen
 }
 
 Environment () {
@@ -88,12 +82,6 @@ Environment () {
   ###################-PERMISSIONS-###################
   
   chmod +x ~/.xinitrc ~/.config/toggle-touchpad.sh ~/.config/dunst/dunst-color.sh ~/.config/low-battery.sh ~/.pfetch
-  
-  ###################-EXECUTION-###################
-  
-  #sudo sed -i '/ntfs/ s/ro/rw/' /etc/fstab
-  #sudo ntfsfix /dev/sda1
-  #wpg-install.sh -b -g -i
 }
 
 DisplayManager () {
