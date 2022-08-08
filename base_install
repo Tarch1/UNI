@@ -104,7 +104,7 @@ AdditionalDriveSetup () {
 
 BaseSystemInstall () {
 	local BasePKG=( "${baselinux[@]}"  "${elogind[@]}" "${btrfspkg[@]}" )
-	if [ "$FSsel" = btrfs ]; then BasePKG+=( "${btrfsutility[@]}" )
+	if [ "$FSsel" = btrfs ]; then BasePKG+=( "${btrfsutility[@]}" ); fi
 	"$PKGstrap" /mnt "${microcode[@]}" "${BasePKG[@]}"
 }
 
