@@ -229,10 +229,10 @@ BootloaderSetup () {
 
 InstallationSetup () {
 	echo 'List of all errors during the installation progress:' > Errors
-	Check_required_files &&	UEFIsel && CPUsel && GPUsel && Pacman_Locked && PKGcheck
+	Check_required_files &&	UEFIsel && CPUsel && GPUsel && Pacman_Locked
+	OperatingSystemSel && ArchRepoSel && PKGcheck
 	
 	if [[ "$VBTsel" = 1 ]]; then
-		Personalization=( OperatingSystemSel ArchRepoSel )
 		LANGsel='en_GB.UTF-8' && LOCsel='en_GB.UTF-8'
 		HNsel=tarch1 && UNsel=tarch1
 		TZsel='Europe/Rome'
