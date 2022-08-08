@@ -1,11 +1,19 @@
 #!/bin/bash
-media=(celluloid mate-utils pantheon-screenshot simplescreenrecorder)
+#media=(celluloid mate-utils pantheon-screenshot simplescreenrecorder)
+
+Check_required_files () {
+	local files=( additional_setup )
+	for a in "${files[@]}"; do if [ ! -f "$(pwd)/$a" ]; then echo "Missing required file: $a" && local miss+=("$a"); fi
+	done
+	if [[ -v miss ]]; then echo 'Required file(s):' "${miss[@]}"
+	else source additional_setup ; fi
+}
 
 Installation () {
-	local Steps=( 'Snapper' 'Trizen' 'Environment' 'DisplayManager' 'WindowManager' )
+	local Steps=( 'Snapper' 'Trizen' GNOME 'Environment' 'DisplayManager' 'WindowManager' )
 	T=0
 	for i in "${Steps[@]}"; do
-		YesNoSel want "$i"
+		YesNoSel "You want $i ?"
 		case "$CC" in
 		1) echo yes ;;
 		0) echo "Skipping $i" && unset 'Steps[T]' ;;
@@ -15,6 +23,7 @@ Installation () {
 	done
 	for i in "${Steps[@]}"; do "$i"; done
 }
+
 Snapper () {
 	sudo -- bash -c "
 	umount /.snapshots/
@@ -23,12 +32,10 @@ Snapper () {
 	btrfs su del /.snapshots
 	mkdir /.snapshots
 	chmod 750 /.snapshots
-	"
-	sudo -- bash -c "
+	
 	sed -i '/\(TIMELINE_LIMIT_HOURLY\|TIMELINE_LIMIT_DAILY\|TIMELINE_LIMIT_WEEKLY\|TIMELINE_LIMIT_MONTHLY\|TIMELINE_LIMIT_YEARLY\)/ s/=\"[0-9]\"*$/=\"1\"/g' /etc/snapper/configs/root
 	sed -i '/ALLOW_USERS=\"\"/ALLOW_USERS=\"tarch1\"/' /etc/snapper/configs/root
-	"
-	sudo -- bash -c "
+	
 	chmod a+rx /.snapshots
 	chown :tarch1 /.snapshots
 	mkdir /etc/pacman.d/hooks
@@ -45,6 +52,25 @@ Trizen () {
   cd /home/tarch1/Trizen || exit
   makepkg -si
   #clapper phinger-cursors bibata-cursor-translucent steamtinkerlaunch betterlockscreen
+}
+
+GNOME () {
+	#sudo pacman -Syu gnome-shell gnome-control-center gnome-firmware baobab gnome-system-monitor xdg-desktop-portal-gtk gnome-weather gnuchess gnome-chess gnome-calculator gnome-keyring gnome-software gnome-software-packagekit-plugin flatpak evince nautilus xdg-desktop-portal xdg-desktop-portal-gnome xdg-desktop-portal-wlr xdg-desktop-portal-gtk file-roller
+	sudo pacman -Syu gnome gdm gdm-openrc gst-libav #gnome-extra
+	trizen -Syu gnome-browser-connector
+	mkdir -p ~/{.wallpapers,.config/kitty}
+	cp -r /media/internal_hdd/OS/Wallpapers/* ~/.wallpapers
+	cp ~/UNI/Conf_files/kitty.conf ~/.config/kitty/kitty.conf
+	cp ~/UNI/Conf_files/Script/pfetch ~/.pfetch
+	cp ~/UNI/Conf_files/nanorc ~/.nanorc
+	echo 'Xft.dpi: 90' > ~/.Xdefaults
+	chmod +x ~/.pfetch
+	#sudo mkdir -p /etc/xdg/autostart/
+	mkdir ~/.config/autostart
+	cp -r ~/UNI/Conf_files/pipewire/ ~/.config/autostart
+	sudo rc-update add gdm default
+	sudo systemctl enable gdm
+	echo "MOZ_ENABLE_WAYLAND=1" | sudo tee -a /etc/environment > /dev/null
 }
 
 Environment () {
@@ -92,31 +118,15 @@ DisplayManager () {
   systemctl enable lightdm
   "
 }
+
 function WindowManager () {
-  read -rp "What setup you want? [bspwm gnome herbstluftwm xmonad polybar] " SS
+  read -rp "What setup you want? [bspwm herbstluftwm xmonad polybar] " SS
   case $SS in
     bspwm ) sudo pacman -S bspwm sxhkd --noconfirm
             mkdir ~/.config/{bspwm,sxhkd}
             cp ~/UNI/Conf_files/Bspwm/sxhkdrc ~/.config/sxhkd/sxhkdrc
             cp ~/UNI/Conf_files/Bspwm/bspwmrc ~/.config/bspwm/bspwmrc
             chmod +x ~/.config/sxhkd/sxhkdrc ~/.config/bspwm/bspwmrc
-    ;;
-    gnome ) #sudo pacman -Syu gnome-shell gnome-control-center gnome-firmware baobab gnome-system-monitor xdg-desktop-portal-gtk gnome-weather gnuchess gnome-chess gnome-calculator gnome-keyring gnome-software gnome-software-packagekit-plugin flatpak evince nautilus xdg-desktop-portal xdg-desktop-portal-gnome xdg-desktop-portal-wlr xdg-desktop-portal-gtk file-roller
-            sudo pacman -Syu gnome gdm gdm-openrc gst-libav #gnome-extra
-            trizen -Syu gnome-browser-connector
-            mkdir -p ~/{.wallpapers,.config/kitty}
-            cp -r /media/internal_hdd/OS/Wallpapers/* ~/.wallpapers
-            cp ~/UNI/Conf_files/kitty.conf ~/.config/kitty/kitty.conf
-            cp ~/UNI/Conf_files/Script/pfetch ~/.pfetch
-            cp ~/UNI/Conf_files/nanorc ~/.nanorc
-            echo 'Xft.dpi: 90' > ~/.Xdefaults
-            chmod +x ~/.pfetch
-            #sudo mkdir -p /etc/xdg/autostart/
-            mkdir ~/.config/autostart
-            cp -r ~/UNI/Conf_files/pipewire/ ~/.config/autostart
-            sudo rc-update add gdm default
-            sudo systemctl enable gdm
-            echo "MOZ_ENABLE_WAYLAND=1" | sudo tee -a /etc/environment > /dev/null
     ;;
     herbstluftwm ) sudo pacman -S herbstluftwm --noconfirm
                    mkdir ~/.config/herbstluftwm
@@ -139,15 +149,7 @@ function WindowManager () {
   esac
 
   YesNoSel "Want another WindowManager?"
-  if [ "$CC" = 1 ]; then WindowManager ; else echo "Nothing to do" ; fi
+  if [ "$CC" = 1 ]; then WindowManager ; else echo 'Finished installation' ; fi
 }
-
-YesNoSel () {
-  read -rp "$1 $2 $3 [y/N] " YNS
-  case "$YNS" in 
-  [yY] | [yY][eE][sS] ) CC=1 ;;
-  [nN] | [nN][oO] ) CC=0 ;;
-  *) echo "Wrong choice, type again" && YesNoSel "$1" ;;
-  esac
-}
+Check_required_files
 Installation
