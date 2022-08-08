@@ -25,7 +25,7 @@ Snapper () {
 	chmod 750 /.snapshots
 	"
 	sudo -- bash -c "
-	sed -i '/\(TIMELINE_LIMIT_HOURLY\|TIMELINE_LIMIT_DAILY\|TIMELINE_LIMIT_MONTHLY\|TIMELINE_LIMIT_YEARLY\)/ s/*/1/' /mnt/etc/pacman.conf
+	sed -i '/\(TIMELINE_LIMIT_HOURLY\|TIMELINE_LIMIT_DAILY\|TIMELINE_LIMIT_MONTHLY\|TIMELINE_LIMIT_YEARLY\)/ s/*/1/' /etc/pacman.conf
 	sed -i '/ALLOW_USERS=""/ALLOW_USERS="tarch1"/' /etc/snapper/configs/root
 	#sed -i '/TIMELINE_LIMIT_HOURLY="10"/ s/10/3/' /etc/snapper/configs/root
 	#sed -i '/TIMELINE_LIMIT_DAILY="10"/ s/10/2/' /etc/snapper/configs/root
