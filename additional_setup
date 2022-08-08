@@ -241,8 +241,3 @@ YesNoSel () {
 	*) YesNoSel "$1" ;;
 	esac
 }
-
-UEFIsel
-CPUsel
-GPUsel
-Pacman_Locked
