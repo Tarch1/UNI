@@ -1,49 +1,48 @@
 #!/bin/bash
 media=(celluloid mate-utils pantheon-screenshot simplescreenrecorder)
 Installation () {
-  local Part=( 'Snapper' 'Trizen' 'Environment' 'DisplayManager' 'WindowManager' )
-  local Steps=()
-  local CT=0
-  for i in "${Part[@]}"; do
-  YesNoSel "You need" "$i" "?"
-  case "$CC" in
-  1) Steps["$CT"]="$i";;
-  0) unset "Steps[$CT]";;
-  *) echo wrong && Installation;;
-  esac
-  CT=$((CT + 1))
-  done
-  for i in "${Steps[@]}"; do "$i"; done
+	local Part=( 'Snapper' 'Trizen' 'Environment' 'DisplayManager' 'WindowManager' )
+	local Steps=()
+	local CT=0
+	for i in "${Part[@]}"; do
+		YesNoSel "You need" "$i" "?"
+		case "$CC" in
+		1) Steps["$CT"]="$i";;
+		0) unset "Steps[$CT]";;
+		*) echo wrong && Installation;;
+		esac
+		CT=$((CT + 1))
+	done
+	for i in "${Steps[@]}"; do "$i"; done
 }
-
 Snapper () {
-  sudo -- bash -c "
-  umount /.snapshots/
-  rm -rf /.snapshots
-  snapper -c root create-config /
-  btrfs su del /.snapshots
-  mkdir /.snapshots
-  chmod 750 /.snapshots
-  "
-  
-  sudo sed -i 's/ALLOW_USERS=""/ALLOW_USERS="tarch1"/g' /etc/snapper/configs/root
-  sudo sed -i 's/TIMELINE_LIMIT_HOURLY="10"/TIMELINE_LIMIT_HOURLY="3"/g' /etc/snapper/configs/root
-  sudo sed -i 's/TIMELINE_LIMIT_DAILY="10"/TIMELINE_LIMIT_DAILY="2"/g' /etc/snapper/configs/root
-  sudo sed -i 's/TIMELINE_LIMIT_WEEKLY="0"/TIMELINE_LIMIT_WEEKLY="1"/g' /etc/snapper/configs/root
-  sudo sed -i 's/TIMELINE_LIMIT_MONTHLY="10"/TIMELINE_LIMIT_MONTHLY="1"/g' /etc/snapper/configs/root
-  sudo sed -i 's/TIMELINE_LIMIT_YEARLY="10"/TIMELINE_LIMIT_YEARLY="1"/g' /etc/snapper/configs/root
-  
-  sudo -- bash -c "
-  chmod a+rx /.snapshots
-  chown :tarch1 /.snapshots
-  mkdir /etc/pacman.d/hooks
-  cp ~/UNI/Conf_files/50-bootbackup.hook /etc/pacman.d/hooks/50-bootbackup.hook
-  pacman -S rsync --noconfirm
-  "
-  
-#sudo systemctl enable snapper-timeline.timer
-#sudo systemctl enable snapper-cleanup.timer
-#sudo systemctl enable grub-btrfs.path
+	sudo -- bash -c "
+	umount /.snapshots/
+	rm -rf /.snapshots
+	snapper -c root create-config /
+	btrfs su del /.snapshots
+	mkdir /.snapshots
+	chmod 750 /.snapshots
+	"
+	sudo -- bash -c "
+	sed -i '/\(TIMELINE_LIMIT_HOURLY\|TIMELINE_LIMIT_DAILY\|TIMELINE_LIMIT_MONTHLY\|TIMELINE_LIMIT_YEARLY\)/ s/*/1/' /mnt/etc/pacman.conf
+	sed -i '/ALLOW_USERS=""/ALLOW_USERS="tarch1"/' /etc/snapper/configs/root
+	#sed -i '/TIMELINE_LIMIT_HOURLY="10"/ s/10/3/' /etc/snapper/configs/root
+	#sed -i '/TIMELINE_LIMIT_DAILY="10"/ s/10/2/' /etc/snapper/configs/root
+	sed -i '/TIMELINE_LIMIT_WEEKLY="0"/ s/0/1/' /etc/snapper/configs/root
+	#sed -i '/TIMELINE_LIMIT_MONTHLY="10"/ s/10/1/' /etc/snapper/configs/root
+	#sed -i '/TIMELINE_LIMIT_YEARLY="10"/ s/10/1/' /etc/snapper/configs/root
+	"
+	sudo -- bash -c "
+	chmod a+rx /.snapshots
+	chown :tarch1 /.snapshots
+	mkdir /etc/pacman.d/hooks
+	cp ~/UNI/Conf_files/50-bootbackup.hook /etc/pacman.d/hooks/50-bootbackup.hook
+	pacman -S rsync --noconfirm
+	"
+	#sudo systemctl enable snapper-timeline.timer
+	#sudo systemctl enable snapper-cleanup.timer
+	#sudo systemctl enable grub-btrfs.path
 }
 
 Trizen () {
@@ -117,7 +116,7 @@ function WindowManager () {
     ;;
     gnome ) #sudo pacman -Syu gnome-shell gnome-control-center gnome-firmware baobab gnome-system-monitor xdg-desktop-portal-gtk gnome-weather gnuchess gnome-chess gnome-calculator gnome-keyring gnome-software gnome-software-packagekit-plugin flatpak evince nautilus xdg-desktop-portal xdg-desktop-portal-gnome xdg-desktop-portal-wlr xdg-desktop-portal-gtk file-roller
             sudo pacman -Syu gnome gdm gdm-openrc gst-libav #gnome-extra
-            trizen -Syu chrome-gnome-shell
+            trizen -Syu gnome-browser-connector
             mkdir -p ~/{.wallpapers,.config/kitty}
             cp -r /media/internal_hdd/OS/Wallpapers/* ~/.wallpapers
             cp ~/UNI/Conf_files/kitty.conf ~/.config/kitty/kitty.conf
@@ -153,7 +152,7 @@ function WindowManager () {
   esac
 
   YesNoSel "Want another WindowManager?"
-  if [ "$CC" = 1 ]; then WindowManager ; else echo "Nothing" ; fi
+  if [ "$CC" = 1 ]; then WindowManager ; else echo "Nothing to do" ; fi
 }
 
 YesNoSel () {
@@ -164,5 +163,4 @@ YesNoSel () {
   *) echo "Wrong choice, type again" && YesNoSel "$1" ;;
   esac
 }
-
 Installation
