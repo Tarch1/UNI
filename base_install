@@ -120,7 +120,7 @@ FStabGen () {
 SetupEnvironment () {
 	#sed -i "/$LOCsel/ s/#//g" /mnt/etc/locale.gen
 	sed -i "/\($LOCsel\|$LANGsel\)/ s/#//g" /mnt/etc/locale.gen
-	echo -e "LANG=$LANGsel \nLANGUAGE=$LOCsel \nLC_TIME=$LANGsel \nLC_ADDRESS=$LANGsel \nLC_MESSAGES=$LANGsel \nLC_CTYPE=C" >> /mnt/etc/locale.conf
+	echo -e "LANG=$LANGsel \nLANGUAGE=$LOCsel \nLC_TIME=$LOCsel \nLC_ADDRESS=$LOCsel \nLC_MESSAGES=$LOCsel \nLC_CTYPE=C" >> /mnt/etc/locale.conf
 	echo "$keylayout" | tee /mnt/"$keypath" /mnt/etc/vconsole.conf
 	"chroot" /mnt ln -sf /usr/share/zoneinfo/"$TZsel" /etc/localtime && hwclock --systohc --utc && locale-gen
 	#echo -e "HARDWARECLOCK=$HARDWARECLOCK \nKEYMAP=$KEYMAP \nFONT=$FONT \nTTYS=$TTYS" >> /mnt/etc/rc.conf
@@ -230,7 +230,7 @@ InstallationSetup () {
 	
 	if [[ "$VBTsel" = 1 ]]; then
 		Personalization=( OperatingSystemSel ArchRepoSel )
-		LANGsel='en_GB.UTF-8' && LOCsel='en_GB.UTF-8'
+		LANGsel='en_GB.UTF-8' && LOCsel='it_IT.UTF-8'
 		HNsel=tarch1 && UNsel=tarch1
 		TZsel='Europe/Rome'
 		PIDsel=UUID &&	FSsel=btrfs
