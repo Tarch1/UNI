@@ -59,7 +59,7 @@ GPUsel () {
 }
 
 Pacman_Locked() {
-	if [[ -f $(/var/lib/pacman/db.lck || /mnt/var/lib/pacman/db.lck) ]]; then
+	if [ -f /var/lib/pacman/db.lck ] || [ -f /mnt/var/lib/pacman/db.lck ]; then
 		echo -e " !!!ERROR!!! Pacman is blocked. \n We try to remove /var/lib/pacman/db.lck."
 		rm -f /var/lib/pacman/db.lck || /mnt/var/lib/pacman/db.lck
 	else echo "No locked database"
