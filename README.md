@@ -1,5 +1,7 @@
 # Universal-Installation-Script
 
+sudo -E hw-probe -all -upload
+
 **Wifi-setup**
 `ip a
 rfkill unblock all
