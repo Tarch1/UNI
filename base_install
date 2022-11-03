@@ -61,7 +61,7 @@ FileSystemFormat () {
 	;;
 	btrfs)
 		modules=(btrfs)
-		binaries='\/usr\/bin\/btrfsck'
+		binaries='btrfs'	#'\/usr\/bin\/btrfsck'
 		local SUBVolumes=( 'home' 'var_log' 'snapshots' )
 		local options='noatime,compress=lzo,space_cache=v2' #default use the default options: rw, suid, dev, exec, auto, nouser, and async.
 		mkfs.btrfs -fL "$RootLabel" "$ROOT_PART" #-f option to force overwrite filesystem
@@ -155,6 +155,8 @@ PackageInstall () {
 	fi
 	sed -i "/MODULES/ s/()/(${modules[*]})/" /mnt/etc/mkinitcpio.conf
 	sed -i "/BINARIES/ s/()/($binaries)/" /mnt/etc/mkinitcpio.conf
+	sed -i "/HOOKS=/ s/#//" /mnt/etc/locale.gen
+	sed -i "/COMPRESSION/ i/HOOKS=(base udev usr resume autodetect modconf kms block filesystems keyboard keymap fsck)/" /mnt/etc/locale.gen
 	mkinitcpio -p linux
 }
 
