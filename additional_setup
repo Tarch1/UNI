@@ -99,7 +99,7 @@ AnotherCheck () {
 ########## PERSONALIZATION-SCRIPT ##########
 
 VirtualBoxTest () {
-  YesNoSel "If this is a Virtualbox installation for test the script, we will skip every choice -- Type yes or no -- "
+  YesNoSel "If this is a Virtualbox installation for test the script, we will skip every choice \n"
   case $CC in
     1) VBTsel=1 && echo "OK, skip all check $VBTSel" ;;
     0) VBTsel='' && echo "OK, now respond a few question" ;;
@@ -119,7 +119,7 @@ OperatingSystemSel () {
 }
 
 ArchRepoSel () {
-	YesNoSel "You want Arch repositories as well as Artix repositories -- Type yes or no -- "
+	YesNoSel "You want Arch repositories as well as Artix repositories \n"
   case $CC in
     1) ARCHrepo=1 && echo "OK, adding the repositories of arch" ;;
     0) ARCHrepo='' && echo "Well, trying without them" ;;
