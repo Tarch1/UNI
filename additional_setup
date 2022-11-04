@@ -103,7 +103,7 @@ VirtualBoxTest () {
   YesNoSel "If this is a Virtualbox installation for test the script, we will skip every choice \n"
   case $CC in
     1) VBTsel=1 && echo "OK, skip all check $VBTSel" ;;
-    0) VBTsel='' && echo "OK, now respond a few question" ;;
+    0) VBTsel=0 && echo "OK, now respond a few question" ;;
     *) echo "Do again please" && VirtualBoxTest ;;
   esac
 }
