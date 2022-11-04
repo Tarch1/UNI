@@ -19,7 +19,8 @@ UEFIsel () {
 }
 
 CPUsel () {
-	CPUT="$(lscpu | awk '/Vendor ID:/ {print $3}')"
+	#CPUT="$(lscpu | awk '/Vendor ID:/ {print $3}')"
+CPUT="$(lscpu | grep -Eo "GenuineIntel|AuthenticAMD")"
 	case "$CPUT" in
 	GenuineIntel) echo 'Installing Intel microcode' && microcodepkg='intel-ucode' ;;
 	AuthenticAMD) echo 'Installing AMD microcode' && microcodepkg='amd-ucode' ;;
