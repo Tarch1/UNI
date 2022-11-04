@@ -230,6 +230,7 @@ BootloaderSetup () {
 ########## INSTALLATION-PROCESS ##########
 
 InstallationSetup () {
+VBTsel=0
 	echo 'List of all errors during the installation progress:' > Errors
 	Check_required_files &&	UEFIsel && CPUsel && GPUsel && Pacman_Locked
 	
