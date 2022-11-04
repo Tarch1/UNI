@@ -31,7 +31,7 @@ GPUsel () {
 	echo " Detecting video chipset "
 	Gsel=( VM NVIDIA Intel AMD )
 	t=0
-
+######### try lspci | grep VGA | grep -Eo "VM NVIDIA Intel AMD"
 	for i in "${Gsel[@]}"; do
 		if lspci | grep VGA | grep -q "$i"; then
 			YesNoSel " We found an $i graphics card wanna install the relative driver?"
