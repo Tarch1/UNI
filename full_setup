@@ -59,7 +59,7 @@ GNOME () {
 	sudo pacman -Syu gnome gdm gdm-openrc gst-libav #gnome-extra
 	trizen -Syu gnome-browser-connector
 	mkdir -p ~/{.wallpapers,.config/kitty}
-	cp -r /media/internal_hdd/OS/Wallpapers/* ~/.wallpapers
+	cp -r /run/tarch1/media/HDD/Pictures/* ~/.wallpapers
 	cp ~/UNI/Conf_files/kitty.conf ~/.config/kitty/kitty.conf
 	cp ~/UNI/Conf_files/Script/pfetch ~/.pfetch
 	cp ~/UNI/Conf_files/nanorc ~/.nanorc
