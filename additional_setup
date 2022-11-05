@@ -120,7 +120,7 @@ OperatingSystemSel () {
 }
 
 ArchRepoSel () {
-	YesNoSel "You want Arch repositories as well as Artix repositories \n"
+	YesNoSel "You want Arch repositories as well as Artix repositories"
   case $CC in
     1) ARCHrepo=1 && echo "OK, adding the repositories of arch" ;;
     0) ARCHrepo='' && echo "Well, trying without them" ;;
