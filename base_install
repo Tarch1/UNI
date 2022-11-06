@@ -230,10 +230,10 @@ BootloaderSetup () {
 ########## INSTALLATION-PROCESS ##########
 
 InstallationSetup () {
-VBTsel=0
+	VBTsel=0
 	echo 'List of all errors during the installation progress:' > Errors
 	Check_required_files &&	UEFIsel && CPUsel && GPUsel && Pacman_Locked
-	
+
 	if [[ "$VBTsel" = 1 ]]; then
 		Personalization=( OperatingSystemSel ArchRepoSel )
 		LANGsel='en_GB.UTF-8' && LOCsel='it_IT.UTF-8'
@@ -313,8 +313,8 @@ FinishInst () {
 
 PKGcheck () {
 	microcode=("$microcodepkg")
-	#amdgraphics=("${amddrivers[@]}")
-	#nvidiagraphics=("${nvidiadrivers[@]}")
+	#amdgraphics=("${amddrivers[@]}")	#setupped by additional_setup
+	#nvidiagraphics=("${nvidiadrivers[@]}")	#setupped by additional_setup
 	baselinux=(base base-devel linux linux-firmware linux-headers)
 	baseutils=(man bash-completion kitty vim nano wget git)
 	fs=(dialog mtools parted gptfdisk dosfstools ntfs-3g gvfs-mtp)
