@@ -55,6 +55,8 @@ Install Bottles from Flatpak for managing Windows apps.
 
 TROUBLESHOOTIG
 
+GDM cursor blinking /run/gdm/custom.conf overwrite /etc/gdm/custom.conf with WaylandEnable=false just delete the first
+
 If gnome on wayland not start's on machine's with hybrid gpu setup comment 
      
     sed -i 's/DRIVER=="nvidia"/#DRIVER=="nvidia"/g' /lib/udev/rules.d/61-gdm.rules
