@@ -66,9 +66,9 @@ GNOME () {
 	echo 'Xft.dpi: 90' > ~/.Xdefaults
 	chmod +x ~/.pfetch
 	#sudo mkdir -p /etc/xdg/autostart/
-	cp -r /usr/share/pipewire /mnt/home/"$UNsel"/.config
-	sed 's/#{ path = "/usr/bin/pipewire-media-session" args = "" }/{ path = "wireplumber"  args = "" }/' /mnt/home/"$UNsel"/.config
-	sed '/#{ path = "/usr/bin/pipewire" args = "-c pipewire-pulse.conf" }/ s/#//' /mnt/home/"$UNsel"/.config/pipewire/pipewire.conf
+	cp -r /usr/share/pipewire /home/"$UNsel"/.config
+	sed 's/#{ path = "/usr/bin/pipewire-media-session" args = "" }/{ path = "wireplumber"  args = "" }/' /home/"$UNsel"/.config
+	sed '/#{ path = "/usr/bin/pipewire" args = "-c pipewire-pulse.conf" }/ s/#//' /home/"$UNsel"/.config/pipewire/pipewire.conf
 	mkdir ~/.config/autostart
 	cp -r ~/UNI/Conf_files/pipewire/ ~/.config/autostart
 	sudo rc-update add gdm default
