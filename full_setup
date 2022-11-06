@@ -1,6 +1,8 @@
 #!/bin/bash
 #media=(celluloid mate-utils pantheon-screenshot simplescreenrecorder)
 
+if [ "$(id -u)" == 0 ]; then echo 'Please don't run as root.' >&2; exit 1; fi
+
 Check_required_files () {
 	local files=( additional_setup )
 	for a in "${files[@]}"; do if [ ! -f "$(pwd)/$a" ]; then echo "Missing required file: $a" && local miss+=("$a"); fi
