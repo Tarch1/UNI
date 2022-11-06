@@ -58,19 +58,17 @@ GNOME () {
 	#sudo pacman -Syu gnome-shell gnome-control-center gnome-firmware baobab gnome-system-monitor xdg-desktop-portal-gtk gnome-weather gnuchess gnome-chess gnome-calculator gnome-keyring gnome-software gnome-software-packagekit-plugin flatpak evince nautilus xdg-desktop-portal xdg-desktop-portal-gnome xdg-desktop-portal-wlr xdg-desktop-portal-gtk file-roller
 	sudo pacman -Syu gnome gdm gdm-openrc gst-libav #gnome-extra
 	trizen -Syu gnome-browser-connector
-	mkdir -p ~/{.wallpapers,.config/kitty}
+	mkdir -p ~/{.wallpapers,.config/kitty,.config/autostart,/etc/xdg/autostart}
 	cp -r /run/tarch1/media/HDD/Pictures/* ~/.wallpapers
 	cp ~/UNI/Conf_files/kitty.conf ~/.config/kitty/kitty.conf
 	cp ~/UNI/Conf_files/Script/pfetch ~/.pfetch
 	cp ~/UNI/Conf_files/nanorc ~/.nanorc
 	echo 'Xft.dpi: 90' > ~/.Xdefaults
 	chmod +x ~/.pfetch
-	#sudo mkdir -p /etc/xdg/autostart/
 	cp -r /usr/share/pipewire /home/"$UNsel"/.config
 	sed 's/#{ path = "/usr/bin/pipewire-media-session" args = "" }/{ path = "wireplumber"  args = "" }/' /home/"$UNsel"/.config
 	sed '/#{ path = "/usr/bin/pipewire" args = "-c pipewire-pulse.conf" }/ s/#//' /home/"$UNsel"/.config/pipewire/pipewire.conf
-	mkdir ~/.config/autostart
-	cp -r ~/UNI/Conf_files/pipewire/ ~/.config/autostart
+	cp -r ~/UNI/Conf_files/pipewire/ ~/.config/autostart /etc/xdg/autostart/
 	sudo rc-update add gdm default
 	sudo systemctl enable gdm
 	echo "MOZ_ENABLE_WAYLAND=1" | sudo tee -a /etc/environment > /dev/null
