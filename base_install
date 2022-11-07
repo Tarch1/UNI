@@ -120,7 +120,7 @@ FStabGen () {
 SetupEnvironment () {
 	#sed -i "/$LOCsel/ s/#//g" /mnt/etc/locale.gen
 	sed -i "/\($LOCsel\|$LANGsel\)/ s/#//g" /mnt/etc/locale.gen
-	echo -e "LANG=$LANGsel \nLANGUAGE=$LOCsel \nLC_TIME=$LOCsel \nLC_ADDRESS=$LOCsel \nLC_MESSAGES=$LOCsel \nLC_CTYPE=C" >> /mnt/etc/locale.conf
+	echo -e "LANG=$LOCsel \nLANGUAGE=$LANGsel \nLC_TIME=$LOCsel \nLC_ADDRESS=$LOCsel \nLC_MESSAGES=$LOCsel \nLC_CTYPE=C" >> /mnt/etc/locale.conf
 	echo "$keylayout" | tee /mnt/"$keypath" /mnt/etc/vconsole.conf
 	"chroot" /mnt ln -sf /usr/share/zoneinfo/"$TZsel" /etc/localtime
 	"chroot" /mnt hwclock --systohc --utc
