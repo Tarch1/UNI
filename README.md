@@ -64,6 +64,7 @@ PIPEWIRE TROUBLESHOOTING
 If /etc/pipewire/ folder and its contents doesn't exist run
 
     cp -r /usr/share/pipewire /etc/
+    cp -r /usr/share/wireplumber /etc/
 
     than be sure /home/!!!your username!!!/.config/autostart/pipewire.desktop exist in case copy it :
 
