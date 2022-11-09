@@ -180,7 +180,8 @@ UserSetup () {
 AudioSetup () {
 	echo -e "options nvidia-drm modeset=1\noptions nvidia NVreg_UsePageAttributeTable=1\noptions nvidia NVreg_EnablePCIeGen3=1" >> /mnt/etc/modprobe.d/nvidia.conf
 	#echo "options snd-intel-dspcfg dsp_driver=1" >> /mnt/etc/modprobe.d/dsp.conf
-	#cp -r /mnt/usr/share/pipewire /mnt/etc/
+	cp -r /mnt/usr/share/pipewire /mnt/etc
+	cp -r /mnt/usr/share/wireplumber /mnt/etc
 }
 
 BootloaderSetup () {
