@@ -301,6 +301,7 @@ InstallationSetup () {
 FinishInst () {
 	echo -e " INSTALLATION COMPLETED \n A copy of the script will be placed in your user home directory"
 	cp "$(pwd)"/Conf_files/bashrc /mnt/home/"$UNsel"/.bashrc
+	"$chroot" /mnt ln -frs /home/"$UNsel"/.bashrc /etc/bash/bashrc.d/"$UNsel".bashrc
 	cp -r "$(pwd)" /mnt/home/"$UNsel"/
 	echo 'export MOZ_ENABLE_WAYLAND=1' > /mnt/home/"$UNsel"/.profile
 	cat Errors
