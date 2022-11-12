@@ -55,9 +55,9 @@ Install Bottles from Flatpak for managing Windows apps.
 
 TROUBLESHOOTIG
 
-If gnome on wayland not start's on machine's with hybrid gpu setup comment 
+If gnome on wayland not start's on machine's with hybrid gpu try
      
-    sed -i 's/DRIVER=="nvidia"/#DRIVER=="nvidia"/g' /lib/udev/rules.d/61-gdm.rules
+    ln -s /dev/null /etc/udev/rules.d/61-gdm.rules
 
 PIPEWIRE TROUBLESHOOTING
 
