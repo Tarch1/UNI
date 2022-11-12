@@ -151,7 +151,10 @@ PackageInstall () {
 	if [[ "$VBTsel" = 1 ]]; then "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${EssentialPKG[@]}"
 	else "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${EssentialPKG[@]}" "${AdditionalPKG[@]}"
 	fi
-	if [[ -v nvidiadrivers ]]; then 
+	if [[ -v nvidiadrivers ]]; then
+		if [ "$OSsel" = Artix ]; then "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" nvidia-utils-openrc 
+		Servies+=( nvidia-persistenced )
+		fi
 		ln -s /dev/null /etc/udev/rules.d/61-gdm.rules
 		modules+=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)
 	fi
@@ -163,7 +166,7 @@ PackageInstall () {
 }
 
 ServiceSetup () {
-	Services=( NetworkManager openrc-settingsd cupsd avahi-daemon bluetoothd )
+	Services+=( NetworkManager openrc-settingsd cupsd avahi-daemon bluetoothd )
 	for s in "${Services[@]}"; do "$chroot" /mnt "$initc0" "$initc1" "$s" ; done
 }
 
