@@ -160,8 +160,7 @@ PackageInstall () {
 	fi
 	sed -i "/MODULES/ s/()/(${modules[*]})/" /mnt/etc/mkinitcpio.conf
 	sed -i "/BINARIES/ s/()/($binaries)/" /mnt/etc/mkinitcpio.conf
-	#sed -i "/HOOKS=/ s/#//" /mnt/etc/locale.gen
-	#sed -i "/COMPRESSION/ i/HOOKS=(base udev usr resume autodetect modconf kms block filesystems keyboard keymap fsck)/" /mnt/etc/locale.gen
+	sed -i 's/^HOOKS.*/HOOKS=(base udev autodetect modconf kms block usr resume filesystems keyboard keymap fsck)/' /etc/mkinitcpio.conf
 	mkinitcpio -p linux
 }
 
