@@ -1,4 +1,28 @@
 #!/bin/bash
+
+main() {
+    # If there is argument, the assigned cases will be executed.
+    while [[ $# -gt 0 ]] && [[ $1 == "--"* ]];
+    do
+        option=$1;
+        shift;
+        case $option in
+        	"arch"*) echo test ;;
+            "--version")
+                whiptail --title "cfetch" --msgbox "cfetch version 0.1.3" 10 50;;
+            "--help") usage;;
+            *) fetch;;
+        esac
+    done
+
+    # If the argument does not match on the cases, then system information will
+    # be displayed.
+    if [[ $option != "--"* ]]; then
+        fetch
+    fi
+}
+main "$@"
+
 SelSteps () {
   OSSelection=( '4' 'Enter the distro we are going to setup : 1) Arch 2) Artix 3) Void \n'
                 'OSSel' ''
