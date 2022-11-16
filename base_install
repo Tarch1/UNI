@@ -62,7 +62,7 @@ FileSystemFormat () {
 	btrfs)
 		modules=(btrfs)
 		binaries='btrfs'	#'\/usr\/bin\/btrfsck'
-		local SUBVolumes=( 'home' 'var_log' 'snapshots' )
+		local SUBVolumes=( 'home' 'var_log' 'snapshots' 'swap' )
 		local options='noatime,compress=lzo,space_cache=v2' #default use the default options: rw, suid, dev, exec, auto, nouser, and async.
 		mkfs.btrfs -fL "$RootLabel" "$ROOT_PART" #-f option to force overwrite filesystem
 		
@@ -73,6 +73,22 @@ FileSystemFormat () {
 		mount -o defaults,"$options",subvol=@ "$ROOT_PART" /mnt
 		echo -e "$PIDsel=$ROOTID / btrfs $options,subvol=@$c 0 0" >> UNIfstab
 		for c in "${SUBVolumes[@]}"; do
+			case "$c" in
+			snapshots) mkdir -p /mnt/."$c"
+				mount -o "$options",discard=async,subvol=@"$c" "$ROOT_PART" /mnt/."$c"
+				echo -e "$PIDsel=$ROOTID /.$c btrfs $options,discard=async,subvol=@$c 0 0" >> UNIfstab
+			;;
+			var_log) mkdir -p /mnt/var/log
+				mount -o "$options",subvol=@"$c" "$ROOT_PART" /mnt/var/log
+				echo -e "$PIDsel=$ROOTID /var/log btrfs $options,subvol=@$c 0 0" >> UNIfstab
+			;;
+			swap) mkdir -p /mnt/swap
+				mount -o compress=no,space_cache,ssd,discard=async,subvol=@"$c" "$ROOT_PART" /mnt/var/log
+				echo -e "$PIDsel=$ROOTID /var/log btrfs $options,subvol=@$c 0 0" >> UNIfstab
+			;;
+			*) mkdir -p /mnt/"$c" && mount -o defaults,"$options",subvol=@"$c" "$ROOT_PART" /mnt/"$c"
+			;;
+			esac
 			if [[ "$c" == snapshots ]]; then
 				mkdir -p /mnt/."$c"
 				mount -o "$options",discard=async,subvol=@"$c" "$ROOT_PART" /mnt/."$c"
@@ -80,6 +96,10 @@ FileSystemFormat () {
 			elif [[ "$c" == var_log ]]; then
 				mkdir -p /mnt/var/log
 				mount -o "$options",subvol=@"$c" "$ROOT_PART" /mnt/var/log
+				echo -e "$PIDsel=$ROOTID /var/log btrfs $options,subvol=@$c 0 0" >> UNIfstab
+			elif [[ "$c" == swap ]]; then
+				mkdir -p /mnt/swap
+				mount -o compress=no,space_cache,ssd,discard=async,subvol=@"$c" "$ROOT_PART" /mnt/var/log
 				echo -e "$PIDsel=$ROOTID /var/log btrfs $options,subvol=@$c 0 0" >> UNIfstab
 			else
 				mkdir -p /mnt/"$c" && mount -o defaults,"$options",subvol=@"$c" "$ROOT_PART" /mnt/"$c"
