@@ -82,28 +82,22 @@ FileSystemFormat () {
 				mount -o "$options",subvol=@"$c" "$ROOT_PART" /mnt/var/log
 				echo -e "$PIDsel=$ROOTID /var/log btrfs $options,subvol=@$c 0 0" >> UNIfstab
 			;;
-			swap) mkdir -p /mnt/swap
+			swap) mkdir -p /mnt/"$c"
 				mount -o compress=no,space_cache,ssd,discard=async,subvol=@"$c" "$ROOT_PART" /mnt/var/log
 				echo -e "$PIDsel=$ROOTID /var/log btrfs $options,subvol=@$c 0 0" >> UNIfstab
+				# Create Swapfile
+				SF=/mnt/"$c"/swapfile
+				truncate -s 0 "$SF"
+				chattr +C "$SF"
+				btrfs property set "$SF" compression none
+				fallocate -l 16G "$SF"
+				chmod 600 "$SF" || chmod 0600 "$SF"
+				mkswap "$SF"
+				swapon "$SF"
 			;;
 			*) mkdir -p /mnt/"$c" && mount -o defaults,"$options",subvol=@"$c" "$ROOT_PART" /mnt/"$c"
 			;;
 			esac
-			if [[ "$c" == snapshots ]]; then
-				mkdir -p /mnt/."$c"
-				mount -o "$options",discard=async,subvol=@"$c" "$ROOT_PART" /mnt/."$c"
-				echo -e "$PIDsel=$ROOTID /.$c btrfs $options,discard=async,subvol=@$c 0 0" >> UNIfstab
-			elif [[ "$c" == var_log ]]; then
-				mkdir -p /mnt/var/log
-				mount -o "$options",subvol=@"$c" "$ROOT_PART" /mnt/var/log
-				echo -e "$PIDsel=$ROOTID /var/log btrfs $options,subvol=@$c 0 0" >> UNIfstab
-			elif [[ "$c" == swap ]]; then
-				mkdir -p /mnt/swap
-				mount -o compress=no,space_cache,ssd,discard=async,subvol=@"$c" "$ROOT_PART" /mnt/var/log
-				echo -e "$PIDsel=$ROOTID /var/log btrfs $options,subvol=@$c 0 0" >> UNIfstab
-			else
-				mkdir -p /mnt/"$c" && mount -o defaults,"$options",subvol=@"$c" "$ROOT_PART" /mnt/"$c"
-			fi
 			echo -e "$PIDsel=$ROOTID /$c btrfs $options,subvol=@$c 0 0" >> UNIfstab
 		done
 	;;
