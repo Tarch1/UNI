@@ -23,6 +23,8 @@ bash full_setup
 
 Reboot and Enjoy!
 
+Try to use https://gitea.arsenm.dev/Arsen6331/lure as AUR helper
+
 DISABLING INTEL TURBO BOOST - https://wiki.archlinux.org/title/CPU_frequency_scaling#Disabling_Turbo_Boost
 
     echo 1 > /sys/devices/system/cpu/intel_pstate/no_turbo
