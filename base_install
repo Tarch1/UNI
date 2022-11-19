@@ -165,6 +165,13 @@ PackageInstall () {
 	if [[ "$VBTsel" = 1 ]]; then "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${EssentialPKG[@]}"
 	else "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${EssentialPKG[@]}" "${AdditionalPKG[@]}"
 	fi
+	case "$microcodepkg" in
+	intel-ucode) echo -e 'options i915 enable_fbc=1 fastboot=0 enable_dc=4' >> /etc/modprobe.d/i915.conf
+	;;
+	amd-ucode) echo 'AMD setup: Nothing at the moment'
+	;;
+	*) echo 'No microcode selected, has additional setup been done?'
+	esac
 	if [[ -v nvidiadrivers ]]; then
 		if [ "$OSsel" = Artix ]; then "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" nvidia-utils-openrc 
 		Servies+=( nvidia-persistenced )
