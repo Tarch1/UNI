@@ -171,6 +171,7 @@ PackageInstall () {
 		fi
 		ln -s /dev/null /etc/udev/rules.d/61-gdm.rules
 		modules+=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)
+		echo 'options nvidia-drm modeset=1' >> /mnt/etc/modprobe.d/nvidia.conf
 	fi
 	sed -i "/MODULES/ s/()/(${modules[*]})/" /mnt/etc/mkinitcpio.conf
 	sed -i "/BINARIES/ s/()/($binaries)/" /mnt/etc/mkinitcpio.conf
