@@ -43,6 +43,9 @@ Snapper () {
 	mkdir /etc/pacman.d/hooks
 	cp ~/UNI/Conf_files/50-bootbackup.hook /etc/pacman.d/hooks/50-bootbackup.hook
 	pacman -S rsync --noconfirm
+	pacman -S rsync-openrc --noconfirm
+	rc-update add rsyncd
+	rc-service rsyncd start
 	"
 	#sudo systemctl enable snapper-timeline.timer
 	#sudo systemctl enable snapper-cleanup.timer
