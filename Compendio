@@ -25,3 +25,6 @@ x  # swap_pattern_and_hold
 y  # transform_chars    
 
 For reshade with steam proton use this https://github.com/kevinlekiller/reshade-steam-proton reshade-linux.sh
+
+OpenRC guide
+https://github.com/OpenRC/openrc/blob/master/service-script-guide.md
