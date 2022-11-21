@@ -343,7 +343,7 @@ PKGcheck () {
 	#nvidiagraphics=("${nvidiadrivers[@]}")	#setupped by additional_setup
 	baselinux=(base base-devel linux linux-firmware linux-headers)
 	baseutils=(man bash-completion kitty vim nano wget git)
-	fs=(dialog mtools parted gptfdisk dosfstools ntfs-3g exfatprogs gvfs-mtp)
+	fs=(dialog mtools parted gptfdisk dosfstools exfatprogs gvfs-mtp)
 	bootloaderutility=(efibootmgr os-prober sbsigntools)
 	elogind=(elogind elogind-openrc openrc-settingsd)
 	btrfsutility=(snapper btrfs-progs)
