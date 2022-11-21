@@ -355,9 +355,9 @@ PKGcheck () {
 	android=(android-tools android-udev)
 	bluetooth=(bluez bluez-utils bluez-plugins bluez-openrc)
 	print=(cups cups-pdf system-config-printer avahi avahi-openrc cups-openrc)
-	xorg=(xorg-server xorg-xinit xorg-xinit light numlockx libinput xorg-xinput xss-lock)
+	#xorg=(xorg-server xorg-xinit xorg-xinit light numlockx libinput xorg-xinput xss-lock)
 	apps=(telegram-desktop firefox profile-sync-daemon)
-	utility=(feh calc fd bpytop adriconf fwupd) #for netwotk test bmon
+	utility=(feh calc fd bpytop adriconf fwupd colord colord-openrc) #for netwotk test bmon
 	hardwareacceleration=(libva-mesa-driver mesa-vdpau intel-media-driver intel-media-driver vkd3d)
 	vulkan=(vulkan-icd-loader vulkan-intel vulkan-mesa-layers)
 	vulkanlib32=(lib32-vulkan-icd-loader lib32-mesa lib32-vulkan-intel)
