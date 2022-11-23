@@ -45,7 +45,7 @@ GPUsel () {
 					0) echo 'Using default Mesa' && nvidiadrivers=(mesa) ;;
 					*) echo "Error with nested YesNoSel funcion" ;;
 					esac
-				elif [[ "$i" == AMD ]]; then amddrivers=(vulkan-radeon)
+				elif [[ "$i" == AMD ]]; then amddrivers=(amdgpu mesa vulkan-radeon libva-mesa-driver mesa-vdpau xf86-video-amdgpu)
 				elif [[ "$i" == VM ]]; then VBTsel=1 && echo "The default Mesa driver will be installed"
 				else echo "No $i graphics card, skipping"
 				fi
