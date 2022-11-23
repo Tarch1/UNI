@@ -27,4 +27,5 @@ y  # transform_chars
 For reshade with steam proton use this https://github.com/kevinlekiller/reshade-steam-proton reshade-linux.sh
 
 OpenRC guide
+https://wiki.gentoo.org/wiki/OpenRC_to_systemd_Cheatsheet
 https://github.com/OpenRC/openrc/blob/master/service-script-guide.md
