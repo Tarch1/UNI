@@ -166,7 +166,7 @@ PackageInstall () {
 	else "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${EssentialPKG[@]}" "${AdditionalPKG[@]}"
 	fi
 	case "$microcodepkg" in
-	intel-ucode) echo -e 'options i915 enable_fbc=1 fastboot=0 enable_dc=4' >> /etc/modprobe.d/i915.conf
+	intel-ucode) echo -e 'options i915 enable_fbc=1 fastboot=0 enable_dc=4' >> /mnt/etc/modprobe.d/i915.conf
 	;;
 	amd-ucode) echo 'AMD setup: Nothing at the moment'
 	;;
@@ -176,14 +176,14 @@ PackageInstall () {
 		if [ "$OSsel" = Artix ]; then "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" nvidia-utils-openrc 
 		Servies+=( nvidia-persistenced )
 		fi
-		ln -s /dev/null /etc/udev/rules.d/61-gdm.rules
+		ln -s /dev/null /mnt/etc/udev/rules.d/61-gdm.rules
 		modules+=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)
 		echo -e "options nvidia-drm modeset=1 \noptions \"NVreg_DynamicPowerManagement=0x02\"" >> /mnt/etc/modprobe.d/nvidia.conf
 	fi
 	sed -i "/MODULES/ s/()/(${modules[*]})/" /mnt/etc/mkinitcpio.conf
 	sed -i "/BINARIES/ s/()/($binaries)/" /mnt/etc/mkinitcpio.conf
-	sed -i 's/^HOOKS.*/HOOKS=(base udev autodetect modconf kms block usr resume filesystems keyboard keymap fsck)/' /etc/mkinitcpio.conf
-	mkinitcpio -p linux
+	sed -i 's/^HOOKS.*/HOOKS=(base udev autodetect modconf kms block usr resume filesystems keyboard keymap fsck)/' /mnt/etc/mkinitcpio.conf
+	"$chroot" /mnt mkinitcpio -p linux
 }
 
 ServiceSetup () {
