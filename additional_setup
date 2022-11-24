@@ -232,8 +232,8 @@ BootloaderSel () {
 
 KernelSel () {
   echo -en "Enter preferred Kernel : 1) Stable 2) Longterm 3) Hardened 4) Zen \n"
-  read -r BLsel
-  case $BLsel in
+  read -r KSel
+  case $KSel in
     1|Stable) KSel="linux" && echo "Kernel selected : linux" ;;
     2|Longterm) KSel="linux-lts" && echo "Kernel selected : linux-lts" ;;
     3|Hardened) KSel="linux-hardened" && echo "Kernel selected : linux-hardened" ;;
