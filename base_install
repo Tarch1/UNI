@@ -262,10 +262,10 @@ BootloaderSetup () {
 InstallationSetup () {
 	VBTsel=0
 	echo 'List of all errors during the installation progress:' > Errors
-	Check_required_files &&	UEFIsel && CPUsel && GPUsel && Pacman_Locked
+	Check_required_files &&	UEFIsel && CPUsel && KernelSel && GPUsel && Pacman_Locked
 
 	if [[ "$VBTsel" = 1 ]]; then
-		Personalization=( KernelSel OperatingSystemSel ArchRepoSel )
+		Personalization=( OperatingSystemSel ArchRepoSel )
 		LANGsel='en_GB.UTF-8' && LOCsel='it_IT.UTF-8'
 		HNsel=tarch1 && UNsel=tarch1
 		TZsel='Europe/Rome'
@@ -273,7 +273,7 @@ InstallationSetup () {
 		BLsel=refind
 		ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' 'BaseSystemInstall' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'ServiceSetup' 'UserSetup' 'BootloaderSetup' )
 	else
-		local Personalization=( KernelSel OperatingSystemSel LocalizationSel LanguageSel TimezoneSel HostnameSel UsernameSel PartIDSel FilesystemSel BootloaderSel )
+		local Personalization=( OperatingSystemSel LocalizationSel LanguageSel TimezoneSel HostnameSel UsernameSel PartIDSel FilesystemSel BootloaderSel )
 		ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' 'AdditionalDriveSetup' 'BaseSystemInstall' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'ServiceSetup' 'UserSetup' 'AudioSetup' 'BootloaderSetup' )
 	fi
 	#VoidSteps=(  )
