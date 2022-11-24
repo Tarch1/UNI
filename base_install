@@ -221,6 +221,9 @@ BootloaderSetup () {
 		cp ../UNI/Bootloader/Refind/refind.conf /mnt/boot/EFI/"$efifolder"/refind.conf
 		cp ../UNI/Bootloader/Refind/refind_linux.conf /mnt/boot/refind_linux.conf
 		cp -r ../UNI/Bootloader/Refind/themes/* /mnt/boot/EFI/"$efifolder"/themes/
+		if [ "$FSsel" = btrfs ]; then rootflags='rootflagssubvol=@' ; fi
+		if [ "${nvidiadrivers[0]}" = nvidia ]; then osi="acpi_osi=! \"acpi_osi=$AcpiOS\"" ; fi
+		echo "\"Standard Boot\"   \"ro root=$ROOTID rootfstype=$FSsel $rootflags initrd=$microcodepkg.img initrd=initramfs-$kernel.img $osi\"" >> /mnt/boot/refind_linux.conf
 		echo '!!!Refind config and theme changed!!!'
 	;;
 	2|GRUB|Grub|grub)
@@ -238,12 +241,15 @@ BootloaderSetup () {
 		mkdir -p /mnt/boot/grub/themes
 		sed -i "/GRUB_DISABLE_OS_PROBER=/ s/#//g" /mnt/etc/default/grub
 		sed -i '/GRUB_THEME=/c GRUB_THEME="/boot/grub/themes/Grub-Sekiro/theme.txt"' /mnt/etc/default/grub
+		if [ "${nvidiadrivers[0]}" = nvidia ]; then sed -i "s/^\(GRUB_CMDLINE_LINUX=.*\)\"$/\1 acpi_osi=! \\\\\"acpi_osi=$AcpiOS\\\\\"\"/" /mnt/etc/default/grub ; fi
 		"$chroot" /mnt grub-mkconfig -o /boot/grub/grub.cfg
 		cp -r ../UNI/Bootloader/Grub-Sekiro /mnt/{boot/grub/themes/,/usr/share/grub/themes}
 	;;
 	3|EFISTUB|Efistub|efistub)
-		BLflags="\'rw root=$PIDsel=$ROOTID rootflags=subvol=@ initrd=\$microcodepkg.img initrd=\initramfs-linux.img quiet loglevel=3'"
-		#"$chroot" /mnt efibootmgr -d "$BOOT_PART" -p 1 -c -L "$OSsel" -l /vmlinuz-linux -u "root=$PIDsel=$ROOTID resume=PARTUUID= initrd=/intel-ucode.img initrd=/initramfs-linux.img rw console=tty2 quiet loglevel=3 rd.udev.log_priority=0" --verbose
+		if [ "${nvidiadrivers[0]}" = nvidia ]; then osi="acpi_osi=! \"acpi_osi=$AcpiOS\"" ; fi
+		BLflags="\'ro root=$ROOTID rootfstype=$FSsel $rootflags initrd=$microcodepkg.img initrd=initramfs-$kernel.img $osi\"\'"
+		#BLflags="\'rw root=$PIDsel=$ROOTID rootflags=subvol=@ initrd=\$microcodepkg.img initrd=\initramfs-linux.img quiet loglevel=3 $osi'"
+		#"$chroot" /mnt efibootmgr -d "$BOOT_PART" -p 1 -c -L "$OSsel" -l /vmlinuz-linux -u "root=$PIDsel=$ROOTID resume=PARTUUID= initrd=/intel-ucode.img initrd=/initramfs-linux.img rw console=tty2 quiet loglevel=3 rd.udev.log_priority=0 acpi_osi=! \"acpi_osi=$AcpiOS\"" --verbose
 		"$chroot" /mnt efibootmgr -d "$BOOT_PART" -p 1 -c -L "$OSsel" -l /vmlinuz-linux -u "$BLflags" --verbose
 		echo "efibootmgr -b lastnumber -B" #delete previous boot entries
 	;;
