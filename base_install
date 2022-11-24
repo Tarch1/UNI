@@ -334,6 +334,9 @@ FinishInst () {
 	cp -r "$(pwd)" /mnt/home/"$UNsel"/
 	echo 'export MOZ_ENABLE_WAYLAND=1' > /mnt/home/"$UNsel"/.profile
 	cat Errors
+	# a means ugo > u='user that owns files' g='group that owns files' o='all other users' 
+	find UNI -type d -exec chmod 777 {} \;
+	find UNI -type f -exec chmod 666 {} \;
 	YesNoSel "Reboot system"
 	case "$CC" in
 	1)	umount "$DRIVE"?* && reboot ;;
