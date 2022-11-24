@@ -66,13 +66,10 @@ ArchRepoSetup () {
 		'[community]' 'Include = /etc/pacman.d/mirrorlist-arch'
 		'[multilib]' 'Include = /etc/pacman.d/mirrorlist-arch' )
 	
-	if grep -m 1 'Server = https://universe.artixlinux.org/$arch' -q "$1"
-	then echo "There is already an entry"
+	if grep -m 1 'Server = https://universe.artixlinux.org/$arch' -q "$1" ; then echo "There is already an entry"
 	else for UR in "${UNIVERSErepo[@]}"; do echo "$UR" >> "$1" ; done
 	fi
-	
-	if grep -m 1 'Include = /etc/pacman.d/mirrorlist-arch' -q "$1"
-	then echo "There is already an entry"
+	if grep -m 1 'Include = /etc/pacman.d/mirrorlist-arch' -q "$1" ; then echo "There is already an entry"
 	else
 		if [ "$1" = /mnt/etc/pacman.conf ]
 		then "$chroot" /mnt "$PKGmanager" -Sy "${pkgskips[@]}" artix-archlinux-support
