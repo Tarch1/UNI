@@ -38,7 +38,7 @@ GPUsel () {
 			0) echo 'Using default Mesa' && nvidiadrivers=(mesa) ;;
 			*) echo "Error with nested YesNoSel funcion" ;;
 			esac ;;
-		AMD) amddrivers=(amdgpu mesa vulkan-radeon libva-mesa-driver mesa-vdpau xf86-video-amdgpu) ;;
+		AMD) amddrivers=(amdgpu mesa vulkan-radeon libva-mesa-driver mesa-vdpau) ;;
 		WM) VBTsel=1 && echo "The default Mesa driver will be installed" ;;
 		*) echo "Error with case 0" ;;
 		esac
