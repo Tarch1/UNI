@@ -1,12 +1,12 @@
 #!/bin/bash
 
-ArchitectureSel () {
-	case "$(uname -m)" in
-	aarch64)	;;
-	i686)	;;
-	x86_64)	;;
-	esac
-}
+#ArchitectureSel () {
+#	case "$(uname -m)" in
+#	aarch64)	;;
+#	i686)	;;
+#	x86_64)	;;
+#	esac
+#}
 
 UEFIsel () {
 	if [[ -d "/sys/firmware/efi/" ]]; then	## Mount efivarfs if it is not already mounted
