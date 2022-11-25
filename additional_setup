@@ -59,26 +59,25 @@ Pacman_Locked() {
 }
 
 ArchRepoSetup () {
-	local UNIVERSErepo=( '[universe]'
+	if grep -m 1 'Server = https://universe.artixlinux.org/$arch' -q "$1" ; then echo "There is already an entry"
+	else
+		local UNIVERSErepo=( '[universe]'
 		'Server = https://universe.artixlinux.org/$arch'
 		'Server = https://mirror1.artixlinux.org/universe/$arch'
 		'Server = https://mirror.pascalpuffke.de/artix-universe/$arch'
 		'Server = https://artixlinux.qontinuum.space/artixlinux/universe/os/$arch'
 		'Server = https://mirror1.cl.netactuate.com/artix/universe/$arch'
 		'Server = https://ftp.crifo.org/artix-universe/' )
-	local ArchRepo=( '# Arch' '[extra]' 'Include = /etc/pacman.d/mirrorlist-arch'
-		'[community]' 'Include = /etc/pacman.d/mirrorlist-arch'
-		'[multilib]' 'Include = /etc/pacman.d/mirrorlist-arch' )
-	
-	if grep -m 1 'Server = https://universe.artixlinux.org/$arch' -q "$1" ; then echo "There is already an entry"
-	else for UR in "${UNIVERSErepo[@]}"; do echo "$UR" >> "$1" ; done
+		for UR in "${UNIVERSErepo[@]}" ; do echo "$UR" >> "$1" ; done
 	fi
 	if grep -m 1 'Include = /etc/pacman.d/mirrorlist-arch' -q "$1" ; then echo "There is already an entry"
 	else
-		if [ "$1" = /mnt/etc/pacman.conf ]
-		then "$chroot" /mnt "$PKGmanager" -Sy "${pkgskips[@]}" artix-archlinux-support
+		if [ "$1" = /mnt/etc/pacman.conf ]; then "$chroot" /mnt "$PKGmanager" -Sy "${pkgskips[@]}" artix-archlinux-support
 		else "$PKGmanager" -Sy "${pkgskips[@]}" artix-archlinux-support
 		fi
+		local ArchRepo=( '# Arch' '[extra]' 'Include = /etc/pacman.d/mirrorlist-arch'
+		'[community]' 'Include = /etc/pacman.d/mirrorlist-arch'
+		'[multilib]' 'Include = /etc/pacman.d/mirrorlist-arch' )
 		for AR in "${ArchRepo[@]}"; do echo "$AR" >> "$1" ; done
 		"$PKGmanager"-key --populate archlinux
 		"$PKGmanager" -Sy
