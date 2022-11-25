@@ -35,8 +35,7 @@ GPUsel () {
 			1) echo 'Setting up Proprietary' 
 				if [ "$KSel" = linux ]; then nvidiadrivers=(nvidia)
 				elif [ "$KSel" = linux-lts ]; then nvidiadrivers=(nvidia-lts)
-				else nvidiadrivers=(nvidia-dkms)
-				fi
+				else nvidiadrivers=(nvidia-dkms) ; fi
 				nvidiadrivers+=(nvidia-prime nvidia-settings nvidia-utils lib32-nvidia-utils opencl-nvidia lib32-opencl-nvidia libxnvctrl libvdpau) ;;
 			0) echo 'Using default Mesa' ;;
 			*) echo "Error with nested NVIDIA case" ;;
