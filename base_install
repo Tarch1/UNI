@@ -192,7 +192,7 @@ ServiceSetup () {
 }
 
 UserSetup () {
-	"$chroot" /mnt useradd -mG wheel,video,audio,storage,input "$UNsel" #,lp,scanner,power
+	"$chroot" /mnt useradd -mg users -G wheel,video,audio,storage,input,lp,scanner,power,kvm "$UNsel" #additional docker,libvirt if you have required package
 	sed -i '/%wheel ALL=(ALL:ALL) ALL/ s/#//' /mnt/etc/sudoers #it's possible to use the username instead of %wheel
 	"$chroot" /mnt echo -n "Type $UNsel "
 	"$chroot" /mnt passwd "$UNsel"
