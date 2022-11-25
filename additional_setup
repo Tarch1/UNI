@@ -95,63 +95,63 @@ AnotherCheck () {
 ########## PERSONALIZATION-SCRIPT ##########
 
 VirtualBoxTest () {
-  YesNoSel "If this is a Virtualbox installation for test the script, we will skip every choice \n"
-  case $CC in
-    1) VBTsel=1 && echo "OK, skip all check $VBTSel" ;;
-    0) VBTsel=0 && echo "OK, now respond a few question" ;;
-    *) echo "Do again please" && VirtualBoxTest ;;
-  esac
+	YesNoSel "If this is a Virtualbox installation for test the script, we will skip every choice \n"
+	case $CC in
+	1) VBTsel=1 && echo "OK, skip all check $VBTSel" ;;
+	0) VBTsel=0 && echo "OK, now respond a few question" ;;
+	*) echo "Do again please" && VirtualBoxTest ;;
+	esac
 }
 
 OperatingSystemSel () {
-  echo -en "Enter the distro we are going to setup : 1) Arch 2) Artix 3) Void \n"
-  read -r OSsel
-  case $OSsel in
-    1|Arch|arch) OSsel="Arch" && echo "distro selected : Arch" ;;
-    2|Artix|artix) OSsel="Artix" && echo "distro selected : Artix" ;;
-    3|Void|void) OSsel="Void" && echo "distro selected : Void" ;;
-    *) echo "Wrong choice, type again" && OperatingSystemSel ;;
-  esac
+	echo -en "Enter the distro we are going to setup : 1) Arch 2) Artix 3) Void \n"
+	read -r OSsel
+	case $OSsel in
+	1|Arch|arch) OSsel="Arch" && echo "distro selected : Arch" ;;
+	2|Artix|artix) OSsel="Artix" && echo "distro selected : Artix" ;;
+	3|Void|void) OSsel="Void" && echo "distro selected : Void" ;;
+	*) echo "Wrong choice, type again" && OperatingSystemSel ;;
+	esac
 }
 
 ArchRepoSel () {
 	YesNoSel "You want Arch repositories as well as Artix repositories"
-  case $CC in
-    1) ARCHrepo=1 && echo "OK, adding the repositories of arch" ;;
-    0) ARCHrepo='' && echo "Well, trying without them" ;;
-    *) echo "Do again please" && ArchRepoSel ;;
-  esac
+	case $CC in
+	1) ARCHrepo=1 && echo "OK, adding the repositories of arch" ;;
+	0) ARCHrepo='' && echo "Well, trying without them" ;;
+	*) echo "Do again please" && ArchRepoSel ;;
+	esac
 }
 
 VoidInstMethod () {
-  echo -en "Enter installation type : 1) XBPS 2) ROOTFS \n"
-  read -r VImethod
-  case $VImethod in
-    1|XBPS|xbps) VImethod="XBPS" && echo 'Selected : XBPS install' ;;
-    2|ROOTFS|rootfs) VImethod="ROOTFS" && echo 'Selected : ROOTFS install' ;;
-    *) echo "Wrong choice, type again" && VoidInstMethod ;;
-  esac
+	echo -en "Enter installation type : 1) XBPS 2) ROOTFS \n"
+	read -r VImethod
+	case $VImethod in
+	1|XBPS|xbps) VImethod="XBPS" && echo 'Selected : XBPS install' ;;
+	2|ROOTFS|rootfs) VImethod="ROOTFS" && echo 'Selected : ROOTFS install' ;;
+	*) echo "Wrong choice, type again" && VoidInstMethod ;;
+	esac
 }
 
 LibrarySel () {
-  echo -en "Enter base library name : 1) GLIBC 2) MUSL \n"
-  read -r LIBsel
-  case $LIBsel in
-  1|GLIBC|glibc) LIBsel="GLIBC" && echo "Selected : GLIBC" ;;
-  2|MUSL|musl) LIBsel="MUSL" && echo "Selected : MUSL" ;;
-  *) echo "Wrong choice, type again" && LibrarySel ;;
-  esac
+	echo -en "Enter base library name : 1) GLIBC 2) MUSL \n"
+	read -r LIBsel
+	case $LIBsel in
+	1|GLIBC|glibc) LIBsel="GLIBC" && echo "Selected : GLIBC" ;;
+	2|MUSL|musl) LIBsel="MUSL" && echo "Selected : MUSL" ;;
+	*) echo "Wrong choice, type again" && LibrarySel ;;
+	esac
 }
 
 LocalizationSel () {
-  echo -en "Enter localization : 1) en_US.UTF-8 2) en_GB.UTF-8 3) it_IT.UTF-8 \n"
-  read -r LOCsel
-  case $LOCsel in
-    1|en_US|en_US.UTF-8) LOCsel="en_US.UTF-8" && echo "Selected : en_US.UTF-8" ;;
-    2|en_GB|en_GB.UTF-8) LOCsel="en_GB.UTF-8" && echo "Selected : en_GB.UTF-8" ;;
-    3|it_IT|it_IT.UTF-8) LOCsel="it_IT.UTF-8" && echo "Selected : it_IT.UTF-8" ;;
-    *) echo "Wrong choice, type again" && LocalizationSel ;;
-  esac
+	echo -en "Enter localization : 1) en_US.UTF-8 2) en_GB.UTF-8 3) it_IT.UTF-8 \n"
+	read -r LOCsel
+	case $LOCsel in
+	1|en_US|en_US.UTF-8) LOCsel="en_US.UTF-8" && echo "Selected : en_US.UTF-8" ;;
+	2|en_GB|en_GB.UTF-8) LOCsel="en_GB.UTF-8" && echo "Selected : en_GB.UTF-8" ;;
+	3|it_IT|it_IT.UTF-8) LOCsel="it_IT.UTF-8" && echo "Selected : it_IT.UTF-8" ;;
+	*) echo "Wrong choice, type again" && LocalizationSel ;;
+	esac
 }
 
 LanguageSel () {
