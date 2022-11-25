@@ -26,9 +26,9 @@ CPUsel () {
 
 GPUsel () {
 	echo " Detecting video chipset "
-	Gsel=( VM Virtio NVIDIA Intel AMD )
+	readarray -t Gsel < <(lspci | grep VGA | grep -Eo 'VM|Virtio|NVIDIA|Intel|AMD')
 	for i in "${Gsel[@]}"; do
-		case "$(lspci | grep VGA | grep -Eo "$i")" in
+		case "$i" in
 		Intel) echo "The default Mesa driver will be installed" ;;
 		NVIDIA) YesNoSel 'Wanna proprietary driver, if no Mesa is the default for nouveau'
 			case "$CC" in
