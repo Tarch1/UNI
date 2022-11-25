@@ -155,91 +155,91 @@ LocalizationSel () {
 }
 
 LanguageSel () {
-  echo -en "Enter preferred Language : 1) en_US.UTF-8 2) en_GB.UTF-8 3) it_IT.UTF-8 \n"
-  read -r LANGsel
-  case $LANGsel in
-    1|en_US|en_US.UTF-8) LANGsel="en_US.UTF-8" && echo "Selected : en_US.UTF-8" ;;
-    2|en_GB|en_GB.UTF-8) LANGsel="en_GB.UTF-8" && echo "Selected : en_GB.UTF-8" ;;
-    3|it_IT|it_IT.UTF-8) LANGsel="it_IT.UTF-8" && echo "Selected : it_IT.UTF-8" ;;
-    *) echo "Wrong choice, type again" && LanguageSel ;;
-  esac
+	echo -en "Enter preferred Language : 1) en_US.UTF-8 2) en_GB.UTF-8 3) it_IT.UTF-8 \n"
+	read -r LANGsel
+	case $LANGsel in
+	1|en_US|en_US.UTF-8) LANGsel="en_US.UTF-8" && echo "Selected : en_US.UTF-8" ;;
+	2|en_GB|en_GB.UTF-8) LANGsel="en_GB.UTF-8" && echo "Selected : en_GB.UTF-8" ;;
+	3|it_IT|it_IT.UTF-8) LANGsel="it_IT.UTF-8" && echo "Selected : it_IT.UTF-8" ;;
+	*) echo "Wrong choice, type again" && LanguageSel ;;
+	esac
 }
 
 HostnameSel () {
-  read -rp "Enter preferred hostname : " HNsel
-  YesNoSel "If << $HNsel >> is the right hostname type y or n for retype it :"
-  case $CC in
-    1) echo "OK, hostname selected $HNsel" ;;
-    *) echo "Then again" && HostnameSel ;;
-  esac
+	read -rp "Enter preferred hostname : " HNsel
+	YesNoSel "If << $HNsel >> is the right hostname type y or n for retype it :"
+	case $CC in
+	1) echo "OK, hostname selected $HNsel" ;;
+	*) echo "Then again" && HostnameSel ;;
+	esac
 }
 
 UsernameSel () {
-  read -rp "Enter preferred username : " UNsel
-  YesNoSel "If << $UNsel >> is the right hostname type y or n for retype it :"
-  case $CC in
-    1) echo "OK, username selected $UNsel" ;;
-    *) echo "Then again" && UsernameSel ;;
-  esac
+	read -rp "Enter preferred username : " UNsel
+	YesNoSel "If << $UNsel >> is the right hostname type y or n for retype it :"
+	case $CC in
+	1) echo "OK, username selected $UNsel" ;;
+	*) echo "Then again" && UsernameSel ;;
+	esac
 }
 
 TimezoneSel () {
-  echo -en " Select Timezone : 1) Europe/Rome \n or type another with the same format "
-  read -r TZsel
-  case "$TZsel" in
-    1|Europe/Rome|Rome) TZsel="Europe/Rome" && echo "Selected : Europe/Rome" ;;
-    q|quit|exit) TZSel="" ;;
-    *) YesNoSel "Want this for timezone : $TZsel ?"
-       case $CC in
-         1) echo "OK, timezone selected $TZsel" ;;
-         *) echo "Then again" && TimezoneSel ;;
-       esac ;;
-  esac
+	echo -en " Select Timezone : 1) Europe/Rome \n or type another with the same format "
+	read -r TZsel
+	case "$TZsel" in
+	1|Europe/Rome|Rome) TZsel="Europe/Rome" && echo "Selected : Europe/Rome" ;;
+	q|quit|exit) TZSel="" ;;
+	*)	YesNoSel "Want this for timezone : $TZsel ?"
+		case $CC in
+		1) echo "OK, timezone selected $TZsel" ;;
+		*) echo "Then again" && TimezoneSel ;;
+		esac ;;
+	esac
 }
 
 PartIDSel () {
-  echo -en "Enter partition identifier : 1) UUID 2) PARTUUID 3) LABEL \n"
-  read -r PIDsel
-  case $PIDsel in
-    1|UUID|uuid) PIDsel=UUID && echo "Selected : UUID" ;;
-    2|PARTUUID|partuuid) PIDsel=PARTUUID && echo "Selected : PARTUUID" ;;
-    3|LABEL|label) PIDsel=LABEL && echo "Selected : LABEL" ;;
-    *) echo "Wrong choice, type again" && PartIDSel ;;
-  esac
+	echo -en "Enter partition identifier : 1) UUID 2) PARTUUID 3) LABEL \n"
+	read -r PIDsel
+	case $PIDsel in
+	1|UUID|uuid) PIDsel=UUID && echo "Selected : UUID" ;;
+	2|PARTUUID|partuuid) PIDsel=PARTUUID && echo "Selected : PARTUUID" ;;
+	3|LABEL|label) PIDsel=LABEL && echo "Selected : LABEL" ;;
+	*) echo "Wrong choice, type again" && PartIDSel ;;
+	esac
 }
 
 FilesystemSel () {
-  echo -en "Enter base filesystem : 1) EXT4 2) BTRFS \n"
-  read -r FSsel
-  case $FSsel in
-    1|EXT4|ext4) FSsel=ext4 && echo "Selected : EXT4" ;;
-    2|BTRFS|btrfs) FSsel=btrfs && echo "Selected : BTRFS" ;;
-    *) echo "Wrong filesystem selected, try one of those provided" && FilesystemSel ;;
-  esac
+	echo -en "Enter base filesystem : 1) EXT4 2) BTRFS \n"
+	read -r FSsel
+	case $FSsel in
+	1|EXT4|ext4) FSsel=ext4 && echo "Selected : EXT4" ;;
+	2|BTRFS|btrfs) FSsel=btrfs && echo "Selected : BTRFS" ;;
+	*) echo "Wrong filesystem selected, try one of those provided" && FilesystemSel ;;
+	esac
 }
 
 BootloaderSel () {
-  echo -en "Enter preferred bootloader : 1) Refind 2) Grub 3) Efistub \n"
-  read -r BLsel
-  case $BLsel in
-    1|REFIND|refind) BLsel="refind" && echo "bootloader selected : refind" ;;
-    2|GRUB|grub) BLsel="grub" && echo "bootloader selected : grub" ;;
-    3|EFISTUB|efistub) BLsel="efistub" && echo "bootloader selected : efistub" ;;
-    *) echo "Wrong bootloader selected, try one of those provided" && BootloaderSel ;;
-  esac
+	echo -en "Enter preferred bootloader : 1) Refind 2) Grub 3) Efistub \n"
+	read -r BLsel
+	case $BLsel in
+	1|REFIND|refind) BLsel="refind" && echo "bootloader selected : refind" ;;
+	2|GRUB|grub) BLsel="grub" && echo "bootloader selected : grub" ;;
+	3|EFISTUB|efistub) BLsel="efistub" && echo "bootloader selected : efistub" ;;
+	*) echo "Wrong bootloader selected, try one of those provided" && BootloaderSel ;;
+	esac
 }
 
 
 KernelSel () {
-  echo -en "Enter preferred Kernel : 1) Stable 2) Longterm 3) Hardened 4) Zen \n"
-  read -r KSel
-  case $KSel in
-    1|Stable) KSel="linux" && echo "Kernel selected : linux" ;;
-    2|Longterm) KSel="linux-lts" && echo "Kernel selected : linux-lts" ;;
-    3|Hardened) KSel="linux-hardened" && echo "Kernel selected : linux-hardened" ;;
-    4|Zen) KSel="linux-zen" && echo "Kernel selected : linux-zen" ;;
-    *) echo "Wrong Kernel selected, try one of those provided" && KernelSel ;;
-  esac
+	echo -en "Enter preferred Kernel : 1) Stable 2) Longterm 3) Hardened 4) Zen \n"
+	read -r KSel
+	case $KSel in
+	1|Stable) KSel="linux" && echo "Kernel selected : linux" ;;
+	2|Longterm) KSel="linux-lts" && echo "Kernel selected : linux-lts" ;;
+	3|Hardened) KSel="linux-hardened" && echo "Kernel selected : linux-hardened" ;;
+	4|Zen) KSel="linux-zen" && echo "Kernel selected : linux-zen" ;;
+	*) echo "Wrong Kernel selected, try one of those provided" && KernelSel ;;
+	esac
 }
 
 YesNoSel () {
