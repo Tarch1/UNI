@@ -260,9 +260,9 @@ BootloaderSetup () {
 ########## INSTALLATION-PROCESS ##########
 
 InstallationSetup () {
-	VBTsel=0
+	VBTsel=0 && CheckandSetup=( Check_required_files UEFIsel CPUsel KernelSel GPUsel Pacman_Locked )
 	echo 'List of all errors during the installation progress:' > Errors
-	Check_required_files &&	UEFIsel && CPUsel && KernelSel && GPUsel && Pacman_Locked
+	for c in "${CheckandSetup[@]}"; do "$c" || SHOWerror "$c" ; done
 
 	if [[ "$VBTsel" = 1 ]]; then
 		Personalization=( OperatingSystemSel ArchRepoSel )
