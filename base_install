@@ -383,6 +383,7 @@ PKGcheck () {
 	for a in $y; do
 		var="$a"'[@]'   #the y element with a [@] to be like an array
 		temp=${!var}  #splitting the every y[@] element inside temp to simulate a subarray
+		#Use IFS=' ' read -r -a temp <<< "${!a}" if you use variable instead of arrays
 		for b in $temp; do   #for every element of subarr temp  
 			if ! pacman -Ss ^"$b"$ 1>/dev/null; then  #check if doesn't exist
 				echo "[x] Package not available: $b from $var"
