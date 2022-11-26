@@ -398,10 +398,7 @@ PKGcheck () {
 		unset new
 	done
 	echo 'miss=' "${miss[@]}"
-	for c in $y; do
-		local d="$c"'[@]'
-		echo "$c=""${!d}"
-	done
+	for c in $y; do	local d="$c"'[@]' ; echo "$c=""${!d}" ; done
 	if [[ -v miss ]]; then
 		echo "${miss[@]}" | tr ' ' '\n' | sort -u > pkg_missed
 		local i=0 ; while (( "$i" < "${#miss[@]}" )); do echo "${miss[i]}" && i="$((i+1))"; done
