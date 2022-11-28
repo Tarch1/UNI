@@ -31,6 +31,6 @@ https://wiki.gentoo.org/wiki/OpenRC_to_systemd_Cheatsheet
 https://github.com/OpenRC/openrc/blob/master/service-script-guide.md
 
 Workaround for suspend
-Add to boot loader acpi_osi=! "acpi_osi=version"
-version=$(strings /sys/firmware/acpi/tables/DSDT | grep -i 'windows ' | sort | tail -1)
 https://iam.tj/prototype/enhancements/Windows-acpi_osi.html
+
+https://github.com/upscayl/upscayl #upscale images
