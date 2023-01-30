@@ -265,9 +265,10 @@ InstallationSetup () {
 	VBTsel=0 && CheckandSetup=( Check_required_files UEFIsel CPUsel KernelSel GPUsel Pacman_Locked )
 	echo 'List of all errors during the installation progress:' > Errors
 	for c in "${CheckandSetup[@]}"; do "$c" || SHOWerror "$c" ; done
-
+	OperatingSystemSel
+	if [[ "$OSsel" = Artix ]]; then ArchRepoSel ; fi
 	if [[ "$VBTsel" = 1 ]]; then
-		Personalization=( OperatingSystemSel ArchRepoSel )
+		#Personalization=( OperatingSystemSel )
 		LANGsel='en_GB.UTF-8' && LOCsel='it_IT.UTF-8'
 		HNsel=tarch1 && UNsel=tarch1
 		TZsel='Europe/Rome'
@@ -275,14 +276,11 @@ InstallationSetup () {
 		BLsel=refind
 		ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' 'BaseSystemInstall' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'ServiceSetup' 'UserSetup' 'BootloaderSetup' )
 	else
-		local Personalization=( OperatingSystemSel LocalizationSel LanguageSel TimezoneSel HostnameSel UsernameSel PartIDSel FilesystemSel BootloaderSel )
+		local Personalization=( LocalizationSel LanguageSel TimezoneSel HostnameSel UsernameSel PartIDSel FilesystemSel BootloaderSel )
 		ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' 'AdditionalDriveSetup' 'BaseSystemInstall' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'ServiceSetup' 'UserSetup' 'AudioSetup' 'BootloaderSetup' )
 	fi
 	#VoidSteps=(  )
-	
 	for s in "${Personalization[@]}"; do "$s" || SHOWerror "$s" ; done
-	
-	if [[ "$OSsel" = Artix ]]; then ArchRepoSel ; fi
 
 	case "$OSsel" in
 	1|Arch|arch)
