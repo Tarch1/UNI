@@ -159,6 +159,7 @@ PackageConfig () {
 }
 
 PackageInstall () {
+	local HOOKS=(base udev autodetect modconf block usr resume filesystems keyboard keymap fsck)
 	local EssentialPKG=( "${microcode[@]}"  "${kernel[@]}" "${baselinux[@]}" "${baseutils[@]}" "${bootloaderutility[@]}" "${fs[@]}" "${amddrivers[@]}" "${nvidiadrivers[@]}"  "${net[@]}" )
 	local AdditionalPKG=( "${audio[@]}" "${bluetooth[@]}" "${android[@]}" "${print[@]}" "${utility[@]}" "${hardwareacceleration[@]}" "${vulkan[@]}" "${vulkanlib32[@]}" "${apps[@]}" )
 	local ExtraPKG=( "${filemanager[@]}" "${archive[@]}" "${xorg[@]}" )
@@ -179,10 +180,11 @@ PackageInstall () {
 		ln -s /dev/null /mnt/etc/udev/rules.d/61-gdm.rules
 		modules+=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)
 		echo -e "options nvidia-drm modeset=1 \noptions nvidia \"NVreg_DynamicPowerManagement=0x02\"" >> /mnt/etc/modprobe.d/nvidia.conf
+		HOOKS+=(kms)
 	fi
 	sed -i "/MODULES/ s/()/(${modules[*]})/" /mnt/etc/mkinitcpio.conf
 	sed -i "/BINARIES/ s/()/($binaries)/" /mnt/etc/mkinitcpio.conf
-	sed -i 's/^HOOKS.*/HOOKS=(base udev autodetect modconf kms block usr resume filesystems keyboard keymap fsck)/' /mnt/etc/mkinitcpio.conf
+	sed -i 's/^HOOKS.*/HOOKS=($HOOKS)/' /mnt/etc/mkinitcpio.conf
 	"$chroot" /mnt mkinitcpio -p "$KSel"
 }
 
