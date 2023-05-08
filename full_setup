@@ -7,8 +7,7 @@ Check_required_files () {
 	local files=( additional_setup )
 	for a in "${files[@]}"; do if [ ! -f "$(pwd)/$a" ]; then echo "Missing required file: $a" && local miss+=("$a"); fi
 	done
-	if [[ -v miss ]]; then echo 'Required file(s):' "${miss[@]}"
-	else source additional_setup ; fi
+	if [[ -v miss ]]; then echo 'Required file(s):' "${miss[@]}"; else source additional_setup ; fi
 }
 
 Installation () {
