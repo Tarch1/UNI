@@ -262,23 +262,46 @@ BootloaderSetup () {
 ########## INSTALLATION-PROCESS ##########
 
 InstallationSetup () {
-	VBTsel=0 && CheckandSetup=( Check_required_files UEFIsel CPUsel KernelSel GPUsel Pacman_Locked )
+	VBTsel=0 && SetupAvaible=1 && CheckandSetup=( Check_required_files UEFIsel CPUsel KernelSel GPUsel Pacman_Locked )
 	echo 'List of all errors during the installation progress:' > Errors
 	for c in "${CheckandSetup[@]}"; do "$c" || SHOWerror "$c" ; done
-	OperatingSystemSel
-	if [[ "$OSsel" = Artix ]]; then ArchRepoSel ; fi
-	if [[ "$VBTsel" = 1 ]]; then
-		#Personalization=( OperatingSystemSel )
-		LANGsel='en_GB.UTF-8' && LOCsel='it_IT.UTF-8'
-		HNsel=tarch1 && UNsel=tarch1
-		TZsel='Europe/Rome'
-		PIDsel=UUID &&	FSsel=btrfs
-		BLsel=refind
-		ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' 'BaseSystemInstall' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'ServiceSetup' 'UserSetup' 'BootloaderSetup' )
-	else
-		local Personalization=( LocalizationSel LanguageSel TimezoneSel HostnameSel UsernameSel PartIDSel FilesystemSel BootloaderSel )
-		ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' 'AdditionalDriveSetup' 'BaseSystemInstall' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'ServiceSetup' 'UserSetup' 'AudioSetup' 'BootloaderSetup' )
+	if [ -v config ]; then
+		cat config
+		YesNoSel "Would you like to change the config manually (no will coint as editing it with nano)"
+		case $CC in
+		1) SetupAvaible=1 && echo "Start again with your setup" ;;
+		0) SetupAvaible=0 && nano config && source config ;;
+		*) SHOWerror InstallationSetup ;;
+		esac
 	fi
+	
+	if [ "$SetupAvaible" = 1 ]; then
+		OperatingSystemSel
+		if [[ "$OSsel" = Artix ]]; then ArchRepoSel ; fi
+		if [[ "$VBTsel" = 1 ]]; then
+			#Personalization=( OperatingSystemSel )
+			LANGsel='en_GB.UTF-8' && LOCsel='it_IT.UTF-8'
+			HNsel=tarch1 && UNsel=tarch1
+			TZsel='Europe/Rome'
+			PIDsel=UUID &&	FSsel=btrfs
+			BLsel=refind
+			ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' 'BaseSystemInstall' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'ServiceSetup' 'UserSetup' 'BootloaderSetup' )
+		else
+			local Personalization=( LocalizationSel LanguageSel TimezoneSel HostnameSel UsernameSel PartIDSel FilesystemSel BootloaderSel )
+			ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' 'AdditionalDriveSetup' 'BaseSystemInstall' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'ServiceSetup' 'UserSetup' 'AudioSetup' 'BootloaderSetup' )
+		fi
+	elif [ SetupAvaible = 0 ] && [ -v config ]; then echo 'Setup loaded'
+	else SHOWerror InstallationSetup
+	fi
+	
+	Steps=( OSsel ARCHrepo LOCsel LANGsel HNsel UNsel TZsel PIDsel FSsel BLsel )
+	cat "${Steps[@]}"
+	YesNoSel "It's correct? Otherwise this will end"
+	case "$CC" in
+	1) rm config && for a in "${Steps[@]}"; do echo "$a" >> config ; done ;;
+	0) SHOWerror InstallationSetup ;;
+	*) SHOWerror InstallationSetup ;;
+	esac
 	#VoidSteps=(  )
 	for s in "${Personalization[@]}"; do "$s" || SHOWerror "$s" ; done
 
