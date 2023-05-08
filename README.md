@@ -7,13 +7,16 @@ sudo -E hw-probe -all -upload
 rfkill unblock all
 ip link interface up
 connmanctl
+
     scan wifi
     services
     agent on
     connect wifi_***_psk
     quit
+
 git clone https://github.com/Tarch1/Arch-tix
 cd Arch-tix/`
+
 **Adjust packages at the end of base_install**
 bash base_install
 
