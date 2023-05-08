@@ -266,12 +266,15 @@ InstallationSetup () {
 	echo 'List of all errors during the installation progress:' > Errors
 	for c in "${CheckandSetup[@]}"; do "$c" || SHOWerror "$c" ; done
 	if [ -v config ]; then
-		cat config
-		YesNoSel "Would you like to edit config file?"
+		cat config && YesNoSel "It's correct?"
+case "$CC" in 
+1) SetupAvaible=0 &&  source config ;;
+*) YesNoSel "Would you like to edit config file?"
 		case $CC in
 		1) SetupAvaible=0 && nano config && source config ;;
 		*) SetupAvaible=1 && echo "Start again with your setup" ;;
-		esac
+		esac ;;
+esac
 	fi
 	
 	if [ "$SetupAvaible" = 1 ]; then
