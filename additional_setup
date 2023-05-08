@@ -49,6 +49,18 @@ GPUsel () {
 	done
 }
 
+KernelSel () {
+	echo -en "Enter preferred Kernel : 1) Stable 2) Longterm 3) Hardened 4) Zen \n"
+	read -r KSel
+	case $KSel in
+	1|Stable) KSel="linux" && echo "Kernel selected : linux" ;;
+	2|Longterm) KSel="linux-lts" && echo "Kernel selected : linux-lts" ;;
+	3|Hardened) KSel="linux-hardened" && echo "Kernel selected : linux-hardened" ;;
+	4|Zen) KSel="linux-zen" && echo "Kernel selected : linux-zen" ;;
+	*) echo "Wrong Kernel selected, try one of those provided" && KernelSel ;;
+	esac
+}
+
 Pacman_Locked() {
 	if [ -f /var/lib/pacman/db.lck ] || [ -f /mnt/var/lib/pacman/db.lck ]; then
 		echo -e " !!!ERROR!!! Pacman is blocked. \n We try to remove /var/lib/pacman/db.lck."
@@ -225,19 +237,6 @@ BootloaderSel () {
 	2|GRUB|grub) BLsel="grub" && echo "bootloader selected : grub" ;;
 	3|EFISTUB|efistub) BLsel="efistub" && echo "bootloader selected : efistub" ;;
 	*) echo "Wrong bootloader selected, try one of those provided" && BootloaderSel ;;
-	esac
-}
-
-
-KernelSel () {
-	echo -en "Enter preferred Kernel : 1) Stable 2) Longterm 3) Hardened 4) Zen \n"
-	read -r KSel
-	case $KSel in
-	1|Stable) KSel="linux" && echo "Kernel selected : linux" ;;
-	2|Longterm) KSel="linux-lts" && echo "Kernel selected : linux-lts" ;;
-	3|Hardened) KSel="linux-hardened" && echo "Kernel selected : linux-hardened" ;;
-	4|Zen) KSel="linux-zen" && echo "Kernel selected : linux-zen" ;;
-	*) echo "Wrong Kernel selected, try one of those provided" && KernelSel ;;
 	esac
 }
 
