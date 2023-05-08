@@ -267,11 +267,10 @@ InstallationSetup () {
 	for c in "${CheckandSetup[@]}"; do "$c" || SHOWerror "$c" ; done
 	if [ -v config ]; then
 		cat config
-		YesNoSel "Would you like to change the config manually (no will coint as editing it with nano)"
+		YesNoSel "Would you like to edit config file?"
 		case $CC in
-		1) SetupAvaible=1 && echo "Start again with your setup" ;;
-		0) SetupAvaible=0 && nano config && source config ;;
-		*) SHOWerror InstallationSetup ;;
+		1) SetupAvaible=0 && nano config && source config ;;
+		*) SetupAvaible=1 && echo "Start again with your setup" ;;
 		esac
 	fi
 	
@@ -299,7 +298,6 @@ InstallationSetup () {
 	YesNoSel "It's correct? Otherwise this will end"
 	case "$CC" in
 	1) rm config && for a in "${Steps[@]}"; do echo "$a" >> config ; done ;;
-	0) SHOWerror InstallationSetup ;;
 	*) SHOWerror InstallationSetup ;;
 	esac
 	#VoidSteps=(  )
