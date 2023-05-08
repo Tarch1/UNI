@@ -354,7 +354,7 @@ PKGcheck () {
 	kernel=("$KSel" linux-firmware "$KSel"-headers)
 	baselinux=(base base-devel)
 	baseutils=(man bash-completion kitty vim nano wget git)
-	fs=(dialog mtools parted gptfdisk dosfstools exfatprogs gvfs-mtp)
+	fs=(dialog mtools parted gptfdisk dosfstools exfat-utils gvfs-mtp)
 	bootloaderutility=(efibootmgr os-prober sbsigntools)
 	elogind=(elogind elogind-openrc openrc-settingsd)
 	btrfsutility=(snapper btrfs-progs)
