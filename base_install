@@ -301,7 +301,7 @@ InstallationSetup () {
 	for s in "${Personalization[@]}"; do "$s" || SHOWerror "$s" ; done
 
 	Steps=( "OSsel = $OSsel" "ARCHrepo = $ARCHrepo" "LOCsel = $LOCsel" "LANGsel = $LANGsel" "HNsel = $HNsel" "UNsel = $UNsel" "TZsel = $TZsel" "PIDsel = $PIDsel" "FSsel = $FSsel" "BLsel = $BLsel" )
-	cat "${Steps[@]}"
+	echo "${Steps[@]}"
 	YesNoSel "It's correct? Otherwise this will end"
 	case "$CC" in
 	1) rm config && for a in "${Steps[@]}"; do echo "$a" >> config ; done ;;
