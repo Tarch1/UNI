@@ -266,7 +266,7 @@ InstallationSetup () {
 	VBTsel=0 && SetupAvaible=1 && CheckandSetup=( Check_required_files UEFIsel CPUsel KernelSel GPUsel Pacman_Locked )
 	echo 'List of all errors during the installation progress:' > Errors
 	for c in "${CheckandSetup[@]}"; do "$c" || SHOWerror "$c" ; done
-	if [ -v config ]; then
+	if [[ -v config ]]; then
 		cat config && YesNoSel "It's correct?"
 		case "$CC" in 
 		1) SetupAvaible=0 &&  source config ;;
@@ -280,7 +280,7 @@ InstallationSetup () {
 		esac
 	fi
 	
-	if [ "$SetupAvaible" = 1 ]; then
+	if [[ "$SetupAvaible" = 1 ]]; then
 		OperatingSystemSel
 		if [[ "$OSsel" = Artix ]]; then ArchRepoSel ; fi
 		if [[ "$VBTsel" = 1 ]]; then
@@ -295,7 +295,7 @@ InstallationSetup () {
 			local Personalization=( LocalizationSel LanguageSel TimezoneSel HostnameSel UsernameSel PartIDSel FilesystemSel BootloaderSel )
 			ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' 'AdditionalDriveSetup' 'BaseSystemInstall' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'ServiceSetup' 'UserSetup' 'AudioSetup' 'BootloaderSetup' )
 		fi
-	elif [ "$SetupAvaible" = 0 ] && [ -v config ]; then echo 'Setup loaded'
+	elif [[ "$SetupAvaible" = 0 ]] && [[ -v config ]]; then echo 'Setup loaded'
 	else SHOWerror InstallationSetup
 	fi
 	
