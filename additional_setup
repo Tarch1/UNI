@@ -42,8 +42,7 @@ GPUsel () {
 			esac
 			AcpiOS="$(strings /sys/firmware/acpi/tables/DSDT | grep -i 'windows ' | sort | tail -1)" ;;
 		AMD) amddrivers=(amdgpu mesa vulkan-radeon libva-mesa-driver mesa-vdpau) ;;
-		WM) VBTsel=1 && echo "The default Mesa driver will be installed" ;;
-		Virtio) VBTsel=1 && echo "The default Mesa driver will be installed" ;;
+		VM|WM|Virtio) VBTsel=1 && echo "The default Mesa driver will be installed" ;;
 		*) echo "No $i gpu found" ;;
 		esac
 	done
