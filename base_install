@@ -284,7 +284,6 @@ InstallationSetup () {
 		OperatingSystemSel
 		if [[ "$OSsel" = Artix ]]; then ArchRepoSel ; fi
 		if [[ "$VBTsel" = 1 ]]; then
-			#Personalization=( OperatingSystemSel )
 			LANGsel='en_GB.UTF-8' && LOCsel='it_IT.UTF-8'
 			HNsel=tarch1 && UNsel=tarch1
 			TZsel='Europe/Rome'
@@ -299,6 +298,8 @@ InstallationSetup () {
 	else SHOWerror InstallationSetup
 	fi
 	
+	for s in "${Personalization[@]}"; do "$s" || SHOWerror "$s" ; done
+
 	Steps=( "OSsel = $OSsel" "ARCHrepo = $ARCHrepo" "LOCsel = $LOCsel" "LANGsel = $LANGsel" "HNsel = $HNsel" "UNsel = $UNsel" "TZsel = $TZsel" "PIDsel = $PIDsel" "FSsel = $FSsel" "BLsel = $BLsel" )
 	cat "${Steps[@]}"
 	YesNoSel "It's correct? Otherwise this will end"
@@ -307,9 +308,7 @@ InstallationSetup () {
 	0) SHOWerror InstallationSetup ;;
 	*) echo 'Not a good answer' && YesNoSel "It's correct? Otherwise this will end" ;;
 	esac
-	#VoidSteps=(  )
-	for s in "${Personalization[@]}"; do "$s" || SHOWerror "$s" ; done
-
+	
 	case "$OSsel" in
 	1|Arch|arch)
 		PKGmanager=pacman
