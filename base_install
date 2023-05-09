@@ -270,10 +270,12 @@ InstallationSetup () {
 		cat config && YesNoSel "It's correct?"
 		case "$CC" in 
 		1) SetupAvaible=0 &&  source config ;;
-		*) YesNoSel "Would you like to edit config file?"
+		0) YesNoSel "Would you like to edit config file?"
 			case $CC in
 			1) SetupAvaible=0 && nano config && source config ;;
-			*) SetupAvaible=1 && echo "Start again with your setup" ;;
+			0) SetupAvaible=1 && echo "Start again with your setup" ;;
+			*) echo 'Not a good answer' && YesNoSel "Would you like to edit config file?" ;;
+		*) echo 'Not a good answer' && YesNoSel "It's correct?" ;;
 		esac ;;
 		esac
 	fi
@@ -302,7 +304,8 @@ InstallationSetup () {
 	YesNoSel "It's correct? Otherwise this will end"
 	case "$CC" in
 	1) rm config && for a in "${Steps[@]}"; do echo "$a" >> config ; done ;;
-	*) SHOWerror InstallationSetup ;;
+	0) SHOWerror InstallationSetup ;;
+	*) echo 'Not a good answer' && YesNoSel "It's correct? Otherwise this will end" ;;
 	esac
 	#VoidSteps=(  )
 	for s in "${Personalization[@]}"; do "$s" || SHOWerror "$s" ; done
@@ -356,14 +359,13 @@ FinishInst () {
 	echo -e " INSTALLATION COMPLETED \n A copy of the script will be placed in your user home directory"
 	cp "$(pwd)"/Conf_files/bashrc /mnt/home/"$UNsel"/.bashrc
 	"$chroot" /mnt ln -frs /home/"$UNsel"/.bashrc /etc/bash/bashrc.d/"$UNsel".bashrc
+	mkdir -p /mnt/home/"$UNsel"
 	cp -r "$(pwd)" /mnt/home/"$UNsel"/
 	echo 'export MOZ_ENABLE_WAYLAND=1' > /mnt/home/"$UNsel"/.profile
 	cat Errors
 	# a means ugo > u='user that owns files' g='group that owns files' o='all other users' 
-	#chown -R "$UNsel": /mnt/home/"$UNsel"/"$(pwd)"
-	chown -R "$UNsel": /mnt/home
-	#find /mnt/home/"$UNsel"/"$(pwd)" -type d -exec chmod 755 {} \;
-	find /mnt/home/"$UNsel"/"$(pwd)" -type f -exec chmod 644 {} \;
+	chown -R "$UNsel" /mnt/home/"$UNsel"
+	#find /mnt/home/"$UNsel"/"$(pwd)" -type f -exec chmod 644 {} \; # or chmod 755
 	YesNoSel "Reboot system"
 	case "$CC" in
 	1)	umount "$DRIVE"?* && reboot ;;
