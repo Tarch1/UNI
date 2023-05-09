@@ -299,7 +299,7 @@ InstallationSetup () {
 	else SHOWerror InstallationSetup
 	fi
 	
-	Steps=( OSsel ARCHrepo LOCsel LANGsel HNsel UNsel TZsel PIDsel FSsel BLsel )
+	Steps=( "OSsel = $OSsel" "ARCHrepo = $ARCHrepo" "LOCsel = $LOCsel" "LANGsel = $LANGsel" "HNsel = $HNsel" "UNsel = $UNsel" "TZsel = $TZsel" "PIDsel = $PIDsel" "FSsel = $FSsel" "BLsel = $BLsel" )
 	cat "${Steps[@]}"
 	YesNoSel "It's correct? Otherwise this will end"
 	case "$CC" in
