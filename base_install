@@ -266,13 +266,13 @@ InstallationSetup () {
 	VBTsel=0 && SetupAvaible=1 && CheckandSetup=( Check_required_files UEFIsel CPUsel KernelSel GPUsel Pacman_Locked )
 	echo 'List of all errors during the installation progress:' > Errors
 	for c in "${CheckandSetup[@]}"; do "$c" || SHOWerror "$c" ; done
-	if [[ -v config ]]; then
+	if [[ -s config ]]; then
 		cat config && YesNoSel "It's correct?"
 		case "$CC" in 
 		1) SetupAvaible=0 &&  source config ;;
 		0) YesNoSel "Would you like to edit config file?"
 			case $CC in
-			1) SetupAvaible=0 && nano config && source config ;;
+			1) SetupAvaible=0 ; nano config ; source config ;;
 			0) SetupAvaible=1 && echo "Start again with your setup" ;;
 			*) echo 'Not a good answer' && YesNoSel "Would you like to edit config file?" ;;
 		*) echo 'Not a good answer' && YesNoSel "It's correct?" ;;
@@ -294,17 +294,17 @@ InstallationSetup () {
 			local Personalization=( LocalizationSel LanguageSel TimezoneSel HostnameSel UsernameSel PartIDSel FilesystemSel BootloaderSel )
 			ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' 'AdditionalDriveSetup' 'BaseSystemInstall' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'ServiceSetup' 'UserSetup' 'AudioSetup' 'BootloaderSetup' )
 		fi
-	elif [[ "$SetupAvaible" = 0 ]] && [[ -v config ]]; then echo 'Setup loaded'
+	elif [[ "$SetupAvaible" = 0 ]] && [[ -s config ]]; then echo 'Setup loaded'
 	else SHOWerror InstallationSetup
 	fi
 	
 	for s in "${Personalization[@]}"; do "$s" || SHOWerror "$s" ; done
 
-	Steps=( "OSsel = $OSsel" "ARCHrepo = $ARCHrepo" "LOCsel = $LOCsel" "LANGsel = $LANGsel" "HNsel = $HNsel" "UNsel = $UNsel" "TZsel = $TZsel" "PIDsel = $PIDsel" "FSsel = $FSsel" "BLsel = $BLsel" )
-	echo "${Steps[@]}"
+	Steps=( "OSsel=$OSsel" "ARCHrepo=$ARCHrepo" "LOCsel=$LOCsel" "LANGsel=$LANGsel" "HNsel=$HNsel" "UNsel=$UNsel" "TZsel=$TZsel" "PIDsel=$PIDsel" "FSsel=$FSsel" "BLsel=$BLsel" )
+	for a in "${Steps[@]}"; do echo "$a" ; done
 	YesNoSel "It's correct? Otherwise this will end"
 	case "$CC" in
-	1) rm config && for a in "${Steps[@]}"; do echo "$a" >> config ; done ;;
+	1) if [[ -e config ]]; then rm config ; else for a in "${Steps[@]}"; do echo "$a" >> config ; done ; fi;;
 	0) SHOWerror InstallationSetup ;;
 	*) echo 'Not a good answer' && YesNoSel "It's correct? Otherwise this will end" ;;
 	esac
