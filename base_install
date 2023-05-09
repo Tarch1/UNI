@@ -269,7 +269,7 @@ InstallationSetup () {
 	if [[ -s config ]]; then
 		cat config && YesNoSel "It's correct?"
 		case "$CC" in 
-		1) SetupAvaible=0 &&  source config ;;
+		1) SetupAvaible=0 ; source config ;;
 		0) YesNoSel "Would you like to edit config file?"
 			case $CC in
 			1) SetupAvaible=0 ; nano config ; source config ;;
@@ -294,11 +294,10 @@ InstallationSetup () {
 			local Personalization=( LocalizationSel LanguageSel TimezoneSel HostnameSel UsernameSel PartIDSel FilesystemSel BootloaderSel )
 			ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' 'AdditionalDriveSetup' 'BaseSystemInstall' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'ServiceSetup' 'UserSetup' 'AudioSetup' 'BootloaderSetup' )
 		fi
+		for s in "${Personalization[@]}"; do "$s" || SHOWerror "$s" ; done
 	elif [[ "$SetupAvaible" = 0 ]] && [[ -s config ]]; then echo 'Setup loaded'
 	else SHOWerror InstallationSetup
 	fi
-	
-	for s in "${Personalization[@]}"; do "$s" || SHOWerror "$s" ; done
 
 	Steps=( "OSsel=$OSsel" "ARCHrepo=$ARCHrepo" "LOCsel=$LOCsel" "LANGsel=$LANGsel" "HNsel=$HNsel" "UNsel=$UNsel" "TZsel=$TZsel" "PIDsel=$PIDsel" "FSsel=$FSsel" "BLsel=$BLsel" )
 	for a in "${Steps[@]}"; do echo "$a" ; done
