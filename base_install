@@ -201,6 +201,7 @@ UserSetup () {
 	"$chroot" /mnt echo -n "Type root "
 	"$chroot" /mnt passwd
 	mkdir -p /mnt/home/"$UNsel"/.config
+	"$chroot" /mnt chown -hR "$UNsel" /home/"$UNsel"
 }
 
 AudioSetup () {
