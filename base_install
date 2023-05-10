@@ -298,10 +298,10 @@ InstallationSetup () {
 		Steps=( "OSsel=$OSsel" "ARCHrepo=$ARCHrepo" "LOCsel=$LOCsel" "LANGsel=$LANGsel" "HNsel=$HNsel" "UNsel=$UNsel" "TZsel=$TZsel" "PIDsel=$PIDsel" "FSsel=$FSsel" "BLsel=$BLsel" )
 		if [[ -e config ]]; then rm config ; fi
 		for a in "${Steps[@]}"; do echo "$a" ; echo "$a" >> config ; done
-		YesNoSel "It's correct? Otherwise this will end"
+		YesNoSel "It's correct?"
 		case "$CC" in
-		1) echo 'OK' ;;
-		0) YesNoSel "Would you like to edit config file?"
+		1) echo 'If you say so...' ;;
+		0) YesNoSel "Would you like to edit config file? (Remember to save your config with CRTL+S)"
 			case $CC in
 			1) nano config ; source config ;;
 			0) "Then start again" && exit 1 ;;
@@ -312,7 +312,10 @@ InstallationSetup () {
 	elif [[ "$SetupAvaible" = 0 ]] && [[ -s config ]]; then echo 'Setup loaded'
 	else SHOWerror InstallationSetup
 	fi
-
+	if [[ "$VBTsel" = 1 ]]; then ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' 'BaseSystemInstall' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'ServiceSetup' 'UserSetup' 'BootloaderSetup' )
+	else ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' 'AdditionalDriveSetup' 'BaseSystemInstall' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'ServiceSetup' 'UserSetup' 'AudioSetup' 'BootloaderSetup' )
+	fi
+	
 	case "$OSsel" in
 	1|Arch|arch)
 		PKGmanager=pacman
