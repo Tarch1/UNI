@@ -92,6 +92,7 @@ ArchRepoSetup () {
 		"$PKGmanager"-key --populate archlinux
 		"$PKGmanager" -Sy
 	fi
+	if ! [[ -s /etc/pacman.d/mirrorlist-arch ]]; then "$PKGmanager" -Sy "${pkgskips[@]}" artix-archlinux-support ; fi
 }
 
 AnotherCheck () {
