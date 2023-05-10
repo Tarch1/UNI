@@ -88,8 +88,8 @@ FileSystemFormat () {
 				# Create Swapfile
 				SF=/mnt/"$c"/swapfile
 				truncate -s 0 "$SF"
-				chattr +C "$SF"
-				btrfs property set "$SF" compression none
+				chattr +mC "$SF" #m=no compression - C=no copyonwrite
+				#btrfs property set "$SF" compression none
 				fallocate -l 16G "$SF"
 				chmod 600 "$SF" || chmod 0600 "$SF"
 				mkswap "$SF"
