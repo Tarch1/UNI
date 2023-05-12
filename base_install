@@ -367,7 +367,7 @@ FinishInst () {
 	"$chroot" /mnt ln -frs /home/"$UNsel"/.bashrc /etc/bash/bashrc.d/"$UNsel".bashrc
 	mkdir -p /mnt/home/"$UNsel"
 	cp -r "$(pwd)" /mnt/home/"$UNsel"/
-	sed "s/ArchTixUser/$UNsel/g" /mnt/home/"$UNsel"/UNI/full_setup
+	sed -i "s/ArchTixUser/$UNsel/g" /mnt/home/"$UNsel"/UNI/full_setup
 	echo 'export MOZ_ENABLE_WAYLAND=1' > /mnt/home/"$UNsel"/.profile
 	cat Errors
 	# a means ugo > u='user that owns files' g='group that owns files' o='all other users' 
