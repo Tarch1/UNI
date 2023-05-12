@@ -8,7 +8,7 @@ ip a
 
 rfkill unblock all
 
-ip link interface up
+ip link set <<interface>> up
 
 connmanctl
 
