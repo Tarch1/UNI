@@ -71,7 +71,7 @@ FileSystemFormat () {
 		for b in "${SUBVolumes[@]}"; do	btrfs su cr /mnt/@"$b"; done
 		umount /mnt
 		mount -o defaults,"$options",subvol=@ "$ROOT_PART" /mnt
-		echo -e "$PIDsel=$ROOTID / btrfs $options,subvol=@$c 0 0" >> UNIfstab
+		echo -e "$PIDsel=$ROOTID / btrfs $options,subvol=@ 0 0" >> UNIfstab
 		for c in "${SUBVolumes[@]}"; do
 			case "$c" in
 			snapshots) mkdir -p /mnt/."$c"
