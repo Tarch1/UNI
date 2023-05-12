@@ -370,7 +370,7 @@ FinishInst () {
 	echo 'export MOZ_ENABLE_WAYLAND=1' > /mnt/home/"$UNsel"/.profile
 	cat Errors
 	# a means ugo > u='user that owns files' g='group that owns files' o='all other users' 
-	chown -R "$UNsel" /mnt/home/"$UNsel"
+	"$chroot" /mnt chown -hR "$UNsel" /home/"$UNsel"
 	#find /mnt/home/"$UNsel"/"$(pwd)" -type f -exec chmod 644 {} \; # or chmod 755
 	YesNoSel "Reboot system"
 	case "$CC" in
