@@ -101,7 +101,7 @@ and uncomment these 2 lines at the end of /etc/pipewire/pipewire.conf
     
        { path = "wireplumber"  args = "" }
 
-At the very end if either else not worked in /etc/pulse/client.conf change from yes to no
+At the very end if everything else not worked in /etc/pulse/client.conf change from yes to no
 
     autospawn = yes
     ;autospawn = yes
