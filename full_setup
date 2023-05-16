@@ -90,24 +90,28 @@ Environment () {
 	sudo ntpd -qg
 	echo "Time set"
 
-	###################-PIPEWIRE-###################
-  	cp -r /usr/share/pipewire /etc/
+	echo '###################-PIPEWIRE-###################'
+  	
+	cp -r /usr/share/pipewire /etc/
   	#mkdir ~/.config/autostart
   	#cp -r ~/UNI/Conf_files/pipewire/ ~/.config/autostart
   	
-	###################-COPYING-###################
+	echo '###################-COPYING-###################'
+	
 	DD=0
 	Folders=( '/media/internal_hdd/OS/Wallpapers/*' "$HOME/UNI/Conf_files/picom.conf" "$HOME/UNI/Conf_files/Dunst/*" "$HOME/UNI/Conf_files/Script/toggle-touchpad.sh" "$HOME/UNI/Conf_files/Script/low-battery.sh"
-	"$HOME/UNI/Conf_files/config.rasi" "$HOME/UNI/Conf_files/kitty.conf" "$HOME/UNI/Conf_files/Script/pfetch" "$HOME/UNI/Conf_files/nanorc" '/etc/X11/xinit/xinitrc' )
+		"$HOME/UNI/Conf_files/config.rasi" "$HOME/UNI/Conf_files/kitty.conf" "$HOME/UNI/Conf_files/Script/pfetch" "$HOME/UNI/Conf_files/nanorc" '/etc/X11/xinit/xinitrc' )
 	Destinations=( "$HOME/.wallpapers" "$HOME/.config/picom.conf" "$HOME/.config/dunst/" "$HOME/.config/toggle-touchpad.sh" "$HOME/.config/low-battery.sh"
-	"$HOME/.config/rofi/config.rasi" "$HOME/.config/kitty/kitty.conf" "$HOME/.pfetch" "$HOME/.nanorc" "$HOME/.xinitrc" )
+		"$HOME/.config/rofi/config.rasi" "$HOME/.config/kitty/kitty.conf" "$HOME/.pfetch" "$HOME/.nanorc" "$HOME/.xinitrc" )
 	for a in "${Folders[@]}"; do cp a "${Destinations[DD]}" ; DD="$(DD+1)" ; done
 	echo 'Xft.dpi: 90' | tee -a ~/.Xdefaults > /dev/null
 	echo "light -S 30" | sudo tee -a ~/.xprofile > /dev/null
 	sudo cp ~/UNI/Conf_files/40-libinput.conf /usr/share/X11/xorg.conf.d/40-libinput.conf
 	sudo ln -s /usr/share/X11/xorg.conf.d/40-libinput.conf /etc/X11/xorg.conf.d/40-libinput.conf
 	sudo cp ~/UNI/Conf_files/90-backlight.rules /usr/lib/udev/rules.d/90-backlight.rules
-	###################-PERMISSIONS-###################
+	
+	echo '###################-PERMISSIONS-###################'
+	
 	chmod +x ~/.xinitrc ~/.config/toggle-touchpad.sh ~/.config/dunst/dunst-color.sh ~/.config/low-battery.sh ~/.pfetch
 }
 
