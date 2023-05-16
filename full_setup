@@ -52,11 +52,11 @@ Snapper () {
 }
 
 Trizen () {
-  git clone https://aur.archlinux.org/trizen.git /home/ArchTixUser/Trizen
-  cd /home/ArchTixUser/Trizen || exit
-  makepkg -si
-  trizen -Syu heimdall-grimler-git
-  #clapper phinger-cursors bibata-cursor-translucent steamtinkerlaunch betterlockscreen
+	git clone https://aur.archlinux.org/trizen.git /home/ArchTixUser/Trizen
+	cd /home/ArchTixUser/Trizen || exit
+	makepkg -si
+	trizen -Syu heimdall-grimler-git
+	#clapper phinger-cursors bibata-cursor-translucent steamtinkerlaunch betterlockscreen
 }
 
 GNOME () {
@@ -72,8 +72,8 @@ GNOME () {
 	chmod +x ~/.pfetch
 	cp -r /usr/share/pipewire /home/ArchTixUser/.config
 	sed -i '/#{ path = "\/usr\/bin\/pipewire-media-session" args = ""/ s/\/usr\/bin\/pipewire-media-session/wireplumber/' /home/ArchTixUser/.config/pipewire/pipewire.conf
-	sed -i '/#{ path = "\/usr\/bin\/wireplumber" args = ""/ s/#//' /home/ArchTixUser/.config/pipewire/pipewire.conf
-	sed -i '/#{ path = "\/usr\/bin\/pipewire" args = "-c pipewire-pulse.conf" / s/#//' /home/ArchTixUser/.config/pipewire/pipewire.conf
+	sed -i '/#{ path = "\/usr\/bin\/pipewire" args = "-c pipewire-pulse.conf"/ s/#//' /home/ArchTixUser/.config/pipewire/pipewire.conf
+	sed -i '/#{ path = "wireplumber" args = ""/ s/#//' /home/ArchTixUser/.config/pipewire/pipewire.conf
 	cp -r ~/UNI/Conf_files/Pipewire/* ~/.config/autostart 
 	#sudo cp -r ~/UNI/Conf_files/Pipewire/* /etc/xdg/autostart/
 	sudo rc-update add gdm default
@@ -86,39 +86,30 @@ Environment () {
 	sed 's/#{ path = "/usr/bin/pipewire-media-session" args = "" }/{ path = "wireplumber"  args = "" }/' /mnt/home/ArchTixUser/.config
 	sed '/#{ path = "/usr/bin/pipewire" args = "-c pipewire-pulse.conf" }/ s/#//' /mnt/home/ArchTixUser/.config/pipewire/pipewire.conf
 
-  sudo pacman -S ttf-roboto rofi sxiv feh python-pywal lxappearance kalgebra imagemagick pacman-contrib slock dunst tcl tk --noconfirm
-  mkdir -p ~/{.wallpapers,.config/{kitty,polybar,rofi,dunst}}
-  
-  sudo ntpd -qg
-  echo "Time set"
-  
-  ###################-PIPEWIRE-###################
-  
-  cp -r /usr/share/pipewire /etc/
-  # mkdir ~/.config/autostart
-  # cp -r ~/UNI/Conf_files/pipewire/ ~/.config/autostart
-  
-  ###################-COPYING-###################
-  
-  cp -r /media/internal_hdd/OS/Wallpapers/* ~/.wallpapers
-  cp ~/UNI/Conf_files/picom.conf ~/.config/picom.conf
-  cp ~/UNI/Conf_files/Dunst/* ~/.config/dunst/ 
-  cp ~/UNI/Conf_files/Script/toggle-touchpad.sh ~/.config/toggle-touchpad.sh
-  cp ~/UNI/Conf_files/Script/low-battery.sh ~/.config/low-battery.sh
-  cp ~/UNI/Conf_files/config.rasi ~/.config/rofi/config.rasi
-  cp ~/UNI/Conf_files/kitty.conf ~/.config/kitty/kitty.conf
-  cp ~/UNI/Conf_files/Script/pfetch ~/.pfetch
-  cp ~/UNI/Conf_files/nanorc ~/.nanorc
-  cp /etc/X11/xinit/xinitrc ~/.xinitrc
-  echo 'Xft.dpi: 90' | tee -a ~/.Xdefaults > /dev/null
-  echo "light -S 30" | sudo tee -a ~/.xprofile > /dev/null
-  sudo cp ~/UNI/Conf_files/40-libinput.conf /usr/share/X11/xorg.conf.d/40-libinput.conf
-  sudo ln -s /usr/share/X11/xorg.conf.d/40-libinput.conf /etc/X11/xorg.conf.d/40-libinput.conf
-  sudo cp ~/UNI/Conf_files/90-backlight.rules /usr/lib/udev/rules.d/90-backlight.rules
-  
-  ###################-PERMISSIONS-###################
-  
-  chmod +x ~/.xinitrc ~/.config/toggle-touchpad.sh ~/.config/dunst/dunst-color.sh ~/.config/low-battery.sh ~/.pfetch
+	sudo pacman -S ttf-roboto rofi sxiv feh python-pywal lxappearance kalgebra imagemagick pacman-contrib slock dunst tcl tk --noconfirm
+	mkdir -p ~/{.wallpapers,.config/{kitty,polybar,rofi,dunst}}
+	sudo ntpd -qg
+	echo "Time set"
+
+	###################-PIPEWIRE-###################
+  	cp -r /usr/share/pipewire /etc/
+  	#mkdir ~/.config/autostart
+  	#cp -r ~/UNI/Conf_files/pipewire/ ~/.config/autostart
+  	
+	###################-COPYING-###################
+	DD=0
+	Folders=( '/media/internal_hdd/OS/Wallpapers/*' "$HOME/UNI/Conf_files/picom.conf" "$HOME/UNI/Conf_files/Dunst/*" "$HOME/UNI/Conf_files/Script/toggle-touchpad.sh" "$HOME/UNI/Conf_files/Script/low-battery.sh"
+	"$HOME/UNI/Conf_files/config.rasi" "$HOME/UNI/Conf_files/kitty.conf" "$HOME/UNI/Conf_files/Script/pfetch" "$HOME/UNI/Conf_files/nanorc" '/etc/X11/xinit/xinitrc' )
+	Destinations=( "$HOME/.wallpapers" "$HOME/.config/picom.conf" "$HOME/.config/dunst/" "$HOME/.config/toggle-touchpad.sh" "$HOME/.config/low-battery.sh"
+	"$HOME/.config/rofi/config.rasi" "$HOME/.config/kitty/kitty.conf" "$HOME/.pfetch" "$HOME/.nanorc" "$HOME/.xinitrc" )
+	for a in "${Folders[@]}"; do cp a "${Destinations[DD]}" ; DD="$(DD+1)" ; done
+	echo 'Xft.dpi: 90' | tee -a ~/.Xdefaults > /dev/null
+	echo "light -S 30" | sudo tee -a ~/.xprofile > /dev/null
+	sudo cp ~/UNI/Conf_files/40-libinput.conf /usr/share/X11/xorg.conf.d/40-libinput.conf
+	sudo ln -s /usr/share/X11/xorg.conf.d/40-libinput.conf /etc/X11/xorg.conf.d/40-libinput.conf
+	sudo cp ~/UNI/Conf_files/90-backlight.rules /usr/lib/udev/rules.d/90-backlight.rules
+	###################-PERMISSIONS-###################
+	chmod +x ~/.xinitrc ~/.config/toggle-touchpad.sh ~/.config/dunst/dunst-color.sh ~/.config/low-battery.sh ~/.pfetch
 }
 
 DisplayManager () {
