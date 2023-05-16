@@ -74,7 +74,8 @@ GNOME () {
 	sed -i '/#{ path = "\/usr\/bin\/pipewire-media-session" args = ""/ s/\/usr\/bin\/pipewire-media-session/wireplumber/' /home/ArchTixUser/.config/pipewire/pipewire.conf
 	sed -i '/#{ path = "\/usr\/bin\/pipewire-media-session" args = ""/ s/#//' /home/ArchTixUser/.config/pipewire/pipewire.conf
 	sed -i '/#{ path = "\/usr\/bin\/pipewire" args = "-c pipewire-pulse.conf" / s/#//' /home/ArchTixUser/.config/pipewire/pipewire.conf
-	sudo cp -r ~/UNI/Conf_files/Pipewire/ ~/.config/autostart /etc/xdg/autostart/
+	cp -r ~/UNI/Conf_files/Pipewire/* ~/.config/autostart 
+	#sudo cp -r ~/UNI/Conf_files/Pipewire/* /etc/xdg/autostart/
 	sudo rc-update add gdm default
 	sudo systemctl enable gdm
 	echo "MOZ_ENABLE_WAYLAND=1" | sudo tee -a /etc/environment > /dev/null
