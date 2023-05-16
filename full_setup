@@ -11,14 +11,13 @@ Check_required_files () {
 }
 
 Installation () {
-	local Steps=( 'Snapper' 'Trizen' GNOME 'Environment' 'DisplayManager' 'WindowManager' )
+	local Steps=( Snapper Trizen GNOME Environment DisplayManager WindowManager )
 	T=0
 	for i in "${Steps[@]}"; do
 		YesNoSel "You want $i ?"
 		case "$CC" in
 		1) echo yes ;;
 		0) echo "Skipping $i" && unset 'Steps[T]' ;;
-		*) echo 'Wrong choice' && Installation ;;
 		esac
 		T=$((T+1))
 	done
@@ -113,46 +112,46 @@ Environment () {
 }
 
 DisplayManager () {
-  sudo -- bash -c "
-  pacman -Sy lightdm lightdm-openrc lightdm-webkit2-greeter lightdm-webkit-theme-litarvan
-  sed -i 's/#greeter-session=example-gtk-gnome/greeter-session=lightdm-webkit2-greeter/' /etc/lightdm/lightdm.conf
-  sed -i 's/antergos/litarvan/g' /etc/lightdm/lightdm-webkit2-greeter.conf
-  rc-update add lightdm default
-  systemctl enable lightdm
-  "
+	sudo -- bash -c "
+	pacman -Sy lightdm lightdm-openrc lightdm-webkit2-greeter lightdm-webkit-theme-litarvan
+	sed -i 's/#greeter-session=example-gtk-gnome/greeter-session=lightdm-webkit2-greeter/' /etc/lightdm/lightdm.conf
+	sed -i 's/antergos/litarvan/g' /etc/lightdm/lightdm-webkit2-greeter.conf
+	rc-update add lightdm default
+	systemctl enable lightdm
+	"
 }
 
 function WindowManager () {
-  read -rp "What setup you want? [bspwm herbstluftwm xmonad polybar] " SS
-  case $SS in
-    bspwm ) sudo pacman -S bspwm sxhkd --noconfirm
-            mkdir ~/.config/{bspwm,sxhkd}
-            cp ~/UNI/Conf_files/Bspwm/sxhkdrc ~/.config/sxhkd/sxhkdrc
-            cp ~/UNI/Conf_files/Bspwm/bspwmrc ~/.config/bspwm/bspwmrc
-            chmod +x ~/.config/sxhkd/sxhkdrc ~/.config/bspwm/bspwmrc
-    ;;
-    herbstluftwm ) sudo pacman -S herbstluftwm --noconfirm
-                   mkdir ~/.config/herbstluftwm
-                   cp ~/UNI/Conf_files/Herbstluftwm/autostart ~/.config/herbstluftwm/
-                   chmod +x ~/.config/herbstluftwm/autostart
-    ;;
-    xmonad )  sudo pacman -S xmonad xmonad-contrib xmobar --noconfirm
-              mkdir ~/.xmonad
-              cp ~/UNI/Conf_files/Xmonad/xmonad.hs ~/.xmonad/xmonad.hs
-              cp ~/UNI/Conf_files/Xmonad/xmobarrc ~/.xmobarrc
-    ;;
-    polybar ) sudo pacman -S xdotool xorg-xwininfo xorg-xev  --noconfirm
-              trizen -S polybar
-              mkdir ~/.config/polybar
-              cp ~/UNI/Conf_files/Polybar/* ~/.config/polybar/
-              chmod +x ~/.config/polybar/launch.sh ~/.config/polybar/hide
-    ;;
-    *) echo "Wrong choice, type again" && WindowManager
-    ;;
-  esac
-
-  YesNoSel "Want another WindowManager?"
-  if [ "$CC" = 1 ]; then WindowManager ; else echo 'Finished installation' ; fi
+	read -rp "What setup you want? [bspwm herbstluftwm xmonad polybar] " SS
+	case $SS in
+	bspwm ) sudo pacman -S bspwm sxhkd --noconfirm
+		mkdir ~/.config/{bspwm,sxhkd}
+		cp ~/UNI/Conf_files/Bspwm/sxhkdrc ~/.config/sxhkd/sxhkdrc
+		cp ~/UNI/Conf_files/Bspwm/bspwmrc ~/.config/bspwm/bspwmrc
+		chmod +x ~/.config/sxhkd/sxhkdrc ~/.config/bspwm/bspwmrc
+	;;
+	herbstluftwm ) sudo pacman -S herbstluftwm --noconfirm
+		mkdir ~/.config/herbstluftwm
+		cp ~/UNI/Conf_files/Herbstluftwm/autostart ~/.config/herbstluftwm/
+		chmod +x ~/.config/herbstluftwm/autostart
+	;;
+	xmonad )  sudo pacman -S xmonad xmonad-contrib xmobar --noconfirm
+		mkdir ~/.xmonad
+		cp ~/UNI/Conf_files/Xmonad/xmonad.hs ~/.xmonad/xmonad.hs
+		cp ~/UNI/Conf_files/Xmonad/xmobarrc ~/.xmobarrc
+	;;
+	polybar ) sudo pacman -S xdotool xorg-xwininfo xorg-xev  --noconfirm
+		trizen -S polybar
+		mkdir ~/.config/polybar
+		cp ~/UNI/Conf_files/Polybar/* ~/.config/polybar/
+		chmod +x ~/.config/polybar/launch.sh ~/.config/polybar/hide
+	;;
+	*) echo "Wrong choice, type again" && WindowManager
+	;;
+	esac
+	
+	YesNoSel "Want another WindowManager?"
+	if [ "$CC" = 1 ]; then WindowManager ; else echo 'Finished installation' ; fi
 }
 Check_required_files
 Installation
