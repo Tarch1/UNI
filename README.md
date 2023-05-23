@@ -69,6 +69,8 @@ Icons and cursor theme
 	or Extract from secondary drive in /OS/Linux/ the theme inside /home/tarch1/.local/share/icons
 
 Install Bottles from Flatpak for managing Windows apps. 
+	
+For Firefox use https://github.com/rafaelmardojai/firefox-gnome-theme
 
 TROUBLESHOOTIG
 
