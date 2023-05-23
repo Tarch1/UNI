@@ -64,7 +64,9 @@ A list of useful gnome extension:
 
 Icons and cursor theme
     
-    Extract from secondary drive in /OS/Linux/ the theme inside /home/tarch1/.local/share/icons
+	Use https://github.com/vinceliuice/Fluent-icon-theme
+	
+	or Extract from secondary drive in /OS/Linux/ the theme inside /home/tarch1/.local/share/icons
 
 Install Bottles from Flatpak for managing Windows apps. 
 
