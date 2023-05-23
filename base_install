@@ -187,7 +187,7 @@ KernelSetup () {
 	fi
 	#case "$IRFSetup" in
 	#booster) "$chroot" /mnt "$PKGmanager" -Syu booster 
-	#	echo -e "mount_timeout: 10s xtra_files: fsck,fsck.$FSsel \nvconsole: true \nenable_lvm: true" >> /etc/booster.yaml ;;
+	#	echo -e "mount_timeout: 10s extra_files: fsck,fsck.$FSsel \nvconsole: true \nenable_lvm: true" >> /mnt/etc/booster.yaml ;;
 	#dracut) ;;
 	#mkinitcpio) sed -i "/MODULES/ s/()/(${modules[*]})/" /mnt/etc/mkinitcpio.conf
 	#	sed -i "/BINARIES/ s/()/($binaries)/" /mnt/etc/mkinitcpio.conf
