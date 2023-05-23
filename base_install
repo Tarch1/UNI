@@ -185,6 +185,13 @@ KernelSetup () {
 		echo -e "options nvidia-drm modeset=1 \noptions nvidia \"NVreg_DynamicPowerManagement=0x02\"" >> /mnt/etc/modprobe.d/nvidia.conf
 		HOOKS+=(kms)
 	fi
+	#case "$IRFSetup" in
+	#booster) "$chroot" /mnt "$PKGmanager" -Syu booster ;;
+	#dracut) ;;
+	#mkinitcpio) sed -i "/MODULES/ s/()/(${modules[*]})/" /mnt/etc/mkinitcpio.conf
+	#	sed -i "/BINARIES/ s/()/($binaries)/" /mnt/etc/mkinitcpio.conf
+	#	sed -i "s/^HOOKS.*/HOOKS=(${HOOKS[*]})/" /mnt/etc/mkinitcpio.conf ;;
+	#esac
 	sed -i "/MODULES/ s/()/(${modules[*]})/" /mnt/etc/mkinitcpio.conf
 	sed -i "/BINARIES/ s/()/($binaries)/" /mnt/etc/mkinitcpio.conf
 	sed -i "s/^HOOKS.*/HOOKS=(${HOOKS[*]})/" /mnt/etc/mkinitcpio.conf
