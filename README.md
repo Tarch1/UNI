@@ -46,15 +46,15 @@ DISABLING INTEL TURBO BOOST - https://wiki.archlinux.org/title/CPU_frequency_sca
 
 In case of error with gdm use Ctrl+Alt+F2
 
-    Increase volume steps by: (less value = more steps)
+Increase volume steps by: (less value = more steps)
 
         gsettings set org.gnome.settings-daemon.plugins.media-keys volume-step 1
 
-   Remove shortcut that coz with super+($number) with: 
+Remove shortcut that coz with super+($number) with: 
      
         for i in {1..9}; do gsettings set "org.gnome.shell.keybindings" "switch-to-application-$i" "[]"; done
 
-    and check that they are properly unset with:
+and check that they are properly unset with:
     
         gsettings list-recursively | grep switch-to-application | sort
 
@@ -64,7 +64,7 @@ A list of useful gnome extension:
 
 Icons and cursor theme
     
-	Use https://github.com/vinceliuice/Fluent-icon-theme
+Use https://github.com/vinceliuice/Fluent-icon-theme
 	
 	or Extract from secondary drive in /OS/Linux/ the theme inside /home/tarch1/.local/share/icons
 
@@ -85,11 +85,11 @@ If /etc/pipewire/ folder and its contents doesn't exist run
     cp -r /usr/share/pipewire /etc/
     cp -r /usr/share/wireplumber /etc/
 
-    than be sure /home/!!!your username!!!/.config/autostart/pipewire.desktop exist in case copy it :
+than be sure /home/!!!your username!!!/.config/autostart/pipewire.desktop exist in case copy it :
 
     cp ~/UNI/Conf_files/Pipewire/pipewire.desktop ~/.config/autostart/
  
-    if you have installed pipewire-media-session comment out at the Exec inside ~/.config/autostart/pipewire.desktop
+if you have installed pipewire-media-session comment out at the Exec inside ~/.config/autostart/pipewire.desktop
  
     ###& /usr/bin/pipewire-media-session
 
