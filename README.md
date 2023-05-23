@@ -108,5 +108,7 @@ At the very end if everything else not worked in /etc/pulse/client.conf change f
 	
 	
 EXTRA
+	
 Steam launch script for dlss and RT
+	
 	PROTON_ENABLE_NVAPI=1 VKD3D_CONFIG=dxr11 VKD3D_FEATURE_LEVEL=12_1 %command%	
