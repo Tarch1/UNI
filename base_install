@@ -193,7 +193,7 @@ KernelSetup () {
 	#mkinitcpio) sed -i "/MODULES/ s/()/(${modules[*]})/" /mnt/etc/mkinitcpio.conf
 	#	sed -i "/BINARIES/ s/()/($binaries)/" /mnt/etc/mkinitcpio.conf
 	#	sed -i "s/^HOOKS.*/HOOKS=(${HOOKS[*]})/" /mnt/etc/mkinitcpio.conf
-		"$chroot" /mnt mkinitcpio -p "$KSel";;
+	#	"$chroot" /mnt mkinitcpio -p "$KSel";;
 	#esac
 	sed -i "/MODULES/ s/()/(${modules[*]})/" /mnt/etc/mkinitcpio.conf
 	sed -i "/BINARIES/ s/()/($binaries)/" /mnt/etc/mkinitcpio.conf
