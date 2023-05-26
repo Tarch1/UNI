@@ -188,8 +188,7 @@ KernelSetup () {
 	#case "$IRFSetup" in
 	#booster) "$chroot" /mnt "$PKGmanager" -Syu booster 
 	#	echo -e "mount_timeout: 10s \nextra_files: fsck,fsck.$FSsel,busybox \nvconsole: true \nenable_lvm: true" >> /mnt/etc/booster.yaml
-		"$chroot" /mnt /usr/lib/booster/regenerate_images
-		sed -i '';;
+	#	"$chroot" /mnt /usr/lib/booster/regenerate_images ;;
 	#dracut) ;;
 	#mkinitcpio) sed -i "/MODULES/ s/()/(${modules[*]})/" /mnt/etc/mkinitcpio.conf
 	#	sed -i "/BINARIES/ s/()/($binaries)/" /mnt/etc/mkinitcpio.conf
@@ -228,6 +227,7 @@ AudioSetup () {
 BootloaderSetup () {
 	case "$BLsel" in
 	1|REFIND|Refind|refind)
+		irfs=initramfs
 		"$chroot" /mnt "$PKGmanager" -Sy "${pkgskips[@]}" "${refindpkg[@]}"
 		"$chroot" /mnt refind-install
 		sed -i "/ucode.img/ s/ucode/$microcodepkg/g" ../UNI/Bootloader/Refind/refind_linux.conf
@@ -240,7 +240,8 @@ BootloaderSetup () {
 		cp -r ../UNI/Bootloader/Refind/themes/* /mnt/boot/EFI/"$efifolder"/themes/
 		if [ "$FSsel" = btrfs ]; then rootflags='rootflagssubvol=@' ; fi
 		if [[ -v nvidiadrivers ]]; then drm='nvidia-drm.modeset=1' ; fi #osi="acpi_osi=! \"acpi_osi=$AcpiOS\""
-		echo "\"Standard Boot\"   \"ro root=$ROOTID rootfstype=$FSsel $rootflags initrd=$microcodepkg.img initrd=initramfs-$KSel.img $drm\"" >> /mnt/boot/refind_linux.conf
+		if [[ "$IRFSetup" = booster ]]; then irfs=booster ; fi
+		echo "\"Standard Boot\"   \"ro root=$ROOTID rootfstype=$FSsel $rootflags initrd=$microcodepkg.img initrd=$irfs-$KSel.img $drm\"" >> /mnt/boot/refind_linux.conf
 		echo '!!!Refind config and theme changed!!!'
 	;;
 	2|GRUB|Grub|grub)
