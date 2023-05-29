@@ -345,6 +345,7 @@ InstallationSetup () {
 		sed -i 's/-openrc//g' ../UNI/full_setup
 		sed -i '/\[multilib]/,/mirrorlist/ s/#//' /etc/pacman.conf
 		pacman -Sylq core extra community multilib | sort > pacman_db
+		echo 'Running check for missing packages'
 		PKGcheck
 		for a in "${ArchTixSteps[@]}"; do "$a" || SHOWerror "$a" ; done
 	;;
@@ -364,6 +365,7 @@ InstallationSetup () {
 		pacman -Sylq system world galaxy lib32 universe extra community multilib | sort > pacman_db
 		else pacman -Sylq system world galaxy lib32 | sort > pacman_db
 		fi
+		echo 'Running check for missing packages'
 		PKGcheck
 		for a in "${ArchTixSteps[@]}"; do "$a" || SHOWerror "$a" ; done
 	;;
