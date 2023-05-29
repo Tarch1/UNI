@@ -22,7 +22,7 @@ connmanctl
 
 	quit
 
-git clone https://github.com/Tarch1/Arch-tix
+git clone https://github.com/Tarch1/UNI
 
 cd Arch-tix/
 
