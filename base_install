@@ -460,6 +460,7 @@ PKGcheck () {
 		*) echo "Do again please" && PkgMissed ;;
 		esac
 	fi
+	echo "For debug PKGcheck! A=$a B=$b C=$c"
 }
 InstallationSetup
 cat Errors
