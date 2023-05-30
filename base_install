@@ -111,8 +111,8 @@ FileSystemFormat () {
 
 AdditionalDriveSetup () {
 	if [ -v "$ADDITIONAL_DRIVE" ]; then
-	mkdir -p /mnt/run/"$HNsel"/media/{HDD,USB}
-	mount "$ADDITIONAL_DRIVE" /mnt/run/"$HNsel"/media/HDD
+	mkdir -p /mnt/run/media/"$HNsel"/{HDD,USB}
+	mount "$ADDITIONAL_DRIVE" /mnt/run/media/"$HNsel"/HDD
 	fi
 }
 
