@@ -31,11 +31,11 @@ DiskPartition () {
 	sgdisk -ozZ "$DRIVE"
 	parted -sf "$DRIVE" mktable gpt mkpart "ESP" 0% 1% mkpart "LINUX-HOME" 1% 100% set 1 esp on set 2 linux-home on
 	if echo "$DRIVE" | grep "^/dev/[a-z]d[a-z]"; then
-	BOOT_PART="$DRIVE"1 && ROOT_PART="$DRIVE"2 && DEVICE="${DRIVE#/*/}"
+	BOOT_PART="$DRIVE"1 ; ROOT_PART="$DRIVE"2 ; DEVICE="${DRIVE#/*/}"
 	elif echo "$DRIVE" | grep "^/dev/nvme"; then
-	BOOT_PART="$DRIVE"p1 && ROOT_PART="$DRIVE"p2 && DEVICE="${DRIVE#/*/}" #printf -v BOOT_PART "%sp1" "$DRIVE"
+	BOOT_PART="$DRIVE"p1 ; ROOT_PART="$DRIVE"p2 ; DEVICE="${DRIVE#/*/}" #printf -v BOOT_PART "%sp1" "$DRIVE"
 	elif echo "$DRIVE" | grep "^/dev/mmc"; then
-	BOOT_PART="$DRIVE"1 && ROOT_PART="$DRIVE"2 && DEVICE="${DRIVE#/*/}"
+	BOOT_PART="$DRIVE"1 ; ROOT_PART="$DRIVE"2 ; DEVICE="${DRIVE#/*/}"
 	fi
 	echo DRIVE="$DRIVE" DEVICE="$DEVICE" && if [[ -z $DRIVE || -z $DEVICE ]]; then exit 1 ;
 	else echo 'We can proceed with the formatting of file system' ; fi
@@ -82,15 +82,16 @@ FileSystemFormat () {
 				mount -o "$options",subvol=@"$c" "$ROOT_PART" /mnt/var/log
 				echo -e "$PIDsel=$ROOTID /var/log btrfs $options,subvol=@$c 0 0" >> UNIfstab
 			;;
-			swap) mkdir -p /mnt/"$c"
-				mount -o compress=no,space_cache,ssd,discard=async,subvol=@"$c" "$ROOT_PART" /mnt/var/log
-				echo -e "$PIDsel=$ROOTID /var/log btrfs $options,subvol=@$c 0 0" >> UNIfstab
+			swap) mkdir -p /mnt/swap
+				mount -o compress=no,space_cache,ssd,discard=async,subvol=@swap "$ROOT_PART" /mnt/swap
+				echo -e "$PIDsel=$ROOTID /swap btrfs $options,subvol=@$c 0 0" >> UNIfstab
 				# Create Swapfile
-				SF=/mnt/"$c"/swapfile
+				#touch /swap/swapfile
+				SF=/mnt/swap/swapfile
 				truncate -s 0 "$SF"
 				chattr +mC "$SF" #m=no compression - C=no copyonwrite
 				#btrfs property set "$SF" compression none
-				fallocate -l 16G "$SF"
+				dd if=/dev/zero of="$SF" bs=1M count=16384 #fallocate -l 16G "$SF"
 				chmod 600 "$SF" || chmod 0600 "$SF"
 				mkswap "$SF"
 				swapon "$SF"
