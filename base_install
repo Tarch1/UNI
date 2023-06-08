@@ -321,7 +321,7 @@ InstallationSetup () {
 		0) YesNoSel "Would you like to edit config file? (Remember to save your config with CRTL+S)"
 			case $CC in
 			1) nano config ; source config ;;
-			0) "Then start again" && exit 1 ;;
+			0) "Then start again" && SHOWerror "Second attempt";;
 			*) echo 'Not a good answer' && YesNoSel "Would you like to edit config file?"
 			esac ;;
 		*) echo 'Not a good answer' && YesNoSel "It's correct? Otherwise this will end" ;;
