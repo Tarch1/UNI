@@ -42,9 +42,7 @@ DiskPartition () {
 	else echo 'We can proceed with the formatting of file system' ; fi
 	BOOTID="$(blkid -s "$PIDsel" -o value "$BOOT_PART")"
 	ROOTID="$(blkid -s "$PIDsel" -o value "$ROOT_PART")"
-	echo BP="$BOOT_PART" RP="$ROOT_PART" PID="$PIDsel"
-	echo "${PIDsel}"_BOOT="$BOOTID" "${PIDsel}"_ROOT="$ROOTID"
-	echo -e " ${PIDsel}_BOOT=$BOOTID \n ${PIDsel}_ROOT=$ROOTID"
+	echo -e " BP=$BOOT_PART RP=$ROOT_PART PID=$PIDsel \n ${PIDsel}_BOOT=$BOOTID \n ${PIDsel}_ROOT=$ROOTID "
 	lsblk -f
 }
 
