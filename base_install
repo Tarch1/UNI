@@ -161,7 +161,6 @@ PackageConfig () {
 }
 
 PackageInstall () {
-	local HOOKS=(base udev autodetect modconf block usr resume filesystems keyboard keymap fsck)
 	local EssentialPKG=( "${microcode[@]}"  "${kernel[@]}" "${baselinux[@]}" "${baseutils[@]}" "${bootloaderutility[@]}" "${fs[@]}" "${amddrivers[@]}" "${nvidiadrivers[@]}"  "${net[@]}" )
 	local AdditionalPKG=( "${audio[@]}" "${bluetooth[@]}" "${android[@]}" "${print[@]}" "${utility[@]}" "${hardwareacceleration[@]}" "${vulkan[@]}" "${vulkanlib32[@]}" "${apps[@]}" )
 	local ExtraPKG=( "${filemanager[@]}" "${archive[@]}" "${xorg[@]}" )
@@ -171,6 +170,7 @@ PackageInstall () {
 }
 
 KernelSetup () {
+	local HOOKS=(base udev autodetect modconf block usr resume filesystems keyboard keymap fsck)
 	case "$microcodepkg" in
 	intel-ucode) echo -e 'options i915 enable_fbc=1 fastboot=0 enable_dc=4' >> /mnt/etc/modprobe.d/i915.conf
 	;;
