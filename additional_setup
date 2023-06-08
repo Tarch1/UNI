@@ -26,7 +26,7 @@ CPUsel () {
 
 GPUsel () {
 	echo " Detecting video chipset "
-	readarray -t Gsel < <(lspci | grep VGA | grep -Eo 'VM|Virtio|NVIDIA|Intel|AMD')
+	readarray -t Gsel < <(lspci | grep VGA | grep -Eo 'VM|Virtio|QXL|NVIDIA|Intel|AMD')
 	for i in "${Gsel[@]}"; do
 		case "$i" in
 		Intel) echo "The default Mesa driver will be installed" ;;
@@ -42,7 +42,7 @@ GPUsel () {
 			esac
 			AcpiOS="$(strings /sys/firmware/acpi/tables/DSDT | grep -i 'windows ' | sort | tail -1)" ;;
 		AMD) amddrivers=(amdgpu mesa vulkan-radeon libva-mesa-driver mesa-vdpau) ;;
-		VM|WM|Virtio) VBTsel=1 && echo "The default Mesa driver will be installed" ;;
+		VM|WM|Virtio|QXL) VBTsel=1 && echo "The default Mesa driver will be installed" ;;
 		*) echo "No $i gpu found" ;;
 		esac
 	done
