@@ -382,8 +382,8 @@ InstallationSetup () {
 
 FinishInst () {
 	echo -e " INSTALLATION COMPLETED \n A copy of the script will be placed in your user home directory"
-	cp "$(pwd)"/Conf_files/bashrc /mnt/home/"$UNsel"/.bashrc
-	"$chroot" /mnt ln -frs /home/"$UNsel"/.bashrc /etc/bash/bashrc.d/"$UNsel".bashrc
+	cp "$(pwd)"/Conf_files/bashrc /mnt/etc/bash/bashrc.d/"$UNsel".bashrc
+	#"$chroot" /mnt ln -frs /home/"$UNsel"/.bashrc /etc/bash/bashrc.d/"$UNsel".bashrc
 	mkdir -p /mnt/home/"$UNsel"
 	cp -r "$(pwd)" /mnt/home/"$UNsel"/
 	sed -i "s/ArchTixUser/$UNsel/g" /mnt/home/"$UNsel"/UNI/full_setup
