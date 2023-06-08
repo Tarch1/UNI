@@ -431,7 +431,7 @@ PKGcheck () {
 
 	ProgressBar=0
 	y=" microcode amddrivers nvidiadrivers kernel baselinux baseutils fs bootloaderutility btrfsutility
-	elogind	grubpkg grubbtrfs refindpkg net audio bluetooth android print apps utility
+	elogind grubpkg grubbtrfs refindpkg net audio bluetooth android print apps utility
 	hardwareacceleration vulkan vulkanlib32 filemanager archive xorg personalization "
 
 	for a in $y; do
@@ -463,6 +463,7 @@ PKGcheck () {
 		*) echo "Do again please" && PkgMissed ;;
 		esac
 	fi
+	unset a b c
 	echo "For debug PKGcheck! A=$a B=$b C=$c"
 }
 InstallationSetup
