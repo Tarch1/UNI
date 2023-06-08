@@ -2,7 +2,7 @@
 #cat ~/.cache/wal/sequences &
 #source ~/.cache/wal/colors-tty.sh
 
-/home/tarch1/.pfetch
+if [ "$(id -u)" -ne 0 ]; then fortune -c | cowthink -f $(find /usr/share/cows -type f | shuf -n 1) ; else /home/tarch1/.pfetch ; fi
 function timer_now {
 	date +%s%N
 }
