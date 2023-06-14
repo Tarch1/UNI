@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#add zenith support
 main() {
     # If there is argument, the assigned cases will be executed.
     while [[ $# -gt 0 ]] && [[ $1 == "--"* ]];
