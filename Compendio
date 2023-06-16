@@ -34,3 +34,12 @@ Workaround for suspend
 https://iam.tj/prototype/enhancements/Windows-acpi_osi.html
 
 https://github.com/upscayl/upscayl #upscale images
+
+ROM BUILDING REQUIREMENTS
+
+device>samsung>a52sxq> device tree
+device>samsung>sm7325-common> tree of the same chipset
+hardware>samsung> android_hardware_samsung from lineage
+kernel>samsung>sm7325> android_kernel_samsung_sm7325 from the dev of my smartphone
+vendor>samsung>a52sxq>vendor
+vendor>samsung>sm7325-common>vendor
