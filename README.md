@@ -69,16 +69,22 @@ Use https://github.com/vinceliuice/Fluent-icon-theme
 	or Extract from secondary drive in /OS/Linux/ the theme inside /home/tarch1/.local/share/icons
 
 Install Bottles from Flatpak for managing Windows apps. 
-	
+
+# Firefox SETUP
+
+
 For Firefox use https://github.com/rafaelmardojai/firefox-gnome-theme
 
-TROUBLESHOOTIG
+Start page https://github.com/victrme/Bonjourr
+
+
+# TROUBLESHOOTIG
 
 If gnome on wayland not start's on machine's with hybrid gpu try
      
     ln -s /dev/null /etc/udev/rules.d/61-gdm.rules
 
-PIPEWIRE TROUBLESHOOTING
+ ### PIPEWIRE TROUBLESHOOTING
 
 If /etc/pipewire/ folder and its contents doesn't exist run
 
