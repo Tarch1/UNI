@@ -34,7 +34,7 @@ DiskPartition () {
 	if echo "$DRIVE" | grep "^/dev/[a-z]d[a-z]"; then
 	BOOT_PART="$DRIVE"1 ; ROOT_PART="$DRIVE"2 ; SWAP_PART="$DRIVE"3 ; DEVICE="${DRIVE#/*/}"
 	elif echo "$DRIVE" | grep "^/dev/nvme"; then
-	BOOT_PART="$DRIVE"p1 ; ROOT_PART="$DRIVE"p2 ; SWAP_PART="$DRIVE"3 ; DEVICE="${DRIVE#/*/}" #printf -v BOOT_PART "%sp1" "$DRIVE"
+	BOOT_PART="$DRIVE"p1 ; ROOT_PART="$DRIVE"p2 ; SWAP_PART="$DRIVE"p3 ; DEVICE="${DRIVE#/*/}" #printf -v BOOT_PART "%sp1" "$DRIVE"
 	elif echo "$DRIVE" | grep "^/dev/mmc"; then
 	BOOT_PART="$DRIVE"1 ; ROOT_PART="$DRIVE"2 ; SWAP_PART="$DRIVE"3 ; DEVICE="${DRIVE#/*/}"
 	fi
