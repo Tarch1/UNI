@@ -23,8 +23,8 @@ DiskPartition () {
 	swapoff -a
 	umount -R /mnt
 	"$PKGmanager" -Sy "${pkgskips[@]}" "${fs[@]}"
-	mapfile -t devicelist < <(lsblk -dlnp -o name | grep -Ev "boot|rpmb|loop")
-	mapfile -t devicesize < <(lsblk -dlnp -o size | grep -Ev "boot|rpmb|loop")
+	mapfile -t devicelist < <(lsblk -dlnp -o name)
+	mapfile -t devicesize < <(lsblk -dlnp -o size)
 	# blkid -o value -s LABEL /dev/nvme1n1 # print device LABEL 
 	DRIVE=$(dialog --title "OS INSTALLATION" --stdout --menu "Select preferred drive" 0 0 0 "${devicelist[0]}" "${devicesize[0]}" "${devicelist[1]}" "${devicesize[1]}" "${devicelist[2]}" "${devicesize[2]}" "${devicelist[3]}" "${devicesize[3]}" "${devicelist[4]}" "${devicesize[4]}" || exit 1)
 	[[ "$VBTsel" = 0 ]] && ADDITIONAL_DRIVE="$(dialog --title "ADDITIONAL" --stdout --menu "Select secondary drive" 0 0 0 "${devicelist[0]}" "${devicesize[0]}" "${devicelist[1]}" "${devicesize[1]}" "${devicelist[2]}" "${devicesize[2]}" "${devicelist[3]}" "${devicesize[3]}" "${devicelist[4]}" "${devicesize[4]}" || exit 1)"
