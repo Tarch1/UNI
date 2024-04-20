@@ -286,7 +286,7 @@ BootloaderSetup () {
 
 InstallationSetup () {
 	VBTsel=0 && SetupAvaible=1 && CheckandSetup=( Check_required_files UEFIsel CPUsel KernelSel GPUsel Pacman_Locked )
-	echo 'List of all errors during the installation progress:' > Errors
+	echo 'List of all errors ocourred during the installation process:' > Errors
 	for c in "${CheckandSetup[@]}"; do "$c" || SHOWerror "$c" ; done
 	if [[ -s config ]]; then
 		cat config && YesNoSel "It's correct?"
