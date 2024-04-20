@@ -199,7 +199,7 @@ TimezoneSel () {
 	read -r TZsel
 	case "$TZsel" in
 	1|Europe/Rome|Rome) TZsel="Europe/Rome" && echo "Selected : Europe/Rome" ;;
-	q|quit|exit) TZSel="" ;;
+	q|quit|exit) TZsel="" ;;
 	*)	YesNoSel "Want this for timezone : $TZsel ?"
 		case $CC in
 		1) echo "OK, timezone selected $TZsel" ;;
