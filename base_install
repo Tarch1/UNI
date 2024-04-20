@@ -432,7 +432,7 @@ PKGcheck () {
 	vulkanlib32=(lib32-vulkan-icd-loader lib32-mesa lib32-vulkan-intel)
 	filemanager=(xed vifm pcmanfm tumbler raw-thumbnailer file-roller)
 	archive=(bzip2 cpio gzip xz lzop p7zip tar unrar zip unzip) # Moved on Aur: atool lha
-	personalization=(cowsay fortune-mod)
+	personalization=(cowfortune)
 
 	ProgressBar=0
 	y=" microcode amddrivers nvidiadrivers kernel baselinux baseutils fs bootloaderutility btrfsutility
