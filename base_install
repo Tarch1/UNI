@@ -238,7 +238,7 @@ BootloaderSetup () {
 		"$chroot" /mnt refind-install
 		sed -i "/ucode.img/ s/ucode/$microcodepkg/g" ../UNI/Bootloader/Refind/refind_linux.conf
 		sed -i "/ArchTixGUID/ s/ArchTixGUID/$PIDsel/g" ../UNI/Bootloader/Refind/refind_linux.conf
-		sed -i "/ArchTixRoot/ s/ArchTixRoot/$ROOT_PART/g" ../UNI/Bootloader/Refind/refind_linux.conf
+		sed -i "/ArchTixROOT/ s/ArchTixROOT/$ROOT_PART/g" ../UNI/Bootloader/Refind/refind_linux.conf
 		if [ "$UEFImode" = 1 ]; then efifolder='refind'; else efifolder='BOOT'; fi
 		mkdir /mnt/boot/EFI/"$efifolder"/themes
 		mv /mnt/boot/EFI/"$efifolder"/refind.conf /mnt/boot/EFI/"$efifolder"/backup-refind.conf
