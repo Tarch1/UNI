@@ -40,8 +40,8 @@ DiskPartition () {
 	fi
 	echo DRIVE="$DRIVE" DEVICE="$DEVICE" && if [[ -z $DRIVE || -z $DEVICE ]]; then echo "No partition were created, check the installer. Closing installation!" ; exit 1 ;
 	else echo 'We can proceed with the formatting of file system' ; fi
-	BOOTID="$(blkid -s "$PIDsel" -o value "$BOOT_PART")"
-	ROOTID="$(blkid -s "$PIDsel" -o value "$ROOT_PART")"
+	BOOTID="$(blkid -s "$PIDsel" -o value "$BOOT_PART")" ; export BOOTID
+	ROOTID="$(blkid -s "$PIDsel" -o value "$ROOT_PART")" ; export ROOTID
 	echo -e " BP=$BOOT_PART RP=$ROOT_PART PID=$PIDsel \n ${PIDsel}_BOOT=$BOOTID \n ${PIDsel}_ROOT=$ROOTID "
 	lsblk -f
 }
