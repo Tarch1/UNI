@@ -30,7 +30,7 @@ GPUsel () {
 	for i in "${Gsel[@]}"; do
 		case "$i" in
 		Intel) echo "The default Mesa driver will be installed" ;;
-		NVIDIA) YesNoSel 'Founded Nvidia gpu, wanna proprietary driver? If don't Mesa is the default for nouveau'
+		NVIDIA) YesNoSel 'Found Nvidia gpu, wanna proprietary driver? If you do not like it, Mesa is the defaulta'
 			case "$CC" in
 			1) echo 'Setting up Proprietary' 
 				if [ "$KSel" = linux ]; then nvidiadrivers=(nvidia)
