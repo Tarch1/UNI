@@ -1,5 +1,6 @@
 #!/bin/bash
 #add zenith support
+#add suspension https://forum.artixlinux.org/index.php/topic,1195.msg8554.html#msg8554
 main() {
     # If there is argument, the assigned cases will be executed.
     while [[ $# -gt 0 ]] && [[ $1 == "--"* ]];
