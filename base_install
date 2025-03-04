@@ -267,7 +267,10 @@ BootloaderSetup () {
 		mkdir -p /mnt/boot/grub/themes
 		sed -i "/GRUB_DISABLE_OS_PROBER=/ s/#//g" /mnt/etc/default/grub
 		sed -i '/GRUB_THEME=/c GRUB_THEME="/boot/grub/themes/Grub-Sekiro/theme.txt"' /mnt/etc/default/grub
-		if [[ -v nvidiadrivers ]]; then sed -i "s/^\(GRUB_CMDLINE_LINUX=.*\)\"$/\1 acpi_osi=! \\\\\"acpi_osi=$AcpiOS\\\\\"\"/" /mnt/etc/default/grub ; fi
+		if [[ -v nvidiadrivers ]]; then 
+			sed -i "s/^\(GRUB_CMDLINE_LINUX=.*\)\"$/\1 acpi_osi=! \\\\\"acpi_osi=$AcpiOS\\\\\"\"/" /mnt/etc/default/grub
+			sed "/^GRUB_CMDLINE_LINUX_DEFAULT=/c\GRUB_CMDLINE_LINUX_DEFAULT=\"quiet splash nvidia-drm.modeset=1 nvidia-drm.fbdev=1\"" /mnt/etc/default/grub
+		fi
 		"$chroot" /mnt grub-mkconfig -o /boot/grub/grub.cfg
 		cp -r ../UNI/Bootloader/Grub-Sekiro /mnt/{boot/grub/themes/,/usr/share/grub/themes}
 	;;
