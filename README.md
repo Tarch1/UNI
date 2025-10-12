@@ -80,6 +80,10 @@ Start page https://github.com/victrme/Bonjourr
 
 # TROUBLESHOOTIG
 
+If on nvidia hybrid gpu setup nvidia doesn't suspend change 10_nvidia.json to 90_nvidia.json in
+
+	/usr/share/glvnd/egl_vendor.d/
+
 If gnome on wayland not start's on machine's with hybrid gpu try
      
     ln -s /dev/null /etc/udev/rules.d/61-gdm.rules
