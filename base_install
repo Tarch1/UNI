@@ -247,7 +247,7 @@ BootloaderSetup () {
 		cp ../UNI/Bootloader/Refind/refind_linux.conf /mnt/boot/refind_linux.conf
 		cp -r ../UNI/Bootloader/Refind/themes/* /mnt/boot/EFI/"$efifolder"/themes/
 		if [ "$FSsel" = btrfs ]; then rootflags='rootflagssubvol=@' ; fi
-		if [[ -v nvidiadrivers ]]; then drm='nvidia-drm.modeset=1' ; fi #osi="acpi_osi=! \"acpi_osi=$AcpiOS\""
+		#if [[ -v nvidiadrivers ]]; then drm='nvidia-drm.modeset=1' ; fi #osi="acpi_osi=! \"acpi_osi=$AcpiOS\""
 		if [[ "$IRFSetup" = booster ]]; then irfs=booster ; fi
 		echo "\"Standard Boot\"   \"ro root=$ROOTID rootfstype=$FSsel $rootflags initrd=$microcodepkg.img initrd=$irfs-$KSel.img $drm\"" >> /mnt/boot/refind_linux.conf
 		echo '!!!Refind config and theme changed!!!'
