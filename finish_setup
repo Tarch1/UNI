@@ -142,15 +142,8 @@ function WindowManager () {
 		cp ~/UNI/Conf_files/hyprland/hyprland.conf ~/.config/hyprland/hyprland.conf
 		SYMLINK_NAME="igpu"
 		RULE_PATH="/etc/udev/rules.d/igpu-dev-path.rules"
-		IGPU_ID=$(lspci -d ::03xx | grep 'AMD' | cut -f1 -d' ')
-		UDEV_RULE="$(cat <<EOF
-		KERNEL=="card*", \
-		KERNELS=="0000:$IGPU_ID", \
-		SUBSYSTEM=="drm", \
-		SUBSYSTEMS=="pci", \
-		SYMLINK+="dri/$SYMLINK_NAME"
-		EOF
-		)"
+		IGPU_ID=$(lspci -d ::03xx | grep 'Intel' | cut -f1 -d' ')
+		UDEV_RULE="KERNEL="="card*"", KERNELS="="0000:$IGPU_ID"", SUBSYSTEM="="drm"", SUBSYSTEMS="="pci"", SYMLINK+"="dri/$SYMLINK_NAME"""
 		echo "$UDEV_RULE" | sudo tee "$RULE_PATH"
 		sudo udevadm control --reload
 		sudo udevadm trigger
