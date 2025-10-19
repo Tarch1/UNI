@@ -26,7 +26,7 @@ main "$@"
 
 SelSteps () {
   OSSelection=( '4' 'Enter the distro we are going to setup : 1) Arch 2) Artix 3) Void \n'
-                'OSSel' ''
+                'OSSel' '2'
                 '1|Arch|arch' 'distro selected : Arch' 'Arch'
                 '2|Artix|artix' 'distro selected : Artix' 'Artix'
                 '3|Void|void' 'distro selected : Void' 'Void'
@@ -40,19 +40,20 @@ SelSteps () {
     echo -en "${var[1]}"
     read -r "${var[2]}"
     ext=("${!var[2]}")
-    echo "var 2 secondo >> ${var[2]} << = $ext "
+    ext2=("${!var[4]}")
     #YesNoSel "${var[3]}"
-    case "${var[2]}" in
-      2) case "${var[2]}" in
-           "${var[4]}") echo "${var[5]}" && eval "${var[2]}"="${var[6]}" ;;
+    case "${var[3]}" in
+      1) echo "we are here" ;;
+      2) case "${ext[@]}" in
+           "${ext2[@]}") echo "${var[5]}" && eval "${var[2]}"="${var[6]}" ;;
            *) "${var[6]}" ;;
          esac ;;
-      3) case "${var[2]}" in
+      3) case "${ext[@]}" in
            "${var[4]}") echo "${var[5]}" && eval "${var[2]}"="${var[6]}" ;;
            "${var[7]}") echo "${var[8]}" && eval "${var[2]}"="${var[9]}" ;;
            *) "${var[10]}" ;;
          esac ;;
-      4) case "${var[2]}" in
+      4) case "${ext[@]}" in
            "${var[4]}") echo "${var[5]}" && eval "${var[2]}"="${var[6]}" ;;
            "${var[7]}") echo "${var[8]}" && eval "${var[2]}"="${var[9]}" ;;
            "${var[10]}") echo "${var[11]}" && eval "${var[2]}"="${var[12]}" ;;
@@ -60,6 +61,7 @@ SelSteps () {
          esac ;;
       *) ;;
     esac
-    echo 'done' "${var[2]} << = $ext"
+    echo 'done' "${var[2]} << = ${ext[*]}"
   done
 }
+SelSteps
