@@ -31,13 +31,16 @@ SelSteps () {
                 '2|Artix|artix' 'distro selected : Artix' 'Artix'
                 '3|Void|void' 'distro selected : Void' 'Void'
                 'echo "Wrong choice, type again" && OperatingSystemSel' )
+  LocalizationSel=( '3' 'Select your locale zone' 'gg' )
   
-  SelS=( 'OSSelection[@]' ) ## LocalizationSel 'LanguageSel' 'TimezoneSel' 
-  ## 'HostnameSel' 'UsernameSel' 'PartIDSel' 'FilesystemSel' 'BootloaderSel' )
+  SelS=( 'OSSelection[@]' 'LocalizationSel[@]' ) 
+  #'LanguageSel' 'TimezoneSel' 'HostnameSel' 'UsernameSel' 'PartIDSel' 'FilesystemSel' 'BootloaderSel' )
   for i in "${SelS[@]}"; do
     var=("${!i}")
     echo -en "${var[1]}"
     read -r "${var[2]}"
+    ext=("${!var[2]}")
+    echo "var 2 secondo >> ${var[2]} << = $ext "
     #YesNoSel "${var[3]}"
     case "${var[2]}" in
       2) case "${var[2]}" in
@@ -57,7 +60,6 @@ SelSteps () {
          esac ;;
       *) ;;
     esac
-    echo doned "${var[2]}"
+    echo 'done' "${var[2]} << = $ext"
   done
 }
-SelSteps
