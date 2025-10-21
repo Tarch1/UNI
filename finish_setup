@@ -137,7 +137,7 @@ function WindowManager () {
 		cp ~/UNI/Conf_files/Herbstluftwm/autostart ~/.config/herbstluftwm/
 		chmod +x ~/.config/herbstluftwm/autostart
 	;;
-	hyprland ) sudo pacman -S hyprland hyprcursor hyprgraphics hyprland hyprland-qtutils hyprland-qt-support hyprlock hyprutils hyprwayland-scanner  --noconfirm
+	hyprland ) sudo pacman -S hyprland hyprcursor hyprgraphics hyprland hyprland-qtutils hyprland-qt-support hyprlock hyprutils hyprwayland-scanner xdg-desktop-portal-hyprland xdg-desktop-portal-gtk --noconfirm
 		mkdir ~/.config/hyprland
 		cp ~/UNI/Conf_files/hyprland/hyprland.conf ~/.config/hyprland/hyprland.conf
 		readarray -t Gsel < <(lspci | grep VGA | grep -Eo 'VM|Virtio|QXL|NVIDIA|Intel|AMD')
