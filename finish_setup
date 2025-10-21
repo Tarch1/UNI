@@ -149,7 +149,7 @@ function WindowManager () {
 		RULE_PATH="/etc/udev/rules.d/igpu-dev-path.rules"
 		IGPU_ID="$(lspci -d ::03xx | grep "$IGPU" | cut -f1 -d' ')"
 		UDEV_RULE="KERNEL==\"card*\", KERNELS==\"0000:$IGPU_ID\", SUBSYSTEM==\"drm\", SUBSYSTEMS==\"pci\", SYMLINK+=\"dri/$SYMLINK_NAME\""
-		echo "$UDEV_RULE" | sudo tee "$RULE_PATH"
+		sudo echo "$UDEV_RULE" | sudo tee "$RULE_PATH"
 		sudo udevadm control --reload
 		sudo udevadm trigger
 	;;
