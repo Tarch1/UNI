@@ -46,18 +46,18 @@ SelSteps () {
       1) echo "we are here" ;;
       2) case "${ext[@]}" in
            "${ext2[@]}") echo "${var[5]}" && eval "${var[2]}"="${var[6]}" ;;
-           *) "${var[6]}" ;;
+           *) echo "${var[6]}" ;;
          esac ;;
       3) case "${ext[@]}" in
            "${var[4]}") echo "${var[5]}" && eval "${var[2]}"="${var[6]}" ;;
            "${var[7]}") echo "${var[8]}" && eval "${var[2]}"="${var[9]}" ;;
-           *) "${var[10]}" ;;
+           *) echo "${var[10]}" ;;
          esac ;;
       4) case "${ext[@]}" in
            "${var[4]}") echo "${var[5]}" && eval "${var[2]}"="${var[6]}" ;;
            "${var[7]}") echo "${var[8]}" && eval "${var[2]}"="${var[9]}" ;;
            "${var[10]}") echo "${var[11]}" && eval "${var[2]}"="${var[12]}" ;;
-           *) "${var[13]}" ;;
+           *) echo "${var[13]}" ;;
          esac ;;
       *) ;;
     esac
