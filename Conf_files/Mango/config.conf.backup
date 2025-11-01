@@ -1,0 +1,15 @@
+# More option see https://github.com/DreamMaoMao/mango/wiki/
+
+# Axis Bindings
+axisbind=SUPER,UP,viewtoleft_have_client
+axisbind=SUPER,DOWN,viewtoright_have_client
+
+
+# layer rule
+layerrule=animation_type_open:zoom,layer_name:rofi
+layerrule=animation_type_close:zoom,layer_name:rofi
+
+# AUDIO
+exec-once = pipewire
+exec-once = pipewire-pulse
+exec-once = wireplumber
