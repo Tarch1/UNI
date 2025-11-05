@@ -155,6 +155,8 @@ function WindowManager () {
 	;;
 	mangowc ) trizen -S mangowc-git qt5-wayland qt6-wayland noto-fonts noto-fonts-emoji xdg-desktop-portal-gtk fuzzel --noconfirm
 		mkdir ~/.config/mango
+		mkdir -p ~/.config/{fuzzel,mango}
+		cp ~/UNI/Conf_files/Fuzzel/fuzzel.ini ~/.config/fuzzel/fuzzel.ini
 		cp ~/UNI/Conf_files/Mango/mango.conf ~/.config/mango/mango.conf
 		readarray -t Gsel < <(lspci | grep VGA | grep -Eo 'VM|Virtio|QXL|NVIDIA|Intel|AMD')
 		for i in "${Gsel[@]}"; do
