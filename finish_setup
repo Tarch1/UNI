@@ -153,7 +153,7 @@ function WindowManager () {
 		sudo udevadm control --reload
 		sudo udevadm trigger
 	;;
-	mangowc ) trizen -S mangowc-git qt5-wayland qt6-wayland noto-fonts noto-fonts-emoji xdg-desktop-portal xdg-desktop-portal-wlr xdg-desktop-portal-gtk xdg-desktop-portal-kde fuzzel swaync --noconfirm
+	mangowc ) trizen -S mangowc-git qt5-wayland qt6-wayland noto-fonts noto-fonts-emoji xdg-desktop-portal xdg-desktop-portal-wlr xdg-desktop-portal-gtk xdg-desktop-portal-kde fuzzel swaync ttf-nerd-fonts-symbols ttf-nerd-fonts-symbols-common --noconfirm
 		mkdir ~/.config/mango
 		mkdir -p ~/.config/{fuzzel,mango}
 		cp ~/UNI/Conf_files/Fuzzel/fuzzel.ini ~/.config/fuzzel/fuzzel.ini
