@@ -426,7 +426,7 @@ PKGcheck () {
 	net=(networkmanager iwd chrony chrony-openrc networkmanager-openrc)
 	audio=(pipewire pipewire-pulse pipewire-alsa pipewire-jack lib32-pipewire lib32-pipewire-jack wireplumber sof-firmware) #void bluetooth = libspa-bluetooth  #pulseaudio pulseaudio-bluetooth pavucontrol ##pulseaudio-alsa alsa-utils , for wine use (lib32-libpulse lib32-alsa-plugins)
 	android=(android-tools android-udev)
-	bluetooth=(bluez bluez-utils bluez-plugins bluez-openrc)
+	bluetooth=(bluez bluez-utils bluez-plugins bluez-openrc bluez-cups bluez-tools bluez-libs bluez-qt bluetui blueman)
 	print=(cups cups-pdf system-config-printer avahi avahi-openrc cups-openrc)
 	#xorg=(xorg-server xorg-xinit xorg-xinit light numlockx libinput xorg-xinput xss-lock)
 	apps=(telegram-desktop firefox profile-sync-daemon)
