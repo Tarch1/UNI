@@ -51,19 +51,19 @@ FileSystemFormat () {
 	RootLabel='ROOT'
 	mkfs.fat -F32 -n "$BootLabel" "$BOOT_PART"
 	mkswap "$SWAP_PART"
-	echo -e "$PIDsel=$BOOTID /boot vfat defaults 0 2" > UNIfstab
+	UNIfstab="$PIDsel=$BOOTID /boot vfat defaults 0 2\n"
 	
 	case "$FSsel" in
 	ext4)
 		mkfs.ext4 -L "$RootLabel" "$ROOT_PART"
 		mount "$ROOT_PART" /mnt
-		echo -e "$PIDsel=$ROOTID / ext4 defaults 0 1" >> UNIfstab
+		UNIfstab+="$PIDsel=$ROOTID / ext4 defaults 0 1\n"
 	;;
 	btrfs)
 		modules=(btrfs)
 		binaries='btrfs'	#'\/usr\/bin\/btrfsck'
 		local SUBVolumes=( 'home' 'var_log' 'snapshots' 'swap' )
-		local options='noatime,compress=lzo,space_cache=v2' #default use the default options: rw, suid, dev, exec, auto, nouser, and async.
+		local options='noatime,compress=zstd,space_cache=v2,discard=async' #default use the default options: rw, suid, dev, exec, auto, nouser, and async.
 		mkfs.btrfs -fL "$RootLabel" "$ROOT_PART" #-f option to force overwrite filesystem
 		
 		mount "$ROOT_PART" /mnt
@@ -71,16 +71,16 @@ FileSystemFormat () {
 		for b in "${SUBVolumes[@]}"; do	btrfs su cr /mnt/@"$b"; done
 		umount /mnt
 		mount -o defaults,"$options",subvol=@ "$ROOT_PART" /mnt
-		echo -e "$PIDsel=$ROOTID / btrfs $options,subvol=@ 0 0" >> UNIfstab
+		UNIfstab+="$PIDsel=$ROOTID / btrfs $options,subvol=@ 0 0\n"
 		for c in "${SUBVolumes[@]}"; do
 			case "$c" in
 			snapshots) mkdir -p /mnt/."$c"
 				mount -o "$options",discard=async,subvol=@"$c" "$ROOT_PART" /mnt/."$c"
-				echo -e "$PIDsel=$ROOTID /.$c btrfs $options,discard=async,subvol=@$c 0 0" >> UNIfstab
+				UNIfstab+="$PIDsel=$ROOTID /.$c btrfs $options,discard=async,subvol=@$c 0 0\n"
 			;;
 			var_log) mkdir -p /mnt/var/log
 				mount -o "$options",subvol=@"$c" "$ROOT_PART" /mnt/var/log
-				echo -e "$PIDsel=$ROOTID /var/log btrfs $options,subvol=@$c 0 0" >> UNIfstab
+				UNIfstab+="$PIDsel=$ROOTID /var/log btrfs $options,subvol=@$c 0 0\n"
 			;;
 			swap) #mkdir -p /mnt/swap
 				#mount -o compress=no,space_cache,ssd,discard=async,subvol=@swap "$ROOT_PART" /mnt/swap
@@ -97,9 +97,9 @@ FileSystemFormat () {
 				#swapon "$SF"
 			;;
 			*) mkdir -p /mnt/"$c" && mount -o defaults,"$options",subvol=@"$c" "$ROOT_PART" /mnt/"$c"
+				UNIfstab+="$PIDsel=$ROOTID /$c btrfs $options,subvol=@$c 0 0\n"
 			;;
 			esac
-			echo -e "$PIDsel=$ROOTID /$c btrfs $options,subvol=@$c 0 0" >> UNIfstab
 		done
 	;;
 	*)	echo boh
@@ -128,7 +128,7 @@ BaseSystemInstall () {
 
 FStabGen () {
 	mv -f /mnt/etc/fstab /mnt/etc/old-fstab
-	if [[ "$OSsel" = Void ]]; then cp UNIfstab /mnt/etc/fstab
+	if [[ "$OSsel" = Void ]]; then echo -e "$UNIfstab" > /mnt/etc/fstab
 	elif [ -v PIDsel ]; then "$fstabgen" -t "$PIDsel" /mnt >> /mnt/etc/fstab
 	else exit 1
 	fi
@@ -165,7 +165,7 @@ PackageConfig () {
 PackageInstall () {
 	if [[ -v nvidiadrivers ]]; then vulkanlib32+=(lib32-vulkan-nvidia); fi
 	local EssentialPKG=( "${microcode[@]}"  "${kernel[@]}" "${baselinux[@]}" "${baseutils[@]}" "${bootloaderutility[@]}" "${fs[@]}" "${amddrivers[@]}" "${nvidiadrivers[@]}"  "${net[@]}" )
-	local AdditionalPKG=( "${audio[@]}" "${bluetooth[@]}" "${android[@]}" "${print[@]}" "${utility[@]}" "${hardwareacceleration[@]}" "${vulkan[@]}" "${vulkanlib32[@]}" "${apps[@]}" "${personalization[@]}" )
+	local AdditionalPKG=( "${audio[@]}" "${bluetooth[@]}" "${battery[@]}" "${android[@]}" "${print[@]}" "${utility[@]}" "${hardwareacceleration[@]}" "${vulkan[@]}" "${vulkanlib32[@]}" "${apps[@]}" "${personalization[@]}" )
 	local ExtraPKG=( "${filemanager[@]}" "${archive[@]}" "${xorg[@]}" )
 	if [[ "$VBTsel" = 1 ]]; then "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${EssentialPKG[@]}"
 	else "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${EssentialPKG[@]}" "${AdditionalPKG[@]}"
@@ -183,11 +183,10 @@ KernelSetup () {
 	esac
 	if [[ -v nvidiadrivers ]]; then
 		if [ "$OSsel" = Artix ]; then "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" nvidia-utils-openrc 
-		Servies+=( nvidia-persistenced )
 		fi
 		ln -s /dev/null /mnt/etc/udev/rules.d/61-gdm.rules
 		modules+=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)
-		echo -e "options nvidia-drm modeset=1 \noptions nvidia \"NVreg_DynamicPowerManagement=0x02\"" >> /mnt/etc/modprobe.d/nvidia.conf
+		echo -e "options nvidia-drm modeset=1\noptions nvidia-drm fbdev=1\noptions nvidia NVreg_DynamicPowerManagement=0x02\noptions nvidia NVreg_UsePageAttributeTable=1" > /mnt/etc/modprobe.d/nvidia.conf
 		HOOKS+=(kms)
 	fi
 	#case "$IRFSetup" in
@@ -206,8 +205,65 @@ KernelSetup () {
 	"$chroot" /mnt mkinitcpio -p "$KSel"
 }
 
+KernelSetup () {
+	local HOOKS=(base udev autodetect modconf block usr resume filesystems keyboard keymap fsck)
+	case "$microcodepkg" in
+		intel-ucode) echo -e 'options i915 enable_fbc=1 fastboot=0 enable_dc=4' >> /mnt/etc/modprobe.d/i915.conf ;;
+		amd-ucode) echo 'AMD setup: Nothing at the moment' ;;
+		*) echo 'No microcode selected, has additional setup been done?'
+	esac
+	if [[ -v nvidiadrivers ]]; then
+		if [ "$OSsel" = Artix ]; then 
+			"$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" nvidia-utils-openrc 
+			# NOTA: Il servizio nvidia-persistenced è stato spostato dentro ServiceSetup
+		fi
+		ln -s /dev/null /mnt/etc/udev/rules.d/61-gdm.rules
+		modules+=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)
+		echo -e "options nvidia-drm modeset=1 fbdev=1\noptions nvidia NVreg_DynamicPowerManagement=0x02 NVreg_UsePageAttributeTable=1 NVreg_EnablePCIeGen3=1" > /mnt/etc/modprobe.d/nvidia.conf
+		HOOKS+=(kms)
+	fi
+	sed -i "/MODULES/ s/()/(${modules[*]})/" /mnt/etc/mkinitcpio.conf
+	sed -i "/BINARIES/ s/()/($binaries)/" /mnt/etc/mkinitcpio.conf
+	sed -i "s/^HOOKS.*/HOOKS=(${HOOKS[*]})/" /mnt/etc/mkinitcpio.conf
+	"$chroot" /mnt mkinitcpio -p "$KSel"
+}
+
+KernelSetup () {
+	case "$microcodepkg" in
+	intel-ucode) echo -e 'options i915 enable_fbc=1 fastboot=0 enable_dc=4' >> /mnt/etc/modprobe.d/i915.conf ;;
+	amd-ucode) echo 'AMD setup: Nothing at the moment' ;;
+	*) echo 'No microcode selected, has additional setup been done?' ;;
+	esac
+	
+	if [[ -v nvidiadrivers ]]; then
+		if [ "$OSsel" = Artix ]; then "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" nvidia-utils-openrc ; fi
+		ln -s /dev/null /mnt/etc/udev/rules.d/61-gdm.rules
+		modules+=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)
+		echo -e "options nvidia-drm modeset=1 fbdev=1\noptions nvidia NVreg_DynamicPowerManagement=0x02 NVreg_UsePageAttributeTable=1 NVreg_EnablePCIeGen3=1" > /mnt/etc/modprobe.d/nvidia.conf
+	fi
+
+	case "$OSsel" in
+	3|[Vv]oid|Void)
+		# Gestione specifica per Void Linux tramite Dracut
+		if [ "$FSsel" = btrfs ]; then echo 'add_dracutmodules+=" btrfs "' > /mnt/etc/dracut.conf.d/btrfs.conf ; fi
+		if [[ -v nvidiadrivers ]]; then	echo 'force_drivers+=" nvidia nvidia_modeset nvidia_uvm nvidia_drm "' > /mnt/etc/dracut.conf.d/nvidia.conf ; fi
+		# Comando nativo per rigenerare l'initramfs su Void (Void usa xbps-reconfigure)
+		"$chroot" /mnt xbps-reconfigure -f "$KSel"
+	;;
+	
+	*)	# Gestione nativa per Arch e Artix tramite Mkinitcpio
+		local HOOKS=(base udev autodetect modconf block usr resume filesystems keyboard keymap fsck)
+		[[ -v nvidiadrivers ]] && HOOKS+=(kms)
+		sed -i "/MODULES/ s/()/(${modules[*]})/" /mnt/etc/mkinitcpio.conf
+		sed -i "/BINARIES/ s/()/($binaries)/" /mnt/etc/mkinitcpio.conf
+		sed -i "s/^HOOKS.*/HOOKS=(${HOOKS[*]})/" /mnt/etc/mkinitcpio.conf
+		"$chroot" /mnt mkinitcpio -p "$KSel"
+	;;
+	esac
+}
+
 ServiceSetup () {
-	Services+=( NetworkManager openrc-settingsd cupsd avahi-daemon bluetoothd )
+	Services+=( NetworkManager openrc-settingsd cupsd avahi-daemon bluetoothd tlp )
 	if [[ -v nvidiadrivers ]] && [ "$OSsel" = Artix ]; then Services+=( nvidia-persistenced ); fi
 	for s in "${Services[@]}"; do "$chroot" /mnt "$initc0" "$initc1" "$s" ; done
 	mkdir -p /mnt/etc/udev/rules.d/
@@ -215,21 +271,35 @@ ServiceSetup () {
 }
 
 UserSetup () {
-	"$chroot" /mnt useradd -mg users -G wheel,video,audio,storage,input,lp,scanner,power,kvm "$UNsel" #additional docker,libvirt if you have required package
+	"$chroot" /mnt useradd -m -g users -G wheel,video,audio,storage,input,lp,scanner,power,kvm "$UNsel" #additional docker,libvirt if you have required package
 	sed -i '/%wheel ALL=(ALL:ALL) ALL/ s/#//' /mnt/etc/sudoers #it's possible to use the username instead of %wheel
-	"$chroot" /mnt echo -n "Type $UNsel "
+	echo "Choose password for user: $UNsel"
 	"$chroot" /mnt passwd "$UNsel"
-	"$chroot" /mnt echo -n "Type root "
+	echo "Choose password for root"
 	"$chroot" /mnt passwd
-	mkdir -p /mnt/home/"$UNsel"/.config
-	"$chroot" /mnt chown -hR "$UNsel" /home/"$UNsel"
+	"$chroot" /mnt su - "$UNsel" -c "mkdir -p ~/.config"
 }
 
 AudioSetup () {
-	echo -e "options nvidia-drm modeset=1\noptions nvidia NVreg_UsePageAttributeTable=1\noptions nvidia NVreg_EnablePCIeGen3=1" >> /mnt/etc/modprobe.d/nvidia.conf
-	#echo "options snd-intel-dspcfg dsp_driver=1" >> /mnt/etc/modprobe.d/dsp.conf
-	cp -r /mnt/usr/share/pipewire /mnt/etc
-	cp -r /mnt/usr/share/wireplumber /mnt/etc
+	"$chroot" /mnt mkdir -p /etc/pipewire/pipewire.conf.d
+	"$chroot" /mnt mkdir -p /etc/wireplumber/wireplumber.conf.d
+	cat <<-EOF > /mnt/etc/wireplumber/wireplumber.conf.d/10-bluetooth-policy.conf
+	monitor.bluez.properties = {
+	    bluez5.enable-sbc-xq = true
+	    bluez5.enable-msbc = true
+	    bluez5.enable-hw-volume = true
+	    bluez5.codecs = [ sbc_xq aac aptx aptx_hd ldac ]
+	}
+	EOF
+	cat <<-EOF > /mnt/etc/pipewire/pipewire.conf.d/99-input-denoise.conf
+	context.properties = {
+	    default.clock.rate = 48000
+	    default.clock.quantum = 1024
+	    default.clock.min-quantum = 32
+	    default.clock.max-quantum = 2048
+	}
+	EOF
+	if [ -f /mnt/etc/bluetooth/main.conf ]; then sed -i 's/#AutoEnable=false/AutoEnable=true/g' /mnt/etc/bluetooth/main.conf; fi
 }
 
 BootloaderSetup () {
@@ -426,9 +496,10 @@ PKGcheck () {
 	grubpkg=(grub)
 	refindpkg=(refind)
 	net=(networkmanager iwd chrony chrony-openrc networkmanager-openrc)
-	audio=(pipewire pipewire-pulse pipewire-alsa pipewire-jack lib32-pipewire lib32-pipewire-jack wireplumber sof-firmware) #void bluetooth = libspa-bluetooth  #pulseaudio pulseaudio-bluetooth pavucontrol ##pulseaudio-alsa alsa-utils , for wine use (lib32-libpulse lib32-alsa-plugins)
+	audio=(pipewire pipewire-pulse pipewire-alsa pipewire-jack wireplumber sof-firmware alsa-card-profiles lib32-pipewire lib32-pipewire-jack)
 	android=(android-tools android-udev)
-	bluetooth=(bluez bluez-utils bluez-plugins bluez-openrc bluez-cups bluez-tools bluez-libs bluez-qt bluetui blueman)
+	bluetooth=(bluez bluez-utils bluez-openrc blueman)
+	battery=(tlp tlp-openrc)
 	print=(cups cups-pdf system-config-printer avahi avahi-openrc cups-openrc)
 	#xorg=(xorg-server xorg-xinit xorg-xinit light numlockx libinput xorg-xinput xss-lock)
 	apps=(telegram-desktop firefox profile-sync-daemon)
@@ -442,7 +513,7 @@ PKGcheck () {
 
 	ProgressBar=0
 	y=" microcode amddrivers nvidiadrivers kernel baselinux baseutils fs bootloaderutility btrfsutility
-	elogind grubpkg grubbtrfs refindpkg net audio bluetooth android print apps utility
+	elogind grubpkg grubbtrfs refindpkg net audio bluetooth battery android print apps utility
 	hardwareacceleration vulkan vulkanlib32 filemanager archive xorg personalization "
 
 	for a in $y; do
