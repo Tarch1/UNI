@@ -163,6 +163,7 @@ PackageConfig () {
 }
 
 PackageInstall () {
+	if [[ -v nvidiadrivers ]]; then vulkanlib32+=(lib32-vulkan-nvidia); fi
 	local EssentialPKG=( "${microcode[@]}"  "${kernel[@]}" "${baselinux[@]}" "${baseutils[@]}" "${bootloaderutility[@]}" "${fs[@]}" "${amddrivers[@]}" "${nvidiadrivers[@]}"  "${net[@]}" )
 	local AdditionalPKG=( "${audio[@]}" "${bluetooth[@]}" "${android[@]}" "${print[@]}" "${utility[@]}" "${hardwareacceleration[@]}" "${vulkan[@]}" "${vulkanlib32[@]}" "${apps[@]}" "${personalization[@]}" )
 	local ExtraPKG=( "${filemanager[@]}" "${archive[@]}" "${xorg[@]}" )
@@ -355,7 +356,7 @@ InstallationSetup () {
 		initc1=enable
 		sed -i 's/-openrc//g' ../UNI/full_setup
 		sed -i '/\[multilib]/,/mirrorlist/ s/#//' /etc/pacman.conf
-		pacman -Sylq core extra community multilib | sort > pacman_db
+		pacman -Sylq core extra multilib | sort > pacman_db
 		echo 'Running check for missing packages'
 		PKGcheck
 		for a in "${ArchTixSteps[@]}"; do "$a" || SHOWerror "$a" ; done
@@ -373,7 +374,7 @@ InstallationSetup () {
 		sed -i '/\[lib32]/,/mirrorlist/ s/#//' /etc/pacman.conf
 		if [ "$ARCHrepo" = 1 ]; then
 		ArchRepoSetup /etc/pacman.conf
-		pacman -Sylq system world galaxy lib32 universe extra community multilib | sort > pacman_db
+		pacman -Sylq system world galaxy lib32 universe extra multilib | sort > pacman_db
 		else pacman -Sylq system world galaxy lib32 | sort > pacman_db
 		fi
 		echo 'Running check for missing packages'
@@ -431,7 +432,7 @@ PKGcheck () {
 	#xorg=(xorg-server xorg-xinit xorg-xinit light numlockx libinput xorg-xinput xss-lock)
 	apps=(telegram-desktop firefox profile-sync-daemon)
 	utility=(feh gedit calc fd bpytop adriconf fwupd colord colord-openrc) #for netwotk test bmon
-	hardwareacceleration=(libva-mesa-driver mesa-vdpau intel-media-driver intel-media-driver vkd3d)
+	hardwareacceleration=(libva-mesa-driver mesa-vdpau intel-media-driver vkd3d)
 	vulkan=(vulkan-icd-loader vulkan-intel vulkan-mesa-layers)
 	vulkanlib32=(lib32-vulkan-icd-loader lib32-mesa lib32-vulkan-intel)
 	filemanager=(xed vifm pcmanfm tumbler raw-thumbnailer file-roller)
