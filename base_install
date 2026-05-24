@@ -32,7 +32,6 @@ DiskPartition () {
 	if [[ "$VBTsel" = 0 ]]; then ADDITIONAL_DRIVE="$(dialog --title "ADDITIONAL" --stdout --menu "Select secondary drive (Optional - Cancel to skip)" 0 0 0 "${dialog_list[@]}")" ; fi
 	umount "$DRIVE"?* 2>/dev/null || true
 	sgdisk -ozZ "$DRIVE"
-	# CORRETTO: Tutto su una riga logica pulita senza backslash residui
 	parted -sf "$DRIVE" mktable gpt mkpart "ESP" 0% 1% mkpart "LINUX-ROOT" 1% 96% mkpart "SWAP" 96% 100% set 1 esp on set 3 swap on
 	if echo "$DRIVE" | grep -q "^/dev/[a-z]d[a-z]"; then BOOT_PART="${DRIVE}1" ; ROOT_PART="${DRIVE}2" ; SWAP_PART="${DRIVE}3"
 	elif echo "$DRIVE" | grep -q "^/dev/nvme"; then	BOOT_PART="${DRIVE}p1" ; ROOT_PART="${DRIVE}p2" ; SWAP_PART="${DRIVE}p3"
@@ -65,10 +64,10 @@ FileSystemFormat () {
 		   UNIfstab+="$PIDsel=$ROOTID / btrfs $options,subvol=@ 0 0\n"
 		   for c in "${SUBVolumes[@]}"; do
 			   case "$c" in
-			   snapshots) mkdir -p /mnt/."$c" ; mount -o "$options",subvol=@"$c" "$ROOT_PART" /mnt/."$c" ;;
-							UNIfstab+="$PIDsel=$ROOTID /.$c btrfs $options,subvol=@$c 0 0\n" ;;
-			   var_log)  mkdir -p /mnt/var/log ; mount -o "$options",subvol=@"$c" "$ROOT_PART" /mnt/var/log ;;
-						  UNIfstab+="$PIDsel=$ROOTID /var/log btrfs $options,subvol=@$c 0 0\n" ;;
+			   snapshots) mkdir -p /mnt/."$c" ; mount -o "$options",subvol=@"$c" "$ROOT_PART" /mnt/."$c"
+						  UNIfstab+="$PIDsel=$ROOTID /.$c btrfs $options,subvol=@$c 0 0\n" ;; # CORRETTO: Unito la riga e spostato il ;; alla fine
+			   var_log)   mkdir -p /mnt/var/log ; mount -o "$options",subvol=@"$c" "$ROOT_PART" /mnt/var/log
+						  UNIfstab+="$PIDsel=$ROOTID /var/log btrfs $options,subvol=@$c 0 0\n" ;; # CORRETTO: Unito la riga e spostato il ;; alla fine
 			   swap)      ;;
 			   *)         mkdir -p /mnt/"$c" && mount -o defaults,"$options",subvol=@"$c" "$ROOT_PART" /mnt/"$c"
 						  UNIfstab+="$PIDsel=$ROOTID /$c btrfs $options,subvol=@$c 0 0\n" ;;
@@ -80,7 +79,6 @@ FileSystemFormat () {
 }
 
 AdditionalDriveSetup () {
-	# Verifica se la stringa non è vuota (ovvero se l'utente ha scelto un secondo disco nel menu)
 	if [ -n "$ADDITIONAL_DRIVE" ]; then
 		mkdir -p /mnt/run/media/"$HNsel"/HDD
 		mount "$ADDITIONAL_DRIVE" /mnt/run/media/"$HNsel"/HDD
@@ -125,7 +123,6 @@ PackageConfig () {
 }
 
 PackageInstall () {
-	# I pacchetti validati in memoria vengono iniettati direttamente senza fare passaggi intermedi
 	if [[ "$VBTsel" = 1 ]]; then "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${_valid[@]}"
 	else "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${_valid[@]}" "${apps[@]}" "${personalization[@]}"
 	fi
