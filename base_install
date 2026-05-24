@@ -21,25 +21,29 @@ Check_required_files () {
 
 DiskPartition () {
 	swapoff -a
-	umount -R /mnt
+	umount -R /mnt 2>/dev/null || true
 	"$PKGmanager" -Sy "${pkgskips[@]}" "${fs[@]}"
 	mapfile -t devicelist < <(lsblk -dlnp -o name)
 	mapfile -t devicesize < <(lsblk -dlnp -o size)
-	# blkid -o value -s LABEL /dev/nvme1n1 # print device LABEL 
-	DRIVE=$(dialog --title "OS INSTALLATION" --stdout --menu "Select preferred drive" 0 0 0 "${devicelist[0]}" "${devicesize[0]}" "${devicelist[1]}" "${devicesize[1]}" "${devicelist[2]}" "${devicesize[2]}" "${devicelist[3]}" "${devicesize[3]}" "${devicelist[4]}" "${devicesize[4]}" || exit 1)
-	[[ "$VBTsel" = 0 ]] && ADDITIONAL_DRIVE="$(dialog --title "ADDITIONAL" --stdout --menu "Select secondary drive" 0 0 0 "${devicelist[0]}" "${devicesize[0]}" "${devicelist[1]}" "${devicesize[1]}" "${devicelist[2]}" "${devicesize[2]}" "${devicelist[3]}" "${devicesize[3]}" "${devicelist[4]}" "${devicesize[4]}" || exit 1)"
-	umount "$DRIVE"?*
+	local dialog_list=()
+	for i in "${!devicelist[@]}"; do dialog_list+=("${devicelist[i]}" "${devicesize[i]}") ; done
+	DRIVE=$(dialog --title "OS INSTALLATION" --stdout --menu "Select preferred drive" 0 0 0 "${dialog_list[@]}")
+	[[ -z "$DRIVE" ]] && exit 1
+	if [[ "$VBTsel" = 0 ]]; then ADDITIONAL_DRIVE="$(dialog --title "ADDITIONAL" --stdout --menu "Select secondary drive (Optional - Cancel to skip)" 0 0 0 "${dialog_list[@]}")" ; fi
+	umount "$DRIVE"?* 2>/dev/null || true
 	sgdisk -ozZ "$DRIVE"
-	parted -sf "$DRIVE" mktable gpt mkpart "ESP" 0% 1% mkpart "LINUX-HOME" 1% 96% mkpart "SWAP" 96% 100% set 1 esp on set 2 linux-home on set 3 swap on
-	if echo "$DRIVE" | grep "^/dev/[a-z]d[a-z]"; then
-	BOOT_PART="$DRIVE"1 ; ROOT_PART="$DRIVE"2 ; SWAP_PART="$DRIVE"3 ; DEVICE="${DRIVE#/*/}"
-	elif echo "$DRIVE" | grep "^/dev/nvme"; then
-	BOOT_PART="$DRIVE"p1 ; ROOT_PART="$DRIVE"p2 ; SWAP_PART="$DRIVE"p3 ; DEVICE="${DRIVE#/*/}" #printf -v BOOT_PART "%sp1" "$DRIVE"
-	elif echo "$DRIVE" | grep "^/dev/mmc"; then
-	BOOT_PART="$DRIVE"1 ; ROOT_PART="$DRIVE"2 ; SWAP_PART="$DRIVE"3 ; DEVICE="${DRIVE#/*/}"
+	# CORRETTO: Tutto su una riga logica pulita senza backslash residui
+	parted -sf "$DRIVE" mktable gpt mkpart "ESP" 0% 1% mkpart "LINUX-ROOT" 1% 96% mkpart "SWAP" 96% 100% set 1 esp on set 3 swap on
+	if echo "$DRIVE" | grep -q "^/dev/[a-z]d[a-z]"; then BOOT_PART="${DRIVE}1" ; ROOT_PART="${DRIVE}2" ; SWAP_PART="${DRIVE}3"
+	elif echo "$DRIVE" | grep -q "^/dev/nvme"; then	BOOT_PART="${DRIVE}p1" ; ROOT_PART="${DRIVE}p2" ; SWAP_PART="${DRIVE}p3"
+	elif echo "$DRIVE" | grep -q "^/dev/mmc"; then BOOT_PART="${DRIVE}1" ; ROOT_PART="${DRIVE}2" ; SWAP_PART="${DRIVE}3"
 	fi
-	echo DRIVE="$DRIVE" DEVICE="$DEVICE" && if [[ -z $DRIVE || -z $DEVICE ]]; then echo "No partition were created, check the installer. Closing installation!" ; exit 1 ;
-	else echo 'We can proceed with the formatting of file system' ; fi
+	DEVICE="${DRIVE##*/}"
+	echo DRIVE="$DRIVE" DEVICE="$DEVICE"
+	if [[ -z $DRIVE || -z $DEVICE ]]; then echo "No partition were created, check the installer. Closing installation!" ; exit 1 
+	else echo 'We can proceed with the formatting of file system' 
+	fi
+	sleep 1
 	BOOTID="$(blkid -s "$PIDsel" -o value "$BOOT_PART")" ; export BOOTID
 	ROOTID="$(blkid -s "$PIDsel" -o value "$ROOT_PART")" ; export ROOTID
 	echo -e " BP=$BOOT_PART RP=$ROOT_PART PID=$PIDsel \n ${PIDsel}_BOOT=$BOOTID \n ${PIDsel}_ROOT=$ROOTID "
@@ -47,76 +51,39 @@ DiskPartition () {
 }
 
 FileSystemFormat () {
-	BootLabel='EFI'
-	RootLabel='ROOT'
-	mkfs.fat -F32 -n "$BootLabel" "$BOOT_PART"
-	mkswap "$SWAP_PART"
-	UNIfstab="$PIDsel=$BOOTID /boot vfat defaults 0 2\n"
-	
+	BootLabel='EFI' ; RootLabel='ROOT' ; mkfs.fat -F32 -n "$BootLabel" "$BOOT_PART" ; mkswap "$SWAP_PART"
+	SWAPID="$(blkid -s "$PIDsel" -o value "$SWAP_PART")"
+	UNIfstab="$PIDsel=$BOOTID /boot vfat defaults 0 2\n$PIDsel=$SWAPID none swap defaults 0 0\n"
 	case "$FSsel" in
-	ext4)
-		mkfs.ext4 -L "$RootLabel" "$ROOT_PART"
-		mount "$ROOT_PART" /mnt
-		UNIfstab+="$PIDsel=$ROOTID / ext4 defaults 0 1\n"
-	;;
-	btrfs)
-		modules=(btrfs)
-		binaries='btrfs'	#'\/usr\/bin\/btrfsck'
-		local SUBVolumes=( 'home' 'var_log' 'snapshots' 'swap' )
-		local options='noatime,compress=zstd,space_cache=v2,discard=async' #default use the default options: rw, suid, dev, exec, auto, nouser, and async.
-		mkfs.btrfs -fL "$RootLabel" "$ROOT_PART" #-f option to force overwrite filesystem
-		
-		mount "$ROOT_PART" /mnt
-		btrfs su cr /mnt/@
-		for b in "${SUBVolumes[@]}"; do	btrfs su cr /mnt/@"$b"; done
-		umount /mnt
-		mount -o defaults,"$options",subvol=@ "$ROOT_PART" /mnt
-		UNIfstab+="$PIDsel=$ROOTID / btrfs $options,subvol=@ 0 0\n"
-		for c in "${SUBVolumes[@]}"; do
-			case "$c" in
-			snapshots) mkdir -p /mnt/."$c"
-				mount -o "$options",discard=async,subvol=@"$c" "$ROOT_PART" /mnt/."$c"
-				UNIfstab+="$PIDsel=$ROOTID /.$c btrfs $options,discard=async,subvol=@$c 0 0\n"
-			;;
-			var_log) mkdir -p /mnt/var/log
-				mount -o "$options",subvol=@"$c" "$ROOT_PART" /mnt/var/log
-				UNIfstab+="$PIDsel=$ROOTID /var/log btrfs $options,subvol=@$c 0 0\n"
-			;;
-			swap) #mkdir -p /mnt/swap
-				#mount -o compress=no,space_cache,ssd,discard=async,subvol=@swap "$ROOT_PART" /mnt/swap
-				#echo -e "$PIDsel=$ROOTID /swap btrfs $options,subvol=@$c 0 0" >> UNIfstab
-				## Create Swapfile
-				##touch /swap/swapfile
-				#SF=/mnt/swap/swapfile
-				#truncate -s 0 "$SF"
-				#chattr +mC "$SF" #m=no compression - C=no copyonwrite
-				##btrfs property set "$SF" compression none
-				#dd if=/dev/zero of="$SF" bs=1M count=16384 #fallocate -l 16G "$SF"
-				#chmod 600 "$SF" || chmod 0600 "$SF"
-				#mkswap "$SF"
-				#swapon "$SF"
-			;;
-			*) mkdir -p /mnt/"$c" && mount -o defaults,"$options",subvol=@"$c" "$ROOT_PART" /mnt/"$c"
-				UNIfstab+="$PIDsel=$ROOTID /$c btrfs $options,subvol=@$c 0 0\n"
-			;;
-			esac
-		done
-	;;
-	*)	echo boh
-	;;
+	ext4)  mkfs.ext4 -L "$RootLabel" "$ROOT_PART" ; mount "$ROOT_PART" /mnt
+		   UNIfstab+="$PIDsel=$ROOTID / ext4 defaults 0 1\n" ;;
+	btrfs) modules=(btrfs) ; binaries='btrfs' ; local SUBVolumes=( 'home' 'var_log' 'snapshots' 'swap' )
+		   local options='noatime,compress=zstd,space_cache=v2,discard=async'
+		   mkfs.btrfs -fL "$RootLabel" "$ROOT_PART" ; mount "$ROOT_PART" /mnt ; btrfs su cr /mnt/@
+		   for b in "${SUBVolumes[@]}"; do btrfs su cr /mnt/@"$b" ; done ; umount /mnt
+		   mount -o defaults,"$options",subvol=@ "$ROOT_PART" /mnt
+		   UNIfstab+="$PIDsel=$ROOTID / btrfs $options,subvol=@ 0 0\n"
+		   for c in "${SUBVolumes[@]}"; do
+			   case "$c" in
+			   snapshots) mkdir -p /mnt/."$c" ; mount -o "$options" "$ROOT_PART" /mnt/."$c"
+						  UNIfstab+="$PIDsel=$ROOTID /.$c btrfs $options,subvol=@$c 0 0\n" ;;
+			   var_log)   mkdir -p /mnt/var/log ; mount -o "$options" "$ROOT_PART" /mnt/var/log
+						  UNIfstab+="$PIDsel=$ROOTID /var/log btrfs $options,subvol=@$c 0 0\n" ;;
+			   swap)      ;;
+			   *)         mkdir -p /mnt/"$c" && mount -o defaults,"$options",subvol=@"$c" "$ROOT_PART" /mnt/"$c"
+						  UNIfstab+="$PIDsel=$ROOTID /$c btrfs $options,subvol=@$c 0 0\n" ;;
+			   esac
+		   done ;;
+	*)	   echo "boh" ;;
 	esac
-	swapon "$SWAP_PART"
-	#UUID=device_UUID none swap defaults 0 0
-	#echo -e "$PIDsel=$BOOTID /boot vfat defaults 0 2" > UNIfstab
-	mkdir /mnt/boot
-	mount "$BOOT_PART" /mnt/boot
-	lsblk -f
+	swapon "$SWAP_PART" ; mkdir -p /mnt/boot ; mount "$BOOT_PART" /mnt/boot ; lsblk -f
 }
 
 AdditionalDriveSetup () {
-	if [ -v "$ADDITIONAL_DRIVE" ]; then
-	mkdir -p /mnt/run/media/"$HNsel"/{HDD,USB}
-	mount "$ADDITIONAL_DRIVE" /mnt/run/media/"$HNsel"/HDD
+	# Verifica se la stringa non è vuota (ovvero se l'utente ha scelto un secondo disco nel menu)
+	if [ -n "$ADDITIONAL_DRIVE" ]; then
+		mkdir -p /mnt/run/media/"$HNsel"/HDD
+		mount "$ADDITIONAL_DRIVE" /mnt/run/media/"$HNsel"/HDD
 	fi
 }
 
