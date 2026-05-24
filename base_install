@@ -208,6 +208,7 @@ KernelSetup () {
 
 ServiceSetup () {
 	Services+=( NetworkManager openrc-settingsd cupsd avahi-daemon bluetoothd )
+	if [[ -v nvidiadrivers ]] && [ "$OSsel" = Artix ]; then Services+=( nvidia-persistenced ); fi
 	for s in "${Services[@]}"; do "$chroot" /mnt "$initc0" "$initc1" "$s" ; done
 	mkdir -p /mnt/etc/udev/rules.d/
 	cp ../UNI/Conf_files/51-android.rules /mnt/etc/udev/rules.d/
