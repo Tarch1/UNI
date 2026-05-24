@@ -173,91 +173,41 @@ PackageInstall () {
 }
 
 KernelSetup () {
-	local HOOKS=(base udev autodetect modconf block usr resume filesystems keyboard keymap fsck)
-	case "$microcodepkg" in
-	intel-ucode) echo -e 'options i915 enable_fbc=1 fastboot=0 enable_dc=4' >> /mnt/etc/modprobe.d/i915.conf
-	;;
-	amd-ucode) echo 'AMD setup: Nothing at the moment'
-	;;
-	*) echo 'No microcode selected, has additional setup been done?'
-	esac
-	if [[ -v nvidiadrivers ]]; then
-		if [ "$OSsel" = Artix ]; then "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" nvidia-utils-openrc 
-		fi
-		ln -s /dev/null /mnt/etc/udev/rules.d/61-gdm.rules
-		modules+=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)
-		echo -e "options nvidia-drm modeset=1\noptions nvidia-drm fbdev=1\noptions nvidia NVreg_DynamicPowerManagement=0x02\noptions nvidia NVreg_UsePageAttributeTable=1" > /mnt/etc/modprobe.d/nvidia.conf
-		HOOKS+=(kms)
-	fi
-	#case "$IRFSetup" in
-	#booster) "$chroot" /mnt "$PKGmanager" -Syu booster 
-	#	echo -e "mount_timeout: 10s \nextra_files: fsck,fsck.$FSsel,busybox \nvconsole: true \nenable_lvm: true" >> /mnt/etc/booster.yaml
-	#	"$chroot" /mnt /usr/lib/booster/regenerate_images ;;
-	#dracut) ;;
-	#mkinitcpio) sed -i "/MODULES/ s/()/(${modules[*]})/" /mnt/etc/mkinitcpio.conf
-	#	sed -i "/BINARIES/ s/()/($binaries)/" /mnt/etc/mkinitcpio.conf
-	#	sed -i "s/^HOOKS.*/HOOKS=(${HOOKS[*]})/" /mnt/etc/mkinitcpio.conf
-	#	"$chroot" /mnt mkinitcpio -p "$KSel";;
-	#esac
-	sed -i "/MODULES/ s/()/(${modules[*]})/" /mnt/etc/mkinitcpio.conf
-	sed -i "/BINARIES/ s/()/($binaries)/" /mnt/etc/mkinitcpio.conf
-	sed -i "s/^HOOKS.*/HOOKS=(${HOOKS[*]})/" /mnt/etc/mkinitcpio.conf
-	"$chroot" /mnt mkinitcpio -p "$KSel"
-}
-
-KernelSetup () {
-	local HOOKS=(base udev autodetect modconf block usr resume filesystems keyboard keymap fsck)
-	case "$microcodepkg" in
-		intel-ucode) echo -e 'options i915 enable_fbc=1 fastboot=0 enable_dc=4' >> /mnt/etc/modprobe.d/i915.conf ;;
-		amd-ucode) echo 'AMD setup: Nothing at the moment' ;;
-		*) echo 'No microcode selected, has additional setup been done?'
-	esac
-	if [[ -v nvidiadrivers ]]; then
-		if [ "$OSsel" = Artix ]; then 
-			"$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" nvidia-utils-openrc 
-			# NOTA: Il servizio nvidia-persistenced è stato spostato dentro ServiceSetup
-		fi
-		ln -s /dev/null /mnt/etc/udev/rules.d/61-gdm.rules
-		modules+=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)
-		echo -e "options nvidia-drm modeset=1 fbdev=1\noptions nvidia NVreg_DynamicPowerManagement=0x02 NVreg_UsePageAttributeTable=1 NVreg_EnablePCIeGen3=1" > /mnt/etc/modprobe.d/nvidia.conf
-		HOOKS+=(kms)
-	fi
-	sed -i "/MODULES/ s/()/(${modules[*]})/" /mnt/etc/mkinitcpio.conf
-	sed -i "/BINARIES/ s/()/($binaries)/" /mnt/etc/mkinitcpio.conf
-	sed -i "s/^HOOKS.*/HOOKS=(${HOOKS[*]})/" /mnt/etc/mkinitcpio.conf
-	"$chroot" /mnt mkinitcpio -p "$KSel"
-}
-
-KernelSetup () {
 	case "$microcodepkg" in
 	intel-ucode) echo -e 'options i915 enable_fbc=1 fastboot=0 enable_dc=4' >> /mnt/etc/modprobe.d/i915.conf ;;
 	amd-ucode) echo 'AMD setup: Nothing at the moment' ;;
 	*) echo 'No microcode selected, has additional setup been done?' ;;
 	esac
-	
 	if [[ -v nvidiadrivers ]]; then
 		if [ "$OSsel" = Artix ]; then "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" nvidia-utils-openrc ; fi
 		ln -s /dev/null /mnt/etc/udev/rules.d/61-gdm.rules
 		modules+=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)
 		echo -e "options nvidia-drm modeset=1 fbdev=1\noptions nvidia NVreg_DynamicPowerManagement=0x02 NVreg_UsePageAttributeTable=1 NVreg_EnablePCIeGen3=1" > /mnt/etc/modprobe.d/nvidia.conf
 	fi
-
-	case "$OSsel" in
-	3|[Vv]oid|Void)
-		# Gestione specifica per Void Linux tramite Dracut
-		if [ "$FSsel" = btrfs ]; then echo 'add_dracutmodules+=" btrfs "' > /mnt/etc/dracut.conf.d/btrfs.conf ; fi
-		if [[ -v nvidiadrivers ]]; then	echo 'force_drivers+=" nvidia nvidia_modeset nvidia_uvm nvidia_drm "' > /mnt/etc/dracut.conf.d/nvidia.conf ; fi
-		# Comando nativo per rigenerare l'initramfs su Void (Void usa xbps-reconfigure)
-		"$chroot" /mnt xbps-reconfigure -f "$KSel"
+	if [ "$OSsel" = Void ]; then IRFSetup="dracut"; else IRFSetup="booster"; fi
+	case "$IRFSetup" in
+	dracut)	mkdir -p /mnt/etc/dracut.conf.d
+			if [ "$FSsel" = btrfs ]; then echo 'add_dracutmodules+=" btrfs "' > /mnt/etc/dracut.conf.d/btrfs.conf ; fi
+			if [[ -v nvidiadrivers ]]; then	echo 'force_drivers+=" nvidia nvidia_modeset nvidia_uvm nvidia_drm "' > /mnt/etc/dracut.conf.d/nvidia.conf ; fi
+			"$chroot" /mnt xbps-reconfigure -f "$KSel"
 	;;
-	
-	*)	# Gestione nativa per Arch e Artix tramite Mkinitcpio
-		local HOOKS=(base udev autodetect modconf block usr resume filesystems keyboard keymap fsck)
-		[[ -v nvidiadrivers ]] && HOOKS+=(kms)
-		sed -i "/MODULES/ s/()/(${modules[*]})/" /mnt/etc/mkinitcpio.conf
-		sed -i "/BINARIES/ s/()/($binaries)/" /mnt/etc/mkinitcpio.conf
-		sed -i "s/^HOOKS.*/HOOKS=(${HOOKS[*]})/" /mnt/etc/mkinitcpio.conf
-		"$chroot" /mnt mkinitcpio -p "$KSel"
+	booster) if [ "$OSsel" = Artix ]; then "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" booster booster-openrc
+			else "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" booster ; fi
+			mkdir -p /mnt/etc/booster.d
+			cat <<-EOF > /mnt/etc/booster.yaml
+			mount_timeout: 10s
+			vconsole: true
+			EOF
+			if [[ -v nvidiadrivers ]]; then	echo 'modules: nvidia,nvidia_modeset,nvidia_uvm,nvidia_drm' >> /mnt/etc/booster.yaml ; fi
+			# CORRETTO: Comando ufficiale e funzionante per generare i file .img con Booster
+			"$chroot" /mnt booster-pkg universal
+	;;
+	mkinitcpio|*)	local HOOKS=(base udev autodetect modconf block usr resume filesystems keyboard keymap fsck)
+					[[ -v nvidiadrivers ]] && HOOKS+=(kms)
+					sed -i "/MODULES/ s/()/(${modules[*]})/" /mnt/etc/mkinitcpio.conf
+					sed -i "/BINARIES/ s/()/($binaries)/" /mnt/etc/mkinitcpio.conf
+					sed -i "s/^HOOKS.*/HOOKS=(${HOOKS[*]})/" /mnt/etc/mkinitcpio.conf
+					"$chroot" /mnt mkinitcpio -p "$KSel"
 	;;
 	esac
 }
