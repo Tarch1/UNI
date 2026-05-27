@@ -64,8 +64,8 @@ UEFIsel () {
 CPUsel () {
 	local cpu_vendor=$(lscpu | grep -Eo "GenuineIntel|AuthenticAMD" | head -n1)
 	case "$cpu_vendor" in
-		GenuineIntel) echo 'Installing Intel microcode'; microcodepkg='intel-ucode' ;;
-		AuthenticAMD) echo 'Installing AMD microcode'; microcodepkg='amd-ucode' ;;
+		GenuineIntel) echo 'Installing Intel microcode' && microcodepkg='intel-ucode' ;;
+		AuthenticAMD) if [[ "$OSsel" == "Void" ]]; then microcodepkg='amd-ucode-firmware' && echo 'Installing AMD microcode'; else microcodepkg='amd-ucode' && echo 'Installing AMD microcode';;
 		*) echo 'No microcode needed or unknown CPU' ;;
 	esac	
 }
