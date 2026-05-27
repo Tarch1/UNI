@@ -1,250 +1,175 @@
 #!/bin/bash
 
-#ArchitectureSel () {
-#	case "$(uname -m)" in
-#	aarch64)	;;
-#	i686)	;;
-#	x86_64)	;;
-#	esac
-#}
-
-UEFIsel () {
-	if [[ -d "/sys/firmware/efi/" ]]; then	## Mount efivarfs if it is not already mounted
-		if (mount | grep /sys/firmware/efi/efivars) ; then mount -t efivarfs efivarfs /sys/firmware/efi/efivars ; fi
-		UEFImode=1 && echo 'UEFI Mode detected'
-	else UEFImode=0 && echo 'BIOS Mode detected'
-	fi
-}
-
-CPUsel () {
-	CPUT="$(lscpu | grep -Eo "GenuineIntel|AuthenticAMD")"
-	case "$CPUT" in
-	GenuineIntel) echo 'Installing Intel microcode' && microcodepkg='intel-ucode' ;;
-	AuthenticAMD) echo 'Installing AMD microcode' && microcodepkg='amd-ucode' ;;
-	esac	
-}
-
-GPUsel () {
-	echo " Detecting video chipset "
-	readarray -t Gsel < <(lspci | grep VGA | grep -Eo 'VM|Virtio|QXL|NVIDIA|Intel|AMD')
-	for i in "${Gsel[@]}"; do
-		case "$i" in
-		Intel) echo "The default Mesa driver will be installed" ;;
-		NVIDIA) YesNoSel 'Found Nvidia gpu, wanna proprietary driver? If you do not like it, Mesa is the defaulta'
-			case "$CC" in
-			1) echo 'Setting up Proprietary' 
-				if [ "$KSel" = linux ]; then nvidiadrivers=(nvidia)
-				elif [ "$KSel" = linux-lts ]; then nvidiadrivers=(nvidia-lts)
-				else nvidiadrivers=(nvidia-dkms) ; fi
-				nvidiadrivers+=(nvidia-prime nvidia-settings nvidia-utils lib32-nvidia-utils opencl-nvidia lib32-opencl-nvidia libxnvctrl libvdpau) ;;
-			0) echo 'Using default Mesa' ;;
-			*) echo "Error with nested NVIDIA case" ;;
-			esac
-			AcpiOS="$(strings /sys/firmware/acpi/tables/DSDT | grep -i 'windows ' | sort | tail -1)" ;;
-		AMD) amddrivers=(amdgpu mesa vulkan-radeon libva-mesa-driver mesa-vdpau) ;;
-		VM|WM|Virtio|QXL) VBTsel=1 && echo "The default Mesa driver will be installed" ;;
-		*) echo "No $i gpu found" ;;
+YesNoSel () {
+	local choice
+	while true; do
+		read -rp "$1 [y/n]: " choice
+		case "$choice" in
+			[Yy]* ) CC=1; break;;
+			[Nn]* ) CC=0; break;;
+			* ) echo "Rispondi 'y' o 'n'.";;
 		esac
 	done
 }
 
-KernelSel () {
-	echo -en "Enter preferred Kernel : 1) Stable 2) Longterm 3) Hardened 4) Zen \n"
-	read -r KSel
-	case $KSel in
-	1|Stable) KSel="linux" && echo "Kernel selected : linux" ;;
-	2|Longterm) KSel="linux-lts" && echo "Kernel selected : linux-lts" ;;
-	3|Hardened) KSel="linux-hardened" && echo "Kernel selected : linux-hardened" ;;
-	4|Zen) KSel="linux-zen" && echo "Kernel selected : linux-zen" ;;
-	*) echo "Wrong Kernel selected, try one of those provided" && KernelSel ;;
+MenuSel () {
+	local var_name="$1" question="$2" user_choice
+	shift 2
+	local options=("$@")
+	while true; do
+		echo -e "\n=== $question ==="
+		for i in "${!options[@]}"; do echo "$((i+1))) ${options[$i]}"; done
+		read -rp "Scelta: " user_choice
+		if [[ "$user_choice" =~ ^[0-9]+$ ]] && [ "$user_choice" -le "${#options[@]}" ] && [ "$user_choice" -gt 0 ]; then
+			local selected_val="${options[$((user_choice-1))]}"
+			eval "$var_name=\"$selected_val\""
+			echo "Selezionato: $selected_val"
+			break
+		else
+			echo "Scelta non valida, riprova."
+		fi
+	done
+}
+
+TextPromptSel () {
+	local var_name="$1" prompt_msg="$2" input_val
+	while true; do
+		read -rp "$prompt_msg: " input_val
+		if [[ -z "$input_val" ]]; then echo "L'input non può essere vuoto."; continue; fi
+		YesNoSel "Confermi che << $input_val >> è corretto?"
+		[[ "$CC" -eq 1 ]] && eval "$var_name=\"$input_val\"" && break
+		echo "Riproviamo..."
+	done
+}
+
+UEFIsel () {
+	if [[ -d "/sys/firmware/efi/" ]]; then
+		mount | grep -q "/sys/firmware/efi/efivars" || mount -t efivarfs efivarfs /sys/firmware/efi/efivars
+		UEFImode=1 && echo 'UEFI Mode detected'
+	else 
+		UEFImode=0 && echo 'BIOS Mode detected'
+	fi
+}
+
+CPUsel () {
+	local cpu_vendor=$(lscpu | grep -Eo "GenuineIntel|AuthenticAMD" | head -n1)
+	case "$cpu_vendor" in
+		GenuineIntel) echo 'Installing Intel microcode'; microcodepkg='intel-ucode' ;;
+		AuthenticAMD) echo 'Installing AMD microcode'; microcodepkg='amd-ucode' ;;
+		*) echo 'No microcode needed or unknown CPU' ;;
+	esac	
+}
+
+GPUsel () {
+	echo "Detecting video chipset..."
+	local gpu_info=$(lspci | grep -Ei 'VGA|3D')
+	case "$gpu_info" in
+		*Intel*) echo "The default Mesa driver will be installed" ;;
+		*NVIDIA*) 
+			YesNoSel 'Found Nvidia gpu, wanna proprietary driver? If you do not like it, Mesa is the default'
+			if [ "$CC" -eq 1 ]; then
+				echo 'Setting up Proprietary Drivers' 
+				case "$KSel" in
+					linux)     nvidiadrivers=(nvidia) ;;
+					linux-lts) nvidiadrivers=(nvidia-lts) ;;
+					*)         nvidiadrivers=(nvidia-dkms) ;;
+				esac
+				nvidiadrivers+=(nvidia-prime nvidia-settings nvidia-utils lib32-nvidia-utils opencl-nvidia lib32-opencl-nvidia libxnvctrl libvdpau)
+			else
+				echo 'Using default Mesa'
+			fi
+			[ -f /sys/firmware/acpi/tables/DSDT ] && AcpiOS="$(strings /sys/firmware/acpi/tables/DSDT | grep -i 'windows ' | sort | tail -1)"
+			;;
+		*AMD*|*Radeon*) amddrivers=(amdgpu mesa vulkan-radeon libva-mesa-driver mesa-vdpau) ;;
+		*VMware*|*VirtualBox*|*Virtio*|*QXL*) VBTsel=1 && echo "VM detected: The default Mesa driver will be installed" ;;
+		*) echo "Generic GPU: Mesa will be installed" ;;
 	esac
 }
 
 Pacman_Locked() {
 	if [ -f /var/lib/pacman/db.lck ] || [ -f /mnt/var/lib/pacman/db.lck ]; then
-		echo -e " !!!ERROR!!! Pacman is blocked. \n We try to remove /var/lib/pacman/db.lck."
-		rm -f /var/lib/pacman/db.lck || /mnt/var/lib/pacman/db.lck
-	else echo "No locked database"
+		echo -e "!!!ERROR!!! Pacman is blocked. Removing lockfiles..."
+		rm -f /var/lib/pacman/db.lck /mnt/var/lib/pacman/db.lck
+	else 
+		echo "No locked database"
 	fi
 }
 
 ArchRepoSetup () {
-	if grep -m 1 'Server = https://universe.artixlinux.org/$arch' -q "$1" ; then echo "There is already an entry"
-	else
-		local UNIVERSErepo=( '[universe]'
-		'Server = https://universe.artixlinux.org/$arch'
-		'Server = https://mirror1.artixlinux.org/universe/$arch'
-		'Server = https://mirror.pascalpuffke.de/artix-universe/$arch'
-		'Server = https://artixlinux.qontinuum.space/artixlinux/universe/os/$arch'
-		'Server = https://mirror1.cl.netactuate.com/artix/universe/$arch'
-		'Server = https://ftp.crifo.org/artix-universe/' )
-		for UR in "${UNIVERSErepo[@]}" ; do echo "$UR" >> "$1" ; done
+	local target_conf="$1" pm="${PKGmanager:-pacman}" ch="${chroot:-artix-chroot}"
+	if ! grep -q 'universe' "$target_conf" 2>/dev/null; then 
+		cat << 'EOF' >> "$target_conf"
+
+[universe]
+Server = https://artixlinux.org\$arch
+Server = https://artixlinux.org\$arch
+EOF
 	fi
-	if grep -m 1 'Include = /etc/pacman.d/mirrorlist-arch' -q "$1" ; then echo "There is already an entry"
-	else
-		if [ "$1" = /mnt/etc/pacman.conf ]; then "$chroot" /mnt "$PKGmanager" -Sy "${pkgskips[@]}" artix-archlinux-support
-		else "$PKGmanager" -Sy "${pkgskips[@]}" artix-archlinux-support
+	if ! grep -q 'mirrorlist-arch' "$target_conf" 2>/dev/null; then 
+		local cmd Ramos=("$pm" -Sy "${pkgskips[@]}" artix-archlinux-support)
+		[ "$target_conf" = /mnt/etc/pacman.conf ] && "$ch" /mnt "${cmd[@]}" || "${cmd[@]}"
+		cat << 'EOF' >> "$target_conf"
+
+# Arch
+[extra]
+Include = /etc/pacman.d/mirrorlist-arch
+[community]
+Include = /etc/pacman.d/mirrorlist-arch
+[multilib]
+Include = /etc/pacman.d/mirrorlist-arch
+EOF
+		if [ "$target_conf" = /mnt/etc/pacman.conf ]; then
+			"$ch" /mnt pacman-key --populate archlinux
+			"$ch" /mnt "$pm" -Sy
+		else
+			pacman-key --populate archlinux && "$pm" -Sy
 		fi
-		local ArchRepo=( '# Arch' '[extra]' 'Include = /etc/pacman.d/mirrorlist-arch'
-		'[community]' 'Include = /etc/pacman.d/mirrorlist-arch'
-		'[multilib]' 'Include = /etc/pacman.d/mirrorlist-arch' )
-		for AR in "${ArchRepo[@]}"; do echo "$AR" >> "$1" ; done
-		"$PKGmanager"-key --populate archlinux
-		"$PKGmanager" -Sy
 	fi
-	if ! [[ -s /etc/pacman.d/mirrorlist-arch ]]; then "$PKGmanager" -Sy "${pkgskips[@]}" artix-archlinux-support ; fi
+	[[ -s /etc/pacman.d/mirrorlist-arch ]] || pacman -Sy artix-archlinux-support --noconfirm 2>/dev/null || true
 }
 
 AnotherCheck () {
 	pacman -Sylq system world galaxy extra community multilib | sort > pacman_db
-	echo "${miss[@]}" | tr ' ' '\n' | sort -u > pkg_missed
+	printf '%s\n' "${miss[@]}" | sort -u > pkg_missed
 	mapfile -t unlisted < <(comm -13 pacman_db pkg_missed)
-	#IFS=" " read -r -a unlisted <<< "$(comm -13 pacman_db pkg_missed)"
-	echo "Unlisted" = "${unlisted[@]}"
+	echo "Unlisted = ${unlisted[*]}"
 }
 
-########## PERSONALIZATION-SCRIPT ##########
+KernelSel()            { MenuSel "KSel" "Select preferred Kernel" "linux" "linux-lts" "linux-hardened" "linux-zen"; }
+OperatingSystemSel()   { MenuSel "OSsel" "Select the distro to setup" "Arch" "Artix" "Void"; }
+VoidInstMethod()       { MenuSel "VImethod" "Select installation type" "XBPS" "ROOTFS"; }
+LibrarySel()           { MenuSel "LIBsel" "Select base library" "GLIBC" "MUSL"; }
+LocalizationSel()      { MenuSel "LOCsel" "Select localization" "en_US.UTF-8" "en_GB.UTF-8" "it_IT.UTF-8"; }
+LanguageSel()          { MenuSel "LANGsel" "Select preferred Language" "en_US.UTF-8" "en_GB.UTF-8" "it_IT.UTF-8"; }
+PartIDSel()            { MenuSel "PIDsel" "Select partition identifier" "UUID" "PARTUUID" "LABEL"; }
+FilesystemSel()        { MenuSel "FSsel" "Select filesystem for ROOT" "ext4" "btrfs"; }
+BootloaderSel()        { MenuSel "BLsel" "Select Bootloader" "refind" "grub" "efistub"; }
+HostnameSel()          { TextPromptSel "HNsel" "Enter preferred hostname"; }
+UsernameSel()          { TextPromptSel "UNsel" "Enter preferred username"; }
 
 VirtualBoxTest () {
-	YesNoSel "If this is a Virtualbox installation for test the script, we will skip every choice \n"
-	case $CC in
-	1) VBTsel=1 && echo "OK, skip all check $VBTsel" ;;
-	0) VBTsel=0 && echo "OK, now respond a few question" ;;
-	*) echo "Do again please" && VirtualBoxTest ;;
-	esac
-}
-
-OperatingSystemSel () {
-	echo -en "Enter the distro we are going to setup : 1) Arch 2) Artix 3) Void \n"
-	read -r OSsel
-	case $OSsel in
-	1|Arch|arch) OSsel="Arch" && echo "distro selected : Arch" ;;
-	2|Artix|artix) OSsel="Artix" && echo "distro selected : Artix" ;;
-	3|Void|void) OSsel="Void" && echo "distro selected : Void" ;;
-	*) echo "Wrong choice, type again" && OperatingSystemSel ;;
-	esac
+	YesNoSel "If this is a Virtualbox installation for test, skip every choice?"
+	VBTsel="$CC"
+	[[ "$VBTsel" -eq 1 ]] && echo "OK, skip all checks." || echo "OK, let's proceed with questions."
 }
 
 ArchRepoSel () {
-	YesNoSel "You want Arch repositories as well as Artix repositories"
-	case $CC in
-	1) ARCHrepo=1 && echo "OK, adding the repositories of Arch!" ;;
-	0) ARCHrepo='' && echo "Well, trying without them..." ;;
-	*) echo "Do again please" && ArchRepoSel ;;
-	esac
-}
-
-VoidInstMethod () {
-	echo -en "Enter installation type : 1) XBPS 2) ROOTFS \n"
-	read -r VImethod
-	case $VImethod in
-	1|XBPS|xbps) VImethod="XBPS" && echo 'Selected : XBPS install' ;;
-	2|ROOTFS|rootfs) VImethod="ROOTFS" && echo 'Selected : ROOTFS install' ;;
-	*) echo "Wrong choice, type again" && VoidInstMethod ;;
-	esac
-}
-
-LibrarySel () {
-	echo -en "Enter base library name : 1) GLIBC 2) MUSL \n"
-	read -r LIBsel
-	case $LIBsel in
-	1|GLIBC|glibc) LIBsel="GLIBC" && echo "Selected : GLIBC" ;;
-	2|MUSL|musl) LIBsel="MUSL" && echo "Selected : MUSL" ;;
-	*) echo "Wrong choice, type again" && LibrarySel ;;
-	esac
-}
-
-LocalizationSel () {
-	echo -en "Enter localization : 1) en_US.UTF-8 2) en_GB.UTF-8 3) it_IT.UTF-8 \n"
-	read -r LOCsel
-	case $LOCsel in
-	1|en_US|en_US.UTF-8) LOCsel="en_US.UTF-8" && echo "Selected : en_US.UTF-8" ;;
-	2|en_GB|en_GB.UTF-8) LOCsel="en_GB.UTF-8" && echo "Selected : en_GB.UTF-8" ;;
-	3|it_IT|it_IT.UTF-8) LOCsel="it_IT.UTF-8" && echo "Selected : it_IT.UTF-8" ;;
-	*) echo "Wrong choice, type again" && LocalizationSel ;;
-	esac
-}
-
-LanguageSel () {
-	echo -en "Enter preferred Language : 1) en_US.UTF-8 2) en_GB.UTF-8 3) it_IT.UTF-8 \n"
-	read -r LANGsel
-	case $LANGsel in
-	1|en_US|en_US.UTF-8) LANGsel="en_US.UTF-8" && echo "Selected : en_US.UTF-8" ;;
-	2|en_GB|en_GB.UTF-8) LANGsel="en_GB.UTF-8" && echo "Selected : en_GB.UTF-8" ;;
-	3|it_IT|it_IT.UTF-8) LANGsel="it_IT.UTF-8" && echo "Selected : it_IT.UTF-8" ;;
-	*) echo "Wrong choice, type again" && LanguageSel ;;
-	esac
-}
-
-HostnameSel () {
-	read -rp "Enter preferred hostname : " HNsel
-	YesNoSel "If << $HNsel >> is the right hostname type y or n for retype it :"
-	case $CC in
-	1) echo "OK, hostname selected $HNsel" ;;
-	*) echo "Then again" && HostnameSel ;;
-	esac
-}
-
-UsernameSel () {
-	read -rp "Enter preferred username : " UNsel
-	YesNoSel "If << $UNsel >> is the right hostname type y or n for retype it :"
-	case $CC in
-	1) echo "OK, username selected $UNsel" ;;
-	*) echo "Then again" && UsernameSel ;;
-	esac
+	YesNoSel "You want Arch repositories as well as Artix repositories?"
+	[[ "$CC" -eq 1 ]] && ARCHrepo=1 && echo "OK, adding Arch repositories!" || { ARCHrepo=''; echo "Proceeding without them..."; }
 }
 
 TimezoneSel () {
-	echo -en " Select Timezone : 1) Europe/Rome \n or type another with the same format "
-	read -r TZsel
-	case "$TZsel" in
-	1|Europe/Rome|Rome) TZsel="Europe/Rome" && echo "Selected : Europe/Rome" ;;
-	q|quit|exit) TZsel="" ;;
-	*)	YesNoSel "Want this for timezone : $TZsel ?"
-		case $CC in
-		1) echo "OK, timezone selected $TZsel" ;;
-		*) echo "Then again" && TimezoneSel ;;
-		esac ;;
-	esac
-}
-
-PartIDSel () {
-	echo -en "Enter partition identifier : 1) UUID 2) PARTUUID 3) LABEL \n"
-	read -r PIDsel
-	case $PIDsel in
-	1|UUID|uuid) PIDsel=UUID && echo "Selected : UUID" ;;
-	2|PARTUUID|partuuid) PIDsel=PARTUUID && echo "Selected : PARTUUID" ;;
-	3|LABEL|label) PIDsel=LABEL && echo "Selected : LABEL" ;;
-	*) echo "Wrong choice, type again" && PartIDSel ;;
-	esac
-}
-
-FilesystemSel () {
-	echo -en "Enter base filesystem : 1) EXT4 2) BTRFS \n"
-	read -r FSsel
-	case $FSsel in
-	1|EXT4|ext4) FSsel=ext4 && echo "Selected : EXT4" ;;
-	2|BTRFS|btrfs) FSsel=btrfs && echo "Selected : BTRFS" ;;
-	*) echo "Wrong filesystem selected, try one of those provided" && FilesystemSel ;;
-	esac
-}
-
-BootloaderSel () {
-	echo -en "Enter preferred bootloader : 1) Refind 2) Grub 3) Efistub \n"
-	read -r BLsel
-	case $BLsel in
-	1|REFIND|refind) BLsel="refind" && echo "bootloader selected : refind" ;;
-	2|GRUB|grub) BLsel="grub" && echo "bootloader selected : grub" ;;
-	3|EFISTUB|efistub) BLsel="efistub" && echo "bootloader selected : efistub" ;;
-	*) echo "Wrong bootloader selected, try one of those provided" && BootloaderSel ;;
-	esac
-}
-
-YesNoSel () {
-	read -rp "$1 $2 $3 [y/N] " YNS
-	case "$YNS" in
-	[yY] | [yY][eE][sS]) CC=1 ;;
-	[nN] | [nN][oO]) CC=0 ;;
-	*) YesNoSel "$1" ;;
-	esac
+	local TZsel
+	while true; do
+		echo -e "\n=== Select Timezone ==="
+		echo "1) Europe/Rome"
+		read -rp "Type '1' or write custom format (e.g. America/New_York) ['q' to quit]: " TZsel
+		case "$TZsel" in
+			1) TZsel="Europe/Rome" ; break ;;
+			q|quit) TZsel="" ; break ;;
+			"") echo "Input cannot be empty." ;;
+			*) YesNoSel "Confirm timezone: $TZsel ?" && [[ "$CC" -eq 1 ]] && break ;;
+		esac
+	done
+	echo "Selected Timezone: $TZsel"
 }
