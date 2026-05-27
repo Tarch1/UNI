@@ -26,7 +26,6 @@ MenuSel () {
 		read -rp "Scelta: " user_choice
 		
 		if [[ "$user_choice" =~ ^[0-9]+$ ]] && [ "$user_choice" -le "${#options[@]}" ] && [ "$user_choice" -gt 0 ]; then
-			# Assegnazione diretta senza eval
 			var_name="${options[$((user_choice-1))]}"
 			echo "Selezionato: $var_name"
 			break
@@ -44,7 +43,6 @@ TextPromptSel () {
 		read -rp "$prompt_msg: " input_val
 		YesNoSel "Confermi che << $input_val >> è corretto?"
 		if [[ "$CC" -eq 1 ]]; then
-			# Assegnazione diretta senza eval
 			var_name="$input_val"
 			break
 		fi
@@ -65,7 +63,7 @@ CPUsel () {
 	local cpu_vendor=$(lscpu | grep -Eo "GenuineIntel|AuthenticAMD" | head -n1)
 	case "$cpu_vendor" in
 		GenuineIntel) echo 'Installing Intel microcode' && microcodepkg='intel-ucode' ;;
-		AuthenticAMD) echo 'Installing AMD microcode' ; if [[ "$OSsel" == "Void" ]]; then microcodepkg='amd-ucode-firmware'; else microcodepkg='amd-ucode'; fi ;;
+		AuthenticAMD) echo 'Installing AMD microcode' ; [[ "$OSsel" == "Void" ]] && microcodepkg='amd-ucode-firmware' || microcodepkg='amd-ucode' ;;
 		*) echo 'No microcode needed or unknown CPU' ;;
 	esac	
 }
@@ -80,10 +78,8 @@ GPUsel () {
 			if [ "$CC" -eq 1 ]; then
 				echo 'Setting up Proprietary Drivers' 
 				if [[ "$OSsel" == "Void" ]]; then
-					# Pacchetti specifici per Void Linux (richiedono repo nonfree)
 					nvidiadrivers=(nvidia nvidia-libs-32bit)
 				else
-					# Pacchetti per Arch / Artix
 					case "$KSel" in
 						linux)     nvidiadrivers=(nvidia) ;;
 						linux-lts) nvidiadrivers=(nvidia-lts) ;;
@@ -149,20 +145,31 @@ Include = /etc/pacman.d/mirrorlist-arch
 [multilib]
 Include = /etc/pacman.d/mirrorlist-arch
 EOF
-		"$PKGmanager"-key --populate archlinux
+		pacman-key --populate archlinux
 		"$PKGmanager" -Sy
 	fi
 	[[ -s /etc/pacman.d/mirrorlist-arch ]] || "$PKGmanager" -Sy "${pkgskips[@]}" artix-archlinux-support
 }
 
 AnotherCheck () {
+	if [[ "$OSsel" != "Artix" ]]; then
+		echo "Skipping repository check (Not on Artix Linux)"
+		return 0
+	fi
 	pacman -Sylq system world galaxy extra multilib | sort > pacman_db
 	printf '%s\n' "${miss[@]}" | sort -u > pkg_missed
 	mapfile -t unlisted < <(comm -13 pacman_db pkg_missed)
 	echo "Unlisted = ${unlisted[*]}"
 }
 
-KernelSel()            { MenuSel "KSel" "Select preferred Kernel" "linux" "linux-lts" "linux-hardened" "linux-zen"; }
+KernelSel() { 
+	if [[ "$OSsel" == "Void" ]]; then
+		MenuSel "KSel" "Select preferred Kernel" "linux" "linux-lts"
+	else
+		MenuSel "KSel" "Select preferred Kernel" "linux" "linux-lts" "linux-hardened" "linux-zen"
+	fi
+}
+
 OperatingSystemSel()   { MenuSel "OSsel" "Select the distro to setup" "Arch" "Artix" "Void"; }
 VoidInstMethod()       { MenuSel "VImethod" "Select installation type" "XBPS" "ROOTFS"; }
 LibrarySel()           { MenuSel "LIBsel" "Select base library" "GLIBC" "MUSL"; }
@@ -192,7 +199,7 @@ ArchRepoSel () {
 }
 
 TimezoneSel () {
-	local -n var_name="$1"     # Passa la variabile (es. TZsel) come argomento alla funzione
+	local -n var_name="$1"
 	while true; do
 		echo -e "\n=== Select Timezone ==="
 		echo "1) Europe/Rome"
