@@ -3,19 +3,19 @@
 YesNoSel () {
 	local choice
 	while true; do
-		read -rp "$1 [y/n]: " choice
+		read -rp "$1 [yes/no]: " choice
 		case "$choice" in
-			[Yy]* ) CC=1; break;;
-			[Nn]* ) CC=0; break;;
-			* ) echo "Rispondi 'y' o 'n'.";;
+			[Yy]|[Yy][Ee][Ss] ) CC=1; break;;
+			[Nn]|[Nn][Oo] ) CC=0; break;;
+			* ) echo "Rispondi 'yes' (y) o 'no' (n).";;
 		esac
 	done
 }
 
 MenuSel () {
-	local var_name="$1" question="$2" user_choice
+	local var_name="$1" question="$2" user_choice i
 	shift 2
-	local options=("$@")
+	local options=("@")
 	while true; do
 		echo -e "\n=== $question ==="
 		for i in "${!options[@]}"; do echo "$((i+1))) ${options[$i]}"; done
@@ -106,7 +106,7 @@ Server = https://artixlinux.org\$arch
 EOF
 	fi
 	if ! grep -q 'mirrorlist-arch' "$target_conf" 2>/dev/null; then 
-		local cmd Ramos=("$pm" -Sy "${pkgskips[@]}" artix-archlinux-support)
+		local cmd=("$pm" -Sy "${pkgskips[@]}" artix-archlinux-support)
 		[ "$target_conf" = /mnt/etc/pacman.conf ] && "$ch" /mnt "${cmd[@]}" || "${cmd[@]}"
 		cat << 'EOF' >> "$target_conf"
 
@@ -168,7 +168,10 @@ TimezoneSel () {
 			1) TZsel="Europe/Rome" ; break ;;
 			q|quit) TZsel="" ; break ;;
 			"") echo "Input cannot be empty." ;;
-			*) YesNoSel "Confirm timezone: $TZsel ?" && [[ "$CC" -eq 1 ]] && break ;;
+			*) 
+				YesNoSel "Confirm timezone: $TZsel ?"
+				[[ "$CC" -eq 1 ]] && break
+				;;
 		esac
 	done
 	echo "Selected Timezone: $TZsel"
