@@ -152,11 +152,10 @@ EOF
 }
 
 AnotherCheck () {
-	if [[ "$OSsel" != "Artix" ]]; then
-		echo "Skipping repository check (Not on Artix Linux)"
-		return 0
-	fi
-	pacman -Sylq system world galaxy extra multilib | sort > pacman_db
+	[[ "$OSsel" == "Void" ]] && echo "Skipping check (Void uses XBPS)" && return 0
+	local repos=(extra multilib)
+	[[ "$OSsel" == "Artix" ]] && repos+=(system world galaxy)
+	pacman -Sylq "${repos[@]}" | sort > pacman_db
 	printf '%s\n' "${miss[@]}" | sort -u > pkg_missed
 	mapfile -t unlisted < <(comm -13 pacman_db pkg_missed)
 	echo "Unlisted = ${unlisted[*]}"
