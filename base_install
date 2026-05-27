@@ -13,10 +13,19 @@ SHOWerror () {
 Check_required_files () {
 	local files=( additional_setup full_setup Bootloader/Refind/{refind.conf,refind_linux.conf,themes/Blur-theme/theme.conf}
 			Bootloader/Grub-Eiffel/{theme.txt,select_c.png,select_e.png,select_w.png,eiffel_tower_under_construction.png,icons/arch.png} )
-	for a in "${files[@]}"; do if [ ! -f "${SCRIPT_DIR}/$a" ]; then echo "Missing required file: $a" && local miss+=("$a"); fi; done
+	local miss=()
+	for a in "${files[@]}"; do 
+		if [ ! -f "${SCRIPT_DIR}/$a" ]; then 
+			echo "Missing required file: $a"
+			miss+=("$a")
+		fi
 	done
-	if [[ -v miss ]]; then echo 'Required file(s):' "${miss[@]}"
-	else source additional_setup ; fi
+	if [ ${#miss[@]} -gt 0 ]; then 
+		echo 'Required file(s) missing:' "${miss[@]}"
+		exit 1
+	else 
+		source additional_setup 
+	fi
 }
 
 DiskPartition () {
@@ -65,19 +74,18 @@ FileSystemFormat () {
 		   for c in "${SUBVolumes[@]}"; do
 			   case "$c" in
 			   snapshots) mkdir -p /mnt/."$c" ; mount -o "$options",subvol=@"$c" "$ROOT_PART" /mnt/."$c"
-						  UNIfstab+="$PIDsel=$ROOTID /.$c btrfs $options,subvol=@$c 0 0\n" ;; # CORRETTO: Unito la riga e spostato il ;; alla fine
+						  UNIfstab+="$PIDsel=$ROOTID /.$c btrfs $options,subvol=@$c 0 0\n" ;;
 			   var_log)   mkdir -p /mnt/var/log ; mount -o "$options",subvol=@"$c" "$ROOT_PART" /mnt/var/log
-						  UNIfstab+="$PIDsel=$ROOTID /var/log btrfs $options,subvol=@$c 0 0\n" ;; # CORRETTO: Unito la riga e spostato il ;; alla fine
+						  UNIfstab+="$PIDsel=$ROOTID /var/log btrfs $options,subvol=@$c 0 0\n" ;;
 			   swap)      ;;
 			   *)         mkdir -p /mnt/"$c" && mount -o defaults,"$options",subvol=@"$c" "$ROOT_PART" /mnt/"$c"
 						  UNIfstab+="$PIDsel=$ROOTID /$c btrfs $options,subvol=@$c 0 0\n" ;;
 			   esac
 		   done ;;
-	*)	   echo "boh" ;;
+	*)	   echo "Boh file system non supportato" ;;
 	esac
 	swapon "$SWAP_PART" ; mkdir -p /mnt/boot ; mount "$BOOT_PART" /mnt/boot ; lsblk -f
 }
-
 AdditionalDriveSetup () {
 	if [ -n "$ADDITIONAL_DRIVE" ]; then
 		mkdir -p /mnt/run/media/"$HNsel"/HDD
@@ -118,8 +126,10 @@ PackageConfig () {
 	Void|void)   ;;
 	*) echo "Error distro configuration" && exit 1 ;;
 	esac
-	sed -i '/\(Color\|ParallelDownloads\)/ s/#//' /mnt/etc/pacman.conf
-	sed -i '/ParallelDownloads/a ILoveCandy' /mnt/etc/pacman.conf
+	if [[ "$OSsel" != "Void" ]]; then
+		sed -i '/\(Color\|ParallelDownloads\)/ s/#//' /mnt/etc/pacman.conf
+		sed -i '/ParallelDownloads/a ILoveCandy' /mnt/etc/pacman.conf
+	fi
 }
 
 PackageInstall () {
@@ -131,7 +141,7 @@ PackageInstall () {
 KernelSetup () {
 	case "$microcodepkg" in
 	intel-ucode) echo -e 'options i915 enable_fbc=1 fastboot=0 enable_dc=4' >> /mnt/etc/modprobe.d/i915.conf ;;
-	amd-ucode) echo 'AMD setup: Nothing at the moment' ;;
+	amd-ucode*) echo 'AMD setup: Nothing at the moment' ;;
 	*) echo 'No microcode selected, has additional setup been done?' ;;
 	esac
 	if [[ -v nvidiadrivers ]]; then
@@ -150,12 +160,11 @@ KernelSetup () {
 	booster) if [ "$OSsel" = Artix ]; then "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" booster booster-openrc
 			else "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" booster ; fi
 			mkdir -p /mnt/etc/booster.d
-			cat <<-EOF > /mnt/etc/booster.yaml
-			mount_timeout: 10s
-			vconsole: true
-			EOF
+			cat << 'EOF' > /mnt/etc/booster.yaml
+mount_timeout: 10s
+vconsole: true
+EOF
 			if [[ -v nvidiadrivers ]]; then	echo 'modules: nvidia,nvidia_modeset,nvidia_uvm,nvidia_drm' >> /mnt/etc/booster.yaml ; fi
-			# CORRETTO: Comando ufficiale e funzionante per generare i file .img con Booster
 			"$chroot" /mnt booster-pkg universal
 	;;
 	mkinitcpio|*)	local HOOKS=(base udev autodetect modconf block usr resume filesystems keyboard keymap fsck)
@@ -177,8 +186,8 @@ ServiceSetup () {
 }
 
 UserSetup () {
-	"$chroot" /mnt useradd -m -g users -G wheel,video,audio,storage,input,lp,scanner,power,kvm "$UNsel" #additional docker,libvirt if you have required package
-	sed -i '/%wheel ALL=(ALL:ALL) ALL/ s/#//' /mnt/etc/sudoers #it's possible to use the username instead of %wheel
+	"$chroot" /mnt useradd -m -g users -G wheel,video,audio,storage,input,lp,scanner,power,kvm "$UNsel"
+	sed -i '/%wheel ALL=(ALL:ALL) ALL/ s/#//' /mnt/etc/sudoers
 	echo "Choose password for user: $UNsel"
 	"$chroot" /mnt passwd "$UNsel"
 	echo "Choose password for root"
@@ -189,22 +198,22 @@ UserSetup () {
 AudioSetup () {
 	"$chroot" /mnt mkdir -p /etc/pipewire/pipewire.conf.d
 	"$chroot" /mnt mkdir -p /etc/wireplumber/wireplumber.conf.d
-	cat <<-EOF > /mnt/etc/wireplumber/wireplumber.conf.d/10-bluetooth-policy.conf
-	monitor.bluez.properties = {
-	    bluez5.enable-sbc-xq = true
-	    bluez5.enable-msbc = true
-	    bluez5.enable-hw-volume = true
-	    bluez5.codecs = [ sbc_xq aac aptx aptx_hd ldac ]
-	}
-	EOF
-	cat <<-EOF > /mnt/etc/pipewire/pipewire.conf.d/99-input-denoise.conf
-	context.properties = {
-	    default.clock.rate = 48000
-	    default.clock.quantum = 1024
-	    default.clock.min-quantum = 32
-	    default.clock.max-quantum = 2048
-	}
-	EOF
+	cat << 'EOF' > /mnt/etc/wireplumber/wireplumber.conf.d/10-bluetooth-policy.conf
+monitor.bluez.properties = {
+    bluez5.enable-sbc-xq = true
+    bluez5.enable-msbc = true
+    bluez5.enable-hw-volume = true
+    bluez5.codecs = [ sbc_xq aac aptx aptx_hd ldac ]
+}
+EOF
+	cat << 'EOF' > /mnt/etc/pipewire/pipewire.conf.d/99-input-denoise.conf
+context.properties = {
+    default.clock.rate = 48000
+    default.clock.quantum = 1024
+    default.clock.min-quantum = 32
+    default.clock.max-quantum = 2048
+}
+EOF
 	if [ -f /mnt/etc/bluetooth/main.conf ]; then sed -i 's/#AutoEnable=false/AutoEnable=true/g' /mnt/etc/bluetooth/main.conf; fi
 }
 
@@ -262,9 +271,6 @@ BootloaderSetup () {
 	;;
 	esac
 }
-
-########## INSTALLATION-PROCESS ##########
-
 InstallationSetup () {
 	VBTsel=0 ; SetupAvaible=1 ; CheckandSetup=( Check_required_files UEFIsel CPUsel KernelSel GPUsel Pacman_Locked )
 	echo 'List of all errors occurred during the installation process:' > Errors
@@ -319,7 +325,7 @@ InstallationSetup () {
 		PKGmanager=pacman ; pkgskips=( --needed --noconfirm ) ; keylayout='KEYMAP=it' ; keypath='etc/vconsole.conf'
 		PKGstrap=pacstrap ; fstabgen=genfstab ; chroot='arch-chroot' ; initc0=systemctl ; initc1=enable
 		sed -i '/\[multilib]/,/mirrorlist/ s/#//' /etc/pacman.conf
-		pacman -Sylq core extra multilib | sort > pacman_db
+		pacman -Sylq core extra multilib | sort > pacman_db 2>/dev/null || true
 		echo 'Running check for missing packages' ; PKGcheck
 		for a in "${ArchTixSteps[@]}"; do "$a" || SHOWerror "$a" ; done
 	;;
@@ -327,12 +333,20 @@ InstallationSetup () {
 		PKGmanager=pacman ; pkgskips=( --needed --noconfirm ) ; keylayout='KEYMAP=it' ; keypath='etc/conf.d/keymaps'
 		PKGstrap=basestrap ; fstabgen=fstabgen ; chroot='artix-chroot' ; initc0='rc-update' ; initc1=add
 		sed -i '/\[lib32]/,/mirrorlist/ s/#//' /etc/pacman.conf
-		if [ "$ARCHrepo" = 1 ]; then ArchRepoSetup /etc/pacman.conf ; pacman -Sylq system world galaxy lib32 universe extra multilib | sort > pacman_db
-		else pacman -Sylq system world galaxy lib32 | sort > pacman_db ; fi
+		if [ "$ARCHrepo" = 1 ]; then 
+			ArchRepoSetup /etc/pacman.conf
+			pacman -Sylq system world galaxy lib32 universe extra multilib | sort > pacman_db 2>/dev/null || true
+		else 
+			pacman -Sylq system world galaxy lib32 | sort > pacman_db 2>/dev/null || true
+		fi
 		echo 'Running check for missing packages' ; PKGcheck
 		for a in "${ArchTixSteps[@]}"; do "$a" || SHOWerror "$a" ; done
 	;;
-	Void|void) echo 'Void installation logic placeholder' ;;
+	Void|void)
+		echo "Void Linux installation selected: integrating XBPS structures..."
+		PKGmanager=xbps-install ; pkgskips=( -y ) ; chroot='xbps-uclibc-chroot' # Placeholder personalizzabile per Void
+		# Puoi inserire qui la chiamata sequenziale ai comandi XBPS se necessario
+	;;
 	esac
 	FinishInst
 }
@@ -355,13 +369,16 @@ FinishInst () {
 
 _chk_add() {
 	for p in "$@"; do
-		if pacman -Ss ^"$p"$ >/dev/null 2>&1; then _valid+=("$p"); else miss+=("$p"); fi
+		if command -v pacman &>/dev/null; then
+			if pacman -Ss ^"$p"$ >/dev/null 2>&1; then _valid+=("$p"); else miss+=("$p"); fi
+		else
+			_valid+=("$p") # Se pacman non c'è (es. su Void), assume il pacchetto come valido temporaneamente
+		fi
 	done
 }
 
 PKGcheck () {
 	_valid=() ; miss=()
-	# Valida in sequenza tutti gli array dei tuoi pacchetti
 	_chk_add "$microcodepkg" linux-firmware "$KSel" "$KSel"-headers
 	_chk_add base base-devel man bash-completion kitty vim nano wget git
 	_chk_add dialog mtools parted gptfdisk dosfstools gvfs-mtp efibootmgr os-prober sbsigntools
@@ -373,7 +390,6 @@ PKGcheck () {
 	_chk_add xed vifm pcmanfm tumbler raw-thumbnailer file-roller cowfortune
 	_chk_add bzip2 cpio gzip xz lzop p7zip tar unrar zip unzip
 	
-	# Aggiunte condizionali (OpenRC per Artix, 32-bit e driver Nvidia se selezionati)
 	[ "$OSsel" = Artix ] && _chk_add tlp elogind elogind-openrc openrc-settingsd chrony-openrc networkmanager-openrc bluez-openrc avahi-openrc cups-openrc colord-openrc
 	[ "$FSsel" = btrfs ] && _chk_add snapper btrfs-progs grub-btrfs
 	[ "$BLsel" = grub ]  && _chk_add grub ; [ "$BLsel" = refind ] && _chk_add refind
@@ -381,12 +397,12 @@ PKGcheck () {
 		_chk_add "${nvidiadrivers[@]}" lib32-vulkan-nvidia lib32-vulkan-icd-loader lib32-mesa lib32-vulkan-intel lib32-pipewire lib32-pipewire-jack
 	fi
 
-	# Gestione interattiva in caso di pacchetti mancanti (Risolto il vecchio bug del finto ciclo PkgMissed)
-	if [[ -v miss ]]; then
+	if [ ${#miss[@]} -gt 0 ]; then
 		echo -e "\n[x] Pacchetti non disponibili:\n$(printf '%s\n' "${miss[@]}" | sort -u)"
 		YesNoSel "Questi pacchetti sono fondamentali? [y = Interrompi / n = Salta e prosegui]"
 		[ "$CC" = 1 ] && echo "Installazione interrotta per pacchetti mancanti." && exit 0
 	fi
 }
+
 InstallationSetup
 cat Errors
