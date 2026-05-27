@@ -13,9 +13,9 @@ YesNoSel () {
 }
 
 MenuSel () {
-	local var_name="$1" question="$2" user_choice i
+	local var_name="$1" question="$2" user_choice
 	shift 2
-	local options=("@")
+	local options=("$@")
 	while true; do
 		echo -e "\n=== $question ==="
 		for i in "${!options[@]}"; do echo "$((i+1))) ${options[$i]}"; done
@@ -35,10 +35,9 @@ TextPromptSel () {
 	local var_name="$1" prompt_msg="$2" input_val
 	while true; do
 		read -rp "$prompt_msg: " input_val
-		if [[ -z "$input_val" ]]; then echo "L'input non può essere vuoto."; continue; fi
 		YesNoSel "Confermi che << $input_val >> è corretto?"
 		[[ "$CC" -eq 1 ]] && eval "$var_name=\"$input_val\"" && break
-		echo "Riproviamo..."
+		echo "Riproiamo..."
 	done
 }
 
@@ -96,18 +95,30 @@ Pacman_Locked() {
 }
 
 ArchRepoSetup () {
-	local target_conf="$1" pm="${PKGmanager:-pacman}" ch="${chroot:-artix-chroot}"
-	if ! grep -q 'universe' "$target_conf" 2>/dev/null; then 
+	local target_conf="$1"
+	if grep -q 'universe' "$target_conf" 2>/dev/null; then 
+		echo "There is already a universe entry"
+	else
 		cat << 'EOF' >> "$target_conf"
 
 [universe]
-Server = https://artixlinux.org\$arch
-Server = https://artixlinux.org\$arch
+Server = https://artixlinux.org
+Server = https://artixlinux.org
+Server = https://pascalpuffke.de
+Server = https://qontinuum.space
+Server = https://netactuate.com
+Server = https://crifo.org
 EOF
 	fi
-	if ! grep -q 'mirrorlist-arch' "$target_conf" 2>/dev/null; then 
-		local cmd=("$pm" -Sy "${pkgskips[@]}" artix-archlinux-support)
-		[ "$target_conf" = /mnt/etc/pacman.conf ] && "$ch" /mnt "${cmd[@]}" || "${cmd[@]}"
+	if grep -q 'mirrorlist-arch' "$target_conf" 2>/dev/null; then 
+		echo "There is already an arch entry"
+	else
+		local cmd Ramos=("$PKGmanager" -Sy "${pkgskips[@]}" artix-archlinux-support)
+		if [ "$target_conf" = /mnt/etc/pacman.conf ]; then
+			"$chroot" /mnt "${cmd[@]}"
+		else
+			"${cmd[@]}"
+		fi
 		cat << 'EOF' >> "$target_conf"
 
 # Arch
@@ -118,14 +129,10 @@ Include = /etc/pacman.d/mirrorlist-arch
 [multilib]
 Include = /etc/pacman.d/mirrorlist-arch
 EOF
-		if [ "$target_conf" = /mnt/etc/pacman.conf ]; then
-			"$ch" /mnt pacman-key --populate archlinux
-			"$ch" /mnt "$pm" -Sy
-		else
-			pacman-key --populate archlinux && "$pm" -Sy
-		fi
+		"$PKGmanager"-key --populate archlinux
+		"$PKGmanager" -Sy
 	fi
-	[[ -s /etc/pacman.d/mirrorlist-arch ]] || pacman -Sy artix-archlinux-support --noconfirm 2>/dev/null || true
+	[[ -s /etc/pacman.d/mirrorlist-arch ]] || "$PKGmanager" -Sy "${pkgskips[@]}" artix-archlinux-support
 }
 
 AnotherCheck () {
@@ -155,11 +162,16 @@ VirtualBoxTest () {
 
 ArchRepoSel () {
 	YesNoSel "You want Arch repositories as well as Artix repositories?"
-	if [[ "$CC" -eq 1 ]]; then ARCHrepo=1 && echo "OK, adding Arch repositories!"; else ARCHrepo='' && echo "Proceeding without them..."; fi
+	if [[ "$CC" -eq 1 ]]; then
+		ARCHrepo=1
+		echo "OK, adding Arch repositories!"
+	else
+		ARCHrepo=''
+		echo "Proceeding without them..."
+	fi
 }
 
 TimezoneSel () {
-	local TZsel
 	while true; do
 		echo -e "\n=== Select Timezone ==="
 		echo "1) Europe/Rome"
