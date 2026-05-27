@@ -226,7 +226,7 @@ BootloaderSetup () {
 		cp -r ../UNI/Bootloader/Refind/themes/* /mnt/boot/EFI/"$efifolder"/themes/
 		if [ "$FSsel" = btrfs ]; then rootflags='rootflags=subvol=@' ; fi
 		if [[ -v nvidiadrivers ]]; then drm="nvidia-drm.modeset=1 nvidia-drm.fbdev=1 acpi_osi='Windows 2020'" ; fi
-		echo "\"Standard Boot\"   \"ro root=$ROOTID rootfstype=$FSsel $rootflags initrd=$microcodepkg.img initrd=$irfs $drm\"" >> /mnt/boot/refind_linux.conf
+		echo "\"Standard Boot\"   \"ro root=$ROOTID rootfstype=$FSsel $rootflags initrd=boot\\${microcodepkg}.img initrd=boot\\${irfs} $drm\"" >> /mnt/boot/refind_linux.conf
 		echo '!!!Refind config and theme changed!!!'
 	;;
 	2|GRUB|Grub|grub)
