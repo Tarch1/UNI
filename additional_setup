@@ -13,17 +13,22 @@ YesNoSel () {
 }
 
 MenuSel () {
-	local var_name="$1" question="$2" user_choice
+	local -n var_name="$1"     # Crea un riferimento dinamico alla variabile passata
+	local question="$2" user_choice
 	shift 2
 	local options=("$@")
+	
 	while true; do
 		echo -e "\n=== $question ==="
-		for i in "${!options[@]}"; do echo "$((i+1))) ${options[$i]}"; done
+		for i in "${!options[@]}"; do 
+			echo "$((i+1))) ${options[$i]}"
+		done
 		read -rp "Scelta: " user_choice
+		
 		if [[ "$user_choice" =~ ^[0-9]+$ ]] && [ "$user_choice" -le "${#options[@]}" ] && [ "$user_choice" -gt 0 ]; then
-			local selected_val="${options[$((user_choice-1))]}"
-			eval "$var_name=\"$selected_val\""
-			echo "Selezionato: $selected_val"
+			# Assegnazione diretta senza eval
+			var_name="${options[$((user_choice-1))]}"
+			echo "Selezionato: $var_name"
 			break
 		else
 			echo "Scelta non valida, riprova."
@@ -32,11 +37,17 @@ MenuSel () {
 }
 
 TextPromptSel () {
-	local var_name="$1" prompt_msg="$2" input_val
+	local -n var_name="$1"     # Crea un riferimento dinamico alla variabile passata
+	local prompt_msg="$2" input_val
+	
 	while true; do
 		read -rp "$prompt_msg: " input_val
 		YesNoSel "Confermi che << $input_val >> è corretto?"
-		[[ "$CC" -eq 1 ]] && eval "$var_name=\"$input_val\"" && break
+		if [[ "$CC" -eq 1 ]]; then
+			# Assegnazione diretta senza eval
+			var_name="$input_val"
+			break
+		fi
 		echo "Riproiamo..."
 	done
 }
@@ -103,7 +114,6 @@ ArchRepoSetup () {
 
 [universe]
 Server = https://artixlinux.org
-Server = https://artixlinux.org
 Server = https://pascalpuffke.de
 Server = https://qontinuum.space
 Server = https://netactuate.com
@@ -113,7 +123,7 @@ EOF
 	if grep -q 'mirrorlist-arch' "$target_conf" 2>/dev/null; then 
 		echo "There is already an arch entry"
 	else
-		local cmd Ramos=("$PKGmanager" -Sy "${pkgskips[@]}" artix-archlinux-support)
+		local cmd=("$PKGmanager" -Sy "${pkgskips[@]}" artix-archlinux-support)
 		if [ "$target_conf" = /mnt/etc/pacman.conf ]; then
 			"$chroot" /mnt "${cmd[@]}"
 		else
@@ -124,12 +134,10 @@ EOF
 # Arch
 [extra]
 Include = /etc/pacman.d/mirrorlist-arch
-[community]
-Include = /etc/pacman.d/mirrorlist-arch
 [multilib]
 Include = /etc/pacman.d/mirrorlist-arch
 EOF
-		"$PKGmanager"-key --populate archlinux
+		"$PKGmanager" -key --populate archlinux
 		"$PKGmanager" -Sy
 	fi
 	[[ -s /etc/pacman.d/mirrorlist-arch ]] || "$PKGmanager" -Sy "${pkgskips[@]}" artix-archlinux-support
@@ -172,19 +180,23 @@ ArchRepoSel () {
 }
 
 TimezoneSel () {
+	local -n var_name="$1"     # Passa la variabile (es. TZsel) come argomento alla funzione
 	while true; do
 		echo -e "\n=== Select Timezone ==="
 		echo "1) Europe/Rome"
-		read -rp "Type '1' or write custom format (e.g. America/New_York) ['q' to quit]: " TZsel
-		case "$TZsel" in
-			1) TZsel="Europe/Rome" ; break ;;
-			q|quit) TZsel="" ; break ;;
+		read -rp "Type '1' or write custom format (e.g. America/New_York) ['q' to quit]: " input_val
+		case "$input_val" in
+			1) var_name="Europe/Rome" ; break ;;
+			q|quit) var_name="" ; break ;;
 			"") echo "Input cannot be empty." ;;
 			*) 
-				YesNoSel "Confirm timezone: $TZsel ?"
-				[[ "$CC" -eq 1 ]] && break
+				YesNoSel "Confirm timezone: $input_val ?"
+				if [[ "$CC" -eq 1 ]]; then
+					var_name="$input_val"
+					break
+				fi
 				;;
 		esac
 	done
-	echo "Selected Timezone: $TZsel"
+	echo "Selected Timezone: $var_name"
 }
