@@ -32,10 +32,8 @@ DiskPartition () {
 	swapoff -a
 	umount -R /mnt 2>/dev/null || true
 	"$PKGmanager" -Sy "${pkgskips[@]}" "${fs[@]}"
-	mapfile -t devicelist < <(lsblk -dlnp -o name)
-	mapfile -t devicesize < <(lsblk -dlnp -o size)
-	local dialog_list=()
-	for i in "${!devicelist[@]}"; do dialog_list+=("${devicelist[i]}" "${devicesize[i]}") ; done
+	# Ottimizzato: Legge NAME e SIZE in un colpo solo direttamente dentro l'array per dialog
+	mapfile -t dialog_list < <(lsblk -dlnp -o NAME,SIZE)
 	DRIVE=$(dialog --title "OS INSTALLATION" --stdout --menu "Select preferred drive" 0 0 0 "${dialog_list[@]}")
 	[[ -z "$DRIVE" ]] && exit 1
 	if [[ "$VBTsel" = 0 ]]; then ADDITIONAL_DRIVE="$(dialog --title "ADDITIONAL" --stdout --menu "Select secondary drive (Optional - Cancel to skip)" 0 0 0 "${dialog_list[@]}")" ; fi
@@ -126,7 +124,7 @@ PackageConfig () {
 	Void|void)   ;;
 	*) echo "Error distro configuration" && exit 1 ;;
 	esac
-	if [[ "$OSsel" != "Void" ]]; then
+	if [ -f /mnt/etc/pacman.conf ]; then
 		sed -i '/\(Color\|ParallelDownloads\)/ s/#//' /mnt/etc/pacman.conf
 		sed -i '/ParallelDownloads/a ILoveCandy' /mnt/etc/pacman.conf
 	fi
@@ -235,7 +233,8 @@ BootloaderSetup () {
 		cp -r "${SCRIPT_DIR}/Bootloader/Refind/themes/"* /mnt/boot/EFI/"$efifolder"/themes/
 		if [ "$FSsel" = btrfs ]; then rootflags='rootflags=subvol=@' ; fi
 		if [[ -v nvidiadrivers ]]; then drm="nvidia-drm.modeset=1 nvidia-drm.fbdev=1 acpi_osi=\"Windows 2020\"" ; fi
-		echo "\"Standard Boot\"   \"ro root=$ROOTID rootfstype=$FSsel $rootflags initrd=boot\\${microcodepkg}.img initrd=boot\\${irfs} $drm\"" >> /mnt/boot/refind_linux.conf
+		# Ottimizzato: Quattro backslash per stamparne correttamente due nel file finale
+		echo "\"Standard Boot\"   \"ro root=$ROOTID rootfstype=$FSsel $rootflags initrd=boot\\\\${microcodepkg}.img initrd=boot\\\\${irfs} $drm\"" >> /mnt/boot/refind_linux.conf
 		echo '!!!Refind config and theme changed!!!'
 	;;
 	2|GRUB|Grub|grub)
@@ -272,6 +271,7 @@ BootloaderSetup () {
 	;;
 	esac
 }
+
 InstallationSetup () {
 	VBTsel=0 ; SetupAvaible=1 ; CheckandSetup=( Check_required_files UEFIsel CPUsel KernelSel GPUsel Pacman_Locked )
 	echo 'List of all errors occurred during the installation process:' > Errors
