@@ -155,7 +155,7 @@ VirtualBoxTest () {
 
 ArchRepoSel () {
 	YesNoSel "You want Arch repositories as well as Artix repositories?"
-	[[ "$CC" -eq 1 ]] && ARCHrepo=1 && echo "OK, adding Arch repositories!" || { ARCHrepo=''; echo "Proceeding without them..."; }
+	if [[ "$CC" -eq 1 ]]; then ARCHrepo=1 && echo "OK, adding Arch repositories!"; else ARCHrepo='' && echo "Proceeding without them..."; fi
 }
 
 TimezoneSel () {
