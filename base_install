@@ -32,7 +32,6 @@ DiskPartition () {
 	swapoff -a
 	umount -R /mnt 2>/dev/null || true
 	"$PKGmanager" -Sy "${pkgskips[@]}" "${fs[@]}"
-	# Ottimizzato: Legge NAME e SIZE in un colpo solo direttamente dentro l'array per dialog
 	mapfile -t dialog_list < <(lsblk -dlnp -o NAME,SIZE)
 	DRIVE=$(dialog --title "OS INSTALLATION" --stdout --menu "Select preferred drive" 0 0 0 "${dialog_list[@]}")
 	[[ -z "$DRIVE" ]] && exit 1
@@ -233,7 +232,6 @@ BootloaderSetup () {
 		cp -r "${SCRIPT_DIR}/Bootloader/Refind/themes/"* /mnt/boot/EFI/"$efifolder"/themes/
 		if [ "$FSsel" = btrfs ]; then rootflags='rootflags=subvol=@' ; fi
 		if [[ -v nvidiadrivers ]]; then drm="nvidia-drm.modeset=1 nvidia-drm.fbdev=1 acpi_osi=\"Windows 2020\"" ; fi
-		# Ottimizzato: Quattro backslash per stamparne correttamente due nel file finale
 		echo "\"Standard Boot\"   \"ro root=$ROOTID rootfstype=$FSsel $rootflags initrd=boot\\\\${microcodepkg}.img initrd=boot\\\\${irfs} $drm\"" >> /mnt/boot/refind_linux.conf
 		echo '!!!Refind config and theme changed!!!'
 	;;
@@ -271,7 +269,6 @@ BootloaderSetup () {
 	;;
 	esac
 }
-
 InstallationSetup () {
 	VBTsel=0 ; SetupAvaible=1 ; CheckandSetup=( Check_required_files UEFIsel CPUsel KernelSel GPUsel Pacman_Locked )
 	echo 'List of all errors occurred during the installation process:' > Errors
@@ -326,7 +323,6 @@ InstallationSetup () {
 		PKGmanager=pacman ; pkgskips=( --needed --noconfirm ) ; keylayout='KEYMAP=it' ; keypath='etc/vconsole.conf'
 		PKGstrap=pacstrap ; fstabgen=genfstab ; chroot='arch-chroot' ; initc0=systemctl ; initc1=enable
 		sed -i '/\[multilib]/,/mirrorlist/ s/#//' /etc/pacman.conf
-		pacman -Sylq core extra multilib | sort > pacman_db 2>/dev/null || true
 		echo 'Running check for missing packages' ; PKGcheck
 		for a in "${ArchTixSteps[@]}"; do "$a" || SHOWerror "$a" ; done
 	;;
@@ -334,12 +330,7 @@ InstallationSetup () {
 		PKGmanager=pacman ; pkgskips=( --needed --noconfirm ) ; keylayout='KEYMAP=it' ; keypath='etc/conf.d/keymaps'
 		PKGstrap=basestrap ; fstabgen=fstabgen ; chroot='artix-chroot' ; initc0='rc-update' ; initc1=add
 		sed -i '/\[lib32]/,/mirrorlist/ s/#//' /etc/pacman.conf
-		if [ "$ARCHrepo" = 1 ]; then 
-			ArchRepoSetup /etc/pacman.conf
-			pacman -Sylq system world galaxy lib32 universe extra multilib | sort > pacman_db 2>/dev/null || true
-		else 
-			pacman -Sylq system world galaxy lib32 | sort > pacman_db 2>/dev/null || true
-		fi
+		if [ "$ARCHrepo" = 1 ]; then ArchRepoSetup /etc/pacman.conf ; fi
 		echo 'Running check for missing packages' ; PKGcheck
 		for a in "${ArchTixSteps[@]}"; do "$a" || SHOWerror "$a" ; done
 	;;
@@ -359,12 +350,16 @@ FinishInst () {
 	echo 'export MOZ_ENABLE_WAYLAND=1' > /mnt/home/"$UNsel"/.profile
 	cat Errors
 	"$chroot" /mnt chown -hR "$UNsel":users /home/"$UNsel"
-	YesNoSel "Reboot system"
-	case "$CC" in
-	1)	umount -R /mnt && reboot ;;
-	0)	echo 'OK' && exit 0 ;;
-	*)	echo 'Not a good answer' && YesNoSel "Reboot system" ;;
-	esac
+	
+	# Ottimizzato (Punto 2): Ciclo di controllo robusto per evitare il blocco infinito del riavvio
+	while true; do
+		YesNoSel "Reboot system"
+		case "$CC" in
+			1) umount -R /mnt && reboot ;;
+			0) echo 'OK' && exit 0 ;;
+			*) echo 'Risposta non valida.' ;;
+		esac
+	done
 }
 
 _chk_add() {
@@ -379,24 +374,29 @@ _chk_add() {
 
 PKGcheck () {
 	_valid=() ; miss=()
-	_chk_add "$microcodepkg" linux-firmware "$KSel" "$KSel"-headers
-	_chk_add base base-devel man bash-completion kitty vim nano wget git
-	_chk_add dialog mtools parted gptfdisk dosfstools gvfs-mtp efibootmgr os-prober sbsigntools
-	_chk_add networkmanager chrony telegram-desktop firefox profile-sync-daemon
-	_chk_add pipewire pipewire-pulse pipewire-alsa pipewire-jack wireplumber sof-firmware alsa-card-profiles
-	_chk_add bluez bluez-utils blueman cups cups-pdf system-config-printer avahi
-	_chk_add feh gedit calc fd bpytop adriconf fwupd colord
-	_chk_add intel-media-driver vkd3d vulkan-icd-loader vulkan-intel vulkan-mesa-layers
-	_chk_add xed vifm pcmanfm tumbler raw-thumbnailer file-roller cowfortune
-	_chk_add bzip2 cpio gzip xz lzop p7zip tar unrar zip unzip
 	
+	# Ottimizzato (Punto 3): Raggruppamento e controllo rapido di tutti i pacchetti principali
+	_chk_add "$microcodepkg" linux-firmware "$KSel" "$KSel"-headers \
+		base base-devel man bash-completion kitty vim nano wget git \
+		dialog mtools parted gptfdisk dosfstools gvfs-mtp efibootmgr os-prober sbsigntools \
+		networkmanager chrony telegram-desktop firefox profile-sync-daemon \
+		pipewire pipewire-pulse pipewire-alsa pipewire-jack wireplumber sof-firmware alsa-card-profiles \
+		bluez bluez-utils blueman cups cups-pdf system-config-printer avahi \
+		feh gedit calc fd bpytop adriconf fwupd colord \
+		intel-media-driver vkd3d vulkan-icd-loader vulkan-intel vulkan-mesa-layers \
+		xed vifm pcmanfm tumbler raw-thumbnailer file-roller cowfortune \
+		bzip2 cpio gzip xz lzop p7zip tar unrar zip unzip
+
+	# Controlli condizionali basati su Distro, Filesystem e Bootloader
 	[ "$OSsel" = Artix ] && _chk_add tlp elogind elogind-openrc openrc-settingsd chrony-openrc networkmanager-openrc bluez-openrc avahi-openrc cups-openrc colord-openrc
 	[ "$FSsel" = btrfs ] && _chk_add snapper btrfs-progs grub-btrfs
 	[ "$BLsel" = grub ]  && _chk_add grub ; [ "$BLsel" = refind ] && _chk_add refind
+	
 	if [[ -v nvidiadrivers ]]; then 
 		_chk_add "${nvidiadrivers[@]}" lib32-vulkan-nvidia lib32-vulkan-icd-loader lib32-mesa lib32-vulkan-intel lib32-pipewire lib32-pipewire-jack
 	fi
 
+	# Gestione finale interattiva della lista dei pacchetti mancanti
 	if [ ${#miss[@]} -gt 0 ]; then
 		echo -e "\n[x] Pacchetti non disponibili:\n$(printf '%s\n' "${miss[@]}" | sort -u)"
 		YesNoSel "Questi pacchetti sono fondamentali? [y = Interrompi / n = Salta e prosegui]"
