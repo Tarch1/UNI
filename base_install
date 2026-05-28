@@ -345,7 +345,7 @@ InstallationSetup () {
 	;;
 	Void|void)
 		echo "Void Linux installation selected: integrating XBPS structures..."
-		PKGmanager=xbps-install ; pkgskips=( -y ) ; chroot='xbps-uclibc-chroot'
+		PKGmanager=xbps-install ; pkgskips=( -y ) ; PKGstrap=xbps-install ; chroot='xbps-uclibc-chroot'
 	;;
 	esac
 	FinishInst
