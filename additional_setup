@@ -52,7 +52,7 @@ TextPromptSel () {
 
 UEFIsel () {
 	if [[ -d "/sys/firmware/efi/" ]]; then
-		mount | grep -q "/sys/firmware/efi/efivars" || mount -t efivarfs efivarfs /sys/firmware/efi/efivars 2>/dev/null
+		mount | grep -q "/sys/firmware/efi/efivars" || mount -t efivarfs efivarfs /sys/firmware/efi/efivars
 		UEFImode=1 && echo 'UEFI Mode detected'
 	else 
 		UEFImode=0 && echo 'BIOS Mode detected'
@@ -60,32 +60,43 @@ UEFIsel () {
 }
 
 CPUsel () {
-	local cpu_vendor=$(lscpu | grep -Eo "GenuineIntel|AuthenticAMD" | head -n1)
-	case "$cpu_vendor" in
-		GenuineIntel) echo 'Installing Intel microcode' && microcodepkg='intel-ucode' ;;
-		AuthenticAMD) echo 'Installing AMD microcode' ; [[ "$OSsel" == "Void" ]] && microcodepkg='amd-ucode-firmware' || microcodepkg='amd-ucode' ;;
-		*) echo 'No microcode needed or unknown CPU' ;;
-	esac	
+	if grep -q "GenuineIntel" /proc/cpuinfo; then
+		echo 'Installing Intel microcode'
+		microcodepkg='intel-ucode'
+	elif grep -q "AuthenticAMD" /proc/cpuinfo; then
+		echo 'Installing AMD microcode'
+		[[ "$OSsel" == "Void" ]] && microcodepkg='amd-ucode-firmware' || microcodepkg='amd-ucode'
+	else
+		echo 'No microcode needed or unknown CPU'
+	fi
 }
 
 GPUsel () {
 	echo "Detecting video chipset..."
 	local gpu_info=$(lspci | grep -Ei 'VGA|3D')
 	case "$gpu_info" in
-		*Intel*) echo "The default Mesa driver will be installed" ;;
+		*Intel*) 
+			echo "The default Mesa driver will be installed" 
+			;;
 		*NVIDIA*) 
 			YesNoSel 'Found Nvidia gpu, wanna proprietary driver? If you do not like it, Mesa is the default'
 			if [ "$CC" -eq 1 ]; then
-				echo 'Setting up Proprietary Drivers' 
+				echo 'Setting up NVIDIA Drivers' 
 				if [[ "$OSsel" == "Void" ]]; then
 					nvidiadrivers=(nvidia nvidia-libs-32bit)
 				else
-					case "$KSel" in
-						linux)     nvidiadrivers=(nvidia) ;;
-						linux-lts) nvidiadrivers=(nvidia-lts) ;;
-						*)         nvidiadrivers=(nvidia-dkms) ;;
-					esac
-					nvidiadrivers+=(nvidia-prime nvidia-settings nvidia-utils lib32-nvidia-utils opencl-nvidia lib32-opencl-nvidia libxnvctrl libvdpau)
+					YesNoSel 'Do you want the official NVIDIA OPEN-source kernel modules? (No = Classic Proprietary)'
+					local open_driver="$CC"
+					local nv_main
+					
+					if [ "$open_driver" -eq 1 ]; then
+						[[ "$KSel" == "linux" ]] && nv_main="nvidia-open" || nv_main="nvidia-open-dkms"
+					else
+						if [[ "$KSel" == "linux" ]]; then nv_main="nvidia"
+						elif [[ "$KSel" == "linux-lts" ]]; then nv_main="nvidia-lts"
+						else nv_main="nvidia-dkms"; fi
+					fi
+					nvidiadrivers=("$nv_main" nvidia-prime nvidia-settings nvidia-utils lib32-nvidia-utils opencl-nvidia lib32-opencl-nvidia libxnvctrl libvdpau)
 				fi
 			else
 				echo 'Using default Mesa'
@@ -99,13 +110,17 @@ GPUsel () {
 				amddrivers=(amdgpu mesa vulkan-radeon libva-mesa-driver mesa-vdpau)
 			fi
 			;;
-		*VMware*|*VirtualBox*|*Virtio*|*QXL*) VBTsel=1 && echo "VM detected: The default Mesa driver will be installed" ;;
-		*) echo "Generic GPU: Mesa will be installed" ;;
+		*VMware*|*VirtualBox*|*Virtio*|*QXL*) 
+			VBTsel=1
+			echo "VM detected: The default Mesa driver will be installed" 
+			;;
+		*) 
+			echo "Generic GPU: Mesa will be installed" 
+			;;
 	esac
 }
 
 Pacman_Locked() {
-	if [[ "$OSsel" == "Void" ]]; then return 0; fi
 	if [ -f /var/lib/pacman/db.lck ] || [ -f /mnt/var/lib/pacman/db.lck ]; then
 		echo -e "!!!ERROR!!! Pacman is blocked. Removing lockfiles..."
 		rm -f /var/lib/pacman/db.lck /mnt/var/lib/pacman/db.lck
@@ -132,13 +147,9 @@ EOF
 	if grep -q 'mirrorlist-arch' "$target_conf" 2>/dev/null; then 
 		echo "There is already an arch entry"
 	else
-		local cmd=("$PKGmanager" -Sy "${pkgskips[@]}" artix-archlinux-support)
 		if [ "$target_conf" = /mnt/etc/pacman.conf ]; then
-			"$chroot" /mnt "${cmd[@]}"
-		else
-			"${cmd[@]}"
-		fi
-		cat << 'EOF' >> "$target_conf"
+			"$chroot" /mnt "$PKGmanager" -Sy "${pkgskips[@]}" artix-archlinux-support
+			cat << 'EOF' >> "$target_conf"
 
 # Arch
 [extra]
@@ -146,8 +157,21 @@ Include = /etc/pacman.d/mirrorlist-arch
 [multilib]
 Include = /etc/pacman.d/mirrorlist-arch
 EOF
-		"$chroot" /mnt pacman-key --populate archlinux 2>/dev/null || pacman-key --populate archlinux
-		"$PKGmanager" -Sy
+			"$chroot" /mnt pacman-key --populate archlinux
+			"$chroot" /mnt "$PKGmanager" -Sy
+		else
+			"$PKGmanager" -Sy "${pkgskips[@]}" artix-archlinux-support
+			cat << 'EOF' >> "$target_conf"
+
+# Arch
+[extra]
+Include = /etc/pacman.d/mirrorlist-arch
+[multilib]
+Include = /etc/pacman.d/mirrorlist-arch
+EOF
+			pacman-key --populate archlinux
+			"$PKGmanager" -Sy
+		fi
 	fi
 	[[ -s /etc/pacman.d/mirrorlist-arch ]] || "$PKGmanager" -Sy "${pkgskips[@]}" artix-archlinux-support
 }
@@ -163,11 +187,7 @@ AnotherCheck () {
 }
 
 KernelSel() { 
-	if [[ "$OSsel" == "Void" ]]; then
-		MenuSel "KSel" "Select preferred Kernel" "linux" "linux-lts"
-	else
-		MenuSel "KSel" "Select preferred Kernel" "linux" "linux-lts" "linux-hardened" "linux-zen"
-	fi
+	[[ "$OSsel" == "Void" ]] && MenuSel "KSel" "Select preferred Kernel" "linux" "linux-lts" || MenuSel "KSel" "Select preferred Kernel" "linux" "linux-lts" "linux-hardened" "linux-zen"
 }
 
 OperatingSystemSel()   { MenuSel "OSsel" "Select the distro to setup" "Arch" "Artix" "Void"; }
@@ -190,11 +210,9 @@ VirtualBoxTest () {
 ArchRepoSel () {
 	YesNoSel "You want Arch repositories as well as Artix repositories?"
 	if [[ "$CC" -eq 1 ]]; then
-		ARCHrepo=1
-		echo "OK, adding Arch repositories!"
+		ARCHrepo=1 && echo "OK, adding Arch repositories!"
 	else
-		ARCHrepo=''
-		echo "Proceeding without them..."
+		ARCHrepo='' && echo "Proceeding without them..."
 	fi
 }
 
