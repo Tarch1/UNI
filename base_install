@@ -90,6 +90,7 @@ AdditionalDriveSetup () {
 		mount "$ADDITIONAL_DRIVE" /mnt/run/media/"$HNsel"/HDD
 	fi
 }
+
 BaseSystemInstall () {
 	local BasePKG=( "${kernel[@]}" "${baselinux[@]}" "${elogind[@]}" "${btrfspkg[@]}" )
 	[ "$FSsel" = btrfs ] && BasePKG+=( "${btrfsutility[@]}" )
@@ -133,7 +134,6 @@ PackageInstall () {
 	if [[ "$VBTsel" = 1 ]]; then 
 		"$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${baselinux[@]}" "${baseutils[@]}"
 	else 
-		# Installa tutti i gruppi di pacchetti originari filtrati e validati da PKGcheck
 		"$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" \
 			"${microcode[@]}" "${kernel[@]}" "${baselinux[@]}" "${baseutils[@]}" "${fs[@]}" \
 			"${bootloaderutility[@]}" "${btrfsutility[@]}" "${elogind[@]}" "${grubpkg[@]}" \
@@ -214,12 +214,9 @@ PKGcheck () {
 			fi
 		done
 
-		unset "$a"
-		if [ ${#new[@]} -gt 0 ]; then
-			eval "$a=(\"\${new[@]}\")"
-		else
-			eval "$a=()"
-		fi
+		# Svuota e ripopola l'array di origine usando i riferimenti nativi (local -n)
+		local -n orig_array="$a"
+		orig_array=("${new[@]}")
 	done
 	echo -e "\n[+] Controllo repository completato."
 
@@ -333,9 +330,7 @@ BootloaderSetup () {
 		if [[ "$IRFSetup" = booster ]]; then irfs="booster.img" ; else irfs="initramfs-$KSel.img" ;	fi
 		"$chroot" /mnt "$PKGmanager" -Sy "${pkgskips[@]}" "${refindpkg[@]}"
 		"$chroot" /mnt refind-install
-		sed -i "/ucode.img/ s/ucode/$microcodepkg/g" "${SCRIPT_DIR}/Bootloader/Refind/refind_linux.conf"
-		sed -i "/ArchTixGUID/ s/ArchTixGUID/$PIDsel/g" "${SCRIPT_DIR}/Bootloader/Refind/refind_linux.conf"
-		sed -i "/ArchTixROOT/ s/ArchTixROOT/$ROOT_PART/g" "${SCRIPT_DIR}/Bootloader/Refind/refind_linux.conf"
+		sed -i -e "s/ucode/$microcodepkg/g" -e "s/ArchTixGUID/$PIDsel/g" -e "s/ArchTixROOT/$ROOT_PART/g" "${SCRIPT_DIR}/Bootloader/Refind/refind_linux.conf"
 		if [ "$UEFImode" = 1 ]; then efifolder='refind'; else efifolder='BOOT'; fi
 		mkdir -p /mnt/boot/EFI/"$efifolder"/themes
 		mv /mnt/boot/EFI/"$efifolder"/refind.conf /mnt/boot/EFI/"$efifolder"/backup-refind.conf
@@ -439,7 +434,6 @@ InstallationSetup () {
 		sed -i '/\[multilib]/,/mirrorlist/ s/#//' /etc/pacman.conf
 		pacman -Sylq core extra multilib | sort > pacman_db 2>/dev/null || true
 		echo 'Running check for missing packages' ; PKGcheck
-		for a in "${ArchTixSteps[@]}"; do "$a" || SHOWerror "$a" ; done
 	;;
 	Artix|artix)
 		PKGmanager=pacman ; pkgskips=( --needed --noconfirm ) ; keylayout='KEYMAP=it' ; keypath='etc/conf.d/keymaps'
@@ -452,13 +446,16 @@ InstallationSetup () {
 			pacman -Sylq system world galaxy lib32 | sort > pacman_db 2>/dev/null || true
 		fi
 		echo 'Running check for missing packages' ; PKGcheck
-		for a in "${ArchTixSteps[@]}"; do "$a" || SHOWerror "$a" ; done
 	;;
 	Void|void)
 		echo "Void Linux installation selected: integrating XBPS structures..."
 		PKGmanager=xbps-install ; pkgskips=( -y ) ; chroot='xbps-uclibc-chroot'
 	;;
 	esac
+
+	if [[ "$OSsel" != "Void" ]]; then
+		for a in "${ArchTixSteps[@]}"; do "$a" || SHOWerror "$a" ; done
+	fi
 	FinishInst
 }
 
