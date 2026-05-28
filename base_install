@@ -158,7 +158,7 @@ PKGcheck () {
 	print=(cups cups-pdf system-config-printer avahi)
 	utility=(feh xed calc fd bpytop adriconf fwupd) 
 	
-	if [ "$OSsel" = "Artix" ]; then
+	if [[ "${OSsel,,}" == "artix" ]]; then
 		elogind=(elogind elogind-openrc openrc-settingsd)
 		net+=(chrony-openrc networkmanager-openrc)
 		bluetooth+=(bluez-openrc bluez-cups)
@@ -214,7 +214,6 @@ PKGcheck () {
 			fi
 		done
 
-		# Svuota e ripopola l'array di origine usando i riferimenti nativi (local -n)
 		local -n orig_array="$a"
 		orig_array=("${new[@]}")
 	done
@@ -252,7 +251,7 @@ KernelSetup () {
 	*) echo 'No microcode selected, has additional setup been done?' ;;
 	esac
 	if [[ -v nvidiadrivers ]]; then
-		if [ "$OSsel" = Artix ]; then "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" nvidia-utils-openrc ; fi
+		if [[ "${OSsel,,}" == "artix" ]]; then "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" nvidia-utils-openrc ; fi
 		ln -s /dev/null /mnt/etc/udev/rules.d/61-gdm.rules
 		modules+=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)
 		echo -e "options nvidia-drm modeset=1 fbdev=1\noptions nvidia NVreg_DynamicPowerManagement=0x02 NVreg_UsePageAttributeTable=1 NVreg_EnablePCIeGen3=1" > /mnt/etc/modprobe.d/nvidia.conf
@@ -264,7 +263,7 @@ KernelSetup () {
 			if [[ -v nvidiadrivers ]]; then	echo 'force_drivers+=" nvidia nvidia_modeset nvidia_uvm nvidia_drm "' > /mnt/etc/dracut.conf.d/nvidia.conf ; fi
 			"$chroot" /mnt xbps-reconfigure -f "$KSel"
 	;;
-	booster) if [ "$OSsel" = Artix ]; then "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" booster booster-openrc
+	booster) if [[ "${OSsel,,}" == "artix" ]]; then "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" booster booster-openrc
 			else "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" booster ; fi
 			mkdir -p /mnt/etc/booster.d
 			cat << 'EOF' > /mnt/etc/booster.yaml
@@ -286,7 +285,7 @@ EOF
 
 ServiceSetup () {
 	Services+=( NetworkManager openrc-settingsd cupsd avahi-daemon bluetoothd tlp )
-	if [[ -v nvidiadrivers ]] && [ "$OSsel" = Artix ]; then Services+=( nvidia-persistenced ); fi
+	if [[ -v nvidiadrivers ]] && [[ "${OSsel,,}" == "artix" ]]; then Services+=( nvidia-persistenced ); fi
 	for s in "${Services[@]}"; do "$chroot" /mnt "$initc0" "$initc1" "$s" ; done
 	mkdir -p /mnt/etc/udev/rules.d/
 	cp "${SCRIPT_DIR}/Conf_files/51-android.rules" /mnt/etc/udev/rules.d/
@@ -325,6 +324,7 @@ EOF
 }
 
 BootloaderSetup () {
+	local osi_version="${AcpiOS:-Windows 2020}"
 	case "$BLsel" in
 	1|REFIND|Refind|refind)
 		if [[ "$IRFSetup" = booster ]]; then irfs="booster.img" ; else irfs="initramfs-$KSel.img" ;	fi
@@ -339,7 +339,7 @@ BootloaderSetup () {
 		cp "${SCRIPT_DIR}/Bootloader/Refind/refind_linux.conf" /mnt/boot/refind_linux.conf
 		cp -r "${SCRIPT_DIR}/Bootloader/Refind/themes/"* /mnt/boot/EFI/"$efifolder"/themes/
 		if [ "$FSsel" = btrfs ]; then rootflags='rootflags=subvol=@' ; fi
-		if [[ -v nvidiadrivers ]]; then drm="nvidia-drm.modeset=1 nvidia-drm.fbdev=1 acpi_osi=\"Windows 2020\"" ; fi
+		if [[ -v nvidiadrivers ]]; then drm="nvidia-drm.modeset=1 nvidia-drm.fbdev=1 acpi_osi=\"$osi_version\"" ; fi
 		echo "\"Standard Boot\"   \"ro root=$ROOTID rootfstype=$FSsel $rootflags initrd=boot\\\\${microcodepkg}.img initrd=boot\\\\${irfs} $drm\"" >> /mnt/boot/refind_linux.conf
 		echo '!!!Refind config and theme changed!!!'
 	;;
@@ -357,7 +357,7 @@ BootloaderSetup () {
 		sed -i "/GRUB_DISABLE_OS_PROBER=/ s/#//g" /mnt/etc/default/grub
 		sed -i '/GRUB_THEME=/c GRUB_THEME="/boot/grub/themes/Grub-Sekiro/theme.txt"' /mnt/etc/default/grub
 		if [[ -v nvidiadrivers ]]; then 
-			sed -i 's/^GRUB_CMDLINE_LINUX=.*/GRUB_CMDLINE_LINUX="acpi_osi='\''Windows 2020'\''"/' /mnt/etc/default/grub
+			sed -i "s/^GRUB_CMDLINE_LINUX=.*/GRUB_CMDLINE_LINUX=\"acpi_osi='\$osi_version'\"/" /mnt/etc/default/grub
 			sed -i '/^GRUB_CMDLINE_LINUX_DEFAULT=/c\GRUB_CMDLINE_LINUX_DEFAULT="quiet splash nvidia-drm.modeset=1 nvidia-drm.fbdev=1"' /mnt/etc/default/grub
 		fi
 		"$chroot" /mnt grub-mkconfig -o /boot/grub/grub.cfg
@@ -367,7 +367,7 @@ BootloaderSetup () {
 	;;
 	3|EFISTUB|Efistub|efistub)
 		if [ "$FSsel" = btrfs ]; then rootflags='rootflags=subvol=@' ; fi
-		if [[ -v nvidiadrivers ]]; then osi="nvidia-drm.modeset=1 nvidia-drm.fbdev=1 acpi_osi=\"Windows 2020\"" ; fi
+		if [[ -v nvidiadrivers ]]; then osi="nvidia-drm.modeset=1 nvidia-drm.fbdev=1 acpi_osi=\"$osi_version\"" ; fi
 		if [[ "$IRFSetup" = booster ]]; then irfs="booster.img"; else irfs="initramfs-$KSel.img"; fi
 		BLflags="ro root=$ROOTID rootfstype=$FSsel $rootflags initrd=\\${microcodepkg}.img initrd=\\${irfs} $osi"
 		"$chroot" /mnt efibootmgr -d "$BOOT_PART" -p 1 -c -L "$OSsel" -l "\\vmlinuz-$KSel" -u "$BLflags" --verbose
@@ -399,7 +399,7 @@ InstallationSetup () {
 	
 	if [[ "$SetupAvaible" = 1 ]]; then
 		OperatingSystemSel
-		[ "$OSsel" = Artix ] && ArchRepoSel
+		[[ "${OSsel,,}" == "artix" ]] && ArchRepoSel
 		if [[ "$VBTsel" = 1 ]]; then
 			LANGsel='en_GB.UTF-8' ; LOCsel='it_IT.UTF-8' ; HNsel=tarch1 ; UNsel=tarch1 ; TZsel='Europe/Rome' ; PIDsel=UUID ; FSsel=btrfs ; BLsel=refind
 		else
@@ -427,15 +427,15 @@ InstallationSetup () {
 	else ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' 'AdditionalDriveSetup' 'BaseSystemInstall' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'KernelSetup' 'ServiceSetup' 'UserSetup' 'AudioSetup' 'BootloaderSetup' )
 	fi
 	
-	case "$OSsel" in
-	Arch|arch)
+	case "${OSsel,,}" in
+	arch)
 		PKGmanager=pacman ; pkgskips=( --needed --noconfirm ) ; keylayout='KEYMAP=it' ; keypath='etc/vconsole.conf'
 		PKGstrap=pacstrap ; FSTABgen=genfstab ; chroot='arch-chroot' ; initc0=systemctl ; initc1=enable
 		sed -i '/\[multilib]/,/mirrorlist/ s/#//' /etc/pacman.conf
 		pacman -Sylq core extra multilib | sort > pacman_db 2>/dev/null || true
 		echo 'Running check for missing packages' ; PKGcheck
 	;;
-	Artix|artix)
+	artix)
 		PKGmanager=pacman ; pkgskips=( --needed --noconfirm ) ; keylayout='KEYMAP=it' ; keypath='etc/conf.d/keymaps'
 		PKGstrap=basestrap ; FSTABgen=fstabgen ; chroot='artix-chroot' ; initc0='rc-update' ; initc1=add
 		sed -i '/\[lib32]/,/mirrorlist/ s/#//' /etc/pacman.conf
@@ -447,13 +447,13 @@ InstallationSetup () {
 		fi
 		echo 'Running check for missing packages' ; PKGcheck
 	;;
-	Void|void)
+	void)
 		echo "Void Linux installation selected: integrating XBPS structures..."
 		PKGmanager=xbps-install ; pkgskips=( -y ) ; chroot='xbps-uclibc-chroot'
 	;;
 	esac
 
-	if [[ "$OSsel" != "Void" ]]; then
+	if [[ "${OSsel,,}" != "void" ]]; then
 		for a in "${ArchTixSteps[@]}"; do "$a" || SHOWerror "$a" ; done
 	fi
 	FinishInst
