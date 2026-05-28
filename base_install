@@ -153,18 +153,18 @@ PKGcheck () {
 	fs=(dialog mtools parted gptfdisk dosfstools gvfs-mtp) 
 	bootloaderutility=(efibootmgr os-prober sbsigntools)
 	
+	net=(networkmanager iwd chrony)
+	bluetooth=(bluez bluez-utils bluez-tools bluetui blueman) 
+	print=(cups cups-pdf system-config-printer avahi)
+	utility=(feh xed calc fd bpytop adriconf fwupd) 
+	
 	if [ "$OSsel" = "Artix" ]; then
 		elogind=(elogind elogind-openrc openrc-settingsd)
-		net=(networkmanager iwd chrony chrony-openrc networkmanager-openrc)
-		bluetooth=(bluez bluez-utils bluez-plugins bluez-openrc bluez-cups bluez-tools bluez-libs bluez-qt bluetui blueman)
-		print=(cups cups-pdf system-config-printer avahi avahi-openrc cups-openrc)
-		utility=(feh gedit calc fd bpytop adriconf fwupd colord colord-openrc)
+		net+=(chrony-openrc networkmanager-openrc)
+		bluetooth+=(bluez-openrc bluez-cups)
+		print+=(avahi-openrc cups-openrc)
 	else
 		elogind=()
-		net=(networkmanager iwd chrony)
-		bluetooth=(bluez bluez-utils blueman)
-		print=(cups cups-pdf system-config-printer avahi)
-		utility=(feh gedit calc fd bpytop adriconf fwupd colord)
 	fi
 
 	[ "$FSsel" = "btrfs" ] && btrfsutility=(snapper btrfs-progs) && grubbtrfs=(grub-btrfs) || { btrfsutility=(); grubbtrfs=(); }
@@ -172,11 +172,11 @@ PKGcheck () {
 	[ "$BLsel" = "refind" ] && refindpkg=(refind) || refindpkg=()
 
 	audio=(pipewire pipewire-pulse pipewire-alsa pipewire-jack wireplumber sof-firmware)
-	android=(android-tools android-udev)
+	android=(android-tools)
 	apps=(telegram-desktop firefox profile-sync-daemon)
 	hardwareacceleration=(libva-mesa-driver mesa-vdpau intel-media-driver vkd3d)
 	vulkan=(vulkan-icd-loader vulkan-intel vulkan-mesa-layers)
-	filemanager=(xed vifm pcmanfm tumbler raw-thumbnailer file-roller)
+	filemanager=(vifm pcmanfm tumbler file-roller)
 	archive=(bzip2 cpio gzip xz lzop p7zip tar unrar zip unzip)
 	personalization=(cowfortune)
 
