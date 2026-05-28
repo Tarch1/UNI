@@ -13,7 +13,7 @@ YesNoSel () {
 }
 
 MenuSel () {
-	local -n var_name="$1"     # Crea un riferimento dinamico alla variabile passata
+	local -n var_name="$1"
 	local question="$2" user_choice
 	shift 2
 	local options=("$@")
@@ -36,7 +36,7 @@ MenuSel () {
 }
 
 TextPromptSel () {
-	local -n var_name="$1"     # Crea un riferimento dinamico alla variabile passata
+	local -n var_name="$1"
 	local prompt_msg="$2" input_val
 	
 	while true; do
@@ -52,7 +52,7 @@ TextPromptSel () {
 
 UEFIsel () {
 	if [[ -d "/sys/firmware/efi/" ]]; then
-		mount | grep -q "/sys/firmware/efi/efivars" || mount -t efivarfs efivarfs /sys/firmware/efi/efivars
+		mount | grep -q "/sys/firmware/efi/efivars" || mount -t efivarfs efivarfs /sys/firmware/efi/efivars 2>/dev/null
 		UEFImode=1 && echo 'UEFI Mode detected'
 	else 
 		UEFImode=0 && echo 'BIOS Mode detected'
@@ -105,6 +105,7 @@ GPUsel () {
 }
 
 Pacman_Locked() {
+	if [[ "$OSsel" == "Void" ]]; then return 0; fi
 	if [ -f /var/lib/pacman/db.lck ] || [ -f /mnt/var/lib/pacman/db.lck ]; then
 		echo -e "!!!ERROR!!! Pacman is blocked. Removing lockfiles..."
 		rm -f /var/lib/pacman/db.lck /mnt/var/lib/pacman/db.lck
@@ -145,7 +146,7 @@ Include = /etc/pacman.d/mirrorlist-arch
 [multilib]
 Include = /etc/pacman.d/mirrorlist-arch
 EOF
-		pacman-key --populate archlinux
+		"$chroot" /mnt pacman-key --populate archlinux 2>/dev/null || pacman-key --populate archlinux
 		"$PKGmanager" -Sy
 	fi
 	[[ -s /etc/pacman.d/mirrorlist-arch ]] || "$PKGmanager" -Sy "${pkgskips[@]}" artix-archlinux-support
