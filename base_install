@@ -1,6 +1,8 @@
 #!/bin/bash
 if [ "$(id -u)" -ne 0 ]; then echo 'Please run as root.' >&2; exit 1; fi
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 SHOWerror () {
 	echo "$1" >> Errors 
 	YesNoSel "Found an error in $1 would you like to continue the installation?"
