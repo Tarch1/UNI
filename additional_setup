@@ -77,23 +77,25 @@ ArchRepoSetup () {
 	local target_conf="$1"
 	local cmd=()
 	[ "$target_conf" = "/mnt/etc/pacman.conf" ] && cmd=( "$chroot" /mnt )
+	local mirror_file="/etc/pacman.d/mirrorlist-arch"
+	[ "$target_conf" = "/mnt/etc/pacman.conf" ] && mirror_file="/mnt/etc/pacman.d/mirrorlist-arch"
 
 	if grep -q '\[universe\]' "$target_conf" 2>/dev/null; then echo "There is already a universe entry"
 	else cat << 'EOF' >> "$target_conf"
 [universe]
-Server = https://universe.artixlinux.org/$arch
-Server = https://mirror1.artixlinux.org/universe/$arch
-Server = https://mirror.pascalpuffke.de/artix-universe/$arch
-Server = https://artixlinux.qontinuum.space/artixlinux/universe/os/$arch
-Server = https://mirror1.cl.netactuate.com/artix/universe/$arch
-Server = https://ftp.crifo.org/artix-universe/$arch
+Server = https://artixlinux.org
+Server = https://artixlinux.org
+Server = https://pascalpuffke.de
+Server = https://qontinuum.space
+Server = https://netactuate.com
+Server = https://crifo.org
 EOF
 	fi
-
-	if grep -q 'mirrorlist-arch' "$target_conf" 2>/dev/null; then echo "There is already an arch entry"
+	if [ -f "$mirror_file" ]; then echo "Arch mirrorlist file already exists"
 	else
 		"${cmd[@]}" pacman -Sy --noconfirm artix-keyring artix-archlinux-support 2>/dev/null || true
-		cat << 'EOF' >> "$target_conf"
+		if ! grep -q 'mirrorlist-arch' "$target_conf" 2>/dev/null; then
+			cat << 'EOF' >> "$target_conf"
 
 # Arch
 [extra]
@@ -102,10 +104,12 @@ Include = /etc/pacman.d/mirrorlist-arch
 [multilib]
 Include = /etc/pacman.d/mirrorlist-arch
 EOF
+		fi
 		"${cmd[@]}" pacman-key --populate artix archlinux 2>/dev/null || true
 		"${cmd[@]}" pacman -Sy 2>/dev/null || true
 	fi
 }
+
 AnotherCheck () {
 	[[ "$OSsel" == "Void" ]] && echo "Skipping check (Void uses XBPS)" && return 0
 	local repos=(extra multilib); [[ "$OSsel" == "Artix" ]] && repos+=(system world galaxy)
