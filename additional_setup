@@ -81,11 +81,21 @@ ArchRepoSetup () {
 	local mirror_file="/etc/pacman.d/mirrorlist-arch"
 	[ "$target_conf" = "/mnt/etc/pacman.conf" ] && mirror_file="/mnt/etc/pacman.d/mirrorlist-arch"
 
-	# Inizializza il portachiavi se non è mai stato fatto prima
-	"${cmd[@]}" pacman-key --init 2>/dev/null || true
+	# AUTOMAZIONE KEYRING: Inizializza forzatamente il portachiavi a ogni avvio per evitare blocchi di permessi
+	if [ ${#cmd[@]} -eq 0 ]; then
+		sudo pacman-key --init 2>/dev/null || true
+		sudo pacman-key --populate artix 2>/dev/null || true
+	else
+		"${cmd[@]}" pacman-key --init 2>/dev/null || true
+		"${cmd[@]}" pacman-key --populate artix archlinux 2>/dev/null || true
+	fi
 
-	if grep -q '\[universe\]' "$target_conf" 2>/dev/null; then echo "There is already a universe entry"
-	else cat << 'EOF' >> "$target_conf"
+	# AUTOMAZIONE UNIVERSE: Rimuove la vecchia sezione se presente per evitare conflitti o doppioni
+	sed -i '/\[universe\]/,/^[[:space:]]*$/d' "$target_conf" 2>/dev/null || true
+	
+	# Scrive la tua lista esatta e immutabile
+	cat << 'EOF' >> "$target_conf"
+
 [universe]
 Server = https://universe.artixlinux.org/$arch
 Server = https://mirror1.artixlinux.org/universe/$arch
@@ -94,14 +104,15 @@ Server = https://artixlinux.qontinuum.space/artixlinux/universe/os/$arch
 Server = https://mirror1.cl.netactuate.com/artix/universe/$arch
 Server = https://ftp.crifo.org/artix-universe/$arch
 EOF
-	fi
 
-	if [ -f "$mirror_file" ]; then echo "Arch mirrorlist file already exists"
-	else
+	# AUTOMAZIONE ARCH REPO: Forza l'installazione del supporto mirror se il file manca sul disco
+	if [ ! -f "$mirror_file" ]; then
 		"${cmd[@]}" pacman -Sy --noconfirm artix-keyring artix-archlinux-support 2>/dev/null || true
-		
-		if ! grep -q 'mirrorlist-arch' "$target_conf" 2>/dev/null; then
-			cat << 'EOF' >> "$target_conf"
+	fi
+	
+	# Scrive la configurazione Arch solo se non è già presente nel testo
+	if ! grep -q 'mirrorlist-arch' "$target_conf" 2>/dev/null; then
+		cat << 'EOF' >> "$target_conf"
 
 # Arch
 [extra]
@@ -110,12 +121,12 @@ Include = /etc/pacman.d/mirrorlist-arch
 [multilib]
 Include = /etc/pacman.d/mirrorlist-arch
 EOF
-		fi
-		"${cmd[@]}" pacman-key --populate artix archlinux 2>/dev/null || true
-		"${cmd[@]}" pacman -Sy 2>/dev/null || true
 	fi
-}
 
+	# Sincronizzazione finale delle chiavi e dei database
+	"${cmd[@]}" pacman-key --populate artix archlinux 2>/dev/null || true
+	"${cmd[@]}" pacman -Sy 2>/dev/null || true
+}
 AnotherCheck () {
 	[[ "$OSsel" == "Void" ]] && echo "Skipping check (Void uses XBPS)" && return 0
 	local repos=(extra multilib); [[ "$OSsel" == "Artix" ]] && repos+=(system world galaxy)
