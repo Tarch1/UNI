@@ -13,7 +13,7 @@ SHOWerror () {
 }
 
 Check_required_files () {
-	local files=( additional_setup full_setup Bootloader/Refind/{refind.conf,refind_linux.conf,themes/Blur-theme/theme.conf}
+	local files=( additional_setup finish_setup Bootloader/Refind/{refind.conf,refind_linux.conf,themes/Blur-theme/theme.conf}
 			Bootloader/Grub-Eiffel/{theme.txt,select_c.png,select_e.png,select_w.png,eiffel_tower_under_construction.png,icons/arch.png} )
 	local miss=()
 	for a in "${files[@]}"; do 
@@ -311,7 +311,7 @@ FinishInst () {
 	echo -e " INSTALLATION COMPLETED \n A copy of the script will be placed in your user home directory"
 	cp "${SCRIPT_DIR}/Conf_files/bashrc" /mnt/etc/bash/bashrc.d/"$UNsel".bashrc 2>/dev/null || true
 	mkdir -p /mnt/home/"$UNsel"; cp -r "${SCRIPT_DIR}" /mnt/home/"$UNsel"/
-	sed -i "s/ArchTixUser/$UNsel/g" /mnt/home/"$UNsel"/UNI/full_setup
+	sed -i "s/ArchTixUser/$UNsel/g" /mnt/home/"$UNsel"/UNI/finish_setup
 	echo 'export MOZ_ENABLE_WAYLAND=1' > /mnt/home/"$UNsel"/.profile; cat Errors
 	"$chroot" /mnt chown -hR "$UNsel":users /home/"$UNsel"
 	YesNoSel "Reboot system"
