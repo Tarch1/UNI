@@ -77,8 +77,12 @@ ArchRepoSetup () {
 	local target_conf="$1"
 	local cmd=()
 	[ "$target_conf" = "/mnt/etc/pacman.conf" ] && cmd=( "$chroot" /mnt )
+
 	local mirror_file="/etc/pacman.d/mirrorlist-arch"
 	[ "$target_conf" = "/mnt/etc/pacman.conf" ] && mirror_file="/mnt/etc/pacman.d/mirrorlist-arch"
+
+	# Inizializza il portachiavi se non è mai stato fatto prima
+	"${cmd[@]}" pacman-key --init 2>/dev/null || true
 
 	if grep -q '\[universe\]' "$target_conf" 2>/dev/null; then echo "There is already a universe entry"
 	else cat << 'EOF' >> "$target_conf"
@@ -91,9 +95,11 @@ Server = https://mirror1.cl.netactuate.com/artix/universe/$arch
 Server = https://ftp.crifo.org/artix-universe/$arch
 EOF
 	fi
+
 	if [ -f "$mirror_file" ]; then echo "Arch mirrorlist file already exists"
 	else
 		"${cmd[@]}" pacman -Sy --noconfirm artix-keyring artix-archlinux-support 2>/dev/null || true
+		
 		if ! grep -q 'mirrorlist-arch' "$target_conf" 2>/dev/null; then
 			cat << 'EOF' >> "$target_conf"
 
