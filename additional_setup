@@ -81,10 +81,13 @@ ArchRepoSetup () {
 	local mirror_file="/etc/pacman.d/mirrorlist-arch"
 	[ "$target_conf" = "/mnt/etc/pacman.conf" ] && mirror_file="/mnt/etc/pacman.d/mirrorlist-arch"
 
-	# AUTOMAZIONE KEYRING: Inizializza forzatamente il portachiavi a ogni avvio per evitare blocchi di permessi
+	# AUTOMAZIONE COMPLETA PORTACHIAVI: Se siamo sulla live e le chiavi sono bloccate, resetta tutto
 	if [ ${#cmd[@]} -eq 0 ]; then
-		sudo pacman-key --init 2>/dev/null || true
-		sudo pacman-key --populate artix 2>/dev/null || true
+		rm -rf /etc/pacman.d/gnupg 2>/dev/null || true
+		mkdir -p /etc/pacman.d/gnupg
+		chmod 700 /etc/pacman.d/gnupg
+		pacman-key --init 2>/dev/null || true
+		pacman-key --populate artix 2>/dev/null || true
 	else
 		"${cmd[@]}" pacman-key --init 2>/dev/null || true
 		"${cmd[@]}" pacman-key --populate artix archlinux 2>/dev/null || true
