@@ -38,9 +38,9 @@ UEFIsel () {
 }
 CPUsel () {
 	if grep -q "GenuineIntel" /proc/cpuinfo; then echo 'Installing Intel microcode'; microcodepkg='intel-ucode'
-	elif grep -q "AuthenticAMD" /proc/cpuinfo; then echo 'Installing AMD microcode'
-		[[ "$OSsel" == "Void" ]] && microcodepkg='amd-ucode-firmware' || microcodepkg='amd-ucode'
+	elif grep -q "AuthenticAMD" /proc/cpuinfo; then echo 'Installing AMD microcode'; [[ "$OSsel" == "Void" ]] && microcodepkg='amd-ucode-firmware' || microcodepkg='amd-ucode'
 	else echo 'No microcode needed or unknown CPU'; fi
+}
 }
 GPUsel () {
 	echo "Detecting video chipset..."
