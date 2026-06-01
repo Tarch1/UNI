@@ -62,8 +62,8 @@ GPUsel () {
 				fi
 			else echo 'Using default Mesa'; fi
 			[ -f /sys/firmware/acpi/tables/DSDT ] && AcpiOS="$(strings /sys/firmware/acpi/tables/DSDT | grep -i 'windows ' | sort | tail -1)" ;;
-		*AMD*|*Radeon*) if [[ "$OSsel" == "Void" ]]; then amddrivers=(xf86-video-amdgpu mesa-dri vulkan-loader mesa-vulkan-radeon libva-vdpau-driver)
-			else amddrivers=(amdgpu mesa vulkan-radeon libva-mesa-driver mesa-vdpau); fi ;;
+		*AMD*|*Radeon*) if [[ "$OSsel" == "Void" ]]; then amddrivers=(xf86-video-amdgpu mesa-dri vulkan-loader mesa-vulkan-radeon)
+			else amddrivers=(amdgpu mesa vulkan-radeon libva-mesa-driver); fi ;;
 		*VMware*|*VirtualBox*|*Virtio*|*QXL*) VBTsel=1; echo "VM detected: The default Mesa driver will be installed" ;;
 		*) echo "Generic GPU: Mesa will be installed" ;;
 	esac
