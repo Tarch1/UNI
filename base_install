@@ -127,7 +127,7 @@ PKGcheck () {
 	[ "$FSsel" = "btrfs" ] && btrfsutility=(snapper btrfs-progs) && grubbtrfs=(grub-btrfs) || { btrfsutility=(); grubbtrfs=(); }
 	[ "$BLsel" = "grub" ] && grubpkg=(grub) || grubpkg=(); [ "$BLsel" = "refind" ] && refindpkg=(refind) || refindpkg=()
 	audio=(pipewire pipewire-pulse pipewire-alsa pipewire-jack wireplumber sof-firmware); android=(android-tools)
-	apps=(telegram-desktop firefox profile-sync-daemon); hardwareacceleration=(libva-mesa-driver mesa-vdpau intel-media-driver vkd3d)
+	apps=(telegram-desktop firefox profile-sync-daemon); hardwareacceleration=(libva-mesa-driver intel-media-driver vkd3d)
 	vulkan=(vulkan-icd-loader vulkan-intel vulkan-mesa-layers); filemanager=(vifm pcmanfm tumbler file-roller)
 	archive=(bzip2 cpio gzip xz lzop p7zip tar unrar zip unzip); personalization=(cowfortune)
 	[[ ! -v nvidiadrivers ]] && nvidiadrivers=(); [[ ! -v amddrivers ]] && amddrivers=()
