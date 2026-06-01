@@ -25,7 +25,7 @@ Check_required_files () {
 
 DiskPartition () {
 	swapoff -a; umount -R /mnt 2>/dev/null || true; "$PKGmanager" -Sy "${pkgskips[@]}" "${fs[@]}"
-	mapfile -t dialog_list < <(lsblk -dlnp -o NAME,SIZE)
+	local dialog_list=(); while read -r n s; do dialog_list+=("$n" "$s"); done < <(lsblk -dlnp -o NAME,SIZE)
 	DRIVE=$(dialog --title "OS INSTALLATION" --stdout --menu "Select preferred drive" 0 0 0 "${dialog_list[@]}")
 	[[ -z "$DRIVE" ]] && exit 1
 	[ "$VBTsel" = 0 ] && ADDITIONAL_DRIVE="$(dialog --title "ADDITIONAL" --stdout --menu "Select secondary drive (Optional - Cancel to skip)" 0 0 0 "${dialog_list[@]}")"
