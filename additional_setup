@@ -41,7 +41,6 @@ CPUsel () {
 	elif grep -q "AuthenticAMD" /proc/cpuinfo; then echo 'Installing AMD microcode'; [[ "$OSsel" == "Void" ]] && microcodepkg='amd-ucode-firmware' || microcodepkg='amd-ucode'
 	else echo 'No microcode needed or unknown CPU'; fi
 }
-}
 GPUsel () {
 	echo "Detecting video chipset..."
 	local gpu_info=$(lspci | grep -Ei 'VGA|3D')
