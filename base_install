@@ -170,7 +170,6 @@ KernelSetup () {
 		ln -s /dev/null /mnt/etc/udev/rules.d/61-gdm.rules; modules+=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)
 		echo -e "options nvidia-drm modeset=1 fbdev=1\noptions nvidia NVreg_DynamicPowerManagement=0x02 NVreg_UsePageAttributeTable=1 NVreg_EnablePCIeGen3=1" > /mnt/etc/modprobe.d/nvidia.conf
 	fi
-	[[ "$OSsel" == "Void" ]] && IRFSetup="dracut" || IRFSetup="booster"
 	case "$IRFSetup" in
 		dracut)	mkdir -p /mnt/etc/dracut.conf.d
 				[ "$FSsel" = btrfs ] && echo 'add_dracutmodules+=" btrfs "' > /mnt/etc/dracut.conf.d/btrfs.conf
@@ -255,7 +254,7 @@ BootloaderSetup () {
 	esac
 }
 InstallationSetup () {
-	VBTsel=0; SetupAvaible=1; CheckandSetup=( Check_required_files UEFIsel CPUsel KernelSel GPUsel Pacman_Locked )
+	VBTsel=0; SetupAvaible=1; CheckandSetup=( Check_required_files UEFIsel CPUsel KernelSel IRFsel GPUsel Pacman_Locked )
 	echo 'List of all errors occurred during the installation process:' > Errors
 	for c in "${CheckandSetup[@]}"; do "$c" || SHOWerror "$c"; done
 	if [[ -s config ]]; then cat config && YesNoSel "It's correct?"
@@ -275,7 +274,7 @@ InstallationSetup () {
 		if [[ "$VBTsel" = 1 ]]; then LANGsel='en_GB.UTF-8'; LOCsel='it_IT.UTF-8'; HNsel=tarch1; UNsel=tarch1; TZsel='Europe/Rome'; PIDsel=UUID; FSsel=btrfs; BLsel=refind
 		else local Personalization=( LocalizationSel LanguageSel TimezoneSel HostnameSel UsernameSel PartIDSel FilesystemSel BootloaderSel )
 			for s in "${Personalization[@]}"; do "$s" || SHOWerror "$s"; done; fi
-		Steps=( "OSsel=$OSsel" "ARCHrepo=$ARCHrepo" "LANGsel=$LANGsel" "LOCsel=$LOCsel" "HNsel=$HNsel" "UNsel=$UNsel" "TZsel=$TZsel" "PIDsel=$PIDsel" "FSsel=$FSsel" "BLsel=$BLsel" )
+		Steps=( "OSsel=$OSsel" "ARCHrepo=$ARCHrepo" "LANGsel=$LANGsel" "LOCsel=$LOCsel" "HNsel=$HNsel" "UNsel=$UNsel" "TZsel=$TZsel" "PIDsel=$PIDsel" "FSsel=$FSsel" "BLsel=$BLsel" "IRFSetup=$IRFSetup" )
 		[ -e config ] && rm config
 		for a in "${Steps[@]}"; do echo "$a"; echo "$a" >> config; done
 		YesNoSel "It's correct?"
