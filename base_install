@@ -217,7 +217,7 @@ BootloaderSetup () {
 	local osi_version="${AcpiOS:-Windows 2020}"
 	case "$BLsel" in
 		1|REFIND|Refind|refind)
-			[[ "$IRFSetup" = booster ]] && irfs="booster.img" || irfs="initramfs-$KSel.img"
+			irfs="initramfs-$KSel.img"
 			"$chroot" /mnt "$PKGmanager" -Sy "${pkgskips[@]}" "${refindpkg[@]}"; "$chroot" /mnt refind-install
 			sed -i -e "s/ucode/$microcodepkg/g" -e "s/ArchTixGUID/$PIDsel/g" -e "s/ArchTixROOT/$ROOT_PART/g" "${SCRIPT_DIR}/Bootloader/Refind/refind_linux.conf"
 			[[ "$UEFImode" = 1 ]] && efifolder='refind' || efifolder='BOOT'
@@ -227,7 +227,9 @@ BootloaderSetup () {
 			cp -r "${SCRIPT_DIR}/Bootloader/Refind/themes/"* /mnt/boot/EFI/"$efifolder"/themes/
 			[ "$FSsel" = btrfs ] && rootflags='rootflags=subvol=@'
 			[[ -v nvidiadrivers ]] && drm="nvidia-drm.modeset=1 nvidia-drm.fbdev=1 acpi_osi=\"$osi_version\""
-			echo "\"Standard Boot\"   \"ro root=$ROOTID rootfstype=$FSsel $rootflags initrd=boot\\\\${microcodepkg}.img initrd=boot\\\\${irfs} $drm\"" >> /mnt/boot/refind_linux.conf
+			if [[ "$IRFSetup" = "booster" ]]; then local initrd_flags="initrd=\\${irfs}"
+			else local initrd_flags="initrd=\\${microcodepkg}.img initrd=\\${irfs}"; fi
+			echo "\"Standard Boot\"   \"ro root=$ROOTID rootfstype=$FSsel $rootflags $initrd_flags $drm\"" >> /mnt/boot/refind_linux.conf
 			echo '!!!Refind config and theme changed!!!' ;;
 		2|GRUB|Grub|grub)
 			[ "$FSsel" = btrfs ] && grubpkg+=("${grubbtrfs[@]}")
@@ -246,7 +248,7 @@ BootloaderSetup () {
 		3|EFISTUB|Efistub|efistub)
 			[ "$FSsel" = btrfs ] && rootflags='rootflags=subvol=@'
 			[[ -v nvidiadrivers ]] && osi="nvidia-drm.modeset=1 nvidia-drm.fbdev=1 acpi_osi=\"$osi_version\""
-			[[ "$IRFSetup" = booster ]] && irfs="booster.img" || irfs="initramfs-$KSel.img"
+			irfs="initramfs-$KSel.img"
 			BLflags="ro root=$ROOTID rootfstype=$FSsel $rootflags initrd=\\${microcodepkg}.img initrd=\\${irfs} $osi"
 			"$chroot" /mnt efibootmgr -d "$BOOT_PART" -p 1 -c -L "$OSsel" -l "\\vmlinuz-$KSel" -u "$BLflags" --verbose
 			echo "efibootmgr -b lastnumber -B" ;;
