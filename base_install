@@ -180,6 +180,7 @@ KernelSetup () {
 mount_timeout: 10s
 vconsole: true
 EOF
+				[ "$FSsel" = btrfs ] && echo 'modules: btrfs' >> /mnt/etc/booster.yaml
 				[[ -v nvidiadrivers ]] && echo 'modules: nvidia,nvidia_modeset,nvidia_uvm,nvidia_drm' >> /mnt/etc/booster.yaml
 				"$chroot" /mnt booster build --universal /boot/initramfs-"${KSel}".img ;;
 		*) local HOOKS=(base udev autodetect modconf block usr resume filesystems keyboard keymap fsck)
@@ -227,8 +228,9 @@ BootloaderSetup () {
 			cp -r "${SCRIPT_DIR}/Bootloader/Refind/themes/"* /mnt/boot/EFI/"$efifolder"/themes/
 			[ "$FSsel" = btrfs ] && rootflags='rootflags=subvol=@'
 			[[ -v nvidiadrivers ]] && drm="nvidia-drm.modeset=1 nvidia-drm.fbdev=1 acpi_osi=\"$osi_version\""
-			if [[ "$IRFSetup" = "booster" ]]; then local initrd_flags="initrd=\\${irfs}"
-			else local initrd_flags="initrd=\\${microcodepkg}.img initrd=\\${irfs}"; fi
+			# CORRETTO PER BTRFS: rEFInd richiede i percorsi assoluti corretti per caricare gli initrd dal subvolume
+			if [[ "$IRFSetup" = "booster" ]]; then local initrd_flags="initrd=\\boot\\${irfs}"
+			else local initrd_flags="initrd=\\boot\\${microcodepkg}.img initrd=\\boot\\${irfs}"; fi
 			echo "\"Standard Boot\"   \"ro root=$ROOTID rootfstype=$FSsel $rootflags $initrd_flags $drm\"" >> /mnt/boot/refind_linux.conf
 			echo '!!!Refind config and theme changed!!!' ;;
 		2|GRUB|Grub|grub)
