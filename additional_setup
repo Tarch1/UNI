@@ -146,6 +146,7 @@ FilesystemSel()        { MenuSel "FSsel" "Select filesystem for ROOT" "ext4" "bt
 BootloaderSel()        { MenuSel "BLsel" "Select Bootloader" "refind" "grub" "efistub"; }
 HostnameSel()          { TextPromptSel "HNsel" "Enter preferred hostname"; }
 UsernameSel()          { TextPromptSel "UNsel" "Enter preferred username"; }
+IRFsel() { [[ "${OSsel}" == "Void" ]] && IRFSetup="dracut" && echo "Selected Initramfs: dracut" || MenuSel "IRFSetup" "Select preferred Initramfs Generator" "booster" "mkinitcpio" "dracut"; }
 VirtualBoxTest () { YesNoSel "If this is a Virtualbox installation for test, skip every choice?"; VBTsel="$CC"; [[ "$VBTsel" -eq 1 ]] && echo "OK, skip all checks." || echo "OK, let's proceed with questions."; }
 ArchRepoSel () { YesNoSel "You want Arch repositories as well as Artix repositories?"; if [[ "$CC" -eq 1 ]]; then ARCHrepo=1 && echo "OK, adding Arch repositories!"; else ARCHrepo='' && echo "Proceeding without them..."; fi; }
 TimezoneSel () {
