@@ -176,7 +176,7 @@ KernelSetup () {
 				[ "$FSsel" = btrfs ] && echo 'add_dracutmodules+=" btrfs "' > /mnt/etc/dracut.conf.d/btrfs.conf
 				[[ -v nvidiadrivers ]] && echo 'force_drivers+=" nvidia nvidia_modeset nvidia_uvm nvidia_drm "' > /mnt/etc/dracut.conf.d/nvidia.conf
 				"$chroot" /mnt xbps-reconfigure -f "$KSel" ;;
-		booster) [[ "${OSsel,,}" == "artix" ]] && "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" booster booster-openrc || "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" booster
+		booster) [ ${#booster[@]} -gt 0 ] && "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${booster[@]}"
 				mkdir -p /mnt/etc/booster.d; cat << 'EOF' > /mnt/etc/booster.yaml
 mount_timeout: 10s
 vconsole: true
