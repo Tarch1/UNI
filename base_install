@@ -176,13 +176,10 @@ KernelSetup () {
 				[[ -v nvidiadrivers ]] && echo 'force_drivers+=" nvidia nvidia_modeset nvidia_uvm nvidia_drm "' > /mnt/etc/dracut.conf.d/nvidia.conf
 				"$chroot" /mnt xbps-reconfigure -f "$KSel" ;;
 		booster) [ ${#booster[@]} -gt 0 ] && "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${booster[@]}"
-				mkdir -p /mnt/etc/booster.d; cat << 'EOF' > /mnt/etc/booster.yaml
-mount_timeout: 10s
-vconsole: true
-EOF
+				mkdir -p /mnt/etc/booster.d; printf "mount_timeout: 10s\nvconsole: true" > /mnt/etc/booster.yaml
 				[ "$FSsel" = btrfs ] && echo 'modules: btrfs' >> /mnt/etc/booster.yaml
 				[[ -v nvidiadrivers ]] && echo 'modules: nvidia,nvidia_modeset,nvidia_uvm,nvidia_drm' >> /mnt/etc/booster.yaml
-				"$chroot" /mnt booster build --universal /boot/initramfs-"${KSel}".img ;;
+				"$chroot" /mnt booster build --force --universal /boot/initramfs-"${KSel}".img ;;
 		*) local HOOKS=(base udev autodetect modconf block usr resume filesystems keyboard keymap fsck)
 		   [[ -v nvidiadrivers ]] && HOOKS+=(kms)
 		   sed -i "/MODULES/ s/()/(${modules[*]})/" /mnt/etc/mkinitcpio.conf
@@ -206,12 +203,8 @@ UserSetup () {
 }
 AudioSetup () {
 	"$chroot" /mnt mkdir -p /etc/pipewire/pipewire.conf.d /etc/wireplumber/wireplumber.conf.d
-	cat << 'EOF' > /mnt/etc/wireplumber/wireplumber.conf.d/10-bluetooth-policy.conf
-monitor.bluez.properties = { bluez5.enable-sbc-xq = true, bluez5.enable-msbc = true, bluez5.enable-hw-volume = true, bluez5.codecs = [ sbc_xq aac aptx aptx_hd ldac ] }
-EOF
-	cat << 'EOF' > /mnt/etc/pipewire/pipewire.conf.d/99-input-denoise.conf
-context.properties = { default.clock.rate = 48000, default.clock.quantum = 1024, default.clock.min-quantum = 32, default.clock.max-quantum = 2048 }
-EOF
+	printf 'monitor.bluez.properties = { bluez5.enable-sbc-xq = true, bluez5.enable-msbc = true, bluez5.enable-hw-volume = true, bluez5.codecs = [ sbc_xq aac aptx aptx_hd ldac ] }\n' > /mnt/etc/wireplumber/wireplumber.conf.d/10-bluetooth-policy.conf
+	printf 'context.properties = { default.clock.rate = 48000, default.clock.quantum = 1024, default.clock.min-quantum = 32, default.clock.max-quantum = 2048 }\n' > /mnt/etc/pipewire/pipewire.conf.d/99-input-denoise.conf
 	[ -f /mnt/etc/bluetooth/main.conf ] && sed -i 's/#AutoEnable=false/AutoEnable=true/g' /mnt/etc/bluetooth/main.conf
 }
 BootloaderSetup () {
