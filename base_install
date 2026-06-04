@@ -302,7 +302,7 @@ InstallationSetup () {
 		artix) PKGmanager=pacman; pkgskips=( --needed --noconfirm ); keylayout='KEYMAP=it'; keypath='etc/conf.d/keymaps'
 			PKGstrap=basestrap; FSTABgen=fstabgen; chroot='artix-chroot'; initc0='rc-update'; initc1=add
 			[[ "$initc0" == "rc-update" ]] && init_sys="openrc" || init_sys="runit"
-			sed -i '/\[lib32]/,/mirrorlist/ s/#//' /etc/etc/pacman.conf
+			sed -i '/\[lib32]/,/mirrorlist/ s/#//' /etc/pacman.conf
 			if [ "$ARCHrepo" = 1 ]; then ArchRepoSetup /etc/pacman.conf; pacman -Sylq system world galaxy lib32 universe extra multilib | sort > pacman_db 2>/dev/null || true
 			else pacman -Sylq system world galaxy lib32 | sort > pacman_db 2>/dev/null || true; fi
 			echo 'Running check for missing packages'; PKGcheck ;;
