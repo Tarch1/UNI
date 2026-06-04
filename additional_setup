@@ -107,12 +107,7 @@ Server = https://mirror1.cl.netactuate.com/artix/universe/$arch
 Server = https://ftp.crifo.org/artix-universe/$arch
 EOF
 
-	# AUTOMAZIONE ARCH REPO: Forza l'installazione del supporto mirror se il file manca sul disco
-	if [ ! -f "$mirror_file" ]; then
-		"${cmd[@]}" pacman -Sy --noconfirm artix-keyring artix-archlinux-support 2>/dev/null || true
-	fi
-	
-	# Scrive la configurazione Arch solo se non è già presente nel testo
+	if [ ! -f "$mirror_file" ]; then "${cmd[@]}" pacman -Sy --noconfirm artix-keyring artix-archlinux-support; fi
 	if ! grep -q 'mirrorlist-arch' "$target_conf" 2>/dev/null; then
 		cat << 'EOF' >> "$target_conf"
 
