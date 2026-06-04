@@ -80,7 +80,6 @@ ArchRepoSetup () {
 	local mirror_file="/etc/pacman.d/mirrorlist-arch"
 	[ "$target_conf" = "/mnt/etc/pacman.conf" ] && mirror_file="/mnt/etc/pacman.d/mirrorlist-arch"
 
-	# AUTOMAZIONE COMPLETA PORTACHIAVI: Se siamo sulla live e le chiavi sono bloccate, resetta tutto
 	if [ ${#cmd[@]} -eq 0 ]; then
 		rm -rf /etc/pacman.d/gnupg 2>/dev/null || true
 		mkdir -p /etc/pacman.d/gnupg
@@ -94,7 +93,6 @@ ArchRepoSetup () {
 
 	sed -i '/\[universe\]/,/^[[:space:]]*$/d' "$target_conf" 2>/dev/null || true
 	printf '\n[universe]\nServer = https://universe.artixlinux.org/$arch\nServer = https://mirror1.artixlinux.org/universe/$arch\nServer = https://mirror.pascalpuffke.de/artix-universe/$arch\nServer = https://artixlinux.qontinuum.space/artixlinux/universe/os/$arch\nServer = https://mirror1.cl.netactuate.com/artix/universe/$arch\nServer = https://ftp.crifo.org/artix-universe/$arch\n' >> "$target_conf"
-
 	if [ ! -f "$mirror_file" ]; then "${cmd[@]}" pacman -Sy --noconfirm artix-keyring artix-archlinux-support; fi
 	if ! grep -q 'mirrorlist-arch' "$target_conf" 2>/dev/null; then
 	printf '\n# Arch\n[extra]\nInclude = /etc/pacman.d/mirrorlist-arch\n\n[multilib]\nInclude = /etc/pacman.d/mirrorlist-arch\n' >> "$target_conf"
