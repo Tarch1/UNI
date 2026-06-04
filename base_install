@@ -176,7 +176,7 @@ KernelSetup () {
 				[[ -v nvidiadrivers ]] && echo 'force_drivers+=" nvidia nvidia_modeset nvidia_uvm nvidia_drm "' > /mnt/etc/dracut.conf.d/nvidia.conf
 				"$chroot" /mnt xbps-reconfigure -f "$KSel" ;;
 		booster) [ ${#booster[@]} -gt 0 ] && "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${booster[@]}"
-				mkdir -p /mnt/etc/booster.d; printf "mount_timeout: 10s\nvconsole: true" > /mnt/etc/booster.yaml
+				printf $'mount_timeout: 10s\nvconsole: true\n' > /mnt/etc/booster.yaml
 				[ "$FSsel" = btrfs ] && echo 'modules: btrfs' >> /mnt/etc/booster.yaml
 				[[ -v nvidiadrivers ]] && echo 'modules: nvidia,nvidia_modeset,nvidia_uvm,nvidia_drm' >> /mnt/etc/booster.yaml
 				"$chroot" /mnt booster build --force --universal /boot/initramfs-"${KSel}".img ;;
