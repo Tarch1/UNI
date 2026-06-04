@@ -68,7 +68,8 @@ GPUsel () {
 	esac
 }
 Pacman_Locked() {
-		if ! grep -q 'mirrorlist-arch' "$target_conf" 2>/dev/null; then printf '\n# Arch\n[extra]\nInclude = /etc/pacman.d/mirrorlist-arch\n\n[multilib]\nInclude = /etc/pacman.d/mirrorlist-arch\n' >> "$target_conf"; fi
+		if [ -f /var/lib/pacman/db.lck ] || [ -f /mnt/var/lib/pacman/db.lck ]; then echo -e "Pacman is blocked. Removing lockfiles..."; rm -f /var/lib/pacman/db.lck /mnt/var/lib/pacman/db.lck
+		else echo "No locked database"; fi
 }
 ArchRepoSetup () {
 	local target_conf="$1"
