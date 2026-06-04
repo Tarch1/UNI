@@ -191,19 +191,18 @@ KernelSetup () {
 }
 ServiceSetup () {
 	if [[ "${OSsel,,}" == "artix" ]]; then
-		Services+=( networkmanager openrc-settingsd cupsd avahi-daemon bluetooth )
+		Services+=( NetworkManager openrc-settingsd cupsd avahi-daemon bluetoothd )
 		[ -f /mnt/etc/init.d/tlp ] && Services+=( tlp )
 		[[ -v nvidiadrivers && -f /mnt/etc/init.d/nvidia-persistenced ]] && Services+=( nvidia-persistenced )
-		for s in "${Services[@]}"; do "$chroot" /mnt "$initc0" "$initc1" "$s"; done
 	elif [[ "${OSsel,,}" == "arch" ]]; then
 		Services+=( NetworkManager cups avahi-daemon bluetooth )
 		[ -f /mnt/usr/lib/systemd/system/tlp.service ] && Services+=( tlp )
-		for s in "${Services[@]}"; do "$chroot" /mnt "$initc0" "$initc1" "$s"; done
 	elif [[ "${OSsel,,}" == "void" ]]; then
 		Services+=( NetworkManager cupsd dbus avahi-daemon bluetoothd )
 		[ -d /mnt/etc/sv/tlp ] && Services+=( tlp )
-		# Su Void l'abilitazione avviene creando il link simbolico dentro /etc/runit/runsvdir/default/
-		for s in "${Services[@]}"; do "$chroot" /mnt ln -s /etc/sv/"$s" /etc/runit/runsvdir/default/; done
+	fi
+	if [[ "${OSsel,,}" == "void" ]]; then for s in "${Services[@]}"; do "$chroot" /mnt ln -s /etc/sv/"$s" /etc/runit/runsvdir/default/; done
+	else for s in "${Services[@]}"; do "$chroot" /mnt "$initc0" "$initc1" "$s"; done
 	fi
 	mkdir -p /mnt/etc/udev/rules.d/; cp "${SCRIPT_DIR}/Conf_files/51-android.rules" /mnt/etc/udev/rules.d/
 }
