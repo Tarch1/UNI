@@ -177,7 +177,8 @@ KernelSetup () {
 				"$chroot" /mnt xbps-reconfigure -f "$KSel" ;;
 		booster) [ ${#booster[@]} -gt 0 ] && "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${booster[@]}"
 				printf $'mount_timeout: 10s\nvconsole: true\n' > /mnt/etc/booster.yaml
-				[ "$FSsel" = btrfs ] && echo 'modules: btrfs' >> /mnt/etc/booster.yaml
+				if [[ "$VBTsel" = 1 ]]; then [ "$FSsel" = btrfs ] && echo 'modules: btrfs,ahci,ata_piix,sd_mod,nvme' >> /mnt/etc/booster.yaml || echo 'modules: ahci,ata_piix,sd_mod,nvme' >> /mnt/etc/booster.yaml
+				else [ "$FSsel" = btrfs ] && echo 'modules: btrfs' >> /mnt/etc/booster.yaml; fi
 				[[ -v nvidiadrivers ]] && echo 'modules: nvidia,nvidia_modeset,nvidia_uvm,nvidia_drm' >> /mnt/etc/booster.yaml
 				local real_kver=$(basename $(k=("/mnt/usr/lib/modules/"*/pkgbase); grep -l "^${KSel}$" "${k[@]}" | xargs dirname))
 				"$chroot" /mnt /bin/bash -c "booster build --force --universal --kernel-version=${real_kver} /boot/initramfs-${KSel}.img" ;;
