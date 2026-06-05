@@ -226,18 +226,18 @@ BootloaderSetup () {
 		1|REFIND|Refind|refind)
 			irfs="initramfs-$KSel.img"
 			"$chroot" /mnt "$PKGmanager" -Sy "${pkgskips[@]}" "${refindpkg[@]}"; "$chroot" /mnt refind-install
-			sed -i -e "s/ucode/$microcodepkg/g" -e "s/ArchTixGUID/$PIDsel/g" -e "s/ArchTixROOT/$ROOT_PART/g" "${SCRIPT_DIR}/Bootloader/Refind/refind_linux.conf"
 			[[ "$UEFImode" = 1 ]] && efifolder='refind' || efifolder='BOOT'
 			mkdir -p /mnt/boot/EFI/"$efifolder"/themes
 			mv /mnt/boot/EFI/"$efifolder"/refind.conf /mnt/boot/EFI/"$efifolder"/backup-refind.conf; mv /mnt/boot/refind_linux.conf /mnt/boot/backup-refind_linux.conf
 			cp "${SCRIPT_DIR}/Bootloader/Refind/refind.conf" /mnt/boot/EFI/"$efifolder"/refind.conf
-			cp "${SCRIPT_DIR}/Bootloader/Refind/refind_linux.conf" /mnt/boot/refind_linux.conf
 			cp -r "${SCRIPT_DIR}/Bootloader/Refind/themes/"* /mnt/boot/EFI/"$efifolder"/themes/
 			[[ "$VBTsel" = 1 ]] && sed -i 's/#resolution 1024 768/resolution 1024 768/' /mnt/boot/EFI/"$efifolder"/refind.conf
 			[ "$FSsel" = btrfs ] && rootflags='rootflags=subvol=@'
 			[[ -v nvidiadrivers ]] && drm="nvidia-drm.modeset=1 nvidia-drm.fbdev=1 acpi_osi=\"$osi_version\""
-			if [[ "$IRFSetup" = "booster" ]]; then local initrd_flags="initrd=\\${irfs}"; else local initrd_flags="initrd=\\${microcodepkg}.img initrd=\\${irfs}"; fi
-			echo "\"Standard Boot\"   \"ro root=${PIDsel}=$ROOTID rootfstype=$FSsel $rootflags $initrd_flags $drm\"" >> /mnt/boot/refind_linux.conf
+			if [[ "$IRFSetup" = "booster" ]]; then local initrd_flags="initrd=\\${irfs}"
+			else local initrd_flags="initrd=\\${microcodepkg}.img initrd=\\${irfs}"; fi
+			# GENERAZIONE DA ZERO: Crea un file fresco eliminando ogni residuo o configurazione sporca
+			echo "\"Standard Boot\"   \"ro root=${PIDsel}=$ROOTID rootfstype=$FSsel $rootflags $initrd_flags $drm\"" > /mnt/boot/refind_linux.conf
 			echo '!!!Refind config and theme changed!!!' ;;
 		2|GRUB|Grub|grub)
 			[ "$FSsel" = btrfs ] && grubpkg+=("${grubbtrfs[@]}")
