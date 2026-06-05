@@ -211,7 +211,7 @@ UserSetup () {
 	sed -i '/%wheel ALL=(ALL:ALL) ALL/ s/#//' /mnt/etc/sudoers
 	echo "Choose password for user: $UNsel" && "$chroot" /mnt passwd "$UNsel"
 	echo "Choose password for root" && "$chroot" /mnt passwd
-	"$chroot" /mnt su - "$UNsel" -c "mkdir -p ~/.config"
+	"$chroot" /mnt su "$UNsel" -c "mkdir -p ~/.config"
 }
 AudioSetup () {
 	"$chroot" /mnt mkdir -p /etc/pipewire/pipewire.conf.d /etc/wireplumber/wireplumber.conf.d
