@@ -106,7 +106,7 @@ PackageConfig () {
 	fi
 }
 PackageInstall () {
-	if [[ "$VBTsel" = 1 ]]; then "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${baselinux[@]}" "${baseutils[@]}"
+	if [[ "$VBTsel" = 1 ]]; then "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${baselinux[@]}" "${baseutils[@]}" "${elogind[@]}" "${net[@]}" "${bluetooth[@]}" "${print[@]}"
 	else "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" \
 			"${microcode[@]}" "${kernel[@]}" "${baselinux[@]}" "${baseutils[@]}" "${fs[@]}" \
 			"${bootloaderutility[@]}" "${btrfsutility[@]}" "${elogind[@]}" "${grubpkg[@]}" \
