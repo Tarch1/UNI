@@ -330,5 +330,6 @@ FinishInst () {
 		0) echo 'OK' && exit 0 ;;
 		*) echo 'Not a good answer' && YesNoSel "Reboot system" ;;
 	esac
-}stallationSetup
+}
+IstallationSetup
 cat Errors
