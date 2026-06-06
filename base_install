@@ -111,8 +111,8 @@ PackageConfig () {
 	fi
 }
 PackageInstall () {
-	if [[ "$VBTsel" = 1 ]]; then "$chroot" /mnt "$PKGmanager" "${PKGmanager_flags[@]}" -Syu "${pkgskips[@]}" "${baselinux[@]}" "${baseutils[@]}" "${elogind[@]}" "${net[@]}" "${bluetooth[@]}" "${print[@]}"
-	else "$chroot" /mnt "$PKGmanager" "${PKGmanager_flags[@]}" -Syu "${pkgskips[@]}" \
+	if [[ "$VBTsel" = 1 ]]; then "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${baselinux[@]}" "${baseutils[@]}" "${elogind[@]}" "${net[@]}" "${bluetooth[@]}" "${print[@]}"
+	else "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" \
 			"${microcode[@]}" "${kernel[@]}" "${baselinux[@]}" "${baseutils[@]}" "${fs[@]}" \
 			"${bootloaderutility[@]}" "${btrfsutility[@]}" "${elogind[@]}" "${grubpkg[@]}" \
 			"${grubbtrfs[@]}" "${refindpkg[@]}" "${net[@]}" "${audio[@]}" "${bluetooth[@]}" \
@@ -180,7 +180,8 @@ KernelSetup () {
 				[ "$FSsel" = btrfs ] && echo 'add_dracutmodules+=" btrfs "' > /mnt/etc/dracut.conf.d/btrfs.conf
 				[[ -v nvidiadrivers ]] && echo 'force_drivers+=" nvidia nvidia_modeset nvidia_uvm nvidia_drm "' > /mnt/etc/dracut.conf.d/nvidia.conf
 				"$chroot" /mnt xbps-reconfigure -f "$KSel" ;;
-		booster) [ ${#booster[@]} -gt 0 ] && "$chroot" /mnt "$PKGmanager" "${PKGmanager_flags[@]}" -Syu "${pkgskips[@]}" "${booster[@]}"
+		booster) [ ${#booster[@]} -gt 0 ] && "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${booster[@]}"
+				"$chroot" /mnt pacman -Rns --noconfirm mkinitcpio 2>/dev/null || true
 				printf $'mount_timeout: 10s\nvconsole: true\n' > /mnt/etc/booster.yaml
 				if [[ "$VBTsel" = 1 ]]; then [ "$FSsel" = btrfs ] && echo 'modules: btrfs,ahci,ata_piix,sd_mod,nvme' >> /mnt/etc/booster.yaml || echo 'modules: ahci,ata_piix,sd_mod,nvme' >> /mnt/etc/booster.yaml
 				else [ "$FSsel" = btrfs ] && echo 'modules: btrfs' >> /mnt/etc/booster.yaml; fi
