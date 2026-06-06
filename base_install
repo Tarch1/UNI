@@ -77,9 +77,11 @@ FileSystemFormat () {
 }
 AdditionalDriveSetup () { [ -n "$ADDITIONAL_DRIVE" ] && mkdir -p /mnt/run/media/"$HNsel"/HDD && mount "$ADDITIONAL_DRIVE" /mnt/run/media/"$HNsel"/HDD; }
 BaseSystemInstall () {
+	local strap_flags=""
 	local BasePKG=( "${kernel[@]}" "${baselinux[@]}" "${elogind[@]}" "${btrfspkg[@]}" )
 	[ "$FSsel" = btrfs ] && BasePKG+=( "${btrfsutility[@]}" )
-	"$PKGstrap" /mnt "$microcodepkg" "${BasePKG[@]}"
+	[[ "$IRFSetup" == "booster" ]] && strap_flags="--assume-installed mkinitcpio=999 --assume-installed mkinitcpio-busybox=999"
+	"$PKGstrap" $strap_flags /mnt "$microcodepkg" "${BasePKG[@]}"
 }
 FStabGen () {
 	mv -f /mnt/etc/fstab /mnt/etc/old-fstab 2>/dev/null || true
