@@ -185,7 +185,7 @@ KernelSetup () {
 				if [[ "$VBTsel" = 1 ]]; then [ "$FSsel" = btrfs ] && echo 'modules: btrfs,ahci,ata_piix,sd_mod,nvme' >> /mnt/etc/booster.yaml || echo 'modules: ahci,ata_piix,sd_mod,nvme' >> /mnt/etc/booster.yaml
 				else [ "$FSsel" = btrfs ] && echo 'modules: btrfs' >> /mnt/etc/booster.yaml; fi
 				[[ -v nvidiadrivers ]] && echo 'modules: nvidia,nvidia_modeset,nvidia_uvm,nvidia_drm' >> /mnt/etc/booster.yaml
-				local real_kver=$(basename $(k=("/mnt/usr/lib/modules/"*/pkgbase); grep -l "^${KSel}$" "${k[@]}" | xargs dirname))
+				local real_kver=$(basename "$(find /mnt/usr/lib/modules/ -maxdepth 1 -mindepth 1 -type d ! -name 'extramodules*' | head -n 1)")
 				"$chroot" /mnt /bin/bash -c "booster build --force --universal --kernel-version=${real_kver} /boot/initramfs-${KSel}.img" ;;
 		*) local HOOKS=(base udev autodetect modconf block usr resume filesystems keyboard keymap fsck)
 		   [[ -v nvidiadrivers ]] && HOOKS+=(kms)
