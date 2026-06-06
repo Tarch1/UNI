@@ -181,13 +181,13 @@ KernelSetup () {
 				[[ -v nvidiadrivers ]] && echo 'force_drivers+=" nvidia nvidia_modeset nvidia_uvm nvidia_drm "' > /mnt/etc/dracut.conf.d/nvidia.conf
 				"$chroot" /mnt xbps-reconfigure -f "$KSel" ;;
 		booster) [ ${#booster[@]} -gt 0 ] && "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${booster[@]}"
-				"$chroot" /mnt pacman -Rns --noconfirm mkinitcpio 2>/dev/null || true
+				if [[ "$OSsel" != "Void" ]]; then "$chroot" /mnt pacman -Rns --noconfirm mkinitcpio 2>/dev/null || true; fi
 				printf $'mount_timeout: 10s\nvconsole: true\n' > /mnt/etc/booster.yaml
 				if [[ "$VBTsel" = 1 ]]; then [ "$FSsel" = btrfs ] && echo 'modules: btrfs,ahci,ata_piix,sd_mod,nvme' >> /mnt/etc/booster.yaml || echo 'modules: ahci,ata_piix,sd_mod,nvme' >> /mnt/etc/booster.yaml
 				else [ "$FSsel" = btrfs ] && echo 'modules: btrfs' >> /mnt/etc/booster.yaml; fi
 				[[ -v nvidiadrivers ]] && echo 'modules: nvidia,nvidia_modeset,nvidia_uvm,nvidia_drm' >> /mnt/etc/booster.yaml
-				mkdir -p /mnt/etc/booster.d
-				printf "output: \"/boot/initramfs-${KSel}.img\"\nuniversal: true\nforce: true\n" > /mnt/etc/booster.d/"${KSel}".yaml
+				if [[ "$OSsel" != "Void" ]]; then mkdir -p /mnt/etc/pacman.d/hooks
+				printf "[Trigger]\nOperation = Install\nOperation = Upgrade\nType = Package\nTarget = ${KSel}\n\n[Action]\nDescription = Forcing Booster initramfs update...\nWhen = PostTransaction\nDepends = booster\nExec = /usr/bin/booster build --force --universal /boot/initramfs-${KSel}.img\n" > /mnt/etc/pacman.d/hooks/95-booster-force.hook; fi
 				local real_kver=$(basename "$(find /mnt/usr/lib/modules/ -maxdepth 1 -mindepth 1 -type d ! -name 'extramodules*' | head -n 1)")
 				"$chroot" /mnt /bin/bash -c "booster build --force --universal --kernel-version=${real_kver} /boot/initramfs-${KSel}.img" ;;
 		*) local HOOKS=(base udev autodetect modconf block usr resume filesystems keyboard keymap fsck)
