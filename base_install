@@ -323,8 +323,8 @@ InstallationSetup () {
 			echo 'Running check for missing packages'; PKGcheck ;;
 		void) echo "Void Linux installation selected: integrating XBPS structures..."; PKGmanager=xbps-install; pkgskips=( -y ); chroot='xbps-uclibc-chroot' ;;
 	esac
-	if [[ "${OSsel,,}" != "void" ]]; then
-		for a in "${ArchTixSteps[@]}"; do "$a" || SHOWerror "$a"; done; fi
+	[[ "$IRFSetup" == "booster" && "$OSsel" != "Void" ]] && PKGmanager+=" --assume-installed mkinitcpio=999 --assume-installed mkinitcpio-busybox=999"
+	if [[ "${OSsel,,}" != "void" ]]; then for a in "${ArchTixSteps[@]}"; do "$a" || SHOWerror "$a"; done; fi
 	FinishInst
 }
 FinishInst () {
