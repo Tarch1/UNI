@@ -38,20 +38,24 @@ DiskPartition () {
 	if [[ -z $DRIVE || -z $DEVICE ]]; then echo "No partition were created, check the installer. Closing installation!" ; exit 1 
 	else echo 'We can proceed with the formatting of file system' ; fi
 	sleep 1
-	BOOTID="$(blkid -s "$PIDsel" -o value "$BOOT_PART")"; ROOTID="$(blkid -s "$PIDsel" -o value "$ROOT_PART")"
-	export BOOTID ROOTID; echo -e " BP=$BOOT_PART RP=$ROOT_PART PID=$PIDsel \n ${PIDsel}_BOOT=$BOOTID \n ${PIDsel}_ROOT=$ROOTID "; lsblk -f
+	echo -e " BP=$BOOT_PART RP=$ROOT_PART PID=$PIDsel" ; lsblk -f
 }
 
 FileSystemFormat () {
-	BootLabel='EFI' ; RootLabel='ROOT' ; mkfs.fat -F32 -n "$BootLabel" "$BOOT_PART" ; mkswap "$SWAP_PART"
-	SWAPID="$(blkid -s "$PIDsel" -o value "$SWAP_PART")"
+	BootLabel='EFI' ; RootLabel='ROOT' ; mkfs.fat -F32 -n "$BootLabel" "$BOOT_PART"
+	BOOTID="$(blkid -s "$PIDsel" -o value "$BOOT_PART")"
+	mkswap "$SWAP_PART" ; SWAPID="$(blkid -s "$PIDsel" -o value "$SWAP_PART")"
 	UNIfstab="$PIDsel=$BOOTID /boot vfat defaults 0 2\n$PIDsel=$SWAPID none swap defaults 0 0\n"
 	case "$FSsel" in
-		ext4)  mkfs.ext4 -L "$RootLabel" "$ROOT_PART" ; mount "$ROOT_PART" /mnt
+		ext4)  mkfs.ext4 -L "$RootLabel" "$ROOT_PART"
+			   ROOTID="$(blkid -s "$PIDsel" -o value "$ROOT_PART")"
+			   mount "$ROOT_PART" /mnt
 			   UNIfstab+="$PIDsel=$ROOTID / ext4 defaults 0 1\n" ;;
 		btrfs) modules=(btrfs) ; binaries='btrfs' ; local SUBVolumes=( 'home' 'var_log' 'snapshots' 'swap' )
 			   local options='noatime,compress=zstd,space_cache=v2,discard=async'
-			   mkfs.btrfs -fL "$RootLabel" "$ROOT_PART" ; mount "$ROOT_PART" /mnt ; btrfs su cr /mnt/@
+			   mkfs.btrfs -fL "$RootLabel" "$ROOT_PART"
+			   ROOTID="$(blkid -s "$PIDsel" -o value "$ROOT_PART")"
+			   mount "$ROOT_PART" /mnt ; btrfs su cr /mnt/@
 			   for b in "${SUBVolumes[@]}"; do btrfs su cr /mnt/@"$b" ; done ; umount /mnt
 			   mount -o defaults,"$options",subvol=@ "$ROOT_PART" /mnt
 			   UNIfstab+="$PIDsel=$ROOTID / btrfs $options,subvol=@ 0 0\n"
@@ -68,6 +72,7 @@ FileSystemFormat () {
 			   done ;;
 		*) echo "Boh file system non supportato" ;;
 	esac
+	export BOOTID ROOTID SWAPID
 	swapon "$SWAP_PART" ; mkdir -p /mnt/boot ; mount "$BOOT_PART" /mnt/boot ; lsblk -f
 }
 AdditionalDriveSetup () { [ -n "$ADDITIONAL_DRIVE" ] && mkdir -p /mnt/run/media/"$HNsel"/HDD && mount "$ADDITIONAL_DRIVE" /mnt/run/media/"$HNsel"/HDD; }
