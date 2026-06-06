@@ -324,7 +324,6 @@ InstallationSetup () {
 			echo 'Running check for missing packages'; PKGcheck ;;
 		void) echo "Void Linux installation selected: integrating XBPS structures..."; PKGmanager=xbps-install; pkgskips=( -y ); chroot='xbps-uclibc-chroot' ;;
 	esac
-	[[ "$IRFSetup" == "booster" && "$OSsel" != "Void" ]] && sed -i '/^#NoUpgrade/a AssumeInstalled = mkinitcpio=999 mkinitcpio-busybox=999' /etc/pacman.conf
 	if [[ "${OSsel,,}" != "void" ]]; then for a in "${ArchTixSteps[@]}"; do "$a" || SHOWerror "$a"; done; fi
 	FinishInst
 }
