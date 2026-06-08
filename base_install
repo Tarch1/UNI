@@ -289,7 +289,7 @@ FinishInst () {
 	echo 'export MOZ_ENABLE_WAYLAND=1' > /mnt/home/"$UNsel"/.profile; cat Errors
 	"$chroot" /mnt chown -hR "$UNsel":users /home/"$UNsel"
 	YesNoSel "Reboot system"
-	if [[ "$CC" -eq 1 ]]; then umount -R /mnt && reboot else echo 'OK' && exit 0; fi
+	if [[ "$CC" -eq 1 ]]; then umount -R /mnt && reboot; else echo 'OK' && exit 0; fi
 }
 InstallationSetup
 cat Errors
