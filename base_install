@@ -40,7 +40,6 @@ DiskPartition () {
 	sleep 1
 	echo -e " BP=$BOOT_PART RP=$ROOT_PART PID=$PIDsel" ; lsblk -f
 }
-
 FileSystemFormat () {
 	BootLabel='EFI' ; RootLabel='ROOT' ; mkfs.fat -F32 -n "$BootLabel" "$BOOT_PART"
 	BOOTID="$(blkid -s "$PIDsel" -o value "$BOOT_PART")"
@@ -111,7 +110,9 @@ PackageConfig () {
 	fi
 }
 PackageInstall () {
-	if [[ "$VBTsel" = 1 ]]; then "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${baselinux[@]}" "${baseutils[@]}" "${elogind[@]}" "${net[@]}" "${bluetooth[@]}" "${print[@]}"
+	if [[ "$VBTsel" = 1 ]]; then
+		local VBTboot=(); [ "$BLsel" = "efistub" ] && VBTboot+=(efibootmgr); [ "$BLsel" = "grub" ] && VBTboot+=(grub); [ "$BLsel" = "refind" ] && VBTboot+=(refind)
+		"$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${baselinux[@]}" "${baseutils[@]}" "${elogind[@]}" "${net[@]}" "${bluetooth[@]}" "${print[@]}" "${VBTboot[@]}"
 	else "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" \
 			"${microcode[@]}" "${kernel[@]}" "${baselinux[@]}" "${baseutils[@]}" "${fs[@]}" \
 			"${bootloaderutility[@]}" "${btrfsutility[@]}" "${elogind[@]}" "${grubpkg[@]}" \
@@ -119,6 +120,7 @@ PackageInstall () {
 			"${android[@]}" "${print[@]}" "${apps[@]}" "${utility[@]}" "${hardwareacceleration[@]}" \
 			"${vulkan[@]}" "${filemanager[@]}" "${archive[@]}" "${personalization[@]}"; fi
 }
+
 PKGcheck () {
 	echo "Inizializzazione gruppi di pacchetti..."
 	microcode=("$microcodepkg"); kernel=("${KSel}" linux-firmware "${KSel}-headers")
