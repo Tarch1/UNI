@@ -89,6 +89,7 @@ PackageConfig () {
 PackageInstall () {
 	if [[ "$VBTsel" = 1 ]]; then
 		local VBTboot=(); [ "$BLsel" = "efistub" ] && VBTboot+=(efibootmgr); [ "$BLsel" = "grub" ] && VBTboot+=(grub); [ "$BLsel" = "refind" ] && VBTboot+=(refind)
+		[ "$FSsel" = "btrfs" ] && VBTboot+=(btrfs-progs)
 		"$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${baselinux[@]}" "${baseutils[@]}" "${elogind[@]}" "${net[@]}" "${bluetooth[@]}" "${print[@]}" "${VBTboot[@]}"
 	else "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" \
 			"${microcode[@]}" "${kernel[@]}" "${baselinux[@]}" "${baseutils[@]}" "${fs[@]}" \
@@ -289,7 +290,7 @@ FinishInst () {
 	echo 'export MOZ_ENABLE_WAYLAND=1' > /mnt/home/"$UNsel"/.profile; cat Errors
 	"$chroot" /mnt chown -hR "$UNsel":users /home/"$UNsel"
 	YesNoSel "Reboot system"
-	if [[ "$CC" -eq 1 ]]; then umount -R /mnt && reboot; else echo 'OK' && exit 0; fi
+	if [[ "$CC" -eq 1 ]]; then umount -R /mnt && reboot; else echo "OK" && exit 0; fi
 }
 InstallationSetup
 cat Errors
