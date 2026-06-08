@@ -183,6 +183,7 @@ KernelSetup () {
 		booster) [ ${#booster[@]} -gt 0 ] && "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${booster[@]}"
 				if [[ "$OSsel" != "Void" ]]; then "$chroot" /mnt pacman -Rns --noconfirm mkinitcpio 2>/dev/null || true; fi
 				printf $'mount_timeout: 10s\nvconsole: true\n' > /mnt/etc/booster.yaml
+				echo "resume: /dev/disk/by-uuid/${SWAPID}" >> /mnt/etc/booster.yaml
 				if [[ "$VBTsel" = 1 ]]; then [ "$FSsel" = btrfs ] && echo 'modules: btrfs,ahci,ata_piix,sd_mod,nvme' >> /mnt/etc/booster.yaml || echo 'modules: ahci,ata_piix,sd_mod,nvme' >> /mnt/etc/booster.yaml
 				else [ "$FSsel" = btrfs ] && echo 'modules: btrfs' >> /mnt/etc/booster.yaml; fi
 				[[ -v nvidiadrivers ]] && echo 'modules: nvidia,nvidia_modeset,nvidia_uvm,nvidia_drm' >> /mnt/etc/booster.yaml
@@ -245,7 +246,7 @@ BootloaderSetup () {
 			[[ -v nvidiadrivers ]] && drm="nvidia-drm.modeset=1 nvidia-drm.fbdev=1 acpi_osi=\"$osi_version\""
 			if [[ "$IRFSetup" = "booster" ]]; then local initrd_flags="initrd=\\${irfs}"
 			else local initrd_flags="initrd=\\${microcodepkg}.img initrd=\\${irfs}"; fi
-			echo "\"Standard Boot\"   \"ro root=${PIDsel}=$ROOTID rootfstype=$FSsel $rootflags $initrd_flags $drm\"" > /mnt/boot/refind_linux.conf
+			echo "\"Standard Boot\"   \"ro root=${PIDsel}=$ROOTID resume=${PIDsel}=$SWAPID rootfstype=$FSsel $rootflags $initrd_flags $drm\"" > /mnt/boot/refind_linux.conf
 			echo '!!!Refind config and theme changed!!!' ;;
 		2|GRUB|Grub|grub)
 			[ "$FSsel" = btrfs ] && grubpkg+=("${grubbtrfs[@]}")
@@ -265,7 +266,7 @@ BootloaderSetup () {
 			[ "$FSsel" = btrfs ] && rootflags='rootflags=subvol=@'
 			[[ -v nvidiadrivers ]] && osi="nvidia-drm.modeset=1 nvidia-drm.fbdev=1 acpi_osi=\"$osi_version\""
 			irfs="initramfs-$KSel.img"
-			BLflags="ro root=${PIDsel}=$ROOTID rootfstype=$FSsel $rootflags initrd=\\${microcodepkg}.img initrd=\\${irfs} $osi"
+			BLflags="ro root=${PIDsel}=$ROOTID resume=${PIDsel}=$SWAPID rootfstype=$FSsel $rootflags initrd=\\${microcodepkg}.img initrd=\\${irfs} $osi"
 			"$chroot" /mnt efibootmgr -d "$BOOT_PART" -p 1 -c -L "$OSsel" -l "\\vmlinuz-$KSel" -u "$BLflags" --verbose
 			echo "efibootmgr -b lastnumber -B" ;;
 		*) exit 1 ;;
