@@ -236,7 +236,8 @@ BootloaderSetup () {
 			"$chroot" /mnt "$PKGmanager" -Sy "${pkgskips[@]}" "${refindpkg[@]}"; "$chroot" /mnt refind-install
 			[[ "$UEFImode" = 1 ]] && efifolder='refind' || efifolder='BOOT'
 			mkdir -p /mnt/boot/EFI/"$efifolder"/themes
-			mv /mnt/boot/EFI/"$efifolder"/refind.conf /mnt/boot/EFI/"$efifolder"/backup-refind.conf; mv /mnt/boot/refind_linux.conf /mnt/boot/backup-refind_linux.conf
+			mv /mnt/boot/EFI/"$efifolder"/refind.conf /mnt/boot/EFI/"$efifolder"/backup-refind.conf
+			[ -f /mnt/boot/refind_linux.conf ] && mv /mnt/boot/refind_linux.conf /mnt/boot/backup-refind_linux.conf
 			cp "${SCRIPT_DIR}/Bootloader/Refind/refind.conf" /mnt/boot/EFI/"$efifolder"/refind.conf
 			cp -r "${SCRIPT_DIR}/Bootloader/Refind/themes/"* /mnt/boot/EFI/"$efifolder"/themes/
 			[[ "$VBTsel" = 1 ]] && sed -i 's/#resolution 1024 768/resolution 1024 768/' /mnt/boot/EFI/"$efifolder"/refind.conf
@@ -244,13 +245,12 @@ BootloaderSetup () {
 			[[ -v nvidiadrivers ]] && drm="nvidia-drm.modeset=1 nvidia-drm.fbdev=1 acpi_osi=\"$osi_version\""
 			if [[ "$IRFSetup" = "booster" ]]; then local initrd_flags="initrd=\\${irfs}"
 			else local initrd_flags="initrd=\\${microcodepkg}.img initrd=\\${irfs}"; fi
-			# GENERAZIONE DA ZERO: Crea un file fresco eliminando ogni residuo o configurazione sporca
 			echo "\"Standard Boot\"   \"ro root=${PIDsel}=$ROOTID rootfstype=$FSsel $rootflags $initrd_flags $drm\"" > /mnt/boot/refind_linux.conf
 			echo '!!!Refind config and theme changed!!!' ;;
 		2|GRUB|Grub|grub)
 			[ "$FSsel" = btrfs ] && grubpkg+=("${grubbtrfs[@]}")
 			case "$UEFImode" in
-				0) "$chroot" /mnt "$PKGmanager" -Sy "${pkgskips[@]}" "${grubpkg[@]}"; "$chroot" /mnt grub-install --target=i386-pc --recheck --debug /boot ;;
+				0) "$chroot" /mnt "$PKGmanager" -Sy "${pkgskips[@]}" "${grubpkg[@]}"; "$chroot" /mnt grub-install --target=i386-pc --recheck --debug "$DRIVE" ;;
 				*) "$chroot" /mnt "$PKGmanager" -Sy "${pkgskips[@]}" "${grubpkg[@]}"; "$chroot" /mnt grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB ;;
 			esac
 			mkdir -p /mnt/boot/grub/themes; sed -i "/GRUB_DISABLE_OS_PROBER=/ s/#//g" /mnt/etc/default/grub
