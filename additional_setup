@@ -3,11 +3,9 @@ YesNoSel () {
 	local choice
 	while true; do
 		read -rp "$1 [yes/no]: " choice
-		case "$choice" in
-			[Yy]|[Yy][Ee][Ss] ) CC=1; break;;
-			[Nn]|[Nn][Oo] ) CC=0; break;;
-			* ) echo "Rispondi 'yes' (y) o 'no' (n).";;
-		esac
+		if [[ "${choice,,}" =~ ^(y|yes)$ ]]; then CC=1 ; break
+		elif [[ "${choice,,}" =~ ^(n|no)$ ]]; then CC=0 ; break
+		else echo "Rispondi 'yes' (y) o 'no' (n)." ; fi
 	done
 }
 MenuSel () {
