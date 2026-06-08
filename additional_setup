@@ -24,8 +24,7 @@ TextPromptSel () {
 	while true; do
 		read -rp "$prompt_msg: " input_val
 		YesNoSel "Confermi che << $input_val >> è corretto?"
-		if [[ "$CC" -eq 1 ]]; then var_name="$input_val"; break; fi
-		echo "Riproiamo..."
+		[[ "$CC" -eq 1 ]] && var_name="$input_val" && break || echo "Riproviamo..."
 	done
 }
 UEFIsel () {
@@ -42,62 +41,40 @@ CPUsel () {
 GPUsel () {
 	echo "Detecting video chipset..."
 	local gpu_info=$(lspci | grep -Ei 'VGA|3D')
-	case "$gpu_info" in
-		*Intel*) echo "The default Mesa driver will be installed" ;;
-		*NVIDIA*) YesNoSel 'Found Nvidia gpu, wanna proprietary driver? If you do not like it, Mesa is the default'
-			if [ "$CC" -eq 1 ]; then echo 'Setting up NVIDIA Drivers' 
-				if [[ "$OSsel" == "Void" ]]; then nvidiadrivers=(nvidia nvidia-libs-32bit)
-				else YesNoSel 'Do you want the official NVIDIA OPEN-source kernel modules? (No = Classic Proprietary)'
-					local open_driver="$CC"; local nv_main
-					if [ "$open_driver" -eq 1 ]; then [[ "$KSel" == "linux" ]] && nv_main="nvidia-open" || nv_main="nvidia-open-dkms"
-					else
-						if [[ "$KSel" == "linux" ]]; then nv_main="nvidia"
-						elif [[ "$KSel" == "linux-lts" ]]; then nv_main="nvidia-lts"
-						else nv_main="nvidia-dkms"; fi
-					fi
-					nvidiadrivers=("$nv_main" nvidia-prime nvidia-settings nvidia-utils lib32-nvidia-utils opencl-nvidia lib32-opencl-nvidia libxnvctrl libvdpau)
+	if [[ "$gpu_info" =~ Intel ]]; then echo "The default Mesa driver will be installed"
+	elif [[ "$gpu_info" =~ NVIDIA ]]; then YesNoSel 'Found Nvidia gpu, wanna proprietary driver? If you do not like it, Mesa is the default'
+		if [ "$CC" -eq 1 ]; then echo 'Setting up NVIDIA Drivers' 
+			if [[ "$OSsel" == "Void" ]]; then nvidiadrivers=(nvidia nvidia-libs-32bit)
+			else YesNoSel 'Do you want the official NVIDIA OPEN-source kernel modules? (No = Classic Proprietary)'
+				local open_driver="$CC"; local nv_main
+				if [ "$open_driver" -eq 1 ]; then [[ "$KSel" == "linux" ]] && nv_main="nvidia-open" || nv_main="nvidia-open-dkms"
+				else
+					if [[ "$KSel" == "linux" ]]; then nv_main="nvidia"
+					elif [[ "$KSel" == "linux-lts" ]]; then nv_main="nvidia-lts"
+					else nv_main="nvidia-dkms"; fi
 				fi
-			else echo 'Using default Mesa'; fi
-			[ -f /sys/firmware/acpi/tables/DSDT ] && AcpiOS="$(strings /sys/firmware/acpi/tables/DSDT | grep -i 'windows ' | sort | tail -1)" ;;
-		*AMD*|*Radeon*) if [[ "$OSsel" == "Void" ]]; then amddrivers=(xf86-video-amdgpu mesa-dri vulkan-loader mesa-vulkan-radeon)
-			else amddrivers=(amdgpu mesa vulkan-radeon libva-mesa-driver); fi ;;
-		*VMware*|*VirtualBox*|*Virtio*|*QXL*) VBTsel=1; echo "VM detected: The default Mesa driver will be installed" ;;
-		*) echo "Generic GPU: Mesa will be installed" ;;
-	esac
+				nvidiadrivers=("$nv_main" nvidia-prime nvidia-settings nvidia-utils lib32-nvidia-utils opencl-nvidia lib32-opencl-nvidia libxnvctrl libvdpau)
+			fi
+		else echo 'Using default Mesa'; fi
+		[ -f /sys/firmware/acpi/tables/DSDT ] && AcpiOS="$(strings /sys/firmware/acpi/tables/DSDT | grep -i 'windows ' | sort | tail -1)"
+	elif [[ "$gpu_info" =~ (AMD|Radeon) ]]; then [[ "$OSsel" == "Void" ]] && amddrivers=(xf86-video-amdgpu mesa-dri vulkan-loader mesa-vulkan-radeon) || amddrivers=(amdgpu mesa vulkan-radeon libva-mesa-driver)
+	elif [[ "$gpu_info" =~ (VMware|VirtualBox|Virtio|QXL) ]]; then VBTsel=1; echo "VM detected: The default Mesa driver will be installed"
+	else echo "Generic GPU: Mesa will be installed"; fi
 }
 Pacman_Locked() {
-		if [ -f /var/lib/pacman/db.lck ] || [ -f /mnt/var/lib/pacman/db.lck ]; then echo -e "Pacman is blocked. Removing lockfiles..."; rm -f /var/lib/pacman/db.lck /mnt/var/lib/pacman/db.lck
-		else echo "No locked database"; fi
+	if [ -f /var/lib/pacman/db.lck ] || [ -f /mnt/var/lib/pacman/db.lck ]; then echo -e "Pacman is blocked. Removing lockfiles..."; rm -f /var/lib/pacman/db.lck /mnt/var/lib/pacman/db.lck
+	else echo "No locked database"; fi
 }
 ArchRepoSetup () {
-	local target_conf="$1"
-	local cmd=()
-	[ "$target_conf" = "/mnt/etc/pacman.conf" ] && cmd=( "$chroot" /mnt )
-
-	local mirror_file="/etc/pacman.d/mirrorlist-arch"
-	[ "$target_conf" = "/mnt/etc/pacman.conf" ] && mirror_file="/mnt/etc/pacman.d/mirrorlist-arch"
-
-	if [ ${#cmd[@]} -eq 0 ]; then
-		rm -rf /etc/pacman.d/gnupg 2>/dev/null || true
-		mkdir -p /etc/pacman.d/gnupg
-		chmod 700 /etc/pacman.d/gnupg
-		pacman-key --init 2>/dev/null || true
-		pacman-key --populate artix 2>/dev/null || true
-	else
-		"${cmd[@]}" pacman-key --init 2>/dev/null || true
-		"${cmd[@]}" pacman-key --populate artix archlinux 2>/dev/null || true
-	fi
-
+	local target_conf="$1" ; local cmd=() ; local mirror_file="/etc/pacman.d/mirrorlist-arch"
+	[ "$target_conf" = "/mnt/etc/pacman.conf" ] && cmd=( "$chroot" /mnt ) && mirror_file="/mnt/etc/pacman.d/mirrorlist-arch"
+	if [ ${#cmd[@]} -eq 0 ]; then rm -rf /etc/pacman.d/gnupg 2>/dev/null || true ; mkdir -p /etc/pacman.d/gnupg ; chmod 700 /etc/pacman.d/gnupg ; pacman-key --init 2>/dev/null || true ; pacman-key --populate artix 2>/dev/null || true
+	else "${cmd[@]}" pacman-key --init 2>/dev/null || true ; "${cmd[@]}" pacman-key --populate artix archlinux 2>/dev/null || true ; fi
 	sed -i '/\[universe\]/,/^[[:space:]]*$/d' "$target_conf" 2>/dev/null || true
 	printf '\n[universe]\nServer = https://universe.artixlinux.org/$arch\nServer = https://mirror1.artixlinux.org/universe/$arch\nServer = https://mirror.pascalpuffke.de/artix-universe/$arch\nServer = https://artixlinux.qontinuum.space/artixlinux/universe/os/$arch\nServer = https://mirror1.cl.netactuate.com/artix/universe/$arch\nServer = https://ftp.crifo.org/artix-universe/$arch\n' >> "$target_conf"
 	if [ ! -f "$mirror_file" ]; then "${cmd[@]}" pacman -Sy --noconfirm artix-keyring artix-archlinux-support; fi
-	if ! grep -q 'mirrorlist-arch' "$target_conf" 2>/dev/null; then
-	printf '\n# Arch\n[extra]\nInclude = /etc/pacman.d/mirrorlist-arch\n\n[multilib]\nInclude = /etc/pacman.d/mirrorlist-arch\n' >> "$target_conf"
-	fi
-
-	# Sincronizzazione finale delle chiavi e dei database
-	"${cmd[@]}" pacman-key --populate artix archlinux 2>/dev/null || true
-	"${cmd[@]}" pacman -Sy 2>/dev/null || true
+	if ! grep -q 'mirrorlist-arch' "$target_conf" 2>/dev/null; then printf '\n# Arch\n[extra]\nInclude = /etc/pacman.d/mirrorlist-arch\n\n[multilib]\nInclude = /etc/pacman.d/mirrorlist-arch\n' >> "$target_conf"; fi
+	"${cmd[@]}" pacman-key --populate artix archlinux 2>/dev/null || true ; "${cmd[@]}" pacman -Sy 2>/dev/null || true
 }
 AnotherCheck () {
 	[[ "$OSsel" == "Void" ]] && echo "Skipping check (Void uses XBPS)" && return 0
@@ -124,13 +101,10 @@ TimezoneSel () {
 	while true; do
 		echo -e "\n=== Select Timezone ==="; echo "1) Europe/Rome"
 		read -rp "Type '1' or write custom format (e.g. America/New_York) ['q' to quit]: " input_val
-		case "$input_val" in
-			1) var_name="Europe/Rome" ; break ;;
-			q|quit) var_name="" ; break ;;
-			"") echo "Input cannot be empty." ;;
-			*) YesNoSel "Confirm timezone: $input_val ?"
-				if [[ "$CC" -eq 1 ]]; then var_name="$input_val"; break; fi ;;
-		esac
+		if [[ "$input_val" == "1" ]]; then var_name="Europe/Rome" ; break
+		elif [[ "$input_val" =~ ^(q|quit)$ ]]; then var_name="" ; break
+		elif [[ -z "$input_val" ]]; then echo "Input cannot be empty."
+		else YesNoSel "Confirm timezone: $input_val ?" ; [[ "$CC" -eq 1 ]] && var_name="$input_val" && break ; fi
 	done
 	echo "Selected Timezone: $var_name"
 }
