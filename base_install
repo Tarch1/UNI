@@ -276,17 +276,21 @@ InstallationSetup () {
 	VBTsel=0; SetupAvaible=1; CheckandSetup=( Check_required_files UEFIsel CPUsel KernelSel IRFsel GPUsel Pacman_Locked )
 	echo 'List of all errors occurred during the installation process:' > Errors
 	for c in "${CheckandSetup[@]}"; do "$c" || SHOWerror "$c"; done
-	if [[ -s config ]]; then cat config && YesNoSel "It's correct?"
-		case "$CC" in 
-			1) SetupAvaible=0; source config ;;
-			0) YesNoSel "Would you like to edit config file?"
-				case $CC in
-					1) SetupAvaible=0; nano config; source config ;;
-					0) SetupAvaible=1 && echo "Repeat the setup" ;;
-					*) echo 'Not a good answer' && YesNoSel "Would you like to edit config file?" ;;
-				esac ;;
-			*) echo 'Not a good answer' && YesNoSel "It's correct?" ;;
-		esac
+	if [[ -s config ]]; then
+		# 1. CICLO PER VECCHIO CONFIG RESIDUO: Continua a mostrare il riepilogo dopo ogni nano
+		while true; do
+			cat config && YesNoSel "It's correct?"
+			case "$CC" in 
+				1) SetupAvaible=0; source config; break ;;
+				0) YesNoSel "Would you like to edit config file?"
+					case $CC in
+						1) SetupAvaible=0; nano config; source config ;;
+						0) SetupAvaible=1 && echo "Repeat the setup" && break ;;
+						*) echo 'Not a good answer' ;;
+					esac ;;
+				*) echo 'Not a good answer' ;;
+			esac
+		done
 	fi
 	if [[ "$SetupAvaible" = 1 ]]; then OperatingSystemSel
 		[[ "${OSsel,,}" == "artix" ]] && ArchRepoSel
@@ -296,17 +300,19 @@ InstallationSetup () {
 		Steps=( "OSsel=$OSsel" "ARCHrepo=$ARCHrepo" "LANGsel=$LANGsel" "LOCsel=$LOCsel" "HNsel=$HNsel" "UNsel=$UNsel" "TZsel=$TZsel" "PIDsel=$PIDsel" "FSsel=$FSsel" "BLsel=$BLsel" "IRFSetup=$IRFSetup" )
 		[ -e config ] && rm config
 		for a in "${Steps[@]}"; do echo "$a"; echo "$a" >> config; done
-		YesNoSel "It's correct?"
-		case "$CC" in
-			1) echo 'Proceeding...' ;;
-			0) YesNoSel "Would you like to edit config file? (CRTL+S to save)"
-				case $CC in
-					1) nano config; source config ;;
-					0) echo "Then start again" && SHOWerror "Second attempt" ;;
-					*) echo 'Not a good answer' && YesNoSel "Would you like to edit config file?" ;;
-				esac ;;
-			*) echo 'Not a good answer' && YesNoSel "It's correct? Otherwise this will end" ;;
-		esac
+		while true; do
+			YesNoSel "It's correct?"
+			case "$CC" in
+				1) echo 'Proceeding...'; break ;;
+				0) YesNoSel "Would you like to edit config file? (CRTL+S to save)"
+					case $CC in
+						1) nano config; source config; cat config ;;
+						0) echo "Then start again" && SHOWerror "Second attempt" ;;
+						*) echo 'Not a good answer' ;;
+					esac ;;
+				*) echo 'Not a good answer' ;;
+			esac
+		done
 	elif [[ "$SetupAvaible" = 0 ]] && [[ -s config ]]; then echo 'Setup loaded'
 	else SHOWerror InstallationSetup; fi
 	if [[ "$VBTsel" = 1 ]]; then ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' 'BaseSystemInstall' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'KernelSetup' 'ServiceSetup' 'UserSetup' 'BootloaderSetup' )
