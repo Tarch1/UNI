@@ -75,11 +75,16 @@ FStabGen () {
 	cat /mnt/etc/fstab
 }
 SetupEnvironment () {
-	sed -i "/\($LOCsel\|$LANGsel\)/ s/#//g" /mnt/etc/locale.gen
-	echo -e "LANG=$LOCsel\nLANGUAGE=$LANGsel\nLC_TIME=$LOCsel\nLC_ADDRESS=$LOCsel\nLC_MESSAGES=$LOCsel\nLC_CTYPE=C" >> /mnt/etc/locale.conf
-	echo "$keylayout" | tee /mnt/"$keypath" /mnt/etc/vconsole.conf >/dev/null
-	"$chroot" /mnt ln -sf /usr/share/zoneinfo/"$TZsel" /etc/localtime
-	"$chroot" /mnt hwclock --systohc --utc ; "$chroot" /mnt locale-gen
+	if [[ "${OSsel,,}" == "void" ]]; then
+		echo "LANG=$LOCsel" > /mnt/etc/locale.conf ; echo "$keylayout" > /mnt/etc/vconsole.conf
+		"$chroot" /mnt ln -sf /usr/share/zoneinfo/"$TZsel" /etc/localtime
+	else
+		sed -i "/\($LOCsel\|$LANGsel\)/ s/#//g" /mnt/etc/locale.gen
+		echo -e "LANG=$LOCsel\nLANGUAGE=$LANGsel\nLC_TIME=$LOCsel\nLC_ADDRESS=$LOCsel\nLC_MESSAGES=$LOCsel\nLC_CTYPE=C" >> /mnt/etc/locale.conf
+		echo "$keylayout" | tee /mnt/"$keypath" /mnt/etc/vconsole.conf >/dev/null
+		"$chroot" /mnt ln -sf /usr/share/zoneinfo/"$TZsel" /etc/localtime
+		"$chroot" /mnt hwclock --systohc --utc ; "$chroot" /mnt locale-gen
+	fi
 	echo "$HNsel" > /mnt/etc/hostname
 	echo -e "127.0.0.1\tlocalhost\n::1\t\tlocalhost\n127.0.1.1\t$HNsel.localdomain $HNsel" >> /mnt/etc/hosts
 }
@@ -151,7 +156,7 @@ KernelSetup () {
 		intel-ucode) echo -e 'options i915 enable_fbc=1 fastboot=0 enable_dc=4' >> /mnt/etc/modprobe.d/i915.conf ;;
 		*) echo 'AMD or generic setup: Nothing at the moment' ;;
 	esac
-	if [[ -v nvidiadrivers ]]; then
+	if [[ -v nvidiadrivers && ${#nvidiadrivers[@]} -gt 0 ]]; then
 		[[ "${OSsel,,}" == "artix" ]] && "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" nvidia-utils-openrc
 		ln -s /dev/null /mnt/etc/udev/rules.d/61-gdm.rules; modules+=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)
 		echo -e "options nvidia-drm modeset=1 fbdev=1\noptions nvidia NVreg_DynamicPowerManagement=0x02 NVreg_UsePageAttributeTable=1 NVreg_EnablePCIeGen3=1" > /mnt/etc/modprobe.d/nvidia.conf
@@ -159,7 +164,7 @@ KernelSetup () {
 	case "$IRFSetup" in
 		dracut)	mkdir -p /mnt/etc/dracut.conf.d
 				[ "$FSsel" = btrfs ] && echo 'add_dracutmodules+=" btrfs "' > /mnt/etc/dracut.conf.d/btrfs.conf
-				[[ -v nvidiadrivers ]] && echo 'force_drivers+=" nvidia nvidia_modeset nvidia_uvm nvidia_drm "' > /mnt/etc/dracut.conf.d/nvidia.conf
+				[[ -v nvidiadrivers && ${#nvidiadrivers[@]} -gt 0 ]] && echo 'force_drivers+=" nvidia nvidia_modeset nvidia_uvm nvidia_drm "' > /mnt/etc/dracut.conf.d/nvidia.conf
 				"$chroot" /mnt xbps-reconfigure -f "$KSel" ;;
 		booster) [ ${#booster[@]} -gt 0 ] && "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${booster[@]}"
 				if [[ "$OSsel" != "Void" ]]; then "$chroot" /mnt pacman -Rns --noconfirm mkinitcpio 2>/dev/null || true; fi
@@ -167,13 +172,13 @@ KernelSetup () {
 				echo "resume: /dev/disk/by-uuid/${SWAPID}" >> /mnt/etc/booster.yaml
 				if [[ "$VBTsel" = 1 ]]; then [ "$FSsel" = btrfs ] && echo 'modules: btrfs,ahci,ata_piix,sd_mod,nvme' >> /mnt/etc/booster.yaml || echo 'modules: ahci,ata_piix,sd_mod,nvme' >> /mnt/etc/booster.yaml
 				else [ "$FSsel" = btrfs ] && echo 'modules: btrfs' >> /mnt/etc/booster.yaml; fi
-				[[ -v nvidiadrivers ]] && echo 'modules: nvidia,nvidia_modeset,nvidia_uvm,nvidia_drm' >> /mnt/etc/booster.yaml
+				[[ -v nvidiadrivers && ${#nvidiadrivers[@]} -gt 0 ]] && echo 'modules: nvidia,nvidia_modeset,nvidia_uvm,nvidia_drm' >> /mnt/etc/booster.yaml
 				if [[ "$OSsel" != "Void" ]]; then mkdir -p /mnt/etc/pacman.d/hooks
 				printf "[Trigger]\nOperation = Install\nOperation = Upgrade\nType = Package\nTarget = ${KSel}\n\n[Action]\nDescription = Forcing Booster initramfs update...\nWhen = PostTransaction\nDepends = booster\nExec = /usr/bin/booster build --force --universal /boot/initramfs-${KSel}.img\n" > /mnt/etc/pacman.d/hooks/95-booster-force.hook; fi
 				local real_kver=$(basename "$(find /mnt/usr/lib/modules/ -maxdepth 1 -mindepth 1 -type d ! -name 'extramodules*' | head -n 1)")
 				"$chroot" /mnt /bin/bash -c "booster build --force --universal --kernel-version=${real_kver} /boot/initramfs-${KSel}.img" ;;
 		*) local HOOKS=(base udev autodetect modconf block usr resume filesystems keyboard keymap fsck)
-		   [[ -v nvidiadrivers ]] && HOOKS+=(kms)
+		   [[ -v nvidiadrivers && ${#nvidiadrivers[@]} -gt 0 ]] && HOOKS+=(kms)
 		   sed -i "/MODULES/ s/()/(${modules[*]})/" /mnt/etc/mkinitcpio.conf
 		   sed -i "/BINARIES/ s/()/($binaries)/" /mnt/etc/mkinitcpio.conf
 		   sed -i "s/^HOOKS.*/HOOKS=(${HOOKS[*]})/" /mnt/etc/mkinitcpio.conf
@@ -185,7 +190,7 @@ ServiceSetup () {
 	elif [[ "${OSsel,,}" == "arch" ]]; then	Services+=( NetworkManager cups avahi-daemon bluetooth ); [ -f /mnt/usr/lib/systemd/system/tlp.service ] && Services+=( tlp )
 	elif [[ "${OSsel,,}" == "void" ]]; then	Services+=( NetworkManager cupsd dbus avahi-daemon bluetoothd ); [ -d /mnt/etc/sv/tlp ] && Services+=( tlp )
 	fi
-	if [[ "${OSsel,,}" == "void" ]]; then for s in "${Services[@]}"; do "$chroot" /mnt ln -s /etc/sv/"$s" /etc/runit/runsvdir/default/; done
+	if [[ "${OSsel,,}" == "void" ]]; then for s in "${Services[@]}"; do "$chroot" /mnt ln -sf /etc/sv/"$s" /etc/runit/runsvdir/default/; done
 	else for s in "${Services[@]}"; do "$chroot" /mnt "$initc0" "$initc1" "$s"; done
 	fi
 	mkdir -p /mnt/etc/udev/rules.d/; cp "${SCRIPT_DIR}/Conf_files/51-android.rules" /mnt/etc/udev/rules.d/
