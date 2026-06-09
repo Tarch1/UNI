@@ -90,10 +90,12 @@ SetupEnvironment () {
 }
 PackageConfig () {
 	if [[ "${OSsel,,}" == "void" ]]; then "$chroot" /mnt "$PKGmanager" -S
-	else "$chroot" /mnt "$PKGmanager" -Sy
+	else
 		if [[ "${OSsel,,}" == "arch" ]]; then sed -i '/\[multilib]/,/mirrorlist/ s/#//' /mnt/etc/pacman.conf
-		elif [[ "${OSsel,,}" == "artix" ]]; then sed -i '/\[lib32]/,/mirrorlist/ s/#//' /mnt/etc/pacman.conf ; [ "$ARCHrepo" = 1 ] && ArchRepoSetup /mnt/etc/pacman.conf ; fi
+		elif [[ "${OSsel,,}" == "artix" ]]; then sed -i '/\[lib32]/,/mirrorlist/ s/#//' /mnt/etc/pacman.conf ; [ "$ARCHrepo" = 1 ] && ArchRepoSetup /mnt/etc/pacman.conf
+		fi
 		if [ -f /mnt/etc/pacman.conf ]; then sed -i '/\(Color\|ParallelDownloads\)/ s/#//' /mnt/etc/pacman.conf ; sed -i '/ParallelDownloads/a ILoveCandy' /mnt/etc/pacman.conf ; fi
+		"$chroot" /mnt "$PKGmanager" -Sy
 	fi
 }
 PackageInstall () {
@@ -237,7 +239,7 @@ BootloaderSetup () {
 			else "$chroot" /mnt grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB; fi
 			mkdir -p /mnt/boot/grub/themes; sed -i "/GRUB_DISABLE_OS_PROBER=/ s/#//g" /mnt/etc/default/grub
 			sed -i '/GRUB_THEME=/c GRUB_THEME="/boot/grub/themes/Grub-Sekiro/theme.txt"' /mnt/etc/default/grub
-			[[ -v nvidiadrivers && ${#nvidiadrivers[@]} -gt 0 ]] && { sed -i "s/^GRUB_CMDLINE_LINUX=.*/GRUB_CMDLINE_LINUX=\"acpi_osi='\$osi_version'\"/" /mnt/etc/default/grub ; sed -i '/^GRUB_CMDLINE_LINUX_DEFAULT=/c\GRUB_CMDLINE_LINUX_DEFAULT="quiet splash nvidia-drm.modeset=1 nvidia-drm.fbdev=1"' /mnt/etc/default/grub; }
+			[[ -v nvidiadrivers && ${#nvidiadrivers[@]} -gt 0 ]] && sed -i -e "s/^GRUB_CMDLINE_LINUX=.*/GRUB_CMDLINE_LINUX=\"acpi_osi='\$osi_version'\"/" -e 's/^GRUB_CMDLINE_LINUX_DEFAULT="\(.*\)"/GRUB_CMDLINE_LINUX_DEFAULT="\1 quiet splash nvidia-drm.modeset=1 nvidia-drm.fbdev=1"/' /mnt/etc/default/grub
 			"$chroot" /mnt grub-mkconfig -o /boot/grub/grub.cfg; cp -r "${SCRIPT_DIR}/Bootloader/Grub-Sekiro" /mnt/boot/grub/themes/ 2>/dev/null || true
 			mkdir -p /mnt/usr/share/grub/themes/; cp -r "${SCRIPT_DIR}/Bootloader/Grub-Sekiro" /mnt/usr/share/grub/themes/ 2>/dev/null || true ;;
 		3|EFISTUB|Efistub|efistub)
