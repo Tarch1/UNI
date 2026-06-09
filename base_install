@@ -209,10 +209,10 @@ AudioSetup () {
 	[ -f /mnt/etc/bluetooth/main.conf ] && sed -i 's/#AutoEnable=false/AutoEnable=true/g' /mnt/etc/bluetooth/main.conf
 }
 BootloaderSetup () {
-	local osi_version="${AcpiOS:-Windows 2020}"
+	local osi_version="${AcpiOS:-Windows 2020}" ; local kname ; [[ "${OSsel,,}" == "void" ]] && kname=$(basename "$(find /mnt/boot/ -type f -name 'vmlinuz-*' | head -n 1)") || kname="vmlinuz-$KSel"
 	case "$BLsel" in
 		1|REFIND|Refind|refind)
-			irfs="initramfs-$KSel.img"
+			[[ "${OSsel,,}" == "void" ]] && irfs="initramfs-${kname#vmlinuz-}.img" || irfs="initramfs-$KSel.img"
 			"$chroot" /mnt "$PKGmanager" -Sy "${pkgskips[@]}" "${refindpkg[@]}"; "$chroot" /mnt refind-install
 			[[ "$UEFImode" = 1 ]] && efifolder='refind' || efifolder='BOOT'
 			mkdir -p /mnt/boot/EFI/"$efifolder"/themes
@@ -222,9 +222,9 @@ BootloaderSetup () {
 			cp -r "${SCRIPT_DIR}/Bootloader/Refind/themes/"* /mnt/boot/EFI/"$efifolder"/themes/
 			[[ "$VBTsel" = 1 ]] && sed -i 's/#resolution 1024 768/resolution 1024 768/' /mnt/boot/EFI/"$efifolder"/refind.conf
 			[ "$FSsel" = btrfs ] && rootflags='rootflags=subvol=@'
-			[[ -v nvidiadrivers ]] && drm="nvidia-drm.modeset=1 nvidia-drm.fbdev=1 acpi_osi=\"$osi_version\""
+			[[ -v nvidiadrivers && ${#nvidiadrivers[@]} -gt 0 ]] && drm="nvidia-drm.modeset=1 nvidia-drm.fbdev=1 acpi_osi=\"$osi_version\""
 			if [[ "$IRFSetup" = "booster" ]]; then local initrd_flags="initrd=\\${irfs}"
-			else local initrd_flags="initrd=\\${microcodepkg}.img initrd=\\${irfs}"; fi
+			else [[ "${OSsel,,}" == "void" ]] && local initrd_flags="initrd=\\${irfs}" || local initrd_flags="initrd=\\${microcodepkg}.img initrd=\\${irfs}"; fi
 			echo "\"Standard Boot\"   \"ro root=${PIDsel}=$ROOTID resume=${PIDsel}=$SWAPID rootfstype=$FSsel $rootflags $initrd_flags $drm\"" > /mnt/boot/refind_linux.conf
 			echo '!!!Refind config and theme changed!!!' ;;
 		2|GRUB|Grub|grub)
@@ -234,20 +234,17 @@ BootloaderSetup () {
 			else "$chroot" /mnt grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB; fi
 			mkdir -p /mnt/boot/grub/themes; sed -i "/GRUB_DISABLE_OS_PROBER=/ s/#//g" /mnt/etc/default/grub
 			sed -i '/GRUB_THEME=/c GRUB_THEME="/boot/grub/themes/Grub-Sekiro/theme.txt"' /mnt/etc/default/grub
-			if [[ -v nvidiadrivers ]]; then 
-				sed -i "s/^GRUB_CMDLINE_LINUX=.*/GRUB_CMDLINE_LINUX=\"acpi_osi='\$osi_version'\"/" /mnt/etc/default/grub
-				sed -i '/^GRUB_CMDLINE_LINUX_DEFAULT=/c\GRUB_CMDLINE_LINUX_DEFAULT="quiet splash nvidia-drm.modeset=1 nvidia-drm.fbdev=1"' /mnt/etc/default/grub
-			fi
-			"$chroot" /mnt grub-mkconfig -o /boot/grub/grub.cfg; cp -r "${SCRIPT_DIR}/Bootloader/Grub-Sekiro" /mnt/boot/grub/themes/
+			[[ -v nvidiadrivers && ${#nvidiadrivers[@]} -gt 0 ]] && { sed -i "s/^GRUB_CMDLINE_LINUX=.*/GRUB_CMDLINE_LINUX=\"acpi_osi='\$osi_version'\"/" /mnt/etc/default/grub ; sed -i '/^GRUB_CMDLINE_LINUX_DEFAULT=/c\GRUB_CMDLINE_LINUX_DEFAULT="quiet splash nvidia-drm.modeset=1 nvidia-drm.fbdev=1"' /mnt/etc/default/grub; }
+			"$chroot" /mnt grub-mkconfig -o /boot/grub/grub.cfg; cp -r "${SCRIPT_DIR}/Bootloader/Grub-Sekiro" /mnt/boot/grub/themes/ 2>/dev/null || true
 			mkdir -p /mnt/usr/share/grub/themes/; cp -r "${SCRIPT_DIR}/Bootloader/Grub-Sekiro" /mnt/usr/share/grub/themes/ 2>/dev/null || true ;;
 		3|EFISTUB|Efistub|efistub)
 			[ "$FSsel" = btrfs ] && rootflags='rootflags=subvol=@'
-			[[ -v nvidiadrivers ]] && osi="nvidia-drm.modeset=1 nvidia-drm.fbdev=1 acpi_osi=\"$osi_version\""
-			irfs="initramfs-$KSel.img"
+			[[ -v nvidiadrivers && ${#nvidiadrivers[@]} -gt 0 ]] && osi="nvidia-drm.modeset=1 nvidia-drm.fbdev=1 acpi_osi=\"$osi_version\""
+			[[ "${OSsel,,}" == "void" ]] && irfs="initramfs-${kname#vmlinuz-}.img" || irfs="initramfs-$KSel.img"
 			if [[ "$IRFSetup" = "booster" ]]; then local initrd_flags="initrd=\\${irfs}"
-			else local initrd_flags="initrd=\\${microcodepkg}.img initrd=\\${irfs}"; fi
+			else [[ "${OSsel,,}" == "void" ]] && local initrd_flags="initrd=\\${irfs}" || local initrd_flags="initrd=\\${microcodepkg}.img initrd=\\${irfs}"; fi
 			BLflags=" $initrd_flags ro root=${PIDsel}=$ROOTID resume=${PIDsel}=$SWAPID rootfstype=$FSsel $rootflags $osi"
-			"$chroot" /mnt efibootmgr -d "$BOOT_PART" -p 1 -c -L "$OSsel" -l "\\vmlinuz-$KSel" -u "$BLflags" --verbose
+			"$chroot" /mnt efibootmgr -d "$BOOT_PART" -p 1 -c -L "$OSsel" -l "\\$kname" -u "$BLflags" --verbose
 			echo "efibootmgr -b lastnumber -B" ;;
 		*) exit 1 ;;
 	esac
