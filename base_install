@@ -15,13 +15,13 @@ Check_required_files () {
 	[[ ${#miss[@]} -gt 0 ]] && echo 'Required file(s) missing:' "${miss[@]}" && exit 1 || source additional_setup
 }
 DiskPartition () {
-	swapoff -a; umount -R /mnt || true; "$PKGmanager" -Sy "${pkgskips[@]}" "${fs[@]}"
+	swapoff -a; umount -R /mnt || true; "$PKGmanager" -Sy "${pkgskips[@]}" "${fs[@]}" || SHOWerror "Sync fs utilities"
 	local dialog_list=(); while read -r n s; do dialog_list+=("$n" "$s"); done < <(lsblk -dlnp -o NAME,SIZE)
 	DRIVE=$(dialog --title "OS INSTALLATION" --stdout --menu "Select preferred drive" 0 0 0 "${dialog_list[@]}")
 	[[ -z "$DRIVE" ]] && exit 1
 	[ "$VBTsel" = 0 ] && ADDITIONAL_DRIVE="$(dialog --title "ADDITIONAL" --stdout --menu "Select secondary drive (Optional - Cancel to skip)" 0 0 0 "${dialog_list[@]}")"
-	umount "$DRIVE"?* || true; sgdisk -ozZ "$DRIVE"
-	parted -sf "$DRIVE" mktable gpt mkpart "ESP" fat32 1MiB 513MiB mkpart "LINUX-ROOT" 513MiB 96% mkpart "SWAP" 96% 100% set 1 esp on set 3 swap on
+	umount "$DRIVE"?* || true; sgdisk -ozZ "$DRIVE" || SHOWerror "Zapping drive partition table"
+	parted -sf "$DRIVE" mktable gpt mkpart "ESP" fat32 1MiB 513MiB mkpart "LINUX-ROOT" 513MiB 96% mkpart "SWAP" 96% 100% set 1 esp on set 3 swap on || SHOWerror "Parted GPT execution"
 	if echo "$DRIVE" | grep -q "^/dev/[a-z]d[a-z]"; then BOOT_PART="${DRIVE}1" ; ROOT_PART="${DRIVE}2" ; SWAP_PART="${DRIVE}3"
 	elif echo "$DRIVE" | grep -q "^/dev/nvme"; then	BOOT_PART="${DRIVE}p1" ; ROOT_PART="${DRIVE}p2" ; SWAP_PART="${DRIVE}p3"
 	elif echo "$DRIVE" | grep -q "^/dev/mmc"; then BOOT_PART="${DRIVE}1" ; ROOT_PART="${DRIVE}2" ; SWAP_PART="${DRIVE}3" ; fi
@@ -65,13 +65,17 @@ BaseSystemInstall () {
 	local BasePKG=( "${kernel[@]}" "${baselinux[@]}" "${elogind[@]}" "${btrfspkg[@]}" )
 	[ "$FSsel" = btrfs ] && BasePKG+=( "${btrfsutility[@]}" )
 	if [[ "${OSsel,,}" == "void" ]]; then
-		$PKGstrap base-system && for d in dev proc sys; do mount --bind /$d /mnt/$d; done && mount --make-rslave /mnt/sys
-		[[ "$UEFImode" -eq 1 ]] && mount --bind /sys/firmware/efi/efivars /mnt/sys/firmware/efi/efivars
-	else "$PKGstrap" /mnt "$microcodepkg" "${BasePKG[@]}"; fi
+		$PKGstrap base-system || SHOWerror "XBPS base-system bootstrap"
+		for d in dev proc sys; do mount --bind /$d /mnt/$d || SHOWerror "Mounting /$d filesystem"; done
+		mount --make-rslave /mnt/sys || SHOWerror "Setting sys rslave"
+		[[ "$UEFImode" -eq 1 ]] && { mount --bind /sys/firmware/efi/efivars /mnt/sys/firmware/efi/efivars || SHOWerror "Mounting efivars filesystem"; }
+	else "$PKGstrap" /mnt "$microcodepkg" "${BasePKG[@]}" || SHOWerror "Arch/Artix strap base installation"; fi
 }
 FStabGen () {
-	mv -f /mnt/etc/fstab /mnt/etc/old-fstab 2>/dev/null || true
-	[[ "$OSsel" = Void ]] && echo -e "$UNIfstab" > /mnt/etc/fstab || { [[ -v PIDsel ]] && "$FSTABgen" -t "$PIDsel" /mnt >> /mnt/etc/fstab || exit 1; }
+	[ -f /mnt/etc/fstab ] && { mv -f /mnt/etc/fstab /mnt/etc/old-fstab || SHOWerror "Backup existing fstab"; }
+	if [[ "$OSsel" == "Void" ]]; then echo -e "$UNIfstab" > /mnt/etc/fstab || SHOWerror "Writing Void native fstab"
+	else if [[ -v PIDsel ]]; then "$FSTABgen" -t "$PIDsel" /mnt >> /mnt/etc/fstab || SHOWerror "Generating Arch/Artix fstab"; else SHOWerror "PIDsel variable missing during fstab generation"; fi
+	fi
 	cat /mnt/etc/fstab
 }
 SetupEnvironment () {
@@ -214,34 +218,39 @@ AudioSetup () {
 	[ -f /mnt/etc/bluetooth/main.conf ] && sed -i 's/#AutoEnable=false/AutoEnable=true/g' /mnt/etc/bluetooth/main.conf
 }
 BootloaderSetup () {
-	local osi_version="${AcpiOS:-Windows 2020}" ; local kname ; [[ "${OSsel,,}" == "void" ]] && kname=$(basename "$(find /mnt/boot/ -type f -name 'vmlinuz-*' | head -n 1)") || kname="vmlinuz-$KSel"
+	local osi_version="${AcpiOS:-Windows 2020}" ; local kname
+	kname=$(basename "$(find /mnt/boot/ -type f -name 'vmlinuz-*' | head -n 1)") || kname="vmlinuz-$KSel"
 	case "$BLsel" in
 		1|REFIND|Refind|refind)
 			local initrd_flags ; [[ "${OSsel,,}" == "void" ]] && irfs="initramfs-${kname#vmlinuz-}.img" || irfs="initramfs-$KSel.img"
-			"$chroot" /mnt "$PKGmanager" -Sy "${pkgskips[@]}" "${refindpkg[@]}"; "$chroot" /mnt refind-install
+			"$chroot" /mnt "$PKGmanager" -Sy "${pkgskips[@]}" "${refindpkg[@]}" || SHOWerror "rEFInd package install"
+			"$chroot" /mnt refind-install || SHOWerror "rEFInd execution"
 			[[ "$UEFImode" = 1 ]] && efifolder='refind' || efifolder='BOOT'
-			mkdir -p /mnt/boot/EFI/"$efifolder"/themes
-			mv /mnt/boot/EFI/"$efifolder"/refind.conf /mnt/boot/EFI/"$efifolder"/backup-refind.conf
-			[ -f /mnt/boot/refind_linux.conf ] && mv /mnt/boot/refind_linux.conf /mnt/boot/backup-refind_linux.conf
-			cp "${SCRIPT_DIR}/Bootloader/Refind/refind.conf" /mnt/boot/EFI/"$efifolder"/refind.conf
-			cp -r "${SCRIPT_DIR}/Bootloader/Refind/themes/"* /mnt/boot/EFI/"$efifolder"/themes/
-			[[ "$VBTsel" = 1 ]] && sed -i 's/#resolution 1024 768/resolution 1024 768/' /mnt/boot/EFI/"$efifolder"/refind.conf
+			mkdir -p /mnt/boot/EFI/"$efifolder"/themes || SHOWerror "mkdir rEFInd themes"
+			[ -f /mnt/boot/EFI/"$efifolder"/refind.conf ] && { mv /mnt/boot/EFI/"$efifolder"/refind.conf /mnt/boot/EFI/"$efifolder"/backup-refind.conf || SHOWerror "Backup refind.conf"; }
+			[ -f /mnt/boot/refind_linux.conf ] && { mv /mnt/boot/refind_linux.conf /mnt/boot/backup-refind_linux.conf || SHOWerror "Backup refind_linux.conf"; }
+			cp "${SCRIPT_DIR}/Bootloader/Refind/refind.conf" /mnt/boot/EFI/"$efifolder"/refind.conf || SHOWerror "Copy refind.conf"
+			cp -r "${SCRIPT_DIR}/Bootloader/Refind/themes/"* /mnt/boot/EFI/"$efifolder"/themes/ || SHOWerror "Copy rEFInd themes"
+			[[ "$VBTsel" = 1 ]] && { sed -i 's/#resolution 1024 768/resolution 1024 768/' /mnt/boot/EFI/"$efifolder"/refind.conf || SHOWerror "Sed rEFInd resolution"; }
 			[ "$FSsel" = btrfs ] && rootflags='rootflags=subvol=@'
 			[[ -v nvidiadrivers && ${#nvidiadrivers[@]} -gt 0 ]] && drm="nvidia-drm.modeset=1 nvidia-drm.fbdev=1 acpi_osi=\"$osi_version\""
 			if [[ "$IRFSetup" = "booster" ]]; then initrd_flags="initrd=\\${irfs}"
 			else [[ "${OSsel,,}" == "void" ]] && initrd_flags="initrd=\\${irfs}" || initrd_flags="initrd=\\${microcodepkg}.img initrd=\\${irfs}"; fi
-			echo "\"Standard Boot\"   \"ro root=${PIDsel}=$ROOTID resume=${PIDsel}=$SWAPID rootfstype=$FSsel $rootflags $initrd_flags $drm\"" > /mnt/boot/refind_linux.conf
+			echo "\"Standard Boot\"   \"ro root=${PIDsel}=$ROOTID resume=${PIDsel}=$SWAPID rootfstype=$FSsel $rootflags $initrd_flags $drm\"" > /mnt/boot/refind_linux.conf || SHOWerror "Write refind_linux.conf"
 			echo '!!!Refind config and theme changed!!!' ;;
 		2|GRUB|Grub|grub)
 			[ "$FSsel" = btrfs ] && grubpkg+=("${grubbtrfs[@]}")
-			"$chroot" /mnt "$PKGmanager" -Sy "${pkgskips[@]}" "${grubpkg[@]}"
-			if [[ "$UEFImode" -eq 0 ]]; then "$chroot" /mnt grub-install --target=i386-pc --recheck --debug "$DRIVE"
-			else "$chroot" /mnt grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB; fi
-			mkdir -p /mnt/boot/grub/themes; sed -i "/GRUB_DISABLE_OS_PROBER=/ s/#//g" /mnt/etc/default/grub
-			sed -i '/GRUB_THEME=/c GRUB_THEME="/boot/grub/themes/Grub-Sekiro/theme.txt"' /mnt/etc/default/grub
-			[[ -v nvidiadrivers && ${#nvidiadrivers[@]} -gt 0 ]] && sed -i -e "s/^GRUB_CMDLINE_LINUX=.*/GRUB_CMDLINE_LINUX=\"acpi_osi='\$osi_version'\"/" -e 's/^GRUB_CMDLINE_LINUX_DEFAULT="\(.*\)"/GRUB_CMDLINE_LINUX_DEFAULT="\1 quiet splash nvidia-drm.modeset=1 nvidia-drm.fbdev=1"/' /mnt/etc/default/grub
-			"$chroot" /mnt grub-mkconfig -o /boot/grub/grub.cfg; cp -r "${SCRIPT_DIR}/Bootloader/Grub-Sekiro" /mnt/boot/grub/themes/ 2>/dev/null || true
-			mkdir -p /mnt/usr/share/grub/themes/; cp -r "${SCRIPT_DIR}/Bootloader/Grub-Sekiro" /mnt/usr/share/grub/themes/ 2>/dev/null || true ;;
+			"$chroot" /mnt "$PKGmanager" -Sy "${pkgskips[@]}" "${grubpkg[@]}" || SHOWerror "GRUB package install"
+			if [[ "$UEFImode" -eq 0 ]]; then "$chroot" /mnt grub-install --target=i386-pc --recheck --debug "$DRIVE" || SHOWerror "GRUB BIOS install"
+			else "$chroot" /mnt grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB || SHOWerror "GRUB UEFI install"; fi
+			mkdir -p /mnt/boot/grub/themes || SHOWerror "mkdir GRUB themes"
+			sed -i "/GRUB_DISABLE_OS_PROBER=/ s/#//g" /mnt/etc/default/grub || SHOWerror "Sed GRUB os-prober"
+			sed -i '/GRUB_THEME=/c GRUB_THEME="/boot/grub/themes/Grub-Sekiro/theme.txt"' /mnt/etc/default/grub || SHOWerror "Sed GRUB theme selection"
+			[[ -v nvidiadrivers && ${#nvidiadrivers[@]} -gt 0 ]] && { sed -i -e "s/^GRUB_CMDLINE_LINUX=.*/GRUB_CMDLINE_LINUX=\"acpi_osi='\$osi_version'\"/" -e 's/^GRUB_CMDLINE_LINUX_DEFAULT="\(.*\)"/GRUB_CMDLINE_LINUX_DEFAULT="\1 quiet splash nvidia-drm.modeset=1 nvidia-drm.fbdev=1"/' /mnt/etc/default/grub || SHOWerror "Sed GRUB nvidia injection"; }
+			mkdir -p /mnt/usr/share/grub/themes/ || SHOWerror "mkdir usr share GRUB themes"
+			cp -r "${SCRIPT_DIR}/Bootloader/Grub-Sekiro" /mnt/boot/grub/themes/ || SHOWerror "Copy Sekiro theme to /boot"
+			cp -r "${SCRIPT_DIR}/Bootloader/Grub-Sekiro" /mnt/usr/share/grub/themes/ || SHOWerror "Copy Sekiro theme to /usr"
+			"$chroot" /mnt grub-mkconfig -o /boot/grub/grub.cfg || SHOWerror "GRUB mkconfig execution" ;;
 		3|EFISTUB|Efistub|efistub)
 			local initrd_flags ; [ "$FSsel" = btrfs ] && rootflags='rootflags=subvol=@'
 			[[ -v nvidiadrivers && ${#nvidiadrivers[@]} -gt 0 ]] && osi="nvidia-drm.modeset=1 nvidia-drm.fbdev=1 acpi_osi=\"$osi_version\""
@@ -249,9 +258,9 @@ BootloaderSetup () {
 			if [[ "$IRFSetup" = "booster" ]]; then initrd_flags="initrd=\\${irfs}"
 			else [[ "${OSsel,,}" == "void" ]] && initrd_flags="initrd=\\${irfs}" || initrd_flags="initrd=\\${microcodepkg}.img initrd=\\${irfs}"; fi
 			BLflags=" $initrd_flags ro root=${PIDsel}=$ROOTID resume=${PIDsel}=$SWAPID rootfstype=$FSsel $rootflags $osi"
-			"$chroot" /mnt efibootmgr -d "$BOOT_PART" -p 1 -c -L "$OSsel" -l "\\$kname" -u "$BLflags" --verbose
+			"$chroot" /mnt efibootmgr -d "$BOOT_PART" -p 1 -c -L "$OSsel" -l "\\$kname" -u "$BLflags" --verbose || SHOWerror "Efibootmgr execution"
 			echo "efibootmgr -b lastnumber -B" ;;
-		*) exit 1 ;;
+		*) SHOWerror "Invalid bootloader choice inside array" ;;
 	esac
 }
 InstallationSetup () {
@@ -311,7 +320,7 @@ FinishInst () {
 	mkdir -p /mnt/home/"$UNsel" && cp -r "${SCRIPT_DIR}" /mnt/home/"$UNsel"/ || SHOWerror "Installer Directory Copy"
 	if [ -f /mnt/home/"$UNsel"/"${SCRIPT_DIR##*/}"/finish_setup ]; then	sed -i "s/ArchTixUser/$UNsel/g" /mnt/home/"$UNsel"/"${SCRIPT_DIR##*/}"/finish_setup || SHOWerror "Sed finish_setup"; fi
 	echo 'export MOZ_ENABLE_WAYLAND=1' > /mnt/home/"$UNsel"/.profile || SHOWerror "Profile Wayland Export"
-	cat Errors
+	[ "$(wc -l < Errors)" -gt 1 ] && { echo -e "\n[!] Alcuni errori registrati durante l'installazione:" && cat Errors && cp Errors /mnt/var/log/installer_errors.log; } || echo "[+] Installazione pulita: zero errori rilevati."
 	"$chroot" /mnt chown -hR "$UNsel":users /home/"$UNsel" || SHOWerror "Chown Home Directory"
 	YesNoSel "Reboot system"
 	if [[ "$CC" -eq 1 ]]; then umount -R /mnt && reboot; else echo "OK" && exit 0; fi
