@@ -115,6 +115,11 @@ PKGcheck () {
 	vulkan=(vulkan-icd-loader vulkan-intel vulkan-mesa-layers); filemanager=(vifm pcmanfm tumbler file-roller)
 	archive=(bzip2 cpio gzip xz lzop p7zip tar unrar zip unzip); personalization=(cowfortune)
 	[[ ! -v nvidiadrivers ]] && nvidiadrivers=(); [[ ! -v amddrivers ]] && amddrivers=()
+	if [[ "${OSsel,,}" == "void" ]]; then
+		kernel=("${KSel}" "${KSel}-headers" linux-firmware-network); baselinux=(base-system base-devel); baseutils=(man-pages bash-completion kitty vim nano wget git)
+		fs=(dialog mtools parted gptfdisk dosfstools); bootloaderutility=(efibootmgr os-prober); net=(NetworkManager iw chrony); bluetooth=(bluez)
+		print=(cups cups-filters cups-pdf avahi); audio=(pipewire wireplumber); hardwareacceleration=(mesa-dri mesa-vaapi mesa-vulkan-radeon)
+		vulkan=(vulkan-loader); personalization=(); booster=(); fi
 	local y="microcode amddrivers nvidiadrivers kernel baselinux baseutils fs bootloaderutility btrfsutility elogind grubpkg grubbtrfs refindpkg net audio bluetooth android print apps utility hardwareacceleration vulkan filemanager archive personalization booster"
 	local total_pkgs=0
 	for group in $y; do local -n current_group="$group" ; total_pkgs=$((total_pkgs + ${#current_group[@]})); done
@@ -124,7 +129,11 @@ PKGcheck () {
 		for b in "${temp[@]}"; do current_item=$((current_item + 1))
 			local percent=$(( current_item * 100 / total_pkgs ))
 			echo -ne "Verifica pacchetti: [${percent}%]\r"
-			if ! pacman -Ss ^"${b}"$ &>/dev/null; then echo -e "\n[x] Pacchetto non disponibile: $b (Gruppo: $a)"; miss+=("$b"); else new+=("$b"); fi
+			if [[ "${OSsel,,}" == "void" ]]; then
+				"$PKGquery" -R -G -A "$b" &>/dev/null && new+=("$b") || { echo -e "\n[x] Pacchetto Void non disponibile: $b (Gruppo: $a)"; miss+=("$b"); }
+			else
+				"$PKGquery" -Ss ^"${b}"$ &>/dev/null && new+=("$b") || { echo -e "\n[x] Pacchetto non disponibile: $b (Gruppo: $a)"; miss+=("$b"); }
+			fi
 		done
 		local -n orig_array="$a"; orig_array=("${new[@]}")
 	done
@@ -267,20 +276,20 @@ InstallationSetup () {
 	if [[ "$VBTsel" = 1 ]]; then ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' 'BaseSystemInstall' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'KernelSetup' 'ServiceSetup' 'UserSetup' 'BootloaderSetup' )
 	else ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' 'AdditionalDriveSetup' 'BaseSystemInstall' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'KernelSetup' 'ServiceSetup' 'UserSetup' 'AudioSetup' 'BootloaderSetup' ) ; fi
 	case "${OSsel,,}" in
-		arch) PKGmanager=pacman; pkgskips=( --needed --noconfirm ); keylayout='KEYMAP=it'; keypath='etc/vconsole.conf'
-				PKGstrap=pacstrap; FSTABgen=genfstab; chroot='arch-chroot'; initc0=systemctl; initc1=enable
-				sed -i '/\[multilib]/,/mirrorlist/ s/#//' /etc/pacman.conf; pacman -Sylq core extra multilib | sort > pacman_db || true
-				echo 'Running check for missing packages'; PKGcheck ;;
-		artix) PKGmanager=pacman; pkgskips=( --needed --noconfirm ); keylayout='KEYMAP=it'; keypath='etc/conf.d/keymaps'
-				PKGstrap=basestrap; FSTABgen=fstabgen; chroot='artix-chroot'; initc0='rc-update'; initc1=add
-				[[ "$initc0" == "rc-update" ]] && init_sys="openrc" || init_sys="runit"
-				sed -i '/\[lib32]/,/mirrorlist/ s/#//' /etc/pacman.conf
-				if [ "$ARCHrepo" = 1 ]; then ArchRepoSetup /etc/pacman.conf; pacman -Sylq system world galaxy lib32 universe extra multilib | sort > pacman_db || true
-				else pacman -Sylq system world galaxy lib32 | sort > pacman_db || true; fi
-				echo 'Running check for missing packages'; PKGcheck ;;
-		void) PKGmanager=xbps-install; pkgskips=( -y -y ); keylayout='KEYMAP=it'; keypath='etc/vconsole.conf'
-				[[ "$LIBsel" == "GLIBC" ]] && VoidArch="x86_64" || VoidArch="x86_64-musl"; VoidRepo="https://voidlinux.org"
-				[[ "$LIBsel" == "MUSL" ]] && VoidRepo+="/musl"; PKGstrap="xbps-install -S -R $VoidRepo -r /mnt $pkgskips" ; chroot="chroot" ;;
+		arch) PKGmanager=pacman; PKGquery=pacman; pkgskips=( --needed --noconfirm ); keylayout='KEYMAP=it'; keypath='etc/vconsole.conf'
+			PKGstrap=pacstrap; FSTABgen=genfstab; chroot='arch-chroot'; initc0=systemctl; initc1=enable
+			sed -i '/\[multilib]/,/mirrorlist/ s/#//' /etc/pacman.conf; pacman -Sylq core extra multilib | sort > pacman_db || true
+			echo 'Running check for missing packages'; PKGcheck ;;
+		artix) PKGmanager=pacman; PKGquery=pacman; pkgskips=( --needed --noconfirm ); keylayout='KEYMAP=it'; keypath='etc/conf.d/keymaps'
+			PKGstrap=basestrap; FSTABgen=fstabgen; chroot='artix-chroot'; initc0='rc-update'; initc1=add
+			[[ "$initc0" == "rc-update" ]] && init_sys="openrc" || init_sys="runit"
+			sed -i '/\[lib32]/,/mirrorlist/ s/#//' /etc/pacman.conf
+			if [ "$ARCHrepo" = 1 ]; then ArchRepoSetup /etc/pacman.conf; pacman -Sylq system world galaxy lib32 universe extra multilib | sort > pacman_db || true
+			else pacman -Sylq system world galaxy lib32 | sort > pacman_db || true; fi
+			echo 'Running check for missing packages'; PKGcheck ;;
+		void) PKGmanager=xbps-install; PKGquery=xbps-query; pkgskips=( -y -y ); keylayout='KEYMAP=it'; keypath='etc/vconsole.conf'
+			[[ "$LIBsel" == "GLIBC" ]] && VoidArch="x86_64" || VoidArch="x86_64-musl"; VoidRepo="https://voidlinux.org"
+			[[ "$LIBsel" == "MUSL" ]] && VoidRepo+="/musl"; PKGstrap="xbps-install -S -R $VoidRepo -r /mnt $pkgskips" ; chroot="chroot" ;;
 	esac
 	if [[ "${OSsel,,}" != "void" ]]; then for a in "${ArchTixSteps[@]}"; do "$a" || SHOWerror "$a"; done; fi
 	FinishInst
