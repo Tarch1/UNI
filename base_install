@@ -302,11 +302,14 @@ InstallationSetup () {
 }
 FinishInst () {
 	echo -e " INSTALLATION COMPLETED \n A copy of the script will be placed in your user home directory"
-	cp "${SCRIPT_DIR}/Conf_files/bashrc" /mnt/etc/bash/bashrc.d/"$UNsel".bashrc 2>/dev/null || true
-	mkdir -p /mnt/home/"$UNsel"; cp -r "${SCRIPT_DIR}" /mnt/home/"$UNsel"/
-	sed -i "s/ArchTixUser/$UNsel/g" /mnt/home/"$UNsel"/"${SCRIPT_DIR##*/}"/finish_setup
-	echo 'export MOZ_ENABLE_WAYLAND=1' > /mnt/home/"$UNsel"/.profile; cat Errors
-	"$chroot" /mnt chown -hR "$UNsel":users /home/"$UNsel"
+	if [[ "${OSsel,,}" == "void" ]]; then mkdir -p /mnt/etc/bash && cp "${SCRIPT_DIR}/Conf_files/bashrc" /mnt/home/"$UNsel"/.bashrc || SHOWerror "Void Bashrc Copy"
+	else mkdir -p /mnt/etc/bash/bashrc.d && cp "${SCRIPT_DIR}/Conf_files/bashrc" /mnt/etc/bash/bashrc.d/"$UNsel".bashrc || SHOWerror "ArchTix Bashrc Copy"
+	fi
+	mkdir -p /mnt/home/"$UNsel" && cp -r "${SCRIPT_DIR}" /mnt/home/"$UNsel"/ || SHOWerror "Installer Directory Copy"
+	if [ -f /mnt/home/"$UNsel"/"${SCRIPT_DIR##*/}"/finish_setup ]; then	sed -i "s/ArchTixUser/$UNsel/g" /mnt/home/"$UNsel"/"${SCRIPT_DIR##*/}"/finish_setup || SHOWerror "Sed finish_setup"; fi
+	echo 'export MOZ_ENABLE_WAYLAND=1' > /mnt/home/"$UNsel"/.profile || SHOWerror "Profile Wayland Export"
+	cat Errors
+	"$chroot" /mnt chown -hR "$UNsel":users /home/"$UNsel" || SHOWerror "Chown Home Directory"
 	YesNoSel "Reboot system"
 	if [[ "$CC" -eq 1 ]]; then umount -R /mnt && reboot; else echo "OK" && exit 0; fi
 }
