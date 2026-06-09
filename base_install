@@ -92,7 +92,7 @@ PackageConfig () {
 	if [[ "${OSsel,,}" == "void" ]]; then "$chroot" /mnt "$PKGmanager" -S
 	else "$chroot" /mnt "$PKGmanager" -Sy
 		if [[ "${OSsel,,}" == "arch" ]]; then sed -i '/\[multilib]/,/mirrorlist/ s/#//' /mnt/etc/pacman.conf
-		elif [[ "${OSsel,,}" == "artix" ]]; then sed -i '/\[lib32]/,/mirrorlist/ s/#//' /mnt/etc/conf.d/keymaps ; [ "$ARCHrepo" = 1 ] && ArchRepoSetup /mnt/etc/pacman.conf ; fi
+		elif [[ "${OSsel,,}" == "artix" ]]; then sed -i '/\[lib32]/,/mirrorlist/ s/#//' /mnt/etc/pacman.conf ; [ "$ARCHrepo" = 1 ] && ArchRepoSetup /mnt/etc/pacman.conf ; fi
 		if [ -f /mnt/etc/pacman.conf ]; then sed -i '/\(Color\|ParallelDownloads\)/ s/#//' /mnt/etc/pacman.conf ; sed -i '/ParallelDownloads/a ILoveCandy' /mnt/etc/pacman.conf ; fi
 	fi
 }
