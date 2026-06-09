@@ -64,7 +64,10 @@ AdditionalDriveSetup () { [ -n "$ADDITIONAL_DRIVE" ] && mkdir -p /mnt/run/media/
 BaseSystemInstall () {
 	local BasePKG=( "${kernel[@]}" "${baselinux[@]}" "${elogind[@]}" "${btrfspkg[@]}" )
 	[ "$FSsel" = btrfs ] && BasePKG+=( "${btrfsutility[@]}" )
-	"$PKGstrap" /mnt "$microcodepkg" "${BasePKG[@]}"
+	if [[ "${OSsel,,}" == "void" ]]; then
+		$PKGstrap base-system && for d in dev proc sys; do mount --bind /$d /mnt/$d; done && mount --make-rslave /mnt/sys
+		[[ "$UEFImode" -eq 1 ]] && mount --bind /sys/firmware/efi/efivars /mnt/sys/firmware/efi/efivars
+	else "$PKGstrap" /mnt "$microcodepkg" "${BasePKG[@]}"; fi
 }
 FStabGen () {
 	mv -f /mnt/etc/fstab /mnt/etc/old-fstab 2>/dev/null || true
@@ -87,16 +90,14 @@ PackageConfig () {
 	if [ -f /mnt/etc/pacman.conf ]; then sed -i '/\(Color\|ParallelDownloads\)/ s/#//' /mnt/etc/pacman.conf ; sed -i '/ParallelDownloads/a ILoveCandy' /mnt/etc/pacman.conf ; fi
 }
 PackageInstall () {
+	local VBTboot=() ; [ "$BLsel" = "efistub" ] && VBTboot+=(efibootmgr) ; [ "$BLsel" = "grub" ] && VBTboot+=(grub) ; [ "$BLsel" = "refind" ] && VBTboot+=(refind) ; [ "$FSsel" = "btrfs" ] && VBTboot+=(btrfs-progs)
 	if [[ "$VBTsel" = 1 ]]; then
-		local VBTboot=(); [ "$BLsel" = "efistub" ] && VBTboot+=(efibootmgr); [ "$BLsel" = "grub" ] && VBTboot+=(grub); [ "$BLsel" = "refind" ] && VBTboot+=(refind)
-		[ "$FSsel" = "btrfs" ] && VBTboot+=(btrfs-progs)
-		"$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${baselinux[@]}" "${baseutils[@]}" "${elogind[@]}" "${net[@]}" "${bluetooth[@]}" "${print[@]}" "${VBTboot[@]}"
-	else "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" \
-			"${microcode[@]}" "${kernel[@]}" "${baselinux[@]}" "${baseutils[@]}" "${fs[@]}" \
-			"${bootloaderutility[@]}" "${btrfsutility[@]}" "${elogind[@]}" "${grubpkg[@]}" \
-			"${grubbtrfs[@]}" "${refindpkg[@]}" "${net[@]}" "${audio[@]}" "${bluetooth[@]}" \
-			"${android[@]}" "${print[@]}" "${apps[@]}" "${utility[@]}" "${hardwareacceleration[@]}" \
-			"${vulkan[@]}" "${filemanager[@]}" "${archive[@]}" "${personalization[@]}"; fi
+		[[ "${OSsel,,}" == "void" ]] && "$chroot" /mnt "$PKGmanager" "${pkgskips[@]}" -S "${VBTboot[@]}" || "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${baselinux[@]}" "${baseutils[@]}" "${elogind[@]}" "${net[@]}" "${bluetooth[@]}" "${print[@]}" "${VBTboot[@]}"
+	else
+		local FullPKGs=( "${microcode[@]}" "${kernel[@]}" "${baseutils[@]}" "${fs[@]}" "${bootloaderutility[@]}" "${btrfsutility[@]}" "${grubpkg[@]}" "${refindpkg[@]}" "${net[@]}" "${audio[@]}" "${bluetooth[@]}" "${android[@]}" "${print[@]}" "${apps[@]}" "${utility[@]}" "${hardwareacceleration[@]}" "${vulkan[@]}" "${filemanager[@]}" "${archive[@]}" "${nvidiadrivers[@]}" "${amddrivers[@]}" )
+		[[ "${OSsel,,}" == "void" ]] || FullPKGs+=( "${baselinux[@]}" "${elogind[@]}" "${grubbtrfs[@]}" "${personalization[@]}" )
+		[[ "${OSsel,,}" == "void" ]] && "$chroot" /mnt "$PKGmanager" "${pkgskips[@]}" -S "${FullPKGs[@]}" || "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${FullPKGs[@]}"
+	fi
 }
 PKGcheck () {
 	echo "Inizializzazione gruppi di pacchetti..."
@@ -279,7 +280,7 @@ InstallationSetup () {
 				echo 'Running check for missing packages'; PKGcheck ;;
 		void) PKGmanager=xbps-install; pkgskips=( -y -y ); keylayout='KEYMAP=it'; keypath='etc/vconsole.conf'
 				[[ "$LIBsel" == "GLIBC" ]] && VoidArch="x86_64" || VoidArch="x86_64-musl"; VoidRepo="https://voidlinux.org"
-				[[ "$LIBsel" == "MUSL" ]] && VoidRepo+="/musl"; PKGstrap="xbps-install -S -R $VoidRepo -r /mnt $pkgskips" ; chroot="void_chroot" ;;
+				[[ "$LIBsel" == "MUSL" ]] && VoidRepo+="/musl"; PKGstrap="xbps-install -S -R $VoidRepo -r /mnt $pkgskips" ; chroot="chroot" ;;
 	esac
 	if [[ "${OSsel,,}" != "void" ]]; then for a in "${ArchTixSteps[@]}"; do "$a" || SHOWerror "$a"; done; fi
 	FinishInst
