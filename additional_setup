@@ -44,7 +44,8 @@ GPUsel () {
 	if [[ "$gpu_info" =~ Intel ]]; then echo "The default Mesa driver will be installed"
 	elif [[ "$gpu_info" =~ NVIDIA ]]; then YesNoSel 'Found Nvidia gpu, wanna proprietary driver? If you do not like it, Mesa is the default'
 		if [ "$CC" -eq 1 ]; then echo 'Setting up NVIDIA Drivers' 
-			if [[ "$OSsel" == "Void" ]]; then nvidiadrivers=(nvidia nvidia-libs-32bit)
+			if [[ "$OSsel" == "Void" ]]; then
+				[[ "$LIBsel" == "MUSL" ]] && { echo "NVIDIA Proprietary is incompatible with MUSL! Forcing Mesa/Nouveau." && nvidiadrivers=(); } || nvidiadrivers=(nvidia nvidia-libs-32bit)
 			else YesNoSel 'Do you want the official NVIDIA OPEN-source kernel modules? (No = Classic Proprietary)'
 				local open_driver="$CC"; local nv_main
 				if [ "$open_driver" -eq 1 ]; then [[ "$KSel" == "linux" ]] && nv_main="nvidia-open" || nv_main="nvidia-open-dkms"
