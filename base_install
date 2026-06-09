@@ -106,10 +106,10 @@ PackageConfig () {
 }
 PackageInstall () {
 	local VBTboot=() ; [ "$BLsel" = "efistub" ] && VBTboot+=(efibootmgr) ; [ "$BLsel" = "grub" ] && VBTboot+=(grub) ; [ "$BLsel" = "refind" ] && VBTboot+=(refind) ; [ "$FSsel" = "btrfs" ] && VBTboot+=(btrfs-progs)
-	if [[ "$VBTsel" = 1 ]]; then
-		[[ "${OSsel,,}" == "void" ]] && "$chroot" /mnt "$PKGmanager" "${pkgskips[@]}" -S "${VBTboot[@]}" || "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${baselinux[@]}" "${baseutils[@]}" "${elogind[@]}" "${net[@]}" "${bluetooth[@]}" "${print[@]}" "${VBTboot[@]}"
-	else
-		local FullPKGs=( "${microcode[@]}" "${kernel[@]}" "${baseutils[@]}" "${fs[@]}" "${bootloaderutility[@]}" "${btrfsutility[@]}" "${grubpkg[@]}" "${refindpkg[@]}" "${net[@]}" "${audio[@]}" "${bluetooth[@]}" "${android[@]}" "${print[@]}" "${apps[@]}" "${utility[@]}" "${hardwareacceleration[@]}" "${vulkan[@]}" "${filemanager[@]}" "${archive[@]}" "${nvidiadrivers[@]}" "${amddrivers[@]}" )
+	if [[ "$VBTsel" = 1 ]]; then [[ "${OSsel,,}" == "void" ]] && "$chroot" /mnt "$PKGmanager" "${pkgskips[@]}" -S "${VBTboot[@]}" || "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${baselinux[@]}" "${baseutils[@]}" "${elogind[@]}" "${net[@]}" "${bluetooth[@]}" "${print[@]}" "${VBTboot[@]}"
+	else local FullPKGs=( "${microcode[@]}" "${kernel[@]}" "${baseutils[@]}" "${fs[@]}" "${bootloaderutility[@]}" "${btrfsutility[@]}" "${grubpkg[@]}" "${refindpkg[@]}" "${net[@]}" "${audio[@]}" "${bluetooth[@]}" "${android[@]}" "${print[@]}" "${apps[@]}" "${utility[@]}" "${hardwareacceleration[@]}" "${vulkan[@]}" "${filemanager[@]}" "${archive[@]}" )
+		[[ -v nvidiadrivers && ${#nvidiadrivers[@]} -gt 0 ]] && FullPKGs+=( "${nvidiadrivers[@]}" )
+		[[ -v amddrivers && ${#amddrivers[@]} -gt 0 ]] && FullPKGs+=( "${amddrivers[@]}" )
 		[[ "${OSsel,,}" == "void" ]] || FullPKGs+=( "${baselinux[@]}" "${elogind[@]}" "${grubbtrfs[@]}" "${personalization[@]}" )
 		[[ "${OSsel,,}" == "void" ]] && "$chroot" /mnt "$PKGmanager" "${pkgskips[@]}" -S "${FullPKGs[@]}" || "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${FullPKGs[@]}"
 	fi
