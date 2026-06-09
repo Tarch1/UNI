@@ -303,7 +303,7 @@ InstallationSetup () {
 			if [ "$ARCHrepo" = 1 ]; then ArchRepoSetup /etc/pacman.conf; pacman -Sylq system world galaxy lib32 universe extra multilib | sort > pacman_db || true
 			else pacman -Sylq system world galaxy lib32 | sort > pacman_db || true; fi
 			echo 'Running check for missing packages'; PKGcheck ;;
-		void) PKGmanager=xbps-install; PKGquery=xbps-query; pkgskips=( -y -y ); keylayout='KEYMAP=it'; keypath='etc/vconsole.conf'
+		void) PKGmanager=xbps-install; PKGquery=xbps-query; pkgskips=( -y -y ); keylayout='KEYMAP=it'; keypath='etc/rc.conf'
 			[[ "$LIBsel" == "GLIBC" ]] && VoidArch="x86_64" || VoidArch="x86_64-musl"; VoidRepo="https://voidlinux.org"
 			[[ "$LIBsel" == "MUSL" ]] && VoidRepo+="/musl"; PKGstrap="xbps-install -S -R $VoidRepo -r /mnt ${pkgskips[*]}" ; chroot="chroot" ;;
 	esac
@@ -321,7 +321,7 @@ FinishInst () {
 	[ "$(wc -l < Errors)" -gt 1 ] && { echo -e "\n[!] Alcuni errori registrati durante l'installazione:" && cat Errors && cp Errors /mnt/var/log/installer_errors.log; } || echo "[+] Installazione pulita: zero errori rilevati."
 	"$chroot" /mnt chown -hR "$UNsel":users /home/"$UNsel" || SHOWerror "Chown Home Directory"
 	YesNoSel "Reboot system"
-	if [[ "$CC" -eq 1 ]]; then umount -R /mnt && reboot; else echo "OK" && exit 0; fi
+	if [[ "$CC" -eq 1 ]]; then [[ "${OSsel,,}" == "void" ]] && umount -l /mnt/{dev,proc,sys}; umount -R /mnt && reboot; else echo "OK" && exit 0; fi
 }
 InstallationSetup
 cat Errors
