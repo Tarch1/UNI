@@ -74,8 +74,8 @@ BaseSystemInstall () {
 FStabGen () {
 	[ -f /mnt/etc/fstab ] && { mv -f /mnt/etc/fstab /mnt/etc/old-fstab || SHOWerror "Backup existing fstab"; }
 	if [[ "$OSsel" == "Void" ]]; then echo -e "$UNIfstab" > /mnt/etc/fstab || SHOWerror "Writing Void native fstab"
-	else if [[ -v PIDsel ]]; then "$FSTABgen" -t "$PIDsel" /mnt >> /mnt/etc/fstab || SHOWerror "Generating Arch/Artix fstab"; else SHOWerror "PIDsel variable missing during fstab generation"; fi
-	fi
+	elif [[ -v PIDsel ]]; then "$FSTABgen" -t "$PIDsel" /mnt >> /mnt/etc/fstab || SHOWerror "Generating Arch/Artix fstab"
+	else SHOWerror "PIDsel variable missing during fstab generation"; fi
 	cat /mnt/etc/fstab
 }
 SetupEnvironment () {
@@ -142,10 +142,8 @@ PKGcheck () {
 		for b in "${temp[@]}"; do current_item=$((current_item + 1))
 			local percent=$(( current_item * 100 / total_pkgs ))
 			echo -ne "Verifica pacchetti: [${percent}%]\r"
-			if [[ "${OSsel,,}" == "void" ]]; then
-				"$PKGquery" -R -G -A "$b" &>/dev/null && new+=("$b") || { echo -e "\n[x] Pacchetto Void non disponibile: $b (Gruppo: $a)"; miss+=("$b"); }
-			else
-				"$PKGquery" -Ss ^"${b}"$ &>/dev/null && new+=("$b") || { echo -e "\n[x] Pacchetto non disponibile: $b (Gruppo: $a)"; miss+=("$b"); }
+			if [[ "${OSsel,,}" == "void" ]]; then "$PKGquery" -R -G -A "$b" &>/dev/null && new+=("$b") || { echo -e "\n[x] Pacchetto Void non disponibile: $b (Gruppo: $a)"; miss+=("$b"); }
+			else "$PKGquery" -Ss ^"${b}"$ &>/dev/null && new+=("$b") || { echo -e "\n[x] Pacchetto non disponibile: $b (Gruppo: $a)"; miss+=("$b"); }
 			fi
 		done
 		local -n orig_array="$a"; orig_array=("${new[@]}")
