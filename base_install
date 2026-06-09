@@ -93,7 +93,9 @@ SetupEnvironment () {
 	echo -e "127.0.0.1\tlocalhost\n::1\t\tlocalhost\n127.0.1.1\t$HNsel.localdomain $HNsel" >> /mnt/etc/hosts
 }
 PackageConfig () {
-	if [[ "${OSsel,,}" == "void" ]]; then "$chroot" /mnt "$PKGmanager" -S
+	if [[ "${OSsel,,}" == "void" ]]; then
+		"$chroot" /mnt xbps-install -y xbps-allow-references void-repo-nonfree void-repo-multilib void-repo-multilib-nonfree
+		"$chroot" /mnt "$PKGmanager" -S
 	else
 		if [[ "${OSsel,,}" == "arch" ]]; then sed -i '/\[multilib]/,/mirrorlist/ s/#//' /mnt/etc/pacman.conf
 		elif [[ "${OSsel,,}" == "artix" ]]; then sed -i '/\[lib32]/,/mirrorlist/ s/#//' /mnt/etc/pacman.conf ; [ "$ARCHrepo" = 1 ] && ArchRepoSetup /mnt/etc/pacman.conf
@@ -129,10 +131,13 @@ PKGcheck () {
 	archive=(bzip2 cpio gzip xz lzop p7zip tar unrar zip unzip); personalization=(cowfortune)
 	[[ ! -v nvidiadrivers ]] && nvidiadrivers=(); [[ ! -v amddrivers ]] && amddrivers=()
 	if [[ "${OSsel,,}" == "void" ]]; then
+		xbps-install -y void-repo-nonfree void-repo-multilib void-repo-multilib-nonfree &>/dev/null || true
 		kernel=("${KSel}" "${KSel}-headers" linux-firmware-network); baselinux=(base-system base-devel); baseutils=(man-pages bash-completion kitty vim nano wget git)
 		fs=(dialog mtools parted gptfdisk dosfstools); bootloaderutility=(efibootmgr os-prober); net=(NetworkManager iw chrony); bluetooth=(bluez)
 		print=(cups cups-filters cups-pdf avahi); audio=(pipewire wireplumber); hardwareacceleration=(mesa-dri mesa-vaapi mesa-vulkan-radeon)
-		vulkan=(vulkan-loader); personalization=(); booster=(); fi
+		vulkan=(vulkan-loader); personalization=(); booster=(); elogind=(); grubbtrfs=()
+		apps=(telegram-desktop firefox); filemanager=(vifm pcmanfm tumbler file-roller)
+		archive=(bzip2 cpio gzip xz p7zip tar unrar zip unzip); utility=(feh xed calc fd bpytop fwupd); fi
 	local y="microcode amddrivers nvidiadrivers kernel baselinux baseutils fs bootloaderutility btrfsutility elogind grubpkg grubbtrfs refindpkg net audio bluetooth android print apps utility hardwareacceleration vulkan filemanager archive personalization booster"
 	local total_pkgs=0
 	for group in $y; do local -n current_group="$group" ; total_pkgs=$((total_pkgs + ${#current_group[@]})); done
