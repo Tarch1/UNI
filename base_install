@@ -30,35 +30,35 @@ DiskPartition () {
 	sleep 1 ; echo -e " BP=$BOOT_PART RP=$ROOT_PART PID=$PIDsel" ; lsblk -f
 }
 FileSystemFormat () {
-	BootLabel='EFI' ; RootLabel='ROOT' ; mkfs.fat -F32 -n "$BootLabel" "$BOOT_PART"
-	BOOTID="$(blkid -s "$PIDsel" -o value "$BOOT_PART")"
-	mkswap "$SWAP_PART" ; SWAPID="$(blkid -s "$PIDsel" -o value "$SWAP_PART")"
+	BootLabel='EFI' ; RootLabel='ROOT' ; mkfs.fat -F32 -n "$BootLabel" "$BOOT_PART" || SHOWerror "mkfs.fat EFI"
+	BOOTID="$(blkid -s "$PIDsel" -o value "$BOOT_PART")" || SHOWerror "blkid BOOTID"
+	mkswap "$SWAP_PART" || SHOWerror "mkswap" ; SWAPID="$(blkid -s "$PIDsel" -o value "$SWAP_PART")" || SHOWerror "blkid SWAPID"
 	UNIfstab="$PIDsel=$BOOTID /boot vfat defaults 0 2\n$PIDsel=$SWAPID none swap defaults 0 0\n"
 	case "$FSsel" in
-		ext4)  mkfs.ext4 -L "$RootLabel" "$ROOT_PART" ; ROOTID="$(blkid -s "$PIDsel" -o value "$ROOT_PART")" ; mount "$ROOT_PART" /mnt
+		ext4)  mkfs.ext4 -L "$RootLabel" "$ROOT_PART" || SHOWerror "mkfs.ext4 ROOT" ; ROOTID="$(blkid -s "$PIDsel" -o value "$ROOT_PART")" || SHOWerror "blkid ROOTID ext4" ; mount "$ROOT_PART" /mnt || SHOWerror "mount ext4 root"
 			   UNIfstab+="$PIDsel=$ROOTID / ext4 defaults 0 1\n" ;;
 		btrfs) modules=(btrfs) ; binaries='btrfs' ; local SUBVolumes=( 'home' 'var_log' 'snapshots' 'swap' )
 			   local options='noatime,compress=zstd,space_cache=v2,discard=async'
-			   mkfs.btrfs -fL "$RootLabel" "$ROOT_PART" ; ROOTID="$(blkid -s "$PIDsel" -o value "$ROOT_PART")"
-			   mount "$ROOT_PART" /mnt ; btrfs su cr /mnt/@
-			   for b in "${SUBVolumes[@]}"; do btrfs su cr /mnt/@"$b" ; done ; umount /mnt
-			   mount -o defaults,"$options",subvol=@ "$ROOT_PART" /mnt
+			   mkfs.btrfs -fL "$RootLabel" "$ROOT_PART" || SHOWerror "mkfs.btrfs ROOT" ; ROOTID="$(blkid -s "$PIDsel" -o value "$ROOT_PART")" || SHOWerror "blkid ROOTID btrfs"
+			   mount "$ROOT_PART" /mnt || SHOWerror "mount btrfs root" ; btrfs su cr /mnt/@ || SHOWerror "btrfs subvol @"
+			   for b in "${SUBVolumes[@]}"; do btrfs su cr /mnt/@"$b" || SHOWerror "btrfs subvol @$b" ; done ; umount /mnt || SHOWerror "umount btrfs root setup"
+			   mount -o defaults,"$options",subvol=@ "$ROOT_PART" /mnt || SHOWerror "mount btrfs subvol @"
 			   UNIfstab+="$PIDsel=$ROOTID / btrfs $options,subvol=@ 0 0\n"
 			   for c in "${SUBVolumes[@]}"; do
 				   case "$c" in
-					   snapshots) mkdir -p /mnt/."$c" ; mount -o "$options",subvol=@"$c" "$ROOT_PART" /mnt/."$c"
+					   snapshots) mkdir -p /mnt/."$c" && mount -o "$options",subvol=@"$c" "$ROOT_PART" /mnt/."$c" || SHOWerror "mount @snapshots"
 								  UNIfstab+="$PIDsel=$ROOTID /.$c btrfs $options,subvol=@$c 0 0\n" ;;
-					   var_log)   mkdir -p /mnt/var/log ; mount -o "$options",subvol=@"$c" "$ROOT_PART" /mnt/var/log
+					   var_log)   mkdir -p /mnt/var/log && mount -o "$options",subvol=@"$c" "$ROOT_PART" /mnt/var/log || SHOWerror "mount @var_log"
 								  UNIfstab+="$PIDsel=$ROOTID /var/log btrfs $options,subvol=@$c 0 0\n" ;;
 					   swap)      ;;
-					   *)         mkdir -p /mnt/"$c" && mount -o defaults,"$options",subvol=@"$c" "$ROOT_PART" /mnt/"$c"
+					   *)         mkdir -p /mnt/"$c" && mount -o defaults,"$options",subvol=@"$c" "$ROOT_PART" /mnt/"$c" || SHOWerror "mount @$c"
 								  UNIfstab+="$PIDsel=$ROOTID /$c btrfs $options,subvol=@$c 0 0\n" ;;
 				   esac
 			   done ;;
 		*) echo "Boh file system non supportato" ;;
 	esac
 	export BOOTID ROOTID SWAPID
-	swapon "$SWAP_PART" ; mkdir -p /mnt/boot ; mount "$BOOT_PART" /mnt/boot ; lsblk -f
+	swapon "$SWAP_PART" || SHOWerror "swapon" ; mkdir -p /mnt/boot ; mount "$BOOT_PART" /mnt/boot || SHOWerror "mount boot partition" ; lsblk -f
 }
 AdditionalDriveSetup () { [ -n "$ADDITIONAL_DRIVE" ] && mkdir -p /mnt/run/media/"$HNsel"/HDD && mount "$ADDITIONAL_DRIVE" /mnt/run/media/"$HNsel"/HDD; }
 BaseSystemInstall () {
@@ -157,37 +157,37 @@ PKGcheck () {
 }
 KernelSetup () {
 	case "$microcodepkg" in
-		intel-ucode) echo -e 'options i915 enable_fbc=1 fastboot=0 enable_dc=4' >> /mnt/etc/modprobe.d/i915.conf ;;
+		intel-ucode) echo -e 'options i915 enable_fbc=1 fastboot=0 enable_dc=4' >> /mnt/etc/modprobe.d/i915.conf || SHOWerror "i915 modprobe options" ;;
 		*) echo 'AMD or generic setup: Nothing at the moment' ;;
 	esac
 	if [[ -v nvidiadrivers && ${#nvidiadrivers[@]} -gt 0 ]]; then
-		[[ "${OSsel,,}" == "artix" ]] && "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" nvidia-utils-openrc
-		ln -s /dev/null /mnt/etc/udev/rules.d/61-gdm.rules; modules+=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)
-		echo -e "options nvidia-drm modeset=1 fbdev=1\noptions nvidia NVreg_DynamicPowerManagement=0x02 NVreg_UsePageAttributeTable=1 NVreg_EnablePCIeGen3=1" > /mnt/etc/modprobe.d/nvidia.conf
+		[[ "${OSsel,,}" == "artix" ]] && { "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" nvidia-utils-openrc || SHOWerror "artix nvidia-utils-openrc"; }
+		ln -s /dev/null /mnt/etc/udev/rules.d/61-gdm.rules || SHOWerror "61-gdm udev rule link"; modules+=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)
+		echo -e "options nvidia-drm modeset=1 fbdev=1\noptions nvidia NVreg_DynamicPowerManagement=0x02 NVreg_UsePageAttributeTable=1 NVreg_EnablePCIeGen3=1" > /mnt/etc/modprobe.d/nvidia.conf || SHOWerror "nvidia modprobe options"
 	fi
 	case "$IRFSetup" in
-		dracut)	mkdir -p /mnt/etc/dracut.conf.d
-				[ "$FSsel" = btrfs ] && echo 'add_dracutmodules+=" btrfs "' > /mnt/etc/dracut.conf.d/btrfs.conf
-				[[ -v nvidiadrivers && ${#nvidiadrivers[@]} -gt 0 ]] && echo 'force_drivers+=" nvidia nvidia_modeset nvidia_uvm nvidia_drm "' > /mnt/etc/dracut.conf.d/nvidia.conf
-				"$chroot" /mnt xbps-reconfigure -f "$KSel" ;;
-		booster) [ ${#booster[@]} -gt 0 ] && "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${booster[@]}"
-				if [[ "$OSsel" != "Void" ]]; then "$chroot" /mnt pacman -Rns --noconfirm mkinitcpio 2>/dev/null || true; fi
-				printf 'mount_timeout: 10s\nvconsole: true\n' > /mnt/etc/booster.yaml
-				echo "resume: /dev/disk/by-uuid/${SWAPID}" >> /mnt/etc/booster.yaml
+		dracut)	mkdir -p /mnt/etc/dracut.conf.d || SHOWerror "mkdir dracut.conf.d"
+				[ "$FSsel" = btrfs ] && { echo 'add_dracutmodules+=" btrfs "' > /mnt/etc/dracut.conf.d/btrfs.conf || SHOWerror "dracut btrfs conf"; }
+				[[ -v nvidiadrivers && ${#nvidiadrivers[@]} -gt 0 ]] && { echo 'force_drivers+=" nvidia nvidia_modeset nvidia_uvm nvidia_drm "' > /mnt/etc/dracut.conf.d/nvidia.conf || SHOWerror "dracut nvidia conf"; }
+				"$chroot" /mnt xbps-reconfigure -f "$KSel" || SHOWerror "xbps-reconfigure dracut" ;;
+		booster) [ ${#booster[@]} -gt 0 ] && { "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${booster[@]}" || SHOWerror "install booster"; }
+				if [[ "$OSsel" != "Void" ]]; then "$chroot" /mnt pacman -Rns --noconfirm mkinitcpio || SHOWerror "purge mkinitcpio"; fi
+				printf 'mount_timeout: 10s\nvconsole: true\n' > /mnt/etc/booster.yaml || SHOWerror "booster.yaml init"
+				echo "resume: /dev/disk/by-uuid/${SWAPID}" >> /mnt/etc/booster.yaml || SHOWerror "booster.yaml resume inject"
 				if [[ "$VBTsel" = 1 ]]; then [ "$FSsel" = btrfs ] && echo 'modules: btrfs,ahci,ata_piix,sd_mod,nvme' >> /mnt/etc/booster.yaml || echo 'modules: ahci,ata_piix,sd_mod,nvme' >> /mnt/etc/booster.yaml
 				else [ "$FSsel" = btrfs ] && echo 'modules: btrfs' >> /mnt/etc/booster.yaml; fi
-				[[ -v nvidiadrivers && ${#nvidiadrivers[@]} -gt 0 ]] && echo 'modules: nvidia,nvidia_modeset,nvidia_uvm,nvidia_drm' >> /mnt/etc/booster.yaml
-				if [[ "$OSsel" != "Void" ]]; then mkdir -p /mnt/etc/pacman.d/hooks
-				printf '[Trigger]\nOperation = Install\nOperation = Upgrade\nType = Package\nTarget = %s\n\n[Action]\nDescription = Forcing Booster initramfs update...\nWhen = PostTransaction\nDepends = booster\nExec = /usr/bin/booster build --force --universal /boot/initramfs-%s.img\n' "$KSel" "$KSel" > /mnt/etc/pacman.d/hooks/95-booster-force.hook; fi
+				[[ -v nvidiadrivers && ${#nvidiadrivers[@]} -gt 0 ]] && { echo 'modules: nvidia,nvidia_modeset,nvidia_uvm,nvidia_drm' >> /mnt/etc/booster.yaml || SHOWerror "booster.yaml nvidia inject"; }
+				if [[ "$OSsel" != "Void" ]]; then mkdir -p /mnt/etc/pacman.d/hooks || SHOWerror "mkdir pacman hooks"
+				printf '[Trigger]\nOperation = Install\nOperation = Upgrade\nType = Package\nTarget = %s\n\n[Action]\nDescription = Forcing Booster initramfs update...\nWhen = PostTransaction\nDepends = booster\nExec = /usr/bin/booster build --force --universal /boot/initramfs-%s.img\n' "$KSel" "$KSel" > /mnt/etc/pacman.d/hooks/95-booster-force.hook || SHOWerror "booster-force hook creation"; fi
 				local real_kver
-				real_kver=$(basename "$(find /mnt/usr/lib/modules/ -maxdepth 1 -mindepth 1 -type d ! -name 'extramodules*' | head -n 1)")
-				"$chroot" /mnt /bin/bash -c "booster build --force --universal --kernel-version=${real_kver} /boot/initramfs-${KSel}.img" ;;
+				real_kver=$(basename "$(find /mnt/usr/lib/modules/ -maxdepth 1 -mindepth 1 -type d ! -name 'extramodules*' | head -n 1)") || SHOWerror "find real_kver"
+				"$chroot" /mnt /bin/bash -c "booster build --force --universal --kernel-version=${real_kver} /boot/initramfs-${KSel}.img" || SHOWerror "booster build" ;;
 		*) local HOOKS=(base udev autodetect modconf block usr resume filesystems keyboard keymap fsck)
 		   [[ -v nvidiadrivers && ${#nvidiadrivers[@]} -gt 0 ]] && HOOKS+=(kms)
-		   sed -i "/MODULES/ s/()/(${modules[*]})/" /mnt/etc/mkinitcpio.conf
+		   sed -i "/MODULES/ s/()/(${modules[*]})/" /mnt/etc/mkinitcpio.conf || SHOWerror "mkinitcpio modules inject"
 		   sed -i "/BINARIES/ s/()/($binaries)/" /mnt/etc/mkinitcpio.conf
-		   sed -i "s/^HOOKS.*/HOOKS=(${HOOKS[*]})/" /mnt/etc/mkinitcpio.conf
-		   "$chroot" /mnt mkinitcpio -p "$KSel" ;;
+		   sed -i "s/^HOOKS.*/HOOKS=(${HOOKS[*]})/" /mnt/etc/mkinitcpio.conf || SHOWerror "mkinitcpio hooks inject"
+		   "$chroot" /mnt mkinitcpio -p "$KSel" || SHOWerror "mkinitcpio build" ;;
 	esac
 }
 ServiceSetup () {
