@@ -75,7 +75,7 @@ ArchRepoSetup () {
 	printf '\n[universe]\nServer = https://universe.artixlinux.org/$arch\nServer = https://mirror1.artixlinux.org/universe/$arch\nServer = https://mirror.pascalpuffke.de/artix-universe/$arch\nServer = https://artixlinux.qontinuum.space/artixlinux/universe/os/$arch\nServer = https://mirror1.cl.netactuate.com/artix/universe/$arch\nServer = https://ftp.crifo.org/artix-universe/$arch\n' >> "$target_conf"
 	if [ ! -f "$mirror_file" ]; then "${cmd[@]}" pacman -Sy --noconfirm artix-keyring artix-archlinux-support; fi
 	if ! grep -q 'mirrorlist-arch' "$target_conf" 2>/dev/null; then printf '\n# Arch\n[extra]\nInclude = /etc/pacman.d/mirrorlist-arch\n\n[multilib]\nInclude = /etc/pacman.d/mirrorlist-arch\n' >> "$target_conf"; fi
-	"${cmd[@]}" pacman-key --populate artix archlinux 2>/dev/null || true ; "${cmd[@]}" pacman -Sy 2>/dev/null || true
+	"${cmd[@]}" pacman-key --populate artix archlinux || SHOWerror "Final pacman-key populate"
 }
 AnotherCheck () {
 	[[ "$OSsel" == "Void" ]] && echo "Skipping check (Void uses XBPS)" && return 0
