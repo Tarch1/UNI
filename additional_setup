@@ -14,9 +14,7 @@ MenuSel () {
 		echo -e "\n=== $question ==="
 		for i in "${!options[@]}"; do echo "$((i+1))) ${options[$i]}"; done
 		read -rp "Scelta: " user_choice
-		if [[ "$user_choice" =~ ^[0-9]+$ ]] && [ "$user_choice" -le "${#options[@]}" ] && [ "$user_choice" -gt 0 ]; then
-			var_name="${options[$((user_choice-1))]}"; echo "Selezionato: $var_name"; break
-		else echo "Scelta non valida, riprova."; fi
+		[[ "$user_choice" =~ ^[0-9]+$ && "$user_choice" -le "${#options[@]}" && "$user_choice" -gt 0 ]] && { var_name="${options[$((user_choice-1))]}"; echo "Selezionato: $var_name"; break; } || echo "Scelta non valida, riprova."
 	done
 }
 TextPromptSel () {
@@ -24,18 +22,15 @@ TextPromptSel () {
 	while true; do
 		read -rp "$prompt_msg: " input_val
 		YesNoSel "Confermi che << $input_val >> è corretto?"
-		[[ "$CC" -eq 1 ]] && var_name="$input_val" && break || echo "Riproviamo..."
+		[[ "$CC" -eq 1 ]] && { var_name="$input_val"; break; } || echo "Riproviamo..."
 	done
 }
 UEFIsel () {
-	if [[ -d "/sys/firmware/efi/" ]]; then
-		mount | grep -q "/sys/firmware/efi/efivars" || mount -t efivarfs efivarfs /sys/firmware/efi/efivars
-		UEFImode=1 && echo 'UEFI Mode detected'
-	else UEFImode=0 && echo 'BIOS Mode detected'; fi
+	[[ -d "/sys/firmware/efi/" ]] && { mount | grep -q "/sys/firmware/efi/efivars" || mount -t efivarfs efivarfs /sys/firmware/efi/efivars; UEFImode=1; echo 'UEFI Mode detected'; } || { UEFImode=0; echo 'BIOS Mode detected'; }
 }
 CPUsel () {
 	if grep -q "GenuineIntel" /proc/cpuinfo; then echo 'Installing Intel microcode'; microcodepkg='intel-ucode'
-	elif grep -q "AuthenticAMD" /proc/cpuinfo; then echo 'Installing AMD microcode'; [[ "$OSsel" == "Void" ]] && microcodepkg='amd-ucode-firmware' || microcodepkg='amd-ucode'
+	elif grep -q "AuthenticAMD" /proc/cpuinfo; then echo 'Installing AMD microcode'; [[ "${OSsel,,}" == "void" ]] && microcodepkg='amd-ucode-firmware' || microcodepkg='amd-ucode'
 	else echo 'No microcode needed or unknown CPU'; fi
 }
 GPUsel () {
@@ -43,47 +38,46 @@ GPUsel () {
 	local gpu_info=$(lspci | grep -Ei 'VGA|3D')
 	if [[ "$gpu_info" =~ Intel ]]; then echo "The default Mesa driver will be installed"
 	elif [[ "$gpu_info" =~ NVIDIA ]]; then YesNoSel 'Found Nvidia gpu, wanna proprietary driver? If you do not like it, Mesa is the default'
-		if [ "$CC" -eq 1 ]; then echo 'Setting up NVIDIA Drivers' 
-			if [[ "$OSsel" == "Void" ]]; then
-				[[ "$LIBsel" == "MUSL" ]] && { echo "NVIDIA Proprietary is incompatible with MUSL! Forcing Mesa/Nouveau." && nvidiadrivers=(); } || nvidiadrivers=(nvidia nvidia-libs-32bit)
+		if [[ "$CC" -eq 1 ]]; then echo 'Setting up NVIDIA Drivers'
+			if [[ "${OSsel,,}" == "void" ]]; then
+				[[ "$LIBsel" == "MUSL" ]] && { echo "NVIDIA Proprietary is incompatible with MUSL! Forcing Mesa/Nouveau."; nvidiadrivers=(); } || nvidiadrivers=(nvidia nvidia-libs-32bit)
 			else YesNoSel 'Do you want the official NVIDIA OPEN-source kernel modules? (No = Classic Proprietary)'
 				local open_driver="$CC"; local nv_main
-				if [ "$open_driver" -eq 1 ]; then [[ "$KSel" == "linux" ]] && nv_main="nvidia-open" || nv_main="nvidia-open-dkms"
+				if [[ "$open_driver" -eq 1 ]]; then [[ "$KSel" == "linux" ]] && nv_main="nvidia-open" || nv_main="nvidia-open-dkms"
 				else
 					if [[ "$KSel" == "linux" ]]; then nv_main="nvidia"
 					elif [[ "$KSel" == "linux-lts" ]]; then nv_main="nvidia-lts"
 					else nv_main="nvidia-dkms"; fi
 				fi
-				nvidiadrivers=("$nv_main" nvidia-prime nvidia-settings nvidia-utils lib32-nvidia-utils opencl-nvidia lib32-opencl-nvidia libxnvctrl libvdpau)
+				nvidiadrivers=("${nv_main}" nvidia-prime nvidia-settings nvidia-utils lib32-nvidia-utils opencl-nvidia lib32-opencl-nvidia libxnvctrl libvdpau)
 			fi
 		else echo 'Using default Mesa'; fi
-		[ -f /sys/firmware/acpi/tables/DSDT ] && AcpiOS="$(strings /sys/firmware/acpi/tables/DSDT | grep -i 'windows ' | sort | tail -1)"
-	elif [[ "$gpu_info" =~ (AMD|Radeon) ]]; then [[ "$OSsel" == "Void" ]] && amddrivers=(xf86-video-amdgpu mesa-dri vulkan-loader mesa-vulkan-radeon) || amddrivers=(amdgpu mesa vulkan-radeon libva-mesa-driver)
+		[[ -f /sys/firmware/acpi/tables/DSDT ]] && AcpiOS="$(strings /sys/firmware/acpi/tables/DSDT | grep -i 'windows ' | sort | tail -1)"
+	elif [[ "$gpu_info" =~ (AMD|Radeon) ]]; then [[ "${OSsel,,}" == "void" ]] && amddrivers=(xf86-video-amdgpu mesa-dri vulkan-loader mesa-vulkan-radeon) || amddrivers=(amdgpu mesa vulkan-radeon libva-mesa-driver)
 	elif [[ "$gpu_info" =~ (VMware|VirtualBox|Virtio|QXL) ]]; then VBTsel=1; echo "VM detected: The default Mesa driver will be installed"
 	else echo "Generic GPU: Mesa will be installed"; fi
 }
 Pacman_Locked() {
-	if [ -f /var/lib/pacman/db.lck ] || [ -f /mnt/var/lib/pacman/db.lck ]; then echo -e "Pacman is blocked. Removing lockfiles..."; rm -f /var/lib/pacman/db.lck /mnt/var/lib/pacman/db.lck
-	else echo "No locked database"; fi
+	[[ -f /var/lib/pacman/db.lck || -f /mnt/var/lib/pacman/db.lck ]] && { echo -e "Pacman is blocked. Removing lockfiles..."; rm -f /var/lib/pacman/db.lck /mnt/var/lib/pacman/db.lck; } || echo "No locked database"
 }
 ArchRepoSetup () {
-	local target_conf="$1" ; local cmd=() ; local mirror_file="/etc/pacman.d/mirrorlist-arch"
-	[ "$target_conf" = "/mnt/etc/pacman.conf" ] && cmd=( "$chroot" /mnt ) && mirror_file="/mnt/etc/pacman.d/mirrorlist-arch"
-	if [ ${#cmd[@]} -eq 0 ]; then rm -rf /etc/pacman.d/gnupg 2>/dev/null || true ; mkdir -p /etc/pacman.d/gnupg ; chmod 700 /etc/pacman.d/gnupg ; pacman-key --init 2>/dev/null || true ; pacman-key --populate artix 2>/dev/null || true
-	else "${cmd[@]}" pacman-key --init 2>/dev/null || true ; "${cmd[@]}" pacman-key --populate artix archlinux 2>/dev/null || true ; fi
+	local target_conf="$1"; local cmd=(); local mirror_file="/etc/pacman.d/mirrorlist-arch"
+	[[ "$target_conf" == "/mnt/etc/pacman.conf" ]] && { cmd=( "$chroot" /mnt ); mirror_file="/mnt/etc/pacman.d/mirrorlist-arch"; }
+	if [[ ${#cmd[@]} -eq 0 ]]; then rm -rf /etc/pacman.d/gnupg 2>/dev/null || true; mkdir -p /etc/pacman.d/gnupg; chmod 700 /etc/pacman.d/gnupg; pacman-key --init 2>/dev/null || true; pacman-key --populate artix 2>/dev/null || true
+	else "${cmd[@]}" pacman-key --init 2>/dev/null || true; "${cmd[@]}" pacman-key --populate artix archlinux 2>/dev/null || true; fi
 	sed -i '/\[universe\]/,/^[[:space:]]*$/d' "$target_conf" 2>/dev/null || true
 	printf '\n[universe]\nServer = https://universe.artixlinux.org/$arch\nServer = https://mirror1.artixlinux.org/universe/$arch\nServer = https://mirror.pascalpuffke.de/artix-universe/$arch\nServer = https://artixlinux.qontinuum.space/artixlinux/universe/os/$arch\nServer = https://mirror1.cl.netactuate.com/artix/universe/$arch\nServer = https://ftp.crifo.org/artix-universe/$arch\n' >> "$target_conf"
-	if [ ! -f "$mirror_file" ]; then "${cmd[@]}" pacman -Sy --noconfirm artix-keyring artix-archlinux-support; fi
-	if ! grep -q 'mirrorlist-arch' "$target_conf" 2>/dev/null; then printf '\n# Arch\n[extra]\nInclude = /etc/pacman.d/mirrorlist-arch\n\n[multilib]\nInclude = /etc/pacman.d/mirrorlist-arch\n' >> "$target_conf"; fi
+	[[ ! -f "$mirror_file" ]] && "${cmd[@]}" pacman -Sy --noconfirm artix-keyring artix-archlinux-support
+	grep -q 'mirrorlist-arch' "$target_conf" 2>/dev/null || printf '\n# Arch\n[extra]\nInclude = /etc/pacman.d/mirrorlist-arch\n\n[multilib]\nInclude = /etc/pacman.d/mirrorlist-arch\n' >> "$target_conf"
 	"${cmd[@]}" pacman-key --populate artix archlinux || SHOWerror "Final pacman-key populate"
 }
 AnotherCheck () {
-	[[ "$OSsel" == "Void" ]] && echo "Skipping check (Void uses XBPS)" && return 0
-	local repos=(extra multilib); [[ "$OSsel" == "Artix" ]] && repos+=(system world galaxy)
+	[[ "${OSsel,,}" == "void" ]] && { echo "Skipping check (Void uses XBPS)"; return 0; }
+	local repos=(extra multilib); [[ "${OSsel,,}" == "artix" ]] && repos+=(system world galaxy)
 	pacman -Sylq "${repos[@]}" | sort > pacman_db; printf '%s\n' "${miss[@]}" | sort -u > pkg_missed
 	mapfile -t unlisted < <(comm -13 pacman_db pkg_missed); echo "Unlisted = ${unlisted[*]}"
 }
-KernelSel() { [[ "$OSsel" == "Void" ]] && MenuSel "KSel" "Select preferred Kernel" "linux" "linux-lts" || MenuSel "KSel" "Select preferred Kernel" "linux" "linux-lts" "linux-hardened" "linux-zen"; }
+KernelSel() { [[ "${OSsel,,}" == "void" ]] && MenuSel "KSel" "Select preferred Kernel" "linux" "linux-lts" || MenuSel "KSel" "Select preferred Kernel" "linux" "linux-lts" "linux-hardened" "linux-zen"; }
 OperatingSystemSel()   { MenuSel "OSsel" "Select the distro to setup" "Arch" "Artix" "Void"; }
 VoidInstMethod()       { MenuSel "VImethod" "Select installation type" "XBPS" "ROOTFS"; }
 LibrarySel()           { MenuSel "LIBsel" "Select base library" "GLIBC" "MUSL"; }
@@ -91,12 +85,12 @@ LocalizationSel()      { MenuSel "LOCsel" "Select localization" "en_US.UTF-8" "e
 LanguageSel()          { MenuSel "LANGsel" "Select preferred Language" "en_US.UTF-8" "en_GB.UTF-8" "it_IT.UTF-8"; }
 PartIDSel()            { MenuSel "PIDsel" "Select partition identifier" "UUID" "PARTUUID" "LABEL"; }
 FilesystemSel()        { MenuSel "FSsel" "Select filesystem for ROOT" "ext4" "btrfs"; }
-BootloaderSel()        { [[ "$UEFImode" = 0 ]] && BLsel="grub" && echo "BIOS mode: GRUB selected automatically" || MenuSel "BLsel" "Select Bootloader" "refind" "grub" "efistub"; }
+BootloaderSel()        { [[ "$UEFImode" -eq 0 ]] && { BLsel="grub"; echo "BIOS mode: GRUB selected automatically"; } || MenuSel "BLsel" "Select Bootloader" "refind" "grub" "efistub"; }
 HostnameSel()          { TextPromptSel "HNsel" "Enter preferred hostname"; }
 UsernameSel()          { TextPromptSel "UNsel" "Enter preferred username"; }
-IRFsel()               { [[ "${OSsel}" == "Void" ]] && IRFSetup="dracut" && echo "Selected Initramfs: dracut" || MenuSel "IRFSetup" "Select preferred Initramfs Generator" "booster" "mkinitcpio" "dracut"; }
+IRFsel()               { [[ "${OSsel,,}" == "void" ]] && { IRFSetup="dracut"; echo "Selected Initramfs: dracut"; } || MenuSel "IRFSetup" "Select preferred Initramfs Generator" "booster" "mkinitcpio" "dracut"; }
 VirtualBoxTest () { YesNoSel "If this is a Virtualbox installation for test, skip every choice?"; VBTsel="$CC"; [[ "$VBTsel" -eq 1 ]] && echo "OK, skip all checks." || echo "OK, let's proceed with questions."; }
-ArchRepoSel () { YesNoSel "You want Arch repositories as well as Artix repositories?"; if [[ "$CC" -eq 1 ]]; then ARCHrepo=1 && echo "OK, adding Arch repositories!"; else ARCHrepo='' && echo "Proceeding without them..."; fi; }
+ArchRepoSel () { YesNoSel "You want Arch repositories as well as Artix repositories?"; [[ "$CC" -eq 1 ]] && { ARCHrepo=1; echo "OK, adding Arch repositories!"; } || { ARCHrepo=''; echo "Proceeding without them..."; }; }
 TimezoneSel () {
 	local -n var_name="$1"
 	while true; do
@@ -105,7 +99,7 @@ TimezoneSel () {
 		if [[ "$input_val" == "1" ]]; then var_name="Europe/Rome" ; break
 		elif [[ "$input_val" =~ ^(q|quit)$ ]]; then var_name="" ; break
 		elif [[ -z "$input_val" ]]; then echo "Input cannot be empty."
-		else YesNoSel "Confirm timezone: $input_val ?" ; [[ "$CC" -eq 1 ]] && var_name="$input_val" && break ; fi
+		else YesNoSel "Confirm timezone: $input_val ?"; [[ "$CC" -eq 1 ]] && { var_name="$input_val"; break; }; fi
 	done
 	echo "Selected Timezone: $var_name"
 }
