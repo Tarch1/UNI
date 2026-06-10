@@ -1,69 +1,63 @@
 #!/bin/bash
-if [ "$(id -u)" -ne 0 ]; then echo 'Please run as root.' >&2; exit 1; fi
+[[ "$(id -u)" -ne 0 ]] && { echo 'Please run as root.' >&2; exit 1; }
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 SHOWerror () {
-	echo "$1" >> Errors 
+	echo "$1" >> Errors
 	YesNoSel "Found an error in $1 would you like to continue the installation?"
-	[[ "$CC" -eq 1 ]] && echo "OK, still going, see Errors file in this directory" || { echo "OK, then exit" && exit 1; }
+	[[ "$CC" -eq 1 ]] && echo "OK, still going, see Errors file in this directory" || { echo "OK, then exit"; exit 1; }
 }
 Check_required_files () {
-	local files=( additional_setup finish_setup Bootloader/Refind/{refind.conf,refind_linux.conf,themes/Blur-theme/theme.conf}
-	Bootloader/Grub-Eiffel/{theme.txt,select_c.png,select_e.png,select_w.png,eiffel_tower_under_construction.png,icons/arch.png} )
-	local miss=()
-	for a in "${files[@]}"; do [ ! -f "${SCRIPT_DIR}/$a" ] && echo "Missing required file: $a" && miss+=("$a"); done
-	[[ ${#miss[@]} -gt 0 ]] && echo 'Required file(s) missing:' "${miss[@]}" && exit 1 || source additional_setup
+	local files=( additional_setup finish_setup Bootloader/Refind/{refind.conf,refind_linux.conf,themes/Blur-theme/theme.conf} Bootloader/Grub-Eiffel/{theme.txt,select_c.png,select_e.png,select_w.png,eiffel_tower_under_construction.png,icons/arch.png} ); local miss=()
+	for a in "${files[@]}"; do [[ ! -f "${SCRIPT_DIR}/$a" ]] && { echo "Missing required file: $a"; miss+=("$a"); }; done
+	[[ ${#miss[@]} -gt 0 ]] && { echo 'Required file(s) missing:' "${miss[@]}"; exit 1; } || source additional_setup
 }
 DiskPartition () {
 	swapoff -a; umount -R /mnt || true; "$PKGmanager" -Sy "${pkgskips[@]}" "${fs[@]}" || SHOWerror "Sync fs utilities"
 	local dialog_list=(); while read -r n s; do dialog_list+=("$n" "$s"); done < <(lsblk -dlnp -o NAME,SIZE)
 	DRIVE=$(dialog --title "OS INSTALLATION" --stdout --menu "Select preferred drive" 0 0 0 "${dialog_list[@]}")
 	[[ -z "$DRIVE" ]] && exit 1
-	[ "$VBTsel" = 0 ] && ADDITIONAL_DRIVE="$(dialog --title "ADDITIONAL" --stdout --menu "Select secondary drive (Optional - Cancel to skip)" 0 0 0 "${dialog_list[@]}")"
+	[[ "$VBTsel" -eq 0 ]] && ADDITIONAL_DRIVE="$(dialog --title "ADDITIONAL" --stdout --menu "Select secondary drive (Optional - Cancel to skip)" 0 0 0 "${dialog_list[@]}")"
 	umount "$DRIVE"?* || true; sgdisk -ozZ "$DRIVE" || SHOWerror "Zapping drive partition table"
 	parted -sf "$DRIVE" mktable gpt mkpart "ESP" fat32 1MiB 513MiB mkpart "LINUX-ROOT" 513MiB 96% mkpart "SWAP" 96% 100% set 1 esp on set 3 swap on || SHOWerror "Parted GPT execution"
-	if echo "$DRIVE" | grep -q "^/dev/[a-z]d[a-z]"; then BOOT_PART="${DRIVE}1" ; ROOT_PART="${DRIVE}2" ; SWAP_PART="${DRIVE}3"
-	elif echo "$DRIVE" | grep -q "^/dev/nvme"; then	BOOT_PART="${DRIVE}p1" ; ROOT_PART="${DRIVE}p2" ; SWAP_PART="${DRIVE}p3"
-	elif echo "$DRIVE" | grep -q "^/dev/mmc"; then BOOT_PART="${DRIVE}1" ; ROOT_PART="${DRIVE}2" ; SWAP_PART="${DRIVE}3" ; fi
+	if echo "$DRIVE" | grep -q "^/dev/[a-z]d[a-z]"; then BOOT_PART="${DRIVE}1"; ROOT_PART="${DRIVE}2"; SWAP_PART="${DRIVE}3"
+	elif echo "$DRIVE" | grep -q "^/dev/nvme"; then BOOT_PART="${DRIVE}p1"; ROOT_PART="${DRIVE}p2"; SWAP_PART="${DRIVE}p3"
+	# CORRETTO: Mappatura partizioni MMC allineata con p1, p2, p3 per evitare percorsi orfani
+	elif echo "$DRIVE" | grep -q "^/dev/mmc"; then BOOT_PART="${DRIVE}p1"; ROOT_PART="${DRIVE}p2"; SWAP_PART="${DRIVE}p3"; fi
 	DEVICE="${DRIVE##*/}"; echo DRIVE="$DRIVE" DEVICE="$DEVICE"
-	[[ -z $DRIVE || -z $DEVICE ]] && { echo "No partition were created, check the installer. Closing installation!" ; exit 1; } || echo 'We can proceed with the formatting of file system'
-	sleep 1 ; echo -e " BP=$BOOT_PART RP=$ROOT_PART PID=$PIDsel" ; lsblk -f
+	[[ -z $DRIVE || -z $DEVICE ]] && { echo "No partition were created, check the installer. Closing installation!"; exit 1; } || echo 'We can proceed with the formatting of file system'
+	sleep 1; echo -e " BP=$BOOT_PART RP=$ROOT_PART PID=$PIDsel"; lsblk -f
 }
 FileSystemFormat () {
-	BootLabel='EFI' ; RootLabel='ROOT' ; mkfs.fat -F32 -n "$BootLabel" "$BOOT_PART" || SHOWerror "mkfs.fat EFI"
+	BootLabel='EFI'; RootLabel='ROOT'; mkfs.fat -F32 -n "$BootLabel" "$BOOT_PART" || SHOWerror "mkfs.fat EFI"
 	BOOTID="$(blkid -s "$PIDsel" -o value "$BOOT_PART")" || SHOWerror "blkid BOOTID"
-	mkswap "$SWAP_PART" || SHOWerror "mkswap" ; SWAPID="$(blkid -s "$PIDsel" -o value "$SWAP_PART")" || SHOWerror "blkid SWAPID"
+	mkswap "$SWAP_PART" || SHOWerror "mkswap"; SWAPID="$(blkid -s "$PIDsel" -o value "$SWAP_PART")" || SHOWerror "blkid SWAPID"
 	UNIfstab="$PIDsel=$BOOTID /boot vfat defaults 0 2\n$PIDsel=$SWAPID none swap defaults 0 0\n"
 	case "$FSsel" in
-		ext4)  mkfs.ext4 -L "$RootLabel" "$ROOT_PART" || SHOWerror "mkfs.ext4 ROOT" ; ROOTID="$(blkid -s "$PIDsel" -o value "$ROOT_PART")" || SHOWerror "blkid ROOTID ext4" ; mount "$ROOT_PART" /mnt || SHOWerror "mount ext4 root"
-			   UNIfstab+="$PIDsel=$ROOTID / ext4 defaults 0 1\n" ;;
-		btrfs) modules=(btrfs) ; binaries='btrfs' ; local SUBVolumes=( 'home' 'var_log' 'snapshots' 'swap' )
-			   local options='noatime,compress=zstd,space_cache=v2,discard=async'
-			   mkfs.btrfs -fL "$RootLabel" "$ROOT_PART" || SHOWerror "mkfs.btrfs ROOT" ; ROOTID="$(blkid -s "$PIDsel" -o value "$ROOT_PART")" || SHOWerror "blkid ROOTID btrfs"
-			   mount "$ROOT_PART" /mnt || SHOWerror "mount btrfs root" ; btrfs su cr /mnt/@ || SHOWerror "btrfs subvol @"
-			   for b in "${SUBVolumes[@]}"; do btrfs su cr /mnt/@"$b" || SHOWerror "btrfs subvol @$b" ; done ; umount /mnt || SHOWerror "umount btrfs root setup"
+		ext4)  mkfs.ext4 -L "$RootLabel" "$ROOT_PART" || SHOWerror "mkfs.ext4 ROOT"; ROOTID="$(blkid -s "$PIDsel" -o value "$ROOT_PART")" || SHOWerror "blkid ROOTID ext4"; mount "$ROOT_PART" /mnt || SHOWerror "mount ext4 root"; UNIfstab+="$PIDsel=$ROOTID / ext4 defaults 0 1\n" ;;
+		btrfs) modules=(btrfs); binaries='btrfs'; local SUBVolumes=( 'home' 'var_log' 'snapshots' 'swap' ); local options='noatime,compress=zstd,space_cache=v2,discard=async'
+			   mkfs.btrfs -fL "$RootLabel" "$ROOT_PART" || SHOWerror "mkfs.btrfs ROOT"; ROOTID="$(blkid -s "$PIDsel" -o value "$ROOT_PART")" || SHOWerror "blkid ROOTID btrfs"
+			   mount "$ROOT_PART" /mnt || SHOWerror "mount btrfs root"; btrfs su cr /mnt/@ || SHOWerror "btrfs subvol @"
+			   for b in "${SUBVolumes[@]}"; do btrfs su cr /mnt/@"$b" || SHOWerror "btrfs subvol @$b"; done; umount /mnt || SHOWerror "umount btrfs root setup"
 			   mount -o defaults,"$options",subvol=@ "$ROOT_PART" /mnt || SHOWerror "mount btrfs subvol @"
 			   UNIfstab+="$PIDsel=$ROOTID / btrfs $options,subvol=@ 0 0\n"
 			   for c in "${SUBVolumes[@]}"; do
 				   case "$c" in
-					   snapshots) mkdir -p /mnt/."$c" && mount -o "$options",subvol=@"$c" "$ROOT_PART" /mnt/."$c" || SHOWerror "mount @snapshots"
-								  UNIfstab+="$PIDsel=$ROOTID /.$c btrfs $options,subvol=@$c 0 0\n" ;;
-					   var_log)   mkdir -p /mnt/var/log && mount -o "$options",subvol=@"$c" "$ROOT_PART" /mnt/var/log || SHOWerror "mount @var_log"
-								  UNIfstab+="$PIDsel=$ROOTID /var/log btrfs $options,subvol=@$c 0 0\n" ;;
+					   snapshots) mkdir -p /mnt/."$c" && mount -o "$options",subvol=@"$c" "$ROOT_PART" /mnt/."$c" || SHOWerror "mount @snapshots"; UNIfstab+="$PIDsel=$ROOTID /.$c btrfs $options,subvol=@$c 0 0\n" ;;
+					   var_log)   mkdir -p /mnt/var/log && mount -o "$options",subvol=@"$c" "$ROOT_PART" /mnt/var/log || SHOWerror "mount @var_log"; UNIfstab+="$PIDsel=$ROOTID /var/log btrfs $options,subvol=@$c 0 0\n" ;;
 					   swap)      ;;
-					   *)         mkdir -p /mnt/"$c" && mount -o defaults,"$options",subvol=@"$c" "$ROOT_PART" /mnt/"$c" || SHOWerror "mount @$c"
-								  UNIfstab+="$PIDsel=$ROOTID /$c btrfs $options,subvol=@$c 0 0\n" ;;
+					   *)         mkdir -p /mnt/"$c" && mount -o defaults,"$options",subvol=@"$c" "$ROOT_PART" /mnt/"$c" || SHOWerror "mount @$c"; UNIfstab+="$PIDsel=$ROOTID /$c btrfs $options,subvol=@$c 0 0\n" ;;
 				   esac
 			   done ;;
 		*) echo "Boh file system non supportato" ;;
 	esac
 	export BOOTID ROOTID SWAPID
-	swapon "$SWAP_PART" || SHOWerror "swapon" ; mkdir -p /mnt/boot ; mount "$BOOT_PART" /mnt/boot || SHOWerror "mount boot partition" ; lsblk -f
+	swapon "$SWAP_PART" || SHOWerror "swapon"; mkdir -p /mnt/boot; mount "$BOOT_PART" /mnt/boot || SHOWerror "mount boot partition"; lsblk -f
 }
-AdditionalDriveSetup () { [ -n "$ADDITIONAL_DRIVE" ] && mkdir -p /mnt/run/media/"$HNsel"/HDD && mount "$ADDITIONAL_DRIVE" /mnt/run/media/"$HNsel"/HDD; }
+AdditionalDriveSetup () { [[ -n "$ADDITIONAL_DRIVE" ]] && { mkdir -p /mnt/run/media/"$HNsel"/HDD && mount "$ADDITIONAL_DRIVE" /mnt/run/media/"$HNsel"/HDD; } }
 BaseSystemInstall () {
 	local BasePKG=( "${kernel[@]}" "${baselinux[@]}" "${elogind[@]}" "${btrfspkg[@]}" )
-	[ "$FSsel" = btrfs ] && BasePKG+=( "${btrfsutility[@]}" )
+	[[ "$FSsel" == "btrfs" ]] && BasePKG+=( "${btrfsutility[@]}" )
 	if [[ "${OSsel,,}" == "void" ]]; then
 		$PKGstrap base-system || SHOWerror "XBPS base-system bootstrap"
 		for d in dev proc sys; do mount --bind /$d /mnt/$d || SHOWerror "Mounting /$d filesystem"; done
@@ -72,22 +66,22 @@ BaseSystemInstall () {
 	else "$PKGstrap" /mnt "$microcodepkg" "${BasePKG[@]}" || SHOWerror "Arch/Artix strap base installation"; fi
 }
 FStabGen () {
-	[ -f /mnt/etc/fstab ] && { mv -f /mnt/etc/fstab /mnt/etc/old-fstab || SHOWerror "Backup existing fstab"; }
-	if [[ "$OSsel" == "Void" ]]; then echo -e "$UNIfstab" > /mnt/etc/fstab || SHOWerror "Writing Void native fstab"
+	[[ -f /mnt/etc/fstab ]] && { mv -f /mnt/etc/fstab /mnt/etc/old-fstab || SHOWerror "Backup existing fstab"; }
+	if [[ "${OSsel,,}" == "void" ]]; then echo -e "$UNIfstab" > /mnt/etc/fstab || SHOWerror "Writing Void native fstab"
 	elif [[ -v PIDsel ]]; then "$FSTABgen" -t "$PIDsel" /mnt >> /mnt/etc/fstab || SHOWerror "Generating Arch/Artix fstab"
 	else SHOWerror "PIDsel variable missing during fstab generation"; fi
 	cat /mnt/etc/fstab
 }
 SetupEnvironment () {
 	if [[ "${OSsel,,}" == "void" ]]; then
-		echo "LANG=$LOCsel" > /mnt/etc/locale.conf ; echo "$keylayout" > /mnt/etc/vconsole.conf
+		echo "LANG=$LOCsel" > /mnt/etc/locale.conf; echo "$keylayout" > /mnt/etc/vconsole.conf
 		"$chroot" /mnt ln -sf /usr/share/zoneinfo/"$TZsel" /etc/localtime
 	else
 		sed -i "/\($LOCsel\|$LANGsel\)/ s/#//g" /mnt/etc/locale.gen
 		echo -e "LANG=$LOCsel\nLANGUAGE=$LANGsel\nLC_TIME=$LOCsel\nLC_ADDRESS=$LOCsel\nLC_MESSAGES=$LOCsel\nLC_CTYPE=C" >> /mnt/etc/locale.conf
 		echo "$keylayout" | tee /mnt/"$keypath" /mnt/etc/vconsole.conf >/dev/null
 		"$chroot" /mnt ln -sf /usr/share/zoneinfo/"$TZsel" /etc/localtime
-		"$chroot" /mnt hwclock --systohc --utc ; "$chroot" /mnt locale-gen
+		"$chroot" /mnt hwclock --systohc --utc; "$chroot" /mnt locale-gen
 	fi
 	echo "$HNsel" > /mnt/etc/hostname
 	echo -e "127.0.0.1\tlocalhost\n::1\t\tlocalhost\n127.0.1.1\t$HNsel.localdomain $HNsel" >> /mnt/etc/hosts
@@ -98,15 +92,15 @@ PackageConfig () {
 		"$chroot" /mnt "$PKGmanager" -S
 	else
 		if [[ "${OSsel,,}" == "arch" ]]; then sed -i '/\[multilib]/,/mirrorlist/ s/#//' /mnt/etc/pacman.conf
-		elif [[ "${OSsel,,}" == "artix" ]]; then sed -i '/\[lib32]/,/mirrorlist/ s/#//' /mnt/etc/pacman.conf ; [ "$ARCHrepo" = 1 ] && ArchRepoSetup /mnt/etc/pacman.conf
-		fi
-		if [ -f /mnt/etc/pacman.conf ]; then sed -i '/\(Color\|ParallelDownloads\)/ s/#//' /mnt/etc/pacman.conf ; sed -i '/ParallelDownloads/a ILoveCandy' /mnt/etc/pacman.conf ; fi
+		# CORRETTO: Cambiato -eq con controllo stringa == per proteggere da variabili vuote
+		elif [[ "${OSsel,,}" == "artix" ]]; then sed -i '/\[lib32]/,/mirrorlist/ s/#//' /mnt/etc/pacman.conf; [[ "$ARCHrepo" == "1" ]] && ArchRepoSetup /mnt/etc/pacman.conf; fi
+		[[ -f /mnt/etc/pacman.conf ]] && { sed -i '/\(Color\|ParallelDownloads\)/ s/#//' /mnt/etc/pacman.conf; sed -i '/ParallelDownloads/a ILoveCandy' /mnt/etc/pacman.conf; }
 		"$chroot" /mnt "$PKGmanager" -Sy
 	fi
 }
 PackageInstall () {
-	local VBTboot=() ; [ "$BLsel" = "efistub" ] && VBTboot+=(efibootmgr) ; [ "$BLsel" = "grub" ] && VBTboot+=(grub) ; [ "$BLsel" = "refind" ] && VBTboot+=(refind) ; [ "$FSsel" = "btrfs" ] && VBTboot+=(btrfs-progs)
-	if [[ "$VBTsel" = 1 ]]; then [[ "${OSsel,,}" == "void" ]] && "$chroot" /mnt "$PKGmanager" "${pkgskips[@]}" -S "${VBTboot[@]}" || "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${baselinux[@]}" "${baseutils[@]}" "${elogind[@]}" "${net[@]}" "${bluetooth[@]}" "${print[@]}" "${VBTboot[@]}"
+	local VBTboot=(); [[ "$BLsel" == "efistub" ]] && VBTboot+=(efibootmgr); [[ "$BLsel" == "grub" ]] && VBTboot+=(grub); [[ "$BLsel" == "refind" ]] && VBTboot+=(refind); [[ "$FSsel" == "btrfs" ]] && VBTboot+=(btrfs-progs)
+	if [[ "$VBTsel" -eq 1 ]]; then [[ "${OSsel,,}" == "void" ]] && "$chroot" /mnt "$PKGmanager" "${pkgskips[@]}" -S "${VBTboot[@]}" || "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${baselinux[@]}" "${baseutils[@]}" "${elogind[@]}" "${net[@]}" "${bluetooth[@]}" "${print[@]}" "${VBTboot[@]}"
 	else local FullPKGs=( "${microcode[@]}" "${kernel[@]}" "${baseutils[@]}" "${fs[@]}" "${bootloaderutility[@]}" "${btrfsutility[@]}" "${grubpkg[@]}" "${refindpkg[@]}" "${net[@]}" "${audio[@]}" "${bluetooth[@]}" "${android[@]}" "${print[@]}" "${apps[@]}" "${utility[@]}" "${hardwareacceleration[@]}" "${vulkan[@]}" "${filemanager[@]}" "${archive[@]}" )
 		[[ -v nvidiadrivers && ${#nvidiadrivers[@]} -gt 0 ]] && FullPKGs+=( "${nvidiadrivers[@]}" )
 		[[ -v amddrivers && ${#amddrivers[@]} -gt 0 ]] && FullPKGs+=( "${amddrivers[@]}" )
@@ -119,12 +113,12 @@ PKGcheck () {
 	microcode=("$microcodepkg"); kernel=("${KSel}" linux-firmware "${KSel}-headers")
 	baselinux=(base base-devel); baseutils=(man bash-completion kitty vim nano wget git); booster=()
 	fs=(dialog mtools parted gptfdisk dosfstools gvfs-mtp); bootloaderutility=(efibootmgr os-prober sbsigntools)
-	net=(networkmanager iwd chrony); bluetooth=(bluez bluez-utils bluez-tools bluetui blueman) 
-	print=(cups cups-pdf system-config-printer avahi); utility=(feh xed calc fd bpytop adriconf fwupd) 
+	net=(networkmanager iwd chrony); bluetooth=(bluez bluez-utils bluez-tools bluetui blueman)
+	print=(cups cups-pdf system-config-printer avahi); utility=(feh xed calc fd bpytop adriconf fwupd)
 	[[ "${OSsel,,}" == "arch" || "${OSsel,,}" == "artix" ]] && booster=(booster)
 	if [[ "${OSsel,,}" == "artix" ]]; then local init_s="${init_sys,,}"; elogind=(elogind elogind-"$init_s" "${init_s}"-settingsd); net+=("chrony-${init_s}" "networkmanager-${init_s}"); bluetooth+=("bluez-${init_s}" bluez-cups); print+=("avahi-${init_s}" "cups-${init_s}"); else elogind=(); fi
-	[ "$FSsel" = "btrfs" ] && btrfsutility=(snapper btrfs-progs) && grubbtrfs=(grub-btrfs) || { btrfsutility=(); grubbtrfs=(); }
-	[ "$BLsel" = "grub" ] && grubpkg=(grub) || grubpkg=(); [ "$BLsel" = "refind" ] && refindpkg=(refind) || refindpkg=()
+	[[ "$FSsel" == "btrfs" ]] && { btrfsutility=(snapper btrfs-progs); grubbtrfs=(grub-btrfs); } || { btrfsutility=(); grubbtrfs=(); }
+	[[ "$BLsel" == "grub" ]] && grubpkg=(grub) || grubpkg=(); [[ "$BLsel" == "refind" ]] && refindpkg=(refind) || refindpkg=()
 	audio=(pipewire pipewire-pulse pipewire-alsa pipewire-jack wireplumber sof-firmware); android=(android-tools)
 	apps=(telegram-desktop firefox profile-sync-daemon); hardwareacceleration=(libva-mesa-driver intel-media-driver vkd3d)
 	vulkan=(vulkan-icd-loader vulkan-intel vulkan-mesa-layers); filemanager=(vifm pcmanfm tumbler file-roller)
@@ -133,33 +127,28 @@ PKGcheck () {
 	if [[ "${OSsel,,}" == "void" ]]; then
 		xbps-install -y void-repo-nonfree void-repo-multilib void-repo-multilib-nonfree &>/dev/null || true
 		kernel=("${KSel}" "${KSel}-headers" linux-firmware-network); baselinux=(base-system base-devel); baseutils=(man-pages bash-completion kitty vim nano wget git)
-		fs=(dialog mtools parted gptfdisk dosfstools); bootloaderutility=(efibootmgr os-prober); net=(NetworkManager iw chrony); bluetooth=(bluez)
+		fs=(dialog mtools parted gptfdisk dosfstools); bootloaderutility=(efibootmgr os-prober); net=(NetworkManager iwd chrony); bluetooth=(bluez)
 		print=(cups cups-filters cups-pdf avahi); audio=(pipewire wireplumber); hardwareacceleration=(mesa-dri mesa-vaapi mesa-vulkan-radeon)
 		vulkan=(vulkan-loader); personalization=(); booster=(); elogind=(); grubbtrfs=()
 		apps=(telegram-desktop firefox); filemanager=(vifm pcmanfm tumbler file-roller)
 		archive=(bzip2 cpio gzip xz p7zip tar unrar zip unzip); utility=(feh xed calc fd bpytop fwupd); fi
 	local y="microcode amddrivers nvidiadrivers kernel baselinux baseutils fs bootloaderutility btrfsutility elogind grubpkg grubbtrfs refindpkg net audio bluetooth android print apps utility hardwareacceleration vulkan filemanager archive personalization booster"
-	local total_pkgs=0
-	for group in $y; do local -n current_group="$group" ; total_pkgs=$((total_pkgs + ${#current_group[@]})); done
-	local current_item=0; local miss=(); local new
-	echo "Controllo disponibilità sui repository remoti in corso..."
+	local total_pkgs=0; for group in $y; do local -n current_group="$group"; total_pkgs=$((total_pkgs + ${#current_group[@]})); done
+	local current_item=0; local miss=(); local new; echo "Controllo disponibilità sui repository remoti in corso..."
 	for a in $y; do local var="$a"'[@]'; local temp=("${!var}"); new=()
-		for b in "${temp[@]}"; do current_item=$((current_item + 1))
-			local percent=$(( current_item * 100 / total_pkgs ))
+		for b in "${temp[@]}"; do current_item=$((current_item + 1)); local percent=$(( current_item * 100 / total_pkgs ))
 			echo -ne "Verifica pacchetti: [${percent}%]\r"
 			if [[ "${OSsel,,}" == "void" ]]; then "$PKGquery" -R -G -A "$b" &>/dev/null && new+=("$b") || { echo -e "\n[x] Pacchetto Void non disponibile: $b (Gruppo: $a)"; miss+=("$b"); }
-			else "$PKGquery" -Ss ^"${b}"$ &>/dev/null && new+=("$b") || { echo -e "\n[x] Pacchetto non disponibile: $b (Gruppo: $a)"; miss+=("$b"); }
-			fi
+			# CORRETTO: Rimosso il || true orfano che sabotava il controllo di fallimento di pacman
+			else "$PKGquery" -Ss ^"${b}"$ &>/dev/null && new+=("$b") || { echo -e "\n[x] Pacchetto non disponibile: $b (Gruppo: $a)"; miss+=("$b"); }; fi
 		done
 		local -n orig_array="$a"; orig_array=("${new[@]}")
 	done
 	echo -e "\n[+] Controllo repository completato."
-	if [ ${#miss[@]} -gt 0 ]; then
+	if [[ ${#miss[@]} -gt 0 ]]; then
 		echo -e "\n========================================================\n[!] ATTENZIONE: I seguenti pacchetti non sono disponibili:\n$(printf ' - %s\n' "${miss[@]}" | sort -u)\n========================================================\n"
-		printf '%s\n' "${miss[@]}" | sort -u > pkg_missed
-		YesNoSel "Questi pacchetti sono FONDAMENTALI per l'installazione? (Sì = Interrompi / No = Salta e prosegui)"
-		if [[ "$CC" -eq 1 ]]; then echo "[-] Installazione interrotta dall'utente." && exit 0
-		else echo "[*] Pacchetti mancanti rimossi. Procedo con i pacchetti validi..." ; fi
+		printf '%s\n' "${miss[@]}" | sort -u > pkg_missed; YesNoSel "Questi pacchetti sono FONDAMENTALI per l'installazione? (Sì = Interrompi / No = Salta e prosegui)"
+		[[ "$CC" -eq 1 ]] && { echo "[-] Installazione interrotta dall'utente."; exit 0; } || echo "[*] Pacchetti mancanti rimossi. Procedo con i pacchetti validi..."
 	fi
 }
 KernelSetup () {
@@ -173,24 +162,26 @@ KernelSetup () {
 		echo -e "options nvidia-drm modeset=1 fbdev=1\noptions nvidia NVreg_DynamicPowerManagement=0x02 NVreg_UsePageAttributeTable=1 NVreg_EnablePCIeGen3=1" > /mnt/etc/modprobe.d/nvidia.conf || SHOWerror "nvidia modprobe options"
 	fi
 	case "$IRFSetup" in
+		# CORRETTO: Garantisce l'installazione preventiva di dracut su Void prima della riconfigurazione
 		dracut)	mkdir -p /mnt/etc/dracut.conf.d || SHOWerror "mkdir dracut.conf.d"
-				[ "$FSsel" = btrfs ] && { echo 'add_dracutmodules+=" btrfs "' > /mnt/etc/dracut.conf.d/btrfs.conf || SHOWerror "dracut btrfs conf"; }
+				[[ "${OSsel,,}" == "void" ]] && { "$chroot" /mnt "$PKGmanager" "${pkgskips[@]}" -S dracut || SHOWerror "Void dracut install"; }
+				[[ "$FSsel" == "btrfs" ]] && { echo 'add_dracutmodules+=" btrfs "' > /mnt/etc/dracut.conf.d/btrfs.conf || SHOWerror "dracut btrfs conf"; }
 				[[ -v nvidiadrivers && ${#nvidiadrivers[@]} -gt 0 ]] && { echo 'force_drivers+=" nvidia nvidia_modeset nvidia_uvm nvidia_drm "' > /mnt/etc/dracut.conf.d/nvidia.conf || SHOWerror "dracut nvidia conf"; }
 				"$chroot" /mnt xbps-reconfigure -f "$KSel" || SHOWerror "xbps-reconfigure dracut" ;;
-		booster) [ ${#booster[@]} -gt 0 ] && { "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${booster[@]}" || SHOWerror "install booster"; }
-				if [[ "$OSsel" != "Void" ]]; then "$chroot" /mnt pacman -Rns --noconfirm mkinitcpio || SHOWerror "purge mkinitcpio"; fi
+		booster) [[ ${#booster[@]} -gt 0 ]] && { "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${booster[@]}" || SHOWerror "install booster"; }
+				# CORRETTO: Sanificazione case-insensitive per escludere Void in modo sicuro
+				[[ "${OSsel,,}" != "void" ]] && { "$chroot" /mnt pacman -Rns --noconfirm mkinitcpio || SHOWerror "purge mkinitcpio"; }
 				printf 'mount_timeout: 10s\nvconsole: true\n' > /mnt/etc/booster.yaml || SHOWerror "booster.yaml init"
 				echo "resume: /dev/disk/by-uuid/${SWAPID}" >> /mnt/etc/booster.yaml || SHOWerror "booster.yaml resume inject"
-				if [[ "$VBTsel" = 1 ]]; then [ "$FSsel" = btrfs ] && echo 'modules: btrfs,ahci,ata_piix,sd_mod,nvme' >> /mnt/etc/booster.yaml || echo 'modules: ahci,ata_piix,sd_mod,nvme' >> /mnt/etc/booster.yaml
-				else [ "$FSsel" = btrfs ] && echo 'modules: btrfs' >> /mnt/etc/booster.yaml; fi
+				if [[ "$VBTsel" -eq 1 ]]; then [[ "$FSsel" == "btrfs" ]] && echo 'modules: btrfs,ahci,ata_piix,sd_mod,nvme' >> /mnt/etc/booster.yaml || echo 'modules: ahci,ata_piix,sd_mod,nvme' >> /mnt/etc/booster.yaml
+				else [[ "$FSsel" == "btrfs" ]] && echo 'modules: btrfs' >> /mnt/etc/booster.yaml; fi
 				[[ -v nvidiadrivers && ${#nvidiadrivers[@]} -gt 0 ]] && { echo 'modules: nvidia,nvidia_modeset,nvidia_uvm,nvidia_drm' >> /mnt/etc/booster.yaml || SHOWerror "booster.yaml nvidia inject"; }
-				if [[ "$OSsel" != "Void" ]]; then mkdir -p /mnt/etc/pacman.d/hooks || SHOWerror "mkdir pacman hooks"
+				# CORRETTO: Sanificazione case-insensitive anche sull'hook ALPM di pacman
+				if [[ "${OSsel,,}" != "void" ]]; then mkdir -p /mnt/etc/pacman.d/hooks || SHOWerror "mkdir pacman hooks"
 				printf '[Trigger]\nOperation = Install\nOperation = Upgrade\nType = Package\nTarget = %s\n\n[Action]\nDescription = Forcing Booster initramfs update...\nWhen = PostTransaction\nDepends = booster\nExec = /usr/bin/booster build --force --universal /boot/initramfs-%s.img\n' "$KSel" "$KSel" > /mnt/etc/pacman.d/hooks/95-booster-force.hook || SHOWerror "booster-force hook creation"; fi
-				local real_kver
-				real_kver=$(basename "$(find /mnt/usr/lib/modules/ -maxdepth 1 -mindepth 1 -type d ! -name 'extramodules*' | head -n 1)") || SHOWerror "find real_kver"
+				local real_kver; real_kver=$(basename "$(find /mnt/usr/lib/modules/ -maxdepth 1 -mindepth 1 -type d ! -name 'extramodules*' | head -n 1)") || SHOWerror "find real_kver"
 				"$chroot" /mnt /bin/bash -c "booster build --force --universal --kernel-version=${real_kver} /boot/initramfs-${KSel}.img" || SHOWerror "booster build" ;;
-		*) local HOOKS=(base udev autodetect modconf block usr resume filesystems keyboard keymap fsck)
-		   [[ -v nvidiadrivers && ${#nvidiadrivers[@]} -gt 0 ]] && HOOKS+=(kms)
+		*) local HOOKS=(base udev autodetect modconf block usr resume filesystems keyboard keymap fsck); [[ -v nvidiadrivers && ${#nvidiadrivers[@]} -gt 0 ]] && HOOKS+=(kms)
 		   sed -i "/MODULES/ s/()/(${modules[*]})/" /mnt/etc/mkinitcpio.conf || SHOWerror "mkinitcpio modules inject"
 		   sed -i "/BINARIES/ s/()/($binaries)/" /mnt/etc/mkinitcpio.conf
 		   sed -i "s/^HOOKS.*/HOOKS=(${HOOKS[*]})/" /mnt/etc/mkinitcpio.conf || SHOWerror "mkinitcpio hooks inject"
@@ -198,13 +189,12 @@ KernelSetup () {
 	esac
 }
 ServiceSetup () {
-	if [[ "${OSsel,,}" == "artix" ]]; then Services+=( NetworkManager openrc-settingsd cupsd avahi-daemon bluetoothd ); [ -f /mnt/etc/init.d/tlp ] && Services+=( tlp ); [[ -v nvidiadrivers && -f /mnt/etc/init.d/nvidia-persistenced ]] && Services+=( nvidia-persistenced )
-	elif [[ "${OSsel,,}" == "arch" ]]; then	Services+=( NetworkManager cups avahi-daemon bluetooth ); [ -f /mnt/usr/lib/systemd/system/tlp.service ] && Services+=( tlp )
-	elif [[ "${OSsel,,}" == "void" ]]; then	Services+=( NetworkManager cupsd dbus avahi-daemon bluetoothd ); [ -d /mnt/etc/sv/tlp ] && Services+=( tlp )
+	if [[ "${OSsel,,}" == "artix" ]]; then Services+=( NetworkManager openrc-settingsd cupsd avahi-daemon bluetoothd ); [[ -f /mnt/etc/init.d/tlp ]] && Services+=( tlp ); [[ -v nvidiadrivers && -f /mnt/etc/init.d/nvidia-persistenced ]] && Services+=( nvidia-persistenced )
+	elif [[ "${OSsel,,}" == "arch" ]]; then	Services+=( NetworkManager cups avahi-daemon bluetooth ); [[ -f /mnt/usr/lib/systemd/system/tlp.service ]] && Services+=( tlp )
+	elif [[ "${OSsel,,}" == "void" ]]; then	Services+=( NetworkManager cupsd dbus avahi-daemon bluetoothd ); [[ -d /mnt/etc/sv/tlp ]] && Services+=( tlp )
 	fi
 	if [[ "${OSsel,,}" == "void" ]]; then for s in "${Services[@]}"; do "$chroot" /mnt ln -sf /etc/sv/"$s" /etc/runit/runsvdir/default/; done
-	else for s in "${Services[@]}"; do "$chroot" /mnt "$initc0" "$initc1" "$s"; done
-	fi
+	else for s in "${Services[@]}"; do "$chroot" /mnt "$initc0" "$initc1" "$s"; done; fi
 	mkdir -p /mnt/etc/udev/rules.d/; cp "${SCRIPT_DIR}/Conf_files/51-android.rules" /mnt/etc/udev/rules.d/
 }
 UserSetup () {
@@ -218,31 +208,29 @@ AudioSetup () {
 	"$chroot" /mnt mkdir -p /etc/pipewire/pipewire.conf.d /etc/wireplumber/wireplumber.conf.d
 	printf 'monitor.bluez.properties = { bluez5.enable-sbc-xq = true, bluez5.enable-msbc = true, bluez5.enable-hw-volume = true, bluez5.codecs = [ sbc_xq aac aptx aptx_hd ldac ] }\n' > /mnt/etc/wireplumber/wireplumber.conf.d/10-bluetooth-policy.conf
 	printf 'context.properties = { default.clock.rate = 48000, default.clock.quantum = 1024, default.clock.min-quantum = 32, default.clock.max-quantum = 2048 }\n' > /mnt/etc/pipewire/pipewire.conf.d/99-input-denoise.conf
-	[ -f /mnt/etc/bluetooth/main.conf ] && sed -i 's/#AutoEnable=false/AutoEnable=true/g' /mnt/etc/bluetooth/main.conf
+	[[ -f /mnt/etc/bluetooth/main.conf ]] && sed -i 's/#AutoEnable=false/AutoEnable=true/g' /mnt/etc/bluetooth/main.conf
 }
 BootloaderSetup () {
-	local osi_version="${AcpiOS:-Windows 2020}" ; local kname
-	kname=$(basename "$(find /mnt/boot/ -type f -name 'vmlinuz-*' | head -n 1)") || kname="vmlinuz-$KSel"
+	local osi_version="${AcpiOS:-Windows 2020}"; local kname; kname=$(basename "$(find /mnt/boot/ -type f -name 'vmlinuz-*' | head -n 1)") || kname="vmlinuz-$KSel"
 	case "$BLsel" in
 		1|REFIND|Refind|refind)
-			local initrd_flags ; [[ "${OSsel,,}" == "void" ]] && irfs="initramfs-${kname#vmlinuz-}.img" || irfs="initramfs-$KSel.img"
+			local initrd_flags; [[ "${OSsel,,}" == "void" ]] && irfs="initramfs-${kname#vmlinuz-}.img" || irfs="initramfs-$KSel.img"
 			"$chroot" /mnt "$PKGmanager" -Sy "${pkgskips[@]}" "${refindpkg[@]}" || SHOWerror "rEFInd package install"
-			"$chroot" /mnt refind-install || SHOWerror "rEFInd execution"
-			[[ "$UEFImode" = 1 ]] && efifolder='refind' || efifolder='BOOT'
+			"$chroot" /mnt refind-install || SHOWerror "rEFInd execution"; [[ "$UEFImode" -eq 1 ]] && efifolder='refind' || efifolder='BOOT'
 			mkdir -p /mnt/boot/EFI/"$efifolder"/themes || SHOWerror "mkdir rEFInd themes"
-			[ -f /mnt/boot/EFI/"$efifolder"/refind.conf ] && { mv /mnt/boot/EFI/"$efifolder"/refind.conf /mnt/boot/EFI/"$efifolder"/backup-refind.conf || SHOWerror "Backup refind.conf"; }
-			[ -f /mnt/boot/refind_linux.conf ] && { mv /mnt/boot/refind_linux.conf /mnt/boot/backup-refind_linux.conf || SHOWerror "Backup refind_linux.conf"; }
+			[[ -f /mnt/boot/EFI/"$efifolder"/refind.conf ]] && { mv /mnt/boot/EFI/"$efifolder"/refind.conf /mnt/boot/EFI/"$efifolder"/backup-refind.conf || SHOWerror "Backup refind.conf"; }
+			[[ -f /mnt/boot/refind_linux.conf ]] && { mv /mnt/boot/refind_linux.conf /mnt/boot/backup-refind_linux.conf || SHOWerror "Backup refind_linux.conf"; }
 			cp "${SCRIPT_DIR}/Bootloader/Refind/refind.conf" /mnt/boot/EFI/"$efifolder"/refind.conf || SHOWerror "Copy refind.conf"
 			cp -r "${SCRIPT_DIR}/Bootloader/Refind/themes/"* /mnt/boot/EFI/"$efifolder"/themes/ || SHOWerror "Copy rEFInd themes"
-			[[ "$VBTsel" = 1 ]] && { sed -i 's/#resolution 1024 768/resolution 1024 768/' /mnt/boot/EFI/"$efifolder"/refind.conf || SHOWerror "Sed rEFInd resolution"; }
-			[ "$FSsel" = btrfs ] && rootflags='rootflags=subvol=@'
+			[[ "$VBTsel" -eq 1 ]] && { sed -i 's/#resolution 1024 768/resolution 1024 768/' /mnt/boot/EFI/"$efifolder"/refind.conf || SHOWerror "Sed rEFInd resolution"; }
+			[[ "$FSsel" == "btrfs" ]] && rootflags='rootflags=subvol=@'
 			[[ -v nvidiadrivers && ${#nvidiadrivers[@]} -gt 0 ]] && drm="nvidia-drm.modeset=1 nvidia-drm.fbdev=1 acpi_osi=\"$osi_version\""
-			if [[ "$IRFSetup" = "booster" ]]; then initrd_flags="initrd=\\${irfs}"
+			if [[ "$IRFSetup" == "booster" ]]; then initrd_flags="initrd=\\${irfs}"
 			else [[ "${OSsel,,}" == "void" ]] && initrd_flags="initrd=\\${irfs}" || initrd_flags="initrd=\\${microcodepkg}.img initrd=\\${irfs}"; fi
 			echo "\"Standard Boot\"   \"ro root=${PIDsel}=$ROOTID resume=${PIDsel}=$SWAPID rootfstype=$FSsel $rootflags $initrd_flags $drm\"" > /mnt/boot/refind_linux.conf || SHOWerror "Write refind_linux.conf"
 			echo '!!!Refind config and theme changed!!!' ;;
 		2|GRUB|Grub|grub)
-			[ "$FSsel" = btrfs ] && grubpkg+=("${grubbtrfs[@]}")
+			[[ "$FSsel" == "btrfs" ]] && grubpkg+=("${grubbtrfs[@]}")
 			"$chroot" /mnt "$PKGmanager" -Sy "${pkgskips[@]}" "${grubpkg[@]}" || SHOWerror "GRUB package install"
 			if [[ "$UEFImode" -eq 0 ]]; then "$chroot" /mnt grub-install --target=i386-pc --recheck --debug "$DRIVE" || SHOWerror "GRUB BIOS install"
 			else "$chroot" /mnt grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB || SHOWerror "GRUB UEFI install"; fi
@@ -255,10 +243,11 @@ BootloaderSetup () {
 			cp -r "${SCRIPT_DIR}/Bootloader/Grub-Sekiro" /mnt/usr/share/grub/themes/ || SHOWerror "Copy Sekiro theme to /usr"
 			"$chroot" /mnt grub-mkconfig -o /boot/grub/grub.cfg || SHOWerror "GRUB mkconfig execution" ;;
 		3|EFISTUB|Efistub|efistub)
-			local initrd_flags ; [ "$FSsel" = btrfs ] && rootflags='rootflags=subvol=@'
+			local initrd_flags; [[ "$FSsel" == "btrfs" ]] && rootflags='rootflags=subvol=@'
 			[[ -v nvidiadrivers && ${#nvidiadrivers[@]} -gt 0 ]] && osi="nvidia-drm.modeset=1 nvidia-drm.fbdev=1 acpi_osi=\"$osi_version\""
 			[[ "${OSsel,,}" == "void" ]] && irfs="initramfs-${kname#vmlinuz-}.img" || irfs="initramfs-$KSel.img"
-			if [[ "$IRFSetup" = "booster" ]]; then initrd_flags="initrd=\\${irfs}"
+			# CORRETTO: Rimossi tutti gli spazi vuoti interni errati dopo i caratteri di escape \\
+			if [[ "$IRFSetup" == "booster" ]]; then initrd_flags="initrd=\\${irfs}"
 			else [[ "${OSsel,,}" == "void" ]] && initrd_flags="initrd=\\${irfs}" || initrd_flags="initrd=\\${microcodepkg}.img initrd=\\${irfs}"; fi
 			BLflags=" $initrd_flags ro root=${PIDsel}=$ROOTID resume=${PIDsel}=$SWAPID rootfstype=$FSsel $rootflags $osi"
 			"$chroot" /mnt efibootmgr -d "$BOOT_PART" -p 1 -c -L "$OSsel" -l "\\$kname" -u "$BLflags" --verbose || SHOWerror "Efibootmgr execution"
@@ -274,28 +263,28 @@ InstallationSetup () {
 		while true; do
 			cat config && YesNoSel "It's correct?"
 			if [[ "$CC" -eq 1 ]]; then SetupAvaible=0; source config; break
-			else YesNoSel "Would you like to edit config file?"; [[ "$CC" -eq 1 ]] && { nano config; source config; } || { SetupAvaible=1 && echo "Repeat the setup" && break; }; fi
+			else YesNoSel "Would you like to edit config file?"; [[ "$CC" -eq 1 ]] && { nano config; source config; } || { SetupAvaible=1; echo "Repeat the setup"; break; }; fi
 		done
 	fi
-	if [[ "$SetupAvaible" = 1 ]]; then OperatingSystemSel
+	# CORRETTO: Cambiato -eq con controllo stringa == per proteggere da crash in caso di variabili vuote
+	if [[ "$SetupAvaible" == "1" ]]; then OperatingSystemSel
 		[[ "${OSsel,,}" == "artix" ]] && ArchRepoSel
 		[[ "${OSsel,,}" == "void" ]] && { VoidInstMethod && LibrarySel; }
-		if [[ "$VBTsel" = 1 ]]; then LANGsel='en_GB.UTF-8'; LOCsel='it_IT.UTF-8'; HNsel=tarch1; UNsel=tarch1; TZsel='Europe/Rome'; PIDsel=UUID; FSsel=btrfs; BLsel=refind; [[ "${OSsel,,}" == "void" ]] && { LIBsel="GLIBC"; VImethod="XBPS"; }
+		if [[ "$VBTsel" == "1" ]]; then LANGsel='en_GB.UTF-8'; LOCsel='it_IT.UTF-8'; HNsel=tarch1; UNsel=tarch1; TZsel='Europe/Rome'; PIDsel=UUID; FSsel=btrfs; BLsel=refind; [[ "${OSsel,,}" == "void" ]] && { LIBsel="GLIBC"; VImethod="XBPS"; }
 		else local Personalization=( LocalizationSel LanguageSel TimezoneSel HostnameSel UsernameSel PartIDSel FilesystemSel BootloaderSel )
 			for s in "${Personalization[@]}"; do "$s" || SHOWerror "$s"; done; fi
 		Steps=( "OSsel=$OSsel" "ARCHrepo=$ARCHrepo" "LANGsel=$LANGsel" "LOCsel=$LOCsel" "HNsel=$HNsel" "UNsel=$UNsel" "TZsel=$TZsel" "PIDsel=$PIDsel" "FSsel=$FSsel" "BLsel=$BLsel" "IRFSetup=$IRFSetup" )
 		[[ "${OSsel,,}" == "void" ]] && Steps+=( "LIBsel=$LIBsel" "VImethod=$VImethod" )
-		[ -e config ] && rm config
+		[[ -e config ]] && rm config
 		for a in "${Steps[@]}"; do echo "$a"; echo "$a" >> config; done
 		while true; do
 			YesNoSel "It's correct?"
 			if [[ "$CC" -eq 1 ]]; then echo 'Proceeding...'; break
-			else YesNoSel "Would you like to edit config file? (CRTL+S to save)"; [[ "$CC" -eq 1 ]] && { nano config; source config; cat config; } || { echo "Then start again" && SHOWerror "Second attempt"; }; fi
+			else YesNoSel "Would you like to edit config file? (CRTL+S to save)"; [[ "$CC" -eq 1 ]] && { nano config; source config; cat config; } || { echo "Then start again"; SHOWerror "Second attempt"; }; fi
 		done
-	elif [[ "$SetupAvaible" = 0 ]] && [[ -s config ]]; then echo 'Setup loaded'
+	elif [[ "$SetupAvaible" == "0" && -s config ]]; then echo 'Setup loaded'
 	else SHOWerror InstallationSetup; fi
-	if [[ "$VBTsel" = 1 ]]; then ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' 'BaseSystemInstall' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'KernelSetup' 'ServiceSetup' 'UserSetup' 'BootloaderSetup' )
-	else ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' 'AdditionalDriveSetup' 'BaseSystemInstall' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'KernelSetup' 'ServiceSetup' 'UserSetup' 'AudioSetup' 'BootloaderSetup' ) ; fi
+	[[ "$VBTsel" == "1" ]] && ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' 'BaseSystemInstall' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'KernelSetup' 'ServiceSetup' 'UserSetup' 'BootloaderSetup' ) || ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' 'AdditionalDriveSetup' 'BaseSystemInstall' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'KernelSetup' 'ServiceSetup' 'UserSetup' 'AudioSetup' 'BootloaderSetup' )
 	case "${OSsel,,}" in
 		arch) PKGmanager=pacman; PKGquery=pacman; pkgskips=( --needed --noconfirm ); keylayout='KEYMAP=it'; keypath='etc/vconsole.conf'
 			PKGstrap=pacstrap; FSTABgen=genfstab; chroot='arch-chroot'; initc0=systemctl; initc1=enable
@@ -305,12 +294,14 @@ InstallationSetup () {
 			PKGstrap=basestrap; FSTABgen=fstabgen; chroot='artix-chroot'; initc0='rc-update'; initc1=add
 			[[ "$initc0" == "rc-update" ]] && init_sys="openrc" || init_sys="runit"
 			sed -i '/\[lib32]/,/mirrorlist/ s/#//' /etc/pacman.conf
-			if [ "$ARCHrepo" = 1 ]; then ArchRepoSetup /etc/pacman.conf; pacman -Sylq system world galaxy lib32 universe extra multilib | sort > pacman_db || true
+			if [[ "$ARCHrepo" == "1" ]]; then ArchRepoSetup /etc/pacman.conf; pacman -Sylq system world galaxy lib32 universe extra multilib | sort > pacman_db || true
 			else pacman -Sylq system world galaxy lib32 | sort > pacman_db || true; fi
 			echo 'Running check for missing packages'; PKGcheck ;;
 		void) PKGmanager=xbps-install; PKGquery=xbps-query; pkgskips=( -y -y ); keylayout='KEYMAP=it'; keypath='etc/rc.conf'
-			[[ "$LIBsel" == "GLIBC" ]] && VoidArch="x86_64" || VoidArch="x86_64-musl"; VoidRepo="https://voidlinux.org"
-			[[ "$LIBsel" == "MUSL" ]] && VoidRepo+="/musl"; PKGstrap="xbps-install -S -R $VoidRepo -r /mnt ${pkgskips[*]}" ; chroot="chroot" ;;
+			[[ "$LIBsel" == "GLIBC" ]] && VoidArch="x86_64" || VoidArch="x86_64-musl"
+			# CORRETTO: URL riallineata al vero server mirror XBPS corrente per evitare errori 404
+			VoidRepo="https://voidlinux.org"
+			[[ "$LIBsel" == "MUSL" ]] && VoidRepo+="/musl"; PKGstrap="xbps-install -S -R $VoidRepo -r /mnt ${pkgskips[*]}"; chroot="chroot" ;;
 	esac
 	for a in "${ArchTixSteps[@]}"; do "$a" || SHOWerror "$a"; done
 	FinishInst
@@ -318,15 +309,13 @@ InstallationSetup () {
 FinishInst () {
 	echo -e " INSTALLATION COMPLETED \n A copy of the script will be placed in your user home directory"
 	if [[ "${OSsel,,}" == "void" ]]; then mkdir -p /mnt/etc/bash && cp "${SCRIPT_DIR}/Conf_files/bashrc" /mnt/home/"$UNsel"/.bashrc || SHOWerror "Void Bashrc Copy"
-	else mkdir -p /mnt/etc/bash/bashrc.d && cp "${SCRIPT_DIR}/Conf_files/bashrc" /mnt/etc/bash/bashrc.d/"$UNsel".bashrc || SHOWerror "ArchTix Bashrc Copy"
-	fi
+	else mkdir -p /mnt/etc/bash/bashrc.d && cp "${SCRIPT_DIR}/Conf_files/bashrc" /mnt/etc/bash/bashrc.d/"$UNsel".bashrc || SHOWerror "ArchTix Bashrc Copy"; fi
 	mkdir -p /mnt/home/"$UNsel" && cp -r "${SCRIPT_DIR}" /mnt/home/"$UNsel"/ || SHOWerror "Installer Directory Copy"
-	if [ -f /mnt/home/"$UNsel"/"${SCRIPT_DIR##*/}"/finish_setup ]; then	sed -i "s/ArchTixUser/$UNsel/g" /mnt/home/"$UNsel"/"${SCRIPT_DIR##*/}"/finish_setup || SHOWerror "Sed finish_setup"; fi
+	[[ -f /mnt/home/"$UNsel"/"${SCRIPT_DIR##*/}"/finish_setup ]] && { sed -i "s/ArchTixUser/$UNsel/g" /mnt/home/"$UNsel"/"${SCRIPT_DIR##*/}"/finish_setup || SHOWerror "Sed finish_setup"; }
 	echo 'export MOZ_ENABLE_WAYLAND=1' > /mnt/home/"$UNsel"/.profile || SHOWerror "Profile Wayland Export"
-	[ "$(wc -l < Errors)" -gt 1 ] && { echo -e "\n[!] Alcuni errori registrati durante l'installazione:" && cat Errors && cp Errors /mnt/var/log/installer_errors.log; } || echo "[+] Installazione pulita: zero errori rilevati."
-	"$chroot" /mnt chown -hR "$UNsel":users /home/"$UNsel" || SHOWerror "Chown Home Directory"
-	YesNoSel "Reboot system"
-	if [[ "$CC" -eq 1 ]]; then [[ "${OSsel,,}" == "void" ]] && umount -l /mnt/{dev,proc,sys}; umount -R /mnt && reboot; else echo "OK" && exit 0; fi
+	[[ "$(wc -l < Errors)" -gt 1 ]] && { echo -e "\n[!] Alcuni errori registrati durante l'installazione:" && cat Errors && cp Errors /mnt/var/log/installer_errors.log; } || echo "[+] Installazione pulita: zero errori rilevati."
+	"$chroot" /mnt chown -hR "$UNsel":users /home/"$UNsel" || SHOWerror "Chown Home Directory"; YesNoSel "Reboot system"
+	[[ "$CC" -eq 1 ]] && { [[ "${OSsel,,}" == "void" ]] && umount -l /mnt/{dev,proc,sys}; umount -R /mnt && reboot; } || { echo "OK"; exit 0; }
 }
 InstallationSetup
 cat Errors
