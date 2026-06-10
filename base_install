@@ -107,7 +107,8 @@ SetupEnvironment () {
 }
 PackageConfig () {
 	if [[ "${OSsel,,}" == "void" ]]; then
-		"$chroot" /mnt xbps-install -y xbps-allow-references void-repo-nonfree void-repo-multilib void-repo-multilib-nonfree
+		local v_repos=(void-repo-nonfree); [[ "$LIBsel" == "GLIBC" ]] && v_repos+=(void-repo-multilib void-repo-multilib-nonfree)
+		"$chroot" /mnt "$PKGmanager" -y xbps-allow-references "${v_repos[@]}"
 		"$chroot" /mnt "$PKGmanager" -S
 	else
 		if [[ "${OSsel,,}" == "arch" ]]; then sed -i '/\[multilib]/,/mirrorlist/ s/#//' /mnt/etc/pacman.conf
@@ -143,7 +144,7 @@ PKGcheck () {
 	archive=(bzip2 cpio gzip xz lzop p7zip tar unrar zip unzip); personalization=(cowfortune)
 	[[ ! -v nvidiadrivers ]] && nvidiadrivers=(); [[ ! -v amddrivers ]] && amddrivers=()
 	if [[ "${OSsel,,}" == "void" ]]; then
-		xbps-install -y void-repo-nonfree void-repo-multilib void-repo-multilib-nonfree &>/dev/null || true
+		"$PKGmanager" -y void-repo-nonfree void-repo-multilib void-repo-multilib-nonfree &>/dev/null || true
 		kernel=("${KSel}" "${KSel}-headers" linux-firmware-network); baselinux=(base-system base-devel); baseutils=(man-pages bash-completion kitty vim nano wget git)
 		fs=(dialog mtools parted gptfdisk dosfstools); bootloaderutility=(efibootmgr os-prober); net=(NetworkManager iwd chrony); bluetooth=(bluez)
 		print=(cups cups-filters cups-pdf avahi); audio=(pipewire wireplumber); hardwareacceleration=(mesa-dri mesa-vaapi mesa-vulkan-radeon)
