@@ -22,7 +22,6 @@ DiskPartition () {
 	parted -sf "$DRIVE" mktable gpt mkpart "ESP" fat32 1MiB 513MiB mkpart "LINUX-ROOT" 513MiB 96% mkpart "SWAP" 96% 100% set 1 esp on set 3 swap on || SHOWerror "Parted GPT execution"
 	if echo "$DRIVE" | grep -q "^/dev/[a-z]d[a-z]"; then BOOT_PART="${DRIVE}1"; ROOT_PART="${DRIVE}2"; SWAP_PART="${DRIVE}3"
 	elif echo "$DRIVE" | grep -q "^/dev/nvme"; then BOOT_PART="${DRIVE}p1"; ROOT_PART="${DRIVE}p2"; SWAP_PART="${DRIVE}p3"
-	# CORRETTO: Mappatura partizioni MMC allineata con p1, p2, p3 per evitare percorsi orfani
 	elif echo "$DRIVE" | grep -q "^/dev/mmc"; then BOOT_PART="${DRIVE}p1"; ROOT_PART="${DRIVE}p2"; SWAP_PART="${DRIVE}p3"; fi
 	DEVICE="${DRIVE##*/}"; echo DRIVE="$DRIVE" DEVICE="$DEVICE"
 	[[ -z $DRIVE || -z $DEVICE ]] && { echo "No partition were created, check the installer. Closing installation!"; exit 1; } || echo 'We can proceed with the formatting of file system'
@@ -92,7 +91,6 @@ PackageConfig () {
 		"$chroot" /mnt "$PKGmanager" -S
 	else
 		if [[ "${OSsel,,}" == "arch" ]]; then sed -i '/\[multilib]/,/mirrorlist/ s/#//' /mnt/etc/pacman.conf
-		# CORRETTO: Cambiato -eq con controllo stringa == per proteggere da variabili vuote
 		elif [[ "${OSsel,,}" == "artix" ]]; then sed -i '/\[lib32]/,/mirrorlist/ s/#//' /mnt/etc/pacman.conf; [[ "$ARCHrepo" == "1" ]] && ArchRepoSetup /mnt/etc/pacman.conf; fi
 		[[ -f /mnt/etc/pacman.conf ]] && { sed -i '/\(Color\|ParallelDownloads\)/ s/#//' /mnt/etc/pacman.conf; sed -i '/ParallelDownloads/a ILoveCandy' /mnt/etc/pacman.conf; }
 		"$chroot" /mnt "$PKGmanager" -Sy
@@ -139,7 +137,6 @@ PKGcheck () {
 		for b in "${temp[@]}"; do current_item=$((current_item + 1)); local percent=$(( current_item * 100 / total_pkgs ))
 			echo -ne "Verifica pacchetti: [${percent}%]\r"
 			if [[ "${OSsel,,}" == "void" ]]; then "$PKGquery" -R -G -A "$b" &>/dev/null && new+=("$b") || { echo -e "\n[x] Pacchetto Void non disponibile: $b (Gruppo: $a)"; miss+=("$b"); }
-			# CORRETTO: Rimosso il || true orfano che sabotava il controllo di fallimento di pacman
 			else "$PKGquery" -Ss ^"${b}"$ &>/dev/null && new+=("$b") || { echo -e "\n[x] Pacchetto non disponibile: $b (Gruppo: $a)"; miss+=("$b"); }; fi
 		done
 		local -n orig_array="$a"; orig_array=("${new[@]}")
@@ -162,21 +159,18 @@ KernelSetup () {
 		echo -e "options nvidia-drm modeset=1 fbdev=1\noptions nvidia NVreg_DynamicPowerManagement=0x02 NVreg_UsePageAttributeTable=1 NVreg_EnablePCIeGen3=1" > /mnt/etc/modprobe.d/nvidia.conf || SHOWerror "nvidia modprobe options"
 	fi
 	case "$IRFSetup" in
-		# CORRETTO: Garantisce l'installazione preventiva di dracut su Void prima della riconfigurazione
 		dracut)	mkdir -p /mnt/etc/dracut.conf.d || SHOWerror "mkdir dracut.conf.d"
 				[[ "${OSsel,,}" == "void" ]] && { "$chroot" /mnt "$PKGmanager" "${pkgskips[@]}" -S dracut || SHOWerror "Void dracut install"; }
 				[[ "$FSsel" == "btrfs" ]] && { echo 'add_dracutmodules+=" btrfs "' > /mnt/etc/dracut.conf.d/btrfs.conf || SHOWerror "dracut btrfs conf"; }
 				[[ -v nvidiadrivers && ${#nvidiadrivers[@]} -gt 0 ]] && { echo 'force_drivers+=" nvidia nvidia_modeset nvidia_uvm nvidia_drm "' > /mnt/etc/dracut.conf.d/nvidia.conf || SHOWerror "dracut nvidia conf"; }
 				"$chroot" /mnt xbps-reconfigure -f "$KSel" || SHOWerror "xbps-reconfigure dracut" ;;
 		booster) [[ ${#booster[@]} -gt 0 ]] && { "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" "${booster[@]}" || SHOWerror "install booster"; }
-				# CORRETTO: Sanificazione case-insensitive per escludere Void in modo sicuro
 				[[ "${OSsel,,}" != "void" ]] && { "$chroot" /mnt pacman -Rns --noconfirm mkinitcpio || SHOWerror "purge mkinitcpio"; }
 				printf 'mount_timeout: 10s\nvconsole: true\n' > /mnt/etc/booster.yaml || SHOWerror "booster.yaml init"
 				echo "resume: /dev/disk/by-uuid/${SWAPID}" >> /mnt/etc/booster.yaml || SHOWerror "booster.yaml resume inject"
 				if [[ "$VBTsel" -eq 1 ]]; then [[ "$FSsel" == "btrfs" ]] && echo 'modules: btrfs,ahci,ata_piix,sd_mod,nvme' >> /mnt/etc/booster.yaml || echo 'modules: ahci,ata_piix,sd_mod,nvme' >> /mnt/etc/booster.yaml
 				else [[ "$FSsel" == "btrfs" ]] && echo 'modules: btrfs' >> /mnt/etc/booster.yaml; fi
 				[[ -v nvidiadrivers && ${#nvidiadrivers[@]} -gt 0 ]] && { echo 'modules: nvidia,nvidia_modeset,nvidia_uvm,nvidia_drm' >> /mnt/etc/booster.yaml || SHOWerror "booster.yaml nvidia inject"; }
-				# CORRETTO: Sanificazione case-insensitive anche sull'hook ALPM di pacman
 				if [[ "${OSsel,,}" != "void" ]]; then mkdir -p /mnt/etc/pacman.d/hooks || SHOWerror "mkdir pacman hooks"
 				printf '[Trigger]\nOperation = Install\nOperation = Upgrade\nType = Package\nTarget = %s\n\n[Action]\nDescription = Forcing Booster initramfs update...\nWhen = PostTransaction\nDepends = booster\nExec = /usr/bin/booster build --force --universal /boot/initramfs-%s.img\n' "$KSel" "$KSel" > /mnt/etc/pacman.d/hooks/95-booster-force.hook || SHOWerror "booster-force hook creation"; fi
 				local real_kver; real_kver=$(basename "$(find /mnt/usr/lib/modules/ -maxdepth 1 -mindepth 1 -type d ! -name 'extramodules*' | head -n 1)") || SHOWerror "find real_kver"
@@ -214,14 +208,12 @@ BootloaderSetup () {
 	local osi_version="${AcpiOS:-Windows 2020}"; local kname; kname=$(basename "$(find /mnt/boot/ -type f -name 'vmlinuz-*' | head -n 1)") || kname="vmlinuz-$KSel"
 	case "$BLsel" in
 		1|REFIND|Refind|refind)
-			local initrd_flags; [[ "${OSsel,,}" == "void" ]] && irfs="initramfs-${kname#vmlinuz-}.img" || irfs="initramfs-$KSel.img"
+			irfs="initramfs-$KSel.img"
 			"$chroot" /mnt "$PKGmanager" -Sy "${pkgskips[@]}" "${refindpkg[@]}" || SHOWerror "rEFInd package install"
 			"$chroot" /mnt refind-install || SHOWerror "rEFInd execution"; [[ "$UEFImode" -eq 1 ]] && efifolder='refind' || efifolder='BOOT'
 			mkdir -p /mnt/boot/EFI/"$efifolder"/themes || SHOWerror "mkdir rEFInd themes"
-			[[ -f /mnt/boot/EFI/"$efifolder"/refind.conf ]] && { mv /mnt/boot/EFI/"$efifolder"/refind.conf /mnt/boot/EFI/"$efifolder"/backup-refind.conf || SHOWerror "Backup refind.conf"; }
-			[[ -f /mnt/boot/refind_linux.conf ]] && { mv /mnt/boot/refind_linux.conf /mnt/boot/backup-refind_linux.conf || SHOWerror "Backup refind_linux.conf"; }
-			cp "${SCRIPT_DIR}/Bootloader/Refind/refind.conf" /mnt/boot/EFI/"$efifolder"/refind.conf || SHOWerror "Copy refind.conf"
 			cp -r "${SCRIPT_DIR}/Bootloader/Refind/themes/"* /mnt/boot/EFI/"$efifolder"/themes/ || SHOWerror "Copy rEFInd themes"
+			grep -q "theme.conf" /mnt/boot/EFI/"$efifolder"/refind.conf || echo "include themes/Blur-theme/theme.conf" >> /mnt/boot/EFI/"$efifolder"/refind.conf
 			[[ "$VBTsel" -eq 1 ]] && { sed -i 's/#resolution 1024 768/resolution 1024 768/' /mnt/boot/EFI/"$efifolder"/refind.conf || SHOWerror "Sed rEFInd resolution"; }
 			[[ "$FSsel" == "btrfs" ]] && rootflags='rootflags=subvol=@'
 			[[ -v nvidiadrivers && ${#nvidiadrivers[@]} -gt 0 ]] && drm="nvidia-drm.modeset=1 nvidia-drm.fbdev=1 acpi_osi=\"$osi_version\""
@@ -246,7 +238,6 @@ BootloaderSetup () {
 			local initrd_flags; [[ "$FSsel" == "btrfs" ]] && rootflags='rootflags=subvol=@'
 			[[ -v nvidiadrivers && ${#nvidiadrivers[@]} -gt 0 ]] && osi="nvidia-drm.modeset=1 nvidia-drm.fbdev=1 acpi_osi=\"$osi_version\""
 			[[ "${OSsel,,}" == "void" ]] && irfs="initramfs-${kname#vmlinuz-}.img" || irfs="initramfs-$KSel.img"
-			# CORRETTO: Rimossi tutti gli spazi vuoti interni errati dopo i caratteri di escape \\
 			if [[ "$IRFSetup" == "booster" ]]; then initrd_flags="initrd=\\${irfs}"
 			else [[ "${OSsel,,}" == "void" ]] && initrd_flags="initrd=\\${irfs}" || initrd_flags="initrd=\\${microcodepkg}.img initrd=\\${irfs}"; fi
 			BLflags=" $initrd_flags ro root=${PIDsel}=$ROOTID resume=${PIDsel}=$SWAPID rootfstype=$FSsel $rootflags $osi"
