@@ -257,7 +257,6 @@ InstallationSetup () {
 			else YesNoSel "Would you like to edit config file?"; [[ "$CC" -eq 1 ]] && { nano config; source config; } || { SetupAvaible=1; echo "Repeat the setup"; break; }; fi
 		done
 	fi
-	# CORRETTO: Cambiato -eq con controllo stringa == per proteggere da crash in caso di variabili vuote
 	if [[ "$SetupAvaible" == "1" ]]; then OperatingSystemSel
 		[[ "${OSsel,,}" == "artix" ]] && ArchRepoSel
 		[[ "${OSsel,,}" == "void" ]] && { VoidInstMethod && LibrarySel; }
@@ -275,7 +274,8 @@ InstallationSetup () {
 		done
 	elif [[ "$SetupAvaible" == "0" && -s config ]]; then echo 'Setup loaded'
 	else SHOWerror InstallationSetup; fi
-	[[ "$VBTsel" == "1" ]] && ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' 'BaseSystemInstall' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'KernelSetup' 'ServiceSetup' 'UserSetup' 'BootloaderSetup' ) || ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' 'AdditionalDriveSetup' 'BaseSystemInstall' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'KernelSetup' 'ServiceSetup' 'UserSetup' 'AudioSetup' 'BootloaderSetup' )
+	local s_step; [[ "${OSsel,,}" == "void" ]] && s_step='VoidSystemInstall' || s_step='BaseSystemInstall'
+	[[ "$VBTsel" == "1" ]] && ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' "$s_step" 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'KernelSetup' 'ServiceSetup' 'UserSetup' 'BootloaderSetup' ) || ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' 'AdditionalDriveSetup' "$s_step" 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'KernelSetup' 'ServiceSetup' 'UserSetup' 'AudioSetup' 'BootloaderSetup' )
 	case "${OSsel,,}" in
 		arch) PKGmanager=pacman; PKGquery=pacman; pkgskips=( --needed --noconfirm ); keylayout='KEYMAP=it'; keypath='etc/vconsole.conf'
 			PKGstrap=pacstrap; FSTABgen=genfstab; chroot='arch-chroot'; initc0=systemctl; initc1=enable
@@ -290,7 +290,6 @@ InstallationSetup () {
 			echo 'Running check for missing packages'; PKGcheck ;;
 		void) PKGmanager=xbps-install; PKGquery=xbps-query; pkgskips=( -y -y ); keylayout='KEYMAP=it'; keypath='etc/rc.conf'
 			[[ "$LIBsel" == "GLIBC" ]] && VoidArch="x86_64" || VoidArch="x86_64-musl"
-			# CORRETTO: URL riallineata al vero server mirror XBPS corrente per evitare errori 404
 			VoidRepo="https://voidlinux.org"
 			[[ "$LIBsel" == "MUSL" ]] && VoidRepo+="/musl"; PKGstrap="xbps-install -S -R $VoidRepo -r /mnt ${pkgskips[*]}"; chroot="chroot" ;;
 	esac
