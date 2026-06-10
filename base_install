@@ -216,8 +216,8 @@ ServiceSetup () {
 UserSetup () {
 	"$chroot" /mnt useradd -m -g users -G wheel,video,audio,storage,input,lp,scanner,power,kvm "$UNsel"
 	sed -i '/%wheel ALL=(ALL:ALL) ALL/ s/#//' /mnt/etc/sudoers
-	echo "Choose password for user: $UNsel" && "$chroot" /mnt passwd "$UNsel"
-	echo "Choose password for root" && "$chroot" /mnt passwd
+	echo "Choose password for user: $UNsel" ; while true; do "$chroot" /mnt passwd "$UNsel" && break || echo "Errore: le password non coincidono. Riprova..." ; done
+	echo "Choose password for root" ; while true; do "$chroot" /mnt passwd && break || echo "Errore: le password non coincidono. Riprova..." ; done
 	"$chroot" /mnt su "$UNsel" -c "mkdir -p ~/.config"
 }
 AudioSetup () {
