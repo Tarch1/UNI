@@ -265,7 +265,6 @@ BootloaderSetup () {
 			BLflags=" $initrd_flags ro root=${PIDsel}=$ROOTID resume=${PIDsel}=$SWAPID rootfstype=$FSsel $rootflags $osi"
 			"$chroot" /mnt efibootmgr -d "$BOOT_PART" -p 1 -c -L "$OSsel" -l "\\$kname" -u "$BLflags" --verbose || SHOWerror "Efibootmgr execution"
 			echo "efibootmgr -b lastnumber -B" ;;
-		*) SHOWerror "Invalid bootloader choice inside array" ;;
 	esac
 }
 InstallationSetup () {
