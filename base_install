@@ -53,7 +53,14 @@ FileSystemFormat () {
 	export BOOTID ROOTID SWAPID
 	swapon "$SWAP_PART" || SHOWerror "swapon"; mkdir -p /mnt/boot; mount "$BOOT_PART" /mnt/boot || SHOWerror "mount boot partition"; lsblk -f
 }
-AdditionalDriveSetup () { [[ -n "$ADDITIONAL_DRIVE" ]] && { mkdir -p /mnt/run/media/"$HNsel"/HDD && mount "$ADDITIONAL_DRIVE" /mnt/run/media/"$HNsel"/HDD; } }
+AdditionalDriveSetup () {
+	if [[ -n "$ADDITIONAL_DRIVE" ]]; then
+		mkdir -p /mnt/run/media/"$HNsel"/HDD && mount "$ADDITIONAL_DRIVE" /mnt/run/media/"$HNsel"/HDD || SHOWerror "Mount additional drive"
+		local add_id="$(blkid -s "$PIDsel" -o value "$ADDITIONAL_DRIVE" 2>/dev/null || echo "$ADDITIONAL_DRIVE")"
+		local add_fs="$(blkid -s TYPE -o value "$ADDITIONAL_DRIVE" 2>/dev/null || echo "auto")"
+		UNIfstab+="$PIDsel=$add_id /run/media/$HNsel/HDD $add_fs defaults,noatime 0 2\n"
+	fi
+}
 BaseSystemInstall () {
 	local BasePKG=( "${kernel[@]}" "${baselinux[@]}" "${elogind[@]}" "${btrfspkg[@]}" )
 	[[ "$FSsel" == "btrfs" ]] && BasePKG+=( "${btrfsutility[@]}" )
@@ -69,20 +76,15 @@ VoidSystemInstall () {
 	local void_repo="https://voidlinux.org"
 	[[ "${LIBsel}" == "MUSL" ]] && void_repo="${void_repo}/musl"
 	case "${VImethod}" in
-		XBPS)   mkdir -p /mnt/var/db/xbps/keys && cp -r /var/db/xbps/keys/* /mnt/var/db/xbps/keys/ 2>/dev/null || true
-				$PKGstrap base-system || SHOWerror "XBPS base-system bootstrap"
-				for d in dev proc sys; do mount --bind /$d /mnt/$d || SHOWerror "Mounting /$d filesystem"; done
-				mount --make-rslave /mnt/sys || SHOWerror "Setting sys rslave"
-				[[ "$UEFImode" -eq 1 ]] && { mount --bind /sys/firmware/efi/efivars /mnt/sys/firmware/efi/efivars || SHOWerror "Mounting efivars filesystem"; } ;;
-		ROOTFS) local tarball="void-x86_64-ROOTFS.tar.xz"
-				[[ "${LIBsel}" == "MUSL" ]] && tarball="void-x86_64-musl-ROOTFS.tar.xz"
-				if [ -f "${SCRIPT_DIR}/Conf_files/${tarball}" ]; then echo "Extracting local ROOTFS..." ; tar -xJf "${SCRIPT_DIR}/Conf_files/${tarball}" -C /mnt || SHOWerror "ROOTFS extraction"
-				else echo "Tarball not found, downloading..." ; curl -Lo "/tmp/${tarball}" "${void_repo}/static/${tarball}" || SHOWerror "ROOTFS download"
-					 tar -xJf "/tmp/${tarball}" -C /mnt && rm -f "/tmp/${tarball}" || SHOWerror "ROOTFS downloaded extraction"; fi
-				for d in dev proc sys; do mount --bind /$d /mnt/$d || SHOWerror "Mounting /$d filesystem"; done
-				mount --make-rslave /mnt/sys || SHOWerror "Setting sys rslave"
-				[[ "$UEFImode" -eq 1 ]] && { mount --bind /sys/firmware/efi/efivars /mnt/sys/firmware/efi/efivars || SHOWerror "Mounting efivars filesystem"; } ;;
+		XBPS) mkdir -p /mnt/var/db/xbps/keys && cp -r /var/db/xbps/keys/* /mnt/var/db/xbps/keys/ 2>/dev/null || true; $PKGstrap base-system || SHOWerror "XBPS base-system bootstrap" ;;
+		ROOTFS) local tarball="void-x86_64-ROOTFS.tar.xz"; [[ "${LIBsel}" == "MUSL" ]] && tarball="void-x86_64-musl-ROOTFS.tar.xz"
+				if [ -f "${SCRIPT_DIR}/Conf_files/${tarball}" ]; then echo "Extracting local ROOTFS..."; tar -xJf "${SCRIPT_DIR}/Conf_files/${tarball}" -C /mnt || SHOWerror "ROOTFS extraction"
+				else echo "Tarball not found, downloading..."; curl -Lo "/tmp/${tarball}" "${void_repo}/static/${tarball}" || SHOWerror "ROOTFS download"
+					 tar -xJf "/tmp/${tarball}" -C /mnt && rm -f "/tmp/${tarball}" || SHOWerror "ROOTFS downloaded extraction"; fi ;;
 	esac
+	for d in dev proc sys run; do mkdir -p /mnt/$d && mount --bind /$d /mnt/$d || SHOWerror "Mounting /$d filesystem"; done
+	mount --make-rslave /mnt/sys || SHOWerror "Setting sys rslave"
+	[[ "$UEFImode" -eq 1 ]] && { mkdir -p /mnt/sys/firmware/efi/efivars; mount --bind /sys/firmware/efi/efivars /mnt/sys/firmware/efi/efivars || SHOWerror "Mounting efivars filesystem"; }
 }
 FStabGen () {
 	[[ -f /mnt/etc/fstab ]] && { mv -f /mnt/etc/fstab /mnt/etc/old-fstab || SHOWerror "Backup existing fstab"; }
