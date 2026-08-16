@@ -63,9 +63,9 @@ Pacman_Locked() {
 ArchRepoSetup () {
 	local target_conf="$1"; local cmd=(); local mirror_file="/etc/pacman.d/mirrorlist-arch"
 	[[ "$target_conf" == "/mnt/etc/pacman.conf" ]] && { cmd=( "$chroot" /mnt ); mirror_file="/mnt/etc/pacman.d/mirrorlist-arch"; }
-	if [[ ${#cmd[@]} -eq 0 ]]; then rm -rf /etc/pacman.d/gnupg 2>/dev/null || true; mkdir -p /etc/pacman.d/gnupg; chmod 700 /etc/pacman.d/gnupg; pacman-key --init 2>/dev/null || true; pacman-key --populate artix 2>/dev/null || true
-	else "${cmd[@]}" pacman-key --init 2>/dev/null || true; "${cmd[@]}" pacman-key --populate artix archlinux 2>/dev/null || true; fi
-	sed -i '/\[universe\]/,/^[[:space:]]*$/d' "$target_conf" 2>/dev/null || true
+	if [[ ${#cmd[@]} -eq 0 ]]; then rm -rf /etc/pacman.d/gnupg; mkdir -p /etc/pacman.d/gnupg; chmod 700 /etc/pacman.d/gnupg; pacman-key --init; pacman-key --populate artix
+	else "${cmd[@]}" pacman-key --init; "${cmd[@]}" pacman-key --populate artix archlinux; fi
+	sed -i '/\[universe\]/,/^[[:space:]]*$/d' "$target_conf"
 	printf '\n[universe]\nServer = https://universe.artixlinux.org/$arch\nServer = https://mirror1.artixlinux.org/universe/$arch\nServer = https://mirror.pascalpuffke.de/artix-universe/$arch\nServer = https://artixlinux.qontinuum.space/artixlinux/universe/os/$arch\nServer = https://mirror1.cl.netactuate.com/artix/universe/$arch\nServer = https://ftp.crifo.org/artix-universe/$arch\n' >> "$target_conf"
 	[[ ! -f "$mirror_file" ]] && "${cmd[@]}" pacman -Sy --noconfirm artix-keyring artix-archlinux-support
 	grep -q 'mirrorlist-arch' "$target_conf" 2>/dev/null || printf '\n# Arch\n[extra]\nInclude = /etc/pacman.d/mirrorlist-arch\n\n[multilib]\nInclude = /etc/pacman.d/mirrorlist-arch\n' >> "$target_conf"
