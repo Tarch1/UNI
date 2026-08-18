@@ -1,7 +1,7 @@
 #!/bin/bash
 [[ "$(id -u)" -ne 0 ]] && { echo 'Please run as root.' >&2; exit 1; }
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-exec &> >(tee -a /tmp/install_$(date +%Y%m%d_%H%M%S).log)
+exec &> >(stdbuf -oL -eL tee -a /tmp/install_$(date +%Y%m%d_%H%M%S).log)
 
 SHOWerror () {
 	echo "$1" >> Errors
@@ -50,7 +50,7 @@ FileSystemFormat () {
 					   *)         mkdir -p /mnt/"$c" && mount -o defaults,"$options",subvol=@"$c" "$ROOT_PART" /mnt/"$c" || SHOWerror "mount @$c"; UNIfstab+="$PIDsel=$ROOTID /$c btrfs $options,subvol=@$c 0 0\n" ;;
 				   esac
 			   done ;;
-		*) echo "Boh file system non supportato" ;;
+		*) SHOWerror "Unsupported file system selection" ;;
 	esac
 	export BOOTID ROOTID SWAPID
 	swapon "$SWAP_PART" || SHOWerror "swapon"; mkdir -p /mnt/boot; mount "$BOOT_PART" /mnt/boot || SHOWerror "mount boot partition"; lsblk -f
@@ -64,7 +64,7 @@ AdditionalDriveSetup () {
 	fi
 }
 ArchTixSystemInstall () {
-	local BasePKG=( "${kernel[@]}" "${baselinux[@]}" "${elogind[@]}" "${btrfspkg[@]}" )
+	local BasePKG=( "${kernel[@]}" "${baselinux[@]}" "${elogind[@]}" )
 	[[ "$FSsel" == "btrfs" ]] && BasePKG+=( "${btrfsutility[@]}" )
 	"$PKGstrap" /mnt "$microcodepkg" "${BasePKG[@]}" || SHOWerror "Arch/Artix strap base installation"
 	[[ -f /mnt/etc/pacman.conf ]] && sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 5/' /mnt/etc/pacman.conf
@@ -208,8 +208,8 @@ ServiceSetup () {
 UserSetup () {
 	"$chroot" /mnt useradd -m -g users -G wheel,video,audio,storage,input,lp,scanner,power,kvm "$UNsel"
 	sed -i '/%wheel ALL=(ALL:ALL) ALL/ s/#//' /mnt/etc/sudoers
-	echo "Choose password for user: $UNsel" ; while true; do "$chroot" /mnt passwd "$UNsel" && break || echo "Errore: le password non coincidono. Riprova..." ; done
-	echo "Choose password for root" ; while true; do "$chroot" /mnt passwd && break || echo "Errore: le password non coincidono. Riprova..." ; done
+	echo "Choose password for user: $UNsel" ; while true; do "$chroot" /mnt passwd "$UNsel" && break || echo "Error: Passwords do not match. Try again..." ; done
+	echo "Choose password for root" ; while true; do "$chroot" /mnt passwd && break || echo "Error: Passwords do not match. Try again..." ; done
 	"$chroot" /mnt su "$UNsel" -c "mkdir -p ~/.config"
 }
 AudioSetup () {
