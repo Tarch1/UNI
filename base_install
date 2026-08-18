@@ -1,6 +1,7 @@
 #!/bin/bash
 [[ "$(id -u)" -ne 0 ]] && { echo 'Please run as root.' >&2; exit 1; }
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec &> >(tee -a /tmp/install_$(date +%Y%m%d_%H%M%S).log)
 
 SHOWerror () {
 	echo "$1" >> Errors
@@ -34,7 +35,7 @@ FileSystemFormat () {
 	UNIfstab="$PIDsel=$BOOTID /boot vfat defaults 0 2\n$PIDsel=$SWAPID none swap defaults 0 0\n"
 	case "$FSsel" in
 		ext4)  mkfs.ext4 -L "$RootLabel" "$ROOT_PART" || SHOWerror "mkfs.ext4 ROOT"; ROOTID="$(blkid -s "$PIDsel" -o value "$ROOT_PART")" || SHOWerror "blkid ROOTID ext4"; mount "$ROOT_PART" /mnt || SHOWerror "mount ext4 root"; UNIfstab+="$PIDsel=$ROOTID / ext4 defaults 0 1\n" ;;
-		btrfs) modules=(btrfs); binaries='btrfs'; local SUBVolumes=( 'home' 'var_log' 'snapshots' 'swap' ); local options='noatime,compress=zstd,space_cache=v2,discard=async'
+		btrfs) modules=(btrfs); binaries='btrfs'; local SUBVolumes=( 'home' 'var_log' 'var_cache' 'snapshots' 'swap' ); local options='noatime,compress=zstd,space_cache=v2,discard=async'
 			   mkfs.btrfs -fL "$RootLabel" "$ROOT_PART" || SHOWerror "mkfs.btrfs ROOT"; ROOTID="$(blkid -s "$PIDsel" -o value "$ROOT_PART")" || SHOWerror "blkid ROOTID btrfs"
 			   mount "$ROOT_PART" /mnt || SHOWerror "mount btrfs root"; btrfs su cr /mnt/@ || SHOWerror "btrfs subvol @"
 			   for b in "${SUBVolumes[@]}"; do btrfs su cr /mnt/@"$b" || SHOWerror "btrfs subvol @$b"; done; umount /mnt || SHOWerror "umount btrfs root setup"
@@ -265,7 +266,8 @@ BootloaderSetup () {
 			if [[ "$IRFSetup" == "booster" ]]; then initrd_flags="initrd=\\${irfs}"
 			else [[ "${OSsel,,}" == "void" ]] && initrd_flags="initrd=\\${irfs}" || initrd_flags="initrd=\\${microcodepkg}.img initrd=\\${irfs}"; fi
 			BLflags=" $initrd_flags ro root=${PIDsel}=$ROOTID resume=${PIDsel}=$SWAPID rootfstype=$FSsel $rootflags $osi"
-			"$chroot" /mnt efibootmgr -d "$BOOT_PART" -p 1 -c -L "$OSsel" -l "\\$kname" -u "$BLflags" --verbose || SHOWerror "Efibootmgr execution"
+			local efi_dev="${DRIVEsel:-$DRIVE}"; local efi_num="$(echo "$BOOT_PART" | grep -o '[0-9]*$')"
+			"$chroot" /mnt efibootmgr -d "$efi_dev" -p "${efi_num:-1}" -c -L "$OSsel" -l "\\$kname" -u "$BLflags" --verbose || SHOWerror "Efibootmgr execution"
 			echo "efibootmgr -b lastnumber -B" ;;
 	esac
 }
