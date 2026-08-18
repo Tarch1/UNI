@@ -22,7 +22,7 @@ DiskPartition () {
 	umount "$DRIVE"?* || true; sgdisk -ozZ "$DRIVE" || SHOWerror "Zapping drive partition table"
 	local total_ram_gb=$(( ($(free -m | awk '/^Mem:/{print $2}') + 1023) / 1024 )) swap_gb
 	[[ "$total_ram_gb" -le 8 ]] && swap_gb=$(( total_ram_gb + 1 )) || { [[ "$total_ram_gb" -le 32 ]] && swap_gb=$total_ram_gb || swap_gb=32; }
-	parted -sf "$DRIVE" mktable gpt mkpart "ESP" fat32 1MiB 513MiB mkpart "LINUX-ROOT" 513MiB -"${swap_gb}GiB" mkpart "SWAP" -"${swap_gb}GiB" 100% set 1 esp on set 3 swap on || SHOWerror "Parted GPT execution"
+	parted -sf "$DRIVE" -- mktable gpt mkpart "ESP" fat32 1MiB 513MiB mkpart "LINUX-ROOT" 513MiB -"${swap_gb}GiB" mkpart "SWAP" -"${swap_gb}GiB" 100% set 1 esp on set 3 swap on || SHOWerror "Parted GPT execution"
 	echo "$DRIVE" | grep -q "^/dev/\(vd\|[a-z]d\)[a-z]" && { BOOT_PART="${DRIVE}1"; ROOT_PART="${DRIVE}2"; SWAP_PART="${DRIVE}3"; }
 	echo "$DRIVE" | grep -q "^/dev/\(nvme\|mmc\)" && { BOOT_PART="${DRIVE}p1"; ROOT_PART="${DRIVE}p2"; SWAP_PART="${DRIVE}p3"; }
 	DEVICE="${DRIVE##*/}"; echo DRIVE="$DRIVE" DEVICE="$DEVICE"
