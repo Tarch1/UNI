@@ -20,12 +20,13 @@ DiskPartition () {
 	[[ -z "$DRIVE" ]] && exit 1
 	[[ "$VBTsel" -eq 0 ]] && ADDITIONAL_DRIVE="$(dialog --title "ADDITIONAL" --stdout --menu "Select secondary drive (Optional - Cancel to skip)" 0 0 0 "${dialog_list[@]}")"
 	umount "$DRIVE"?* || true; sgdisk -ozZ "$DRIVE" || SHOWerror "Zapping drive partition table"
-	parted -sf "$DRIVE" mktable gpt mkpart "ESP" fat32 1MiB 513MiB mkpart "LINUX-ROOT" 513MiB 96% mkpart "SWAP" 96% 100% set 1 esp on set 3 swap on || SHOWerror "Parted GPT execution"
-	if echo "$DRIVE" | grep -q "^/dev/[a-z]d[a-z]"; then BOOT_PART="${DRIVE}1"; ROOT_PART="${DRIVE}2"; SWAP_PART="${DRIVE}3"
-	elif echo "$DRIVE" | grep -q "^/dev/nvme"; then BOOT_PART="${DRIVE}p1"; ROOT_PART="${DRIVE}p2"; SWAP_PART="${DRIVE}p3"
-	elif echo "$DRIVE" | grep -q "^/dev/mmc"; then BOOT_PART="${DRIVE}p1"; ROOT_PART="${DRIVE}p2"; SWAP_PART="${DRIVE}p3"; fi
+	local total_ram_gb=$(( ($(free -m | awk '/^Mem:/{print $2}') + 1023) / 1024 )) swap_gb
+	[[ "$total_ram_gb" -le 8 ]] && swap_gb=$(( total_ram_gb + 1 )) || { [[ "$total_ram_gb" -le 32 ]] && swap_gb=$total_ram_gb || swap_gb=32; }
+	parted -sf "$DRIVE" mktable gpt mkpart "ESP" fat32 1MiB 513MiB mkpart "LINUX-ROOT" 513MiB -"${swap_gb}GiB" mkpart "SWAP" -"${swap_gb}GiB" 100% set 1 esp on set 3 swap on || SHOWerror "Parted GPT execution"
+	echo "$DRIVE" | grep -q "^/dev/\(vd\|[a-z]d\)[a-z]" && { BOOT_PART="${DRIVE}1"; ROOT_PART="${DRIVE}2"; SWAP_PART="${DRIVE}3"; }
+	echo "$DRIVE" | grep -q "^/dev/\(nvme\|mmc\)" && { BOOT_PART="${DRIVE}p1"; ROOT_PART="${DRIVE}p2"; SWAP_PART="${DRIVE}p3"; }
 	DEVICE="${DRIVE##*/}"; echo DRIVE="$DRIVE" DEVICE="$DEVICE"
-	[[ -z $DRIVE || -z $DEVICE ]] && { echo "No partition were created, check the installer. Closing installation!"; exit 1; } || echo 'We can proceed with the formatting of file system'
+	[[ -z "$DRIVE" || -z "$DEVICE" ]] && { echo "No partition were created, check the installer. Closing installation!"; exit 1; } || echo 'We can proceed with the formatting of file system'
 	sleep 1; echo -e " BP=$BOOT_PART RP=$ROOT_PART PID=$PIDsel"; lsblk -f
 }
 FileSystemFormat () {
@@ -62,33 +63,27 @@ AdditionalDriveSetup () {
 		UNIfstab+="$PIDsel=$add_id /run/media/$HNsel/HDD $add_fs defaults,noatime 0 2\n"
 	fi
 }
-BaseSystemInstall () {
+ArchTixSystemInstall () {
 	local BasePKG=( "${kernel[@]}" "${baselinux[@]}" "${elogind[@]}" "${btrfspkg[@]}" )
 	[[ "$FSsel" == "btrfs" ]] && BasePKG+=( "${btrfsutility[@]}" )
-	if [[ "${OSsel,,}" == "void" ]]; then
-		$PKGstrap base-system || SHOWerror "XBPS base-system bootstrap"
-		for d in dev proc sys; do mount --bind /$d /mnt/$d || SHOWerror "Mounting /$d filesystem"; done
-		mount --make-rslave /mnt/sys || SHOWerror "Setting sys rslave"
-		[[ "$UEFImode" -eq 1 ]] && { mount --bind /sys/firmware/efi/efivars /mnt/sys/firmware/efi/efivars || SHOWerror "Mounting efivars filesystem"; }
-	else
-		"$PKGstrap" /mnt "$microcodepkg" "${BasePKG[@]}" || SHOWerror "Arch/Artix strap base installation"
-		[[ -f /mnt/etc/pacman.conf ]] && sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 5/' /mnt/etc/pacman.conf
-	fi
+	"$PKGstrap" /mnt "$microcodepkg" "${BasePKG[@]}" || SHOWerror "Arch/Artix strap base installation"
+	[[ -f /mnt/etc/pacman.conf ]] && sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 5/' /mnt/etc/pacman.conf
 }
 VoidSystemInstall () {
-	echo "Starting Void Linux bootstrap setup..."
 	local void_repo="https://voidlinux.org"
 	[[ "${LIBsel}" == "MUSL" ]] && void_repo="${void_repo}/musl"
 	case "${VImethod}" in
-		XBPS) mkdir -p /mnt/var/db/xbps/keys && cp -r /var/db/xbps/keys/* /mnt/var/db/xbps/keys/ 2>/dev/null || true; $PKGstrap base-system || SHOWerror "XBPS base-system bootstrap" ;;
-		ROOTFS) local tarball="void-x86_64-ROOTFS.tar.xz"; [[ "${LIBsel}" == "MUSL" ]] && tarball="void-x86_64-musl-ROOTFS.tar.xz"
-				if [ -f "${SCRIPT_DIR}/Conf_files/${tarball}" ]; then echo "Extracting local ROOTFS..."; tar -xJf "${SCRIPT_DIR}/Conf_files/${tarball}" -C /mnt || SHOWerror "ROOTFS extraction"
-				else echo "Tarball not found, downloading..."; curl -Lo "/tmp/${tarball}" "${void_repo}/static/${tarball}" || SHOWerror "ROOTFS download"
-					 tar -xJf "/tmp/${tarball}" -C /mnt && rm -f "/tmp/${tarball}" || SHOWerror "ROOTFS downloaded extraction"; fi ;;
+		XBPS)	mkdir -p /mnt/var/db/xbps/keys && cp -r /var/db/xbps/keys/* /mnt/var/db/xbps/keys/ 2>/dev/null || true
+				$PKGstrap base-system || SHOWerror "XBPS base-system bootstrap";;
+		ROOTFS)	local tarball="void-x86_64-ROOTFS.tar.xz"
+				[[ "${LIBsel}" == "MUSL" ]] && tarball="void-x86_64-musl-ROOTFS.tar.xz"
+				if [ -f "${SCRIPT_DIR}/Conf_files/${tarball}" ]; then tar -xJf "${SCRIPT_DIR}/Conf_files/${tarball}" -C /mnt || SHOWerror "ROOTFS extraction"
+				else curl -Lo "/tmp/${tarball}" "${void_repo}/static/${tarball}" || SHOWerror "ROOTFS download"
+				tar -xJf "/tmp/${tarball}" -C /mnt && rm -f "/tmp/${tarball}" || SHOWerror "ROOTFS downloaded extraction"; fi ;;
 	esac
 	for d in dev proc sys run; do mkdir -p /mnt/$d && mount --bind /$d /mnt/$d || SHOWerror "Mounting /$d filesystem"; done
 	mount --make-rslave /mnt/sys || SHOWerror "Setting sys rslave"
-	[[ "$UEFImode" -eq 1 ]] && { mkdir -p /mnt/sys/firmware/efi/efivars; mount --bind /sys/firmware/efi/efivars /mnt/sys/firmware/efi/efivars || SHOWerror "Mounting efivars filesystem"; }
+	[[ "$UEFImode" -eq 1 ]] && { mkdir -p /mnt/sys/firmware/efi/efivars; mount --bind /sys/firmware/efi/efivars /mnt/sys/firmware/efi/efivars || SHOWerror "Mounting efivars filesystem" }
 }
 FStabGen () {
 	[[ -f /mnt/etc/fstab ]] && { mv -f /mnt/etc/fstab /mnt/etc/old-fstab || SHOWerror "Backup existing fstab"; }
@@ -135,45 +130,36 @@ PackageInstall () {
 }
 PKGcheck () {
 	echo "Inizializzazione gruppi di pacchetti..."
-	microcode=("$microcodepkg"); kernel=("${KSel}" linux-firmware "${KSel}-headers")
-	baselinux=(base base-devel); baseutils=(man bash-completion kitty vim nano wget git); booster=()
-	fs=(dialog mtools parted gptfdisk dosfstools gvfs-mtp); bootloaderutility=(efibootmgr os-prober sbsigntools)
-	net=(networkmanager iwd chrony); bluetooth=(bluez bluez-utils bluez-tools bluetui blueman)
-	print=(cups cups-pdf system-config-printer avahi); utility=(feh xed calc fd bpytop adriconf fwupd)
+	microcode=("$microcodepkg"); kernel=("${KSel}" linux-firmware "${KSel}-headers"); baselinux=(base base-devel); baseutils=(man bash-completion kitty vim nano wget git); booster=(); fs=(dialog mtools parted gptfdisk dosfstools gvfs-mtp)
+	bootloaderutility=(efibootmgr os-prober sbsigntools); net=(networkmanager iwd chrony); bluetooth=(bluez bluez-utils bluez-tools bluetui blueman); print=(cups cups-pdf system-config-printer avahi); utility=(feh xed calc fd bpytop adriconf fwupd)
 	[[ "${OSsel,,}" == "arch" || "${OSsel,,}" == "artix" ]] && booster=(booster)
 	if [[ "${OSsel,,}" == "artix" ]]; then local init_s="${init_sys,,}"; elogind=(elogind elogind-"$init_s" "${init_s}"-settingsd); net+=("chrony-${init_s}" "networkmanager-${init_s}"); bluetooth+=("bluez-${init_s}" bluez-cups); print+=("avahi-${init_s}" "cups-${init_s}"); else elogind=(); fi
 	[[ "$FSsel" == "btrfs" ]] && { btrfsutility=(snapper btrfs-progs); grubbtrfs=(grub-btrfs); } || { btrfsutility=(); grubbtrfs=(); }
 	[[ "$BLsel" == "grub" ]] && grubpkg=(grub) || grubpkg=(); [[ "$BLsel" == "refind" ]] && refindpkg=(refind) || refindpkg=()
-	audio=(pipewire pipewire-pulse pipewire-alsa pipewire-jack wireplumber sof-firmware); android=(android-tools)
-	apps=(telegram-desktop firefox profile-sync-daemon); hardwareacceleration=(libva-mesa-driver intel-media-driver vkd3d)
-	vulkan=(vulkan-icd-loader vulkan-intel vulkan-mesa-layers); filemanager=(vifm pcmanfm tumbler file-roller)
-	archive=(bzip2 cpio gzip xz lzop p7zip tar unrar zip unzip); personalization=(cowfortune)
+	audio=(pipewire pipewire-pulse pipewire-alsa pipewire-jack wireplumber sof-firmware); android=(android-tools); apps=(telegram-desktop firefox profile-sync-daemon); hardwareacceleration=(libva-mesa-driver intel-media-driver vkd3d)
+	vulkan=(vulkan-icd-loader vulkan-intel vulkan-mesa-layers); filemanager=(vifm pcmanfm tumbler file-roller); archive=(bzip2 cpio gzip xz lzop p7zip tar unrar zip unzip); personalization=(cowfortune)
 	[[ ! -v nvidiadrivers ]] && nvidiadrivers=(); [[ ! -v amddrivers ]] && amddrivers=()
 	if [[ "${OSsel,,}" == "void" ]]; then
 		local v_live_repos=(void-repo-nonfree); [[ "$LIBsel" == "GLIBC" ]] && v_live_repos+=(void-repo-multilib void-repo-multilib-nonfree)
 		"$PKGmanager" -y -S "${v_live_repos[@]}" &>/dev/null || true
-		kernel=("${KSel}" "${KSel}-headers" linux-firmware-network); baselinux=(base-system base-devel); baseutils=(man-pages bash-completion kitty vim nano wget git)
-		fs=(dialog mtools parted gptfdisk dosfstools); bootloaderutility=(efibootmgr os-prober); net=(NetworkManager iwd chrony); bluetooth=(bluez)
-		print=(cups cups-filters cups-pdf avahi); audio=(pipewire wireplumber); hardwareacceleration=(mesa-dri mesa-vaapi mesa-vulkan-radeon)
-		vulkan=(vulkan-loader); personalization=(); booster=(); elogind=(); grubbtrfs=()
-		apps=(telegram-desktop firefox); filemanager=(vifm pcmanfm tumbler file-roller)
-		archive=(bzip2 cpio gzip xz p7zip tar unrar zip unzip); utility=(feh xed calc fd bpytop fwupd); fi
-	local y="microcode amddrivers nvidiadrivers kernel baselinux baseutils fs bootloaderutility btrfsutility elogind grubpkg grubbtrfs refindpkg net audio bluetooth android print apps utility hardwareacceleration vulkan filemanager archive personalization booster"
-	local total_pkgs=0; for group in $y; do local -n current_group="$group"; total_pkgs=$((total_pkgs + ${#current_group[@]})); done
-	local current_item=0; local miss=(); local new; echo "Controllo disponibilità sui repository remoti in corso..."
-	for a in $y; do local var="$a"'[@]'; local temp=("${!var}"); new=()
-		for b in "${temp[@]}"; do current_item=$((current_item + 1)); local percent=$(( current_item * 100 / total_pkgs ))
-			echo -ne "Verifica pacchetti: [${percent}%]\r"
-			if [[ "${OSsel,,}" == "void" ]]; then "$PKGquery" -R -G -A "$b" &>/dev/null && new+=("$b") || { echo -e "\n[x] Pacchetto Void non disponibile: $b (Gruppo: $a)"; miss+=("$b"); }
-			else "$PKGquery" -Ss ^"${b}"$ &>/dev/null && new+=("$b") || { echo -e "\n[x] Pacchetto non disponibile: $b (Gruppo: $a)"; miss+=("$b"); }; fi
-		done
-		local -n orig_array="$a"; orig_array=("${new[@]}")
+		kernel=("${KSel}" "${KSel}-headers" linux-firmware-network); baselinux=(base-system base-devel); baseutils=(man-pages bash-completion kitty vim nano wget git); fs=(dialog mtools parted gptfdisk dosfstools); bootloaderutility=(efibootmgr os-prober)
+		net=(NetworkManager iwd chrony); bluetooth=(bluez); print=(cups cups-filters cups-pdf avahi); audio=(pipewire wireplumber); hardwareacceleration=(mesa-dri mesa-vaapi mesa-vulkan-radeon); vulkan=(vulkan-loader); personalization=(); booster=()
+		elogind=(); grubbtrfs=(); apps=(telegram-desktop firefox); filemanager=(vifm pcmanfm tumbler file-roller); archive=(bzip2 cpio gzip xz p7zip tar unrar zip unzip); utility=(feh xed calc fd bpytop fwupd)
+	fi
+	echo "Scaricamento indici remoti..."
+	local remote_repo_list="/tmp/remote_pkgs.list"
+	[[ "${OSsel,,}" == "void" ]] && xbps-query -R -s "" | awk '{print $2}' | sed 's/-[0-9].*//' | sort -u > "$remote_repo_list" || pacman -Sylq | sort -u > "$remote_repo_list"
+	local y="microcode amddrivers nvidiadrivers kernel baselinux baseutils fs bootloaderutility btrfsutility elogind grubpkg grubbtrfs refindpkg net audio bluetooth android print apps utility hardwareacceleration vulkan filemanager archive personalization booster" miss=()
+	for group in $y; do
+		local -n current_group="$group"; local valid_pkgs=()
+		for pkg in "${current_group[@]}"; do grep -qx "$pkg" "$remote_repo_list" && valid_pkgs+=("$pkg") || miss+=("$pkg"); done
+		current_group=("${valid_pkgs[@]}")
 	done
-	echo -e "\n[+] Controllo repository completato."
+	rm -f "$remote_repo_list"
 	if [[ ${#miss[@]} -gt 0 ]]; then
-		echo -e "\n========================================================\n[!] ATTENZIONE: I seguenti pacchetti non sono disponibili:\n$(printf ' - %s\n' "${miss[@]}" | sort -u)\n========================================================\n"
-		printf '%s\n' "${miss[@]}" | sort -u > pkg_missed; YesNoSel "Questi pacchetti sono FONDAMENTALI per l'installazione? (Sì = Interrompi / No = Salta e prosegui)"
-		[[ "$CC" -eq 1 ]] && { echo "[-] Installazione interrotta dall'utente."; exit 0; } || echo "[*] Pacchetti mancanti rimossi. Procedo con i pacchetti validi..."
+		echo -e "\n[!] ATTENZIONE: Pacchetti non disponibili:\n$(printf ' - %s\n' "${miss[@]}" | sort -u)\n"; printf '%s\n' "${miss[@]}" | sort -u > pkg_missed
+		YesNoSel "Questi pacchetti sono FONDAMENTALI per l'installazione? (Sì = Interrompi / No = Salta e prosegui)"
+		[[ "$CC" -eq 1 ]] && { echo "[-] Installazione interrotta dall'utente."; exit 0; } || echo "[*] Pacchetti mancanti rimossi."
 	fi
 }
 KernelSetup () {
@@ -302,7 +288,7 @@ InstallationSetup () {
 		done
 	elif [[ "$SetupAvaible" == "0" && -s config ]]; then echo 'Setup loaded'
 	else SHOWerror InstallationSetup; fi
-	local s_step; [[ "${OSsel,,}" == "void" ]] && s_step='VoidSystemInstall' || s_step='BaseSystemInstall'
+	local s_step; [[ "${OSsel,,}" == "void" ]] && s_step='VoidSystemInstall' || s_step='ArchTixSystemInstall'
 	[[ "$VBTsel" == "1" ]] && ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' "$s_step" 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'KernelSetup' 'ServiceSetup' 'UserSetup' 'BootloaderSetup' ) || ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' 'AdditionalDriveSetup' "$s_step" 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'KernelSetup' 'ServiceSetup' 'UserSetup' 'AudioSetup' 'BootloaderSetup' )
 	case "${OSsel,,}" in
 		arch) PKGmanager=pacman; PKGquery=pacman; pkgskips=( --needed --noconfirm ); keylayout='KEYMAP=it'; keypath='etc/vconsole.conf'; PKGstrap=pacstrap; FSTABgen=genfstab; chroot='arch-chroot'; initc0=systemctl; initc1=enable
