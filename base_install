@@ -129,7 +129,7 @@ PackageInstall () {
 	fi
 }
 PKGcheck () {
-	echo "Inizializzazione gruppi di pacchetti..."
+	echo "Initializing package groups..."
 	microcode=("$microcodepkg"); kernel=("${KSel}" linux-firmware "${KSel}-headers"); baselinux=(base base-devel); baseutils=(man bash-completion kitty vim nano wget git); booster=(); fs=(dialog mtools parted gptfdisk dosfstools gvfs-mtp)
 	bootloaderutility=(efibootmgr os-prober sbsigntools); net=(networkmanager iwd chrony); bluetooth=(bluez bluez-utils bluez-tools bluetui blueman); print=(cups cups-pdf system-config-printer avahi); utility=(feh xed calc fd bpytop adriconf fwupd)
 	[[ "${OSsel,,}" == "arch" || "${OSsel,,}" == "artix" ]] && booster=(booster)
@@ -146,7 +146,7 @@ PKGcheck () {
 		net=(NetworkManager iwd chrony); bluetooth=(bluez); print=(cups cups-filters cups-pdf avahi); audio=(pipewire wireplumber); hardwareacceleration=(mesa-dri mesa-vaapi mesa-vulkan-radeon); vulkan=(vulkan-loader); personalization=(); booster=()
 		elogind=(); grubbtrfs=(); apps=(telegram-desktop firefox); filemanager=(vifm pcmanfm tumbler file-roller); archive=(bzip2 cpio gzip xz p7zip tar unrar zip unzip); utility=(feh xed calc fd bpytop fwupd)
 	fi
-	echo "Scaricamento indici remoti..."
+	echo "Downloading remote package indexes..."
 	local remote_repo_list="/tmp/remote_pkgs.list"
 	[[ "${OSsel,,}" == "void" ]] && xbps-query -R -s "" | awk '{print $2}' | sed 's/-[0-9].*//' | sort -u > "$remote_repo_list" || pacman -Sylq | sort -u > "$remote_repo_list"
 	local y="microcode amddrivers nvidiadrivers kernel baselinux baseutils fs bootloaderutility btrfsutility elogind grubpkg grubbtrfs refindpkg net audio bluetooth android print apps utility hardwareacceleration vulkan filemanager archive personalization booster" miss=()
@@ -157,9 +157,9 @@ PKGcheck () {
 	done
 	rm -f "$remote_repo_list"
 	if [[ ${#miss[@]} -gt 0 ]]; then
-		echo -e "\n[!] ATTENZIONE: Pacchetti non disponibili:\n$(printf ' - %s\n' "${miss[@]}" | sort -u)\n"; printf '%s\n' "${miss[@]}" | sort -u > pkg_missed
-		YesNoSel "Questi pacchetti sono FONDAMENTALI per l'installazione? (Sì = Interrompi / No = Salta e prosegui)"
-		[[ "$CC" -eq 1 ]] && { echo "[-] Installazione interrotta dall'utente."; exit 0; } || echo "[*] Pacchetti mancanti rimossi."
+		echo -e "\n[!] WARNING: Unavailable packages:\n$(printf ' - %s\n' "${miss[@]}" | sort -u)\n"; printf '%s\n' "${miss[@]}" | sort -u > pkg_missed
+		YesNoSel "Are these packages CRITICAL for installation? (Yes = Abort / No = Skip and continue)"
+		[[ "$CC" -eq 1 ]] && { echo "[-] Installation aborted by user."; exit 0; } || echo "[*] Missing packages removed."
 	fi
 }
 KernelSetup () {
