@@ -316,7 +316,7 @@ FinishInst () {
 	mkdir -p /mnt/home/"$UNsel" && cp -r "${SCRIPT_DIR}" /mnt/home/"$UNsel"/ || SHOWerror "Installer Directory Copy"
 	[[ -f /mnt/home/"$UNsel"/"${SCRIPT_DIR##*/}"/finish_setup ]] && { sed -i "s/ArchTixUser/$UNsel/g" /mnt/home/"$UNsel"/"${SCRIPT_DIR##*/}"/finish_setup || SHOWerror "Sed finish_setup"; }
 	echo 'export MOZ_ENABLE_WAYLAND=1' > /mnt/home/"$UNsel"/.profile || SHOWerror "Profile Wayland Export"
-	[[ "$(wc -l < Errors)" -gt 1 ]] && { echo -e "\n[!] Alcuni errori registrati durante l'installazione:" && cat Errors && cp Errors /mnt/var/log/installer_errors.log; } || echo "[+] Installazione pulita: zero errori rilevati."
+	[[ "$(wc -l < Errors)" -gt 1 ]] && { echo -e "\n[!] Some errors logged during installation:" && cat Errors && cp Errors /mnt/var/log/installer_errors.log; } || echo "[+] Clean installation: zero errors detected."
 	"$chroot" /mnt chown -hR "$UNsel":users /home/"$UNsel" || SHOWerror "Chown Home Directory"; YesNoSel "Reboot system"
 	[[ "$CC" -eq 1 ]] && { [[ "${OSsel,,}" == "void" ]] && umount -l /mnt/{dev,proc,sys}; umount -R /mnt && reboot; } || { echo "OK"; exit 0; }
 }
