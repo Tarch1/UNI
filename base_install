@@ -95,13 +95,15 @@ FStabGen () {
 SetupEnvironment () {
 	if [[ "${OSsel,,}" == "void" ]]; then
 		echo "LANG=$LOCsel" > /mnt/etc/locale.conf; echo "$keylayout" > /mnt/etc/vconsole.conf
+		echo 'HARDWARECLOCK="UTC"' >> /mnt/etc/rc.conf
 		"$chroot" /mnt ln -sf /usr/share/zoneinfo/"$TZsel" /etc/localtime
 	else
 		sed -i "/\($LOCsel\|$LANGsel\)/ s/#//g" /mnt/etc/locale.gen
 		echo -e "LANG=$LOCsel\nLANGUAGE=$LANGsel\nLC_TIME=$LOCsel\nLC_ADDRESS=$LOCsel\nLC_MESSAGES=$LOCsel\nLC_CTYPE=C" >> /mnt/etc/locale.conf
 		echo "$keylayout" | tee /mnt/"$keypath" /mnt/etc/vconsole.conf >/dev/null
 		"$chroot" /mnt ln -sf /usr/share/zoneinfo/"$TZsel" /etc/localtime
-		"$chroot" /mnt hwclock --systohc --utc; "$chroot" /mnt locale-gen
+		"$chroot" /mnt hwclock --systohc --utc 2>/dev/null || true
+		"$chroot" /mnt locale-gen
 	fi
 	echo "$HNsel" > /mnt/etc/hostname
 	echo -e "127.0.0.1\tlocalhost\n::1\t\tlocalhost\n127.0.1.1\t$HNsel.localdomain $HNsel" >> /mnt/etc/hosts
@@ -197,9 +199,9 @@ KernelSetup () {
 	esac
 }
 ServiceSetup () {
-	if [[ "${OSsel,,}" == "artix" ]]; then Services+=( NetworkManager openrc-settingsd cupsd avahi-daemon bluetoothd ); [[ -f /mnt/etc/init.d/tlp ]] && Services+=( tlp ); [[ -v nvidiadrivers && -f /mnt/etc/init.d/nvidia-persistenced ]] && Services+=( nvidia-persistenced )
-	elif [[ "${OSsel,,}" == "arch" ]]; then	Services+=( NetworkManager cups avahi-daemon bluetooth ); [[ -f /mnt/usr/lib/systemd/system/tlp.service ]] && Services+=( tlp )
-	elif [[ "${OSsel,,}" == "void" ]]; then	Services+=( NetworkManager cupsd dbus avahi-daemon bluetoothd ); [[ -d /mnt/etc/sv/tlp ]] && Services+=( tlp )
+	if [[ "${OSsel,,}" == "artix" ]]; then Services+=( NetworkManager chronyd openrc-settingsd cupsd avahi-daemon bluetoothd ); [[ -f /mnt/etc/init.d/tlp ]] && Services+=( tlp ); [[ -v nvidiadrivers && -f /mnt/etc/init.d/nvidia-persistenced ]] && Services+=( nvidia-persistenced )
+	elif [[ "${OSsel,,}" == "arch" ]]; then Services+=( NetworkManager chronyd cups avahi-daemon bluetooth ); [[ -f /mnt/usr/lib/systemd/system/tlp.service ]] && Services+=( tlp )
+	elif [[ "${OSsel,,}" == "void" ]]; then Services+=( NetworkManager chronyd cupsd dbus avahi-daemon bluetoothd ); [[ -d /mnt/etc/sv/tlp ]] && Services+=( tlp )
 	fi
 	if [[ "${OSsel,,}" == "void" ]]; then for s in "${Services[@]}"; do "$chroot" /mnt ln -sf /etc/sv/"$s" /etc/runit/runsvdir/default/; done
 	else for s in "${Services[@]}"; do "$chroot" /mnt "$initc0" "$initc1" "$s"; done; fi
@@ -262,6 +264,9 @@ BootloaderSetup () {
 }
 InstallationSetup () {
 	VBTsel=0; SetupAvaible=1; CheckandSetup=( Check_required_files UEFIsel CPUsel KernelSel IRFsel BootloaderSel GPUsel Pacman_Locked )
+	if command -v timedatectl &>/dev/null; then timedatectl set-ntp true 2>/dev/null || true
+	elif command -v chronyd &>/dev/null; then chronyd -q "pool pool.ntp.org iburst" 2>/dev/null || true
+	elif command -v ntpdate &>/dev/null; then ntpdate pool.ntp.org 2>/dev/null || true; fi
 	echo 'List of all errors occurred during the installation process:' > Errors
 	for c in "${CheckandSetup[@]}"; do "$c" || SHOWerror "$c"; done
 	if [[ -s config ]]; then
