@@ -4,16 +4,16 @@ MenuSel () {
 	while true; do
 		echo -e "\n=== $question ==="
 		for i in "${!options[@]}"; do echo "$((i+1))) ${options[$i]}"; done
-		read -rp "Scelta: " user_choice
-		[[ "$user_choice" =~ ^[0-9]+$ && "$user_choice" -le "${#options[@]}" && "$user_choice" -gt 0 ]] && { var_name="${options[$((user_choice-1))]}"; echo "Selezionato: $var_name"; break; } || echo "Scelta non valida, riprova."
+		read -rp "Choice: " user_choice
+		[[ "$user_choice" =~ ^[0-9]+$ && "$user_choice" -le "${#options[@]}" && "$user_choice" -gt 0 ]] && { var_name="${options[$((user_choice-1))]}"; echo "Selected: $var_name"; break; } || echo "Invalid choice, please try again."
 	done
 }
 TextPromptSel () {
 	local -n var_name="$1"; local prompt_msg="$2" input_val
 	while true; do
 		read -rp "$prompt_msg: " input_val
-		YesNoSel "Confermi che << $input_val >> è corretto?"
-		[[ "$CC" -eq 1 ]] && { var_name="$input_val"; break; } || echo "Riproviamo..."
+		YesNoSel "Confirm << $input_val >> is correct?"
+		[[ "$CC" -eq 1 ]] && { var_name="$input_val"; break; } || echo "Let's try again..."
 	done
 }
 YesNoSel () {
@@ -22,7 +22,7 @@ YesNoSel () {
 		read -rp "$1 [yes/no]: " choice
 		if [[ "${choice,,}" =~ ^(y|yes)$ ]]; then CC=1 ; break
 		elif [[ "${choice,,}" =~ ^(n|no)$ ]]; then CC=0 ; break
-		else echo "Rispondi 'yes' (y) o 'no' (n)." ; fi
+		else echo "Please answer 'yes' (y) or 'no' (n)." ; fi
 	done
 }
 AdditionalDriveSel () {
@@ -81,7 +81,7 @@ GPUsel () {
 		else echo 'Using default Mesa'; fi
 		if command -v strings >/dev/null && [[ -f /sys/firmware/acpi/tables/DSDT ]]; then AcpiOS="$(strings /sys/firmware/acpi/tables/DSDT | grep -i 'windows ' | sort | tail -1)"; fi
 	elif [[ "$gpu_info" =~ (AMD|Radeon) ]]; then [[ "${OSsel,,}" == "void" ]] && amddrivers=(xf86-video-amdgpu mesa-dri vulkan-loader mesa-vulkan-radeon) || amddrivers=(amdgpu mesa vulkan-radeon libva-mesa-driver)
-	elif [[ "$gpu_info" =~ (VMware|VirtualBox|Virtio|QXL) ]]; then VBTsel=1; echo "VM detected: The default Mesa driver will be installed"
+	elif [[ "$gpu_info" =~ (VMware|VirtualBox|Virtio|QXL) ]]; then echo "VM detected: The default Mesa driver will be installed"
 	else echo "Generic GPU: Mesa will be installed"; fi
 }
 Pacman_Locked() {
@@ -113,5 +113,4 @@ BootloaderSel()			{ [[ "$UEFImode" -eq 0 ]] && { BLsel="grub"; echo "BIOS mode: 
 HostnameSel()			{ TextPromptSel "HNsel" "Enter preferred hostname"; }
 UsernameSel()			{ TextPromptSel "UNsel" "Enter preferred username"; }
 IRFsel()				{ [[ "${OSsel,,}" == "void" ]] && { IRFSetup="dracut"; echo "Selected Initramfs: dracut"; } || MenuSel "IRFSetup" "Select preferred Initramfs Generator" "booster" "mkinitcpio" "dracut"; }
-VirtualBoxTest()		{ YesNoSel "If this is a Virtualbox installation for test, skip every choice?"; VBTsel="$CC"; [[ "$VBTsel" -eq 1 ]] && echo "OK, skip all checks." || echo "OK, let's proceed with questions."; }
-ArchRepoSel()			{ YesNoSel "You want Arch repositories as well as Artix repositories?"; [[ "$CC" -eq 1 ]] && { ARCHrepo=1; echo "OK, adding Arch repositories!"; } || { ARCHrepo=''; echo "Proceeding without them..."; }; }
+ArchRepoSel()			{ YesNoSel "Do you want Arch repositories as well as Artix repositories?"; [[ "$CC" -eq 1 ]] && { ARCHrepo=1; echo "OK, adding Arch repositories!"; } || { ARCHrepo=''; echo "Proceeding without them..."; }; }
