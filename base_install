@@ -18,7 +18,10 @@ DiskPartition () {
 	local dialog_list=(); while read -r n s; do dialog_list+=("$n" "$s"); done < <(lsblk -dlnp -o NAME,SIZE)
 	DRIVE=$(dialog --title "OS INSTALLATION" --stdout --menu "Select preferred drive" 0 0 0 "${dialog_list[@]}")
 	[[ -z "$DRIVE" ]] && exit 1
-	[[ "$VBTsel" -eq 0 ]] && ADDITIONAL_DRIVE="$(dialog --title "ADDITIONAL" --stdout --menu "Select secondary partition/drive (Optional - Cancel to skip)" 0 0 0 "${dialog_list[@]}")"
+	if [[ "$VBTsel" -eq 0 && "$ADD_SETUP" -eq 1 ]]; then
+		local add_dialog_list=(); while read -r n s; do [[ "$n" != "$DRIVE" ]] && add_dialog_list+=("$n" "$s"); done < <(lsblk -dlnp -o NAME,SIZE)
+		ADDITIONAL_DRIVE="$(dialog --title "ADDITIONAL" --stdout --menu "Select secondary partition/drive (Optional - Cancel to skip)" 0 0 0 "${add_dialog_list[@]}")"
+	fi
 	umount "$DRIVE"?* || true; sgdisk -ozZ "$DRIVE" || SHOWerror "Zapping drive partition table"
 	local total_ram_gb=$(( ($(free -m | awk '/^Mem:/{print $2}') + 1023) / 1024 )) swap_gb
 	[[ "$total_ram_gb" -le 8 ]] && swap_gb=$(( total_ram_gb + 1 )) || { [[ "$total_ram_gb" -le 32 ]] && swap_gb=$total_ram_gb || swap_gb=32; }
@@ -279,9 +282,9 @@ InstallationSetup () {
 		[[ "${OSsel,,}" == "artix" ]] && ArchRepoSel
 		[[ "${OSsel,,}" == "void" ]] && { VoidInstMethod && LibrarySel; }
 		if [[ "$VBTsel" == "1" ]]; then LANGsel='en_GB.UTF-8'; LOCsel='it_IT.UTF-8'; HNsel=tarch1; UNsel=tarch1; TZsel='Europe/Rome'; PIDsel=UUID; FSsel=btrfs; [[ "${OSsel,,}" == "void" ]] && { LIBsel="GLIBC"; VImethod="XBPS"; }
-		else local Personalization=( LocalizationSel LanguageSel TimezoneSel HostnameSel UsernameSel PartIDSel FilesystemSel )
+		else local Personalization=( LocalizationSel LanguageSel TimezoneSel HostnameSel UsernameSel PartIDSel FilesystemSel AdditionalDriveSel )
 			for s in "${Personalization[@]}"; do "$s" || SHOWerror "$s"; done; fi
-		Steps=( "OSsel=$OSsel" "ARCHrepo=$ARCHrepo" "LANGsel=$LANGsel" "LOCsel=$LOCsel" "HNsel=$HNsel" "UNsel=$UNsel" "TZsel=$TZsel" "PIDsel=$PIDsel" "FSsel=$FSsel" "BLsel=$BLsel" "IRFSetup=$IRFSetup" )
+		Steps=( "OSsel=$OSsel" "ARCHrepo=$ARCHrepo" "LANGsel=$LANGsel" "LOCsel=$LOCsel" "HNsel=$HNsel" "UNsel=$UNsel" "TZsel=$TZsel" "PIDsel=$PIDsel" "FSsel=$FSsel" "BLsel=$BLsel" "IRFSetup=$IRFSetup" "ADD_SETUP=$ADD_SETUP" "ADD_FORMAT=$ADD_FORMAT" "ADD_FS=$ADD_FS" "ADD_LABEL=$ADD_LABEL" )
 		[[ "${OSsel,,}" == "void" ]] && Steps+=( "LIBsel=$LIBsel" "VImethod=$VImethod" )
 		rm -f config
 		for a in "${Steps[@]}"; do echo "$a" >> config; done; cat config
