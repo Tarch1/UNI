@@ -61,16 +61,17 @@ Pacman_Locked() {
 	[[ -f /var/lib/pacman/db.lck || -f /mnt/var/lib/pacman/db.lck ]] && { echo -e "Pacman is blocked. Removing lockfiles..."; rm -f /var/lib/pacman/db.lck /mnt/var/lib/pacman/db.lck; } || echo "No locked database"
 }
 AdditionalDriveSel () {
-	YesNoSel "Do you want to configure a secondary drive/partition for /media/HDD?"
-	if [[ "$CC" -eq 1 ]]; then ADD_SETUP=1
-		YesNoSel "WARNING: Do you want to format this secondary drive? (All data will be lost)"
+	local avail_disks=(); while read -r name; do
+		[[ "$name" == *"loop"* || "$name" == *"sr"* ]] && continue; lsblk "$name" -n -o MOUNTPOINTS | grep -qE '/run/.*(iso|live|initramfs|miso)' && continue
+		blkid "$name"* 2>/dev/null | grep -q 'iso9660' && continue; avail_disks+=("$name");	done < <(lsblk -dpno NAME | grep -E '/dev/sd|/dev/nvme|/dev/vd|/dev/hd')
+	if [[ "${#avail_disks[@]}" -gt 1 ]]; then
+		echo -e "\n=== Secondary drive(s) detected ==="
+		YesNoSel "WARNING: Do you want to configure and format a secondary drive? (All data will be lost)"
 		if [[ "$CC" -eq 1 ]]; then
-			ADD_FORMAT=1; MenuSel "ADD_FS" "Select the filesystem for the secondary drive" "ext4" "btrfs" "exfat" "ntfs"
+			ADD_SETUP=1; ADD_FORMAT=1; MenuSel "ADD_FS" "Select the filesystem for the secondary drive" "ext4" "btrfs" "exfat" "ntfs"
 			TextPromptSel "ADD_LABEL" "Enter the label for the secondary drive (leave empty for default 'DATA')"; [[ -z "$ADD_LABEL" ]] && ADD_LABEL="DATA"
-		else ADD_FORMAT=0
-		fi
-	else ADD_SETUP=0
-	fi
+		else ADD_SETUP=0; ADD_FORMAT=0; ADD_FS=""; ADD_LABEL=""; fi
+	else ADD_SETUP=0; ADD_FORMAT=0; ADD_FS=""; ADD_LABEL=""; fi
 }
 ArchRepoSetup () {
 	local target_conf="$1"; local cmd=(); local mirror_file="/etc/pacman.d/mirrorlist-arch"
