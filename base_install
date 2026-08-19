@@ -56,17 +56,15 @@ FileSystemFormat () {
 	swapon "$SWAP_PART" || SHOWerror "swapon"; mkdir -p /mnt/boot; mount "$BOOT_PART" /mnt/boot || SHOWerror "mount boot partition"; lsblk -f
 }
 AdditionalDriveSetup () {
-	if [[ -n "$ADDITIONAL_DRIVE" && "$ADDITIONAL_DRIVE" != "$DRIVE" ]]; then
-		YesNoSel "Do you want to format the secondary drive/partition?"
-		if [[ "$CC" -eq 1 ]]; then
-			MenuSel "ADD_FS" "Select the filesystem for the secondary drive" "ext4" "btrfs" "exfat" "ntfs"
-			read -rp "Enter the label for the secondary drive [default: DATA]: " ADD_LABEL
-			ADD_LABEL="${ADD_LABEL:-DATA}"
+	if [[ "$ADD_SETUP" -ne 1 || -z "$ADDITIONAL_DRIVE" ]]; then return 0; fi
+	if [[ "$ADDITIONAL_DRIVE" != "$DRIVE" ]]; then
+		if [[ "$ADD_FORMAT" -eq 1 ]]; then
 			case "$ADD_FS" in
 				ext4)	mkfs.ext4 -F -L "$ADD_LABEL" "$ADDITIONAL_DRIVE" || SHOWerror "mkfs.ext4 additional drive" ;;
 				btrfs)	mkfs.btrfs -f -L "$ADD_LABEL" "$ADDITIONAL_DRIVE" || SHOWerror "mkfs.btrfs additional drive" ;;
 				exfat)	mkfs.exfat -n "$ADD_LABEL" "$ADDITIONAL_DRIVE" || SHOWerror "mkfs.exfat additional drive" ;;
 				ntfs)	mkfs.ntfs -f -L "$ADD_LABEL" "$ADDITIONAL_DRIVE" || SHOWerror "mkfs.ntfs additional drive" ;;
+				*)		echo "Unsupported filesystem for additional drive: $ADD_FS" ;;
 			esac
 		fi
 		mkdir -p /mnt/media/HDD && mount "$ADDITIONAL_DRIVE" /mnt/media/HDD || SHOWerror "Mount additional drive"
