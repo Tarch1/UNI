@@ -1,13 +1,4 @@
 #!/bin/bash
-YesNoSel () {
-	local choice
-	while true; do
-		read -rp "$1 [yes/no]: " choice
-		if [[ "${choice,,}" =~ ^(y|yes)$ ]]; then CC=1 ; break
-		elif [[ "${choice,,}" =~ ^(n|no)$ ]]; then CC=0 ; break
-		else echo "Rispondi 'yes' (y) o 'no' (n)." ; fi
-	done
-}
 MenuSel () {
 	local -n var_name="$1"; local question="$2" user_choice; shift 2; local options=("$@")
 	while true; do
@@ -25,8 +16,44 @@ TextPromptSel () {
 		[[ "$CC" -eq 1 ]] && { var_name="$input_val"; break; } || echo "Riproviamo..."
 	done
 }
-UEFIsel () {
-	[[ -d "/sys/firmware/efi/" ]] && { mount | grep -q "/sys/firmware/efi/efivars" || mount -t efivarfs efivarfs /sys/firmware/efi/efivars; UEFImode=1; echo 'UEFI Mode detected'; } || { UEFImode=0; echo 'BIOS Mode detected'; }
+YesNoSel () {
+	local choice
+	while true; do
+		read -rp "$1 [yes/no]: " choice
+		if [[ "${choice,,}" =~ ^(y|yes)$ ]]; then CC=1 ; break
+		elif [[ "${choice,,}" =~ ^(n|no)$ ]]; then CC=0 ; break
+		else echo "Rispondi 'yes' (y) o 'no' (n)." ; fi
+	done
+}
+AdditionalDriveSel () {
+	local avail_disks=(); while read -r name; do
+		[[ "$name" == *"loop"* || "$name" == *"sr"* ]] && continue; lsblk "$name" -n -o MOUNTPOINTS | grep -qE '/run/.*(iso|live|initramfs|miso)' && continue
+		blkid "$name"* 2>/dev/null | grep -q 'iso9660' && continue; avail_disks+=("$name");	done < <(lsblk -dpno NAME | grep -E '/dev/sd|/dev/nvme|/dev/vd|/dev/hd')
+	if [[ "${#avail_disks[@]}" -gt 1 ]]; then
+		echo -e "\n=== Secondary drive(s) detected ==="
+		YesNoSel "WARNING: Do you want to configure and format a secondary drive? (All data will be lost)"
+		if [[ "$CC" -eq 1 ]]; then
+			ADD_SETUP=1; ADD_FORMAT=1; MenuSel "ADD_FS" "Select the filesystem for the secondary drive" "ext4" "btrfs" "exfat" "ntfs"
+			TextPromptSel "ADD_LABEL" "Enter the label for the secondary drive (leave empty for default 'DATA')"; [[ -z "$ADD_LABEL" ]] && ADD_LABEL="DATA"
+		else ADD_SETUP=0; ADD_FORMAT=0; ADD_FS=""; ADD_LABEL=""; fi
+	else ADD_SETUP=0; ADD_FORMAT=0; ADD_FS=""; ADD_LABEL=""; fi
+}
+AnotherCheck () {
+	[[ "${OSsel,,}" == "void" ]] && { echo "Skipping check (Void uses XBPS)"; return 0; }
+	local repos=(extra multilib); [[ "${OSsel,,}" == "artix" ]] && repos+=(system world galaxy)
+	pacman -Sylq "${repos[@]}" | sort > pacman_db; printf '%s\n' "${miss[@]}" | sort -u > pkg_missed
+	mapfile -t unlisted < <(comm -13 pacman_db pkg_missed); echo "Unlisted = ${unlisted[*]}"
+}
+ArchRepoSetup () {
+	local target_conf="$1"; local cmd=(); local mirror_file="/etc/pacman.d/mirrorlist-arch"
+	[[ "$target_conf" == "/mnt/etc/pacman.conf" ]] && { cmd=( "$chroot" /mnt ); mirror_file="/mnt/etc/pacman.d/mirrorlist-arch"; }
+	if [[ ${#cmd[@]} -eq 0 ]]; then rm -rf /etc/pacman.d/gnupg; mkdir -p /etc/pacman.d/gnupg; chmod 700 /etc/pacman.d/gnupg; pacman-key --init; pacman-key --populate artix
+	else "${cmd[@]}" pacman-key --init; "${cmd[@]}" pacman-key --populate artix archlinux; fi
+	sed -i '/\[universe\]/,/^[[:space:]]*$/d' "$target_conf"
+	printf '\n[universe]\nServer = https://universe.artixlinux.org/$arch\nServer = https://mirror1.artixlinux.org/universe/$arch\nServer = https://mirror.pascalpuffke.de/artix-universe/$arch\nServer = https://artixlinux.qontinuum.space/artixlinux/universe/os/$arch\nServer = https://mirror1.cl.netactuate.com/artix/universe/$arch\nServer = https://ftp.crifo.org/artix-universe/$arch\n' >> "$target_conf"
+	[[ ! -f "$mirror_file" ]] && "${cmd[@]}" pacman -Sy --noconfirm artix-keyring artix-archlinux-support
+	grep -q 'mirrorlist-arch' "$target_conf" || printf '\n# Arch\n[extra]\nInclude = /etc/pacman.d/mirrorlist-arch\n\n[multilib]\nInclude = /etc/pacman.d/mirrorlist-arch\n' >> "$target_conf"
+	"${cmd[@]}" pacman-key --populate artix archlinux || SHOWerror "Final pacman-key populate"
 }
 CPUsel () {
 	if grep -q "GenuineIntel" /proc/cpuinfo; then echo 'Installing Intel microcode'; microcodepkg='intel-ucode'
@@ -60,50 +87,6 @@ GPUsel () {
 Pacman_Locked() {
 	[[ -f /var/lib/pacman/db.lck || -f /mnt/var/lib/pacman/db.lck ]] && { echo -e "Pacman is blocked. Removing lockfiles..."; rm -f /var/lib/pacman/db.lck /mnt/var/lib/pacman/db.lck; } || echo "No locked database"
 }
-AdditionalDriveSel () {
-	local avail_disks=(); while read -r name; do
-		[[ "$name" == *"loop"* || "$name" == *"sr"* ]] && continue; lsblk "$name" -n -o MOUNTPOINTS | grep -qE '/run/.*(iso|live|initramfs|miso)' && continue
-		blkid "$name"* 2>/dev/null | grep -q 'iso9660' && continue; avail_disks+=("$name");	done < <(lsblk -dpno NAME | grep -E '/dev/sd|/dev/nvme|/dev/vd|/dev/hd')
-	if [[ "${#avail_disks[@]}" -gt 1 ]]; then
-		echo -e "\n=== Secondary drive(s) detected ==="
-		YesNoSel "WARNING: Do you want to configure and format a secondary drive? (All data will be lost)"
-		if [[ "$CC" -eq 1 ]]; then
-			ADD_SETUP=1; ADD_FORMAT=1; MenuSel "ADD_FS" "Select the filesystem for the secondary drive" "ext4" "btrfs" "exfat" "ntfs"
-			TextPromptSel "ADD_LABEL" "Enter the label for the secondary drive (leave empty for default 'DATA')"; [[ -z "$ADD_LABEL" ]] && ADD_LABEL="DATA"
-		else ADD_SETUP=0; ADD_FORMAT=0; ADD_FS=""; ADD_LABEL=""; fi
-	else ADD_SETUP=0; ADD_FORMAT=0; ADD_FS=""; ADD_LABEL=""; fi
-}
-ArchRepoSetup () {
-	local target_conf="$1"; local cmd=(); local mirror_file="/etc/pacman.d/mirrorlist-arch"
-	[[ "$target_conf" == "/mnt/etc/pacman.conf" ]] && { cmd=( "$chroot" /mnt ); mirror_file="/mnt/etc/pacman.d/mirrorlist-arch"; }
-	if [[ ${#cmd[@]} -eq 0 ]]; then rm -rf /etc/pacman.d/gnupg; mkdir -p /etc/pacman.d/gnupg; chmod 700 /etc/pacman.d/gnupg; pacman-key --init; pacman-key --populate artix
-	else "${cmd[@]}" pacman-key --init; "${cmd[@]}" pacman-key --populate artix archlinux; fi
-	sed -i '/\[universe\]/,/^[[:space:]]*$/d' "$target_conf"
-	printf '\n[universe]\nServer = https://universe.artixlinux.org/$arch\nServer = https://mirror1.artixlinux.org/universe/$arch\nServer = https://mirror.pascalpuffke.de/artix-universe/$arch\nServer = https://artixlinux.qontinuum.space/artixlinux/universe/os/$arch\nServer = https://mirror1.cl.netactuate.com/artix/universe/$arch\nServer = https://ftp.crifo.org/artix-universe/$arch\n' >> "$target_conf"
-	[[ ! -f "$mirror_file" ]] && "${cmd[@]}" pacman -Sy --noconfirm artix-keyring artix-archlinux-support
-	grep -q 'mirrorlist-arch' "$target_conf" || printf '\n# Arch\n[extra]\nInclude = /etc/pacman.d/mirrorlist-arch\n\n[multilib]\nInclude = /etc/pacman.d/mirrorlist-arch\n' >> "$target_conf"
-	"${cmd[@]}" pacman-key --populate artix archlinux || SHOWerror "Final pacman-key populate"
-}
-AnotherCheck () {
-	[[ "${OSsel,,}" == "void" ]] && { echo "Skipping check (Void uses XBPS)"; return 0; }
-	local repos=(extra multilib); [[ "${OSsel,,}" == "artix" ]] && repos+=(system world galaxy)
-	pacman -Sylq "${repos[@]}" | sort > pacman_db; printf '%s\n' "${miss[@]}" | sort -u > pkg_missed
-	mapfile -t unlisted < <(comm -13 pacman_db pkg_missed); echo "Unlisted = ${unlisted[*]}"
-}
-KernelSel() { [[ "${OSsel,,}" == "void" ]] && MenuSel "KSel" "Select preferred Kernel" "linux" "linux-lts" || MenuSel "KSel" "Select preferred Kernel" "linux" "linux-lts" "linux-hardened" "linux-zen"; }
-OperatingSystemSel()   { MenuSel "OSsel" "Select the distro to setup" "Arch" "Artix" "Void"; }
-VoidInstMethod()       { MenuSel "VImethod" "Select installation type" "XBPS" "ROOTFS"; }
-LibrarySel()           { MenuSel "LIBsel" "Select base library" "GLIBC" "MUSL"; }
-LocalizationSel()      { MenuSel "LOCsel" "Select localization" "en_US.UTF-8" "en_GB.UTF-8" "it_IT.UTF-8"; }
-LanguageSel()          { MenuSel "LANGsel" "Select preferred Language" "en_US.UTF-8" "en_GB.UTF-8" "it_IT.UTF-8"; }
-PartIDSel()            { MenuSel "PIDsel" "Select partition identifier" "UUID" "PARTUUID" "LABEL"; }
-FilesystemSel()        { MenuSel "FSsel" "Select filesystem for ROOT" "ext4" "btrfs"; }
-BootloaderSel()        { [[ "$UEFImode" -eq 0 ]] && { BLsel="grub"; echo "BIOS mode: GRUB selected automatically"; } || MenuSel "BLsel" "Select Bootloader" "refind" "grub" "efistub"; }
-HostnameSel()          { TextPromptSel "HNsel" "Enter preferred hostname"; }
-UsernameSel()          { TextPromptSel "UNsel" "Enter preferred username"; }
-IRFsel()               { [[ "${OSsel,,}" == "void" ]] && { IRFSetup="dracut"; echo "Selected Initramfs: dracut"; } || MenuSel "IRFSetup" "Select preferred Initramfs Generator" "booster" "mkinitcpio" "dracut"; }
-VirtualBoxTest () { YesNoSel "If this is a Virtualbox installation for test, skip every choice?"; VBTsel="$CC"; [[ "$VBTsel" -eq 1 ]] && echo "OK, skip all checks." || echo "OK, let's proceed with questions."; }
-ArchRepoSel () { YesNoSel "You want Arch repositories as well as Artix repositories?"; [[ "$CC" -eq 1 ]] && { ARCHrepo=1; echo "OK, adding Arch repositories!"; } || { ARCHrepo=''; echo "Proceeding without them..."; }; }
 TimezoneSel () {
 	while true; do
 		echo -e "\n=== Select Timezone ==="; echo "1) Europe/Rome"
@@ -115,3 +98,20 @@ TimezoneSel () {
 	done
 	echo "Selected Timezone: $TZsel"
 }
+UEFIsel () {
+	[[ -d "/sys/firmware/efi/" ]] && { mount | grep -q "/sys/firmware/efi/efivars" || mount -t efivarfs efivarfs /sys/firmware/efi/efivars; UEFImode=1; echo 'UEFI Mode detected'; } || { UEFImode=0; echo 'BIOS Mode detected'; }
+}
+KernelSel()				{ [[ "${OSsel,,}" == "void" ]] && MenuSel "KSel" "Select preferred Kernel" "linux" "linux-lts" || MenuSel "KSel" "Select preferred Kernel" "linux" "linux-lts" "linux-hardened" "linux-zen"; }
+OperatingSystemSel()	{ MenuSel "OSsel" "Select the distro to setup" "Arch" "Artix" "Void"; }
+VoidInstMethod()		{ MenuSel "VImethod" "Select installation type" "XBPS" "ROOTFS"; }
+LibrarySel()			{ MenuSel "LIBsel" "Select base library" "GLIBC" "MUSL"; }
+LocalizationSel()		{ MenuSel "LOCsel" "Select localization" "en_US.UTF-8" "en_GB.UTF-8" "it_IT.UTF-8"; }
+LanguageSel()			{ MenuSel "LANGsel" "Select preferred Language" "en_US.UTF-8" "en_GB.UTF-8" "it_IT.UTF-8"; }
+PartIDSel()				{ MenuSel "PIDsel" "Select partition identifier" "UUID" "PARTUUID" "LABEL"; }
+FilesystemSel()			{ MenuSel "FSsel" "Select filesystem for ROOT" "ext4" "btrfs"; }
+BootloaderSel()			{ [[ "$UEFImode" -eq 0 ]] && { BLsel="grub"; echo "BIOS mode: GRUB selected automatically"; } || MenuSel "BLsel" "Select Bootloader" "refind" "grub" "efistub"; }
+HostnameSel()			{ TextPromptSel "HNsel" "Enter preferred hostname"; }
+UsernameSel()			{ TextPromptSel "UNsel" "Enter preferred username"; }
+IRFsel()				{ [[ "${OSsel,,}" == "void" ]] && { IRFSetup="dracut"; echo "Selected Initramfs: dracut"; } || MenuSel "IRFSetup" "Select preferred Initramfs Generator" "booster" "mkinitcpio" "dracut"; }
+VirtualBoxTest()		{ YesNoSel "If this is a Virtualbox installation for test, skip every choice?"; VBTsel="$CC"; [[ "$VBTsel" -eq 1 ]] && echo "OK, skip all checks." || echo "OK, let's proceed with questions."; }
+ArchRepoSel()			{ YesNoSel "You want Arch repositories as well as Artix repositories?"; [[ "$CC" -eq 1 ]] && { ARCHrepo=1; echo "OK, adding Arch repositories!"; } || { ARCHrepo=''; echo "Proceeding without them..."; }; }
