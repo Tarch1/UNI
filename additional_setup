@@ -105,14 +105,13 @@ IRFsel()               { [[ "${OSsel,,}" == "void" ]] && { IRFSetup="dracut"; ec
 VirtualBoxTest () { YesNoSel "If this is a Virtualbox installation for test, skip every choice?"; VBTsel="$CC"; [[ "$VBTsel" -eq 1 ]] && echo "OK, skip all checks." || echo "OK, let's proceed with questions."; }
 ArchRepoSel () { YesNoSel "You want Arch repositories as well as Artix repositories?"; [[ "$CC" -eq 1 ]] && { ARCHrepo=1; echo "OK, adding Arch repositories!"; } || { ARCHrepo=''; echo "Proceeding without them..."; }; }
 TimezoneSel () {
-	local -n var_name="$1"
 	while true; do
 		echo -e "\n=== Select Timezone ==="; echo "1) Europe/Rome"
 		read -rp "Type '1' or write custom format (e.g. America/New_York) ['q' to quit]: " input_val
-		if [[ "$input_val" == "1" ]]; then var_name="Europe/Rome" ; break
-		elif [[ "$input_val" =~ ^(q|quit)$ ]]; then var_name="" ; break
+		if [[ "$input_val" == "1" ]]; then TZsel="Europe/Rome" ; break
+		elif [[ "$input_val" =~ ^(q|quit)$ ]]; then TZsel="" ; break
 		elif [[ -z "$input_val" ]]; then echo "Input cannot be empty."
-		else YesNoSel "Confirm timezone: $input_val ?"; [[ "$CC" -eq 1 ]] && { var_name="$input_val"; break; }; fi
+		else YesNoSel "Confirm timezone: $input_val ?"; [[ "$CC" -eq 1 ]] && { TZsel="$input_val"; break; }; fi
 	done
-	echo "Selected Timezone: $var_name"
+	echo "Selected Timezone: $TZsel"
 }
