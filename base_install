@@ -54,16 +54,16 @@ FileSystemFormat () {
 }
 AdditionalDriveSetup () {
 	if [[ -n "$ADDITIONAL_DRIVE" && "$ADDITIONAL_DRIVE" != "$DRIVE" ]]; then
-		YesNoSel "ATTENZIONE: Vuoi formattare il disco/partizione secondaria ($ADDITIONAL_DRIVE)? (Tutti i dati verranno persi)"
+		YesNoSel "Do you want to format the secondary drive/partition?"
 		if [[ "$CC" -eq 1 ]]; then
-			MenuSel "ADD_FS" "Seleziona il filesystem per il disco secondario" "ext4" "btrfs" "exfat" "ntfs"
-			read -rp "Inserisci l'etichetta (Label) per il disco secondario [default: DATA]: " ADD_LABEL
+			MenuSel "ADD_FS" "Select the filesystem for the secondary drive" "ext4" "btrfs" "exfat" "ntfs"
+			read -rp "Enter the label for the secondary drive [default: DATA]: " ADD_LABEL
 			ADD_LABEL="${ADD_LABEL:-DATA}"
 			case "$ADD_FS" in
-				ext4)  mkfs.ext4 -F -L "$ADD_LABEL" "$ADDITIONAL_DRIVE" || SHOWerror "mkfs.ext4 additional drive" ;;
-				btrfs) mkfs.btrfs -f -L "$ADD_LABEL" "$ADDITIONAL_DRIVE" || SHOWerror "mkfs.btrfs additional drive" ;;
-				exfat) mkfs.exfat -n "$ADD_LABEL" "$ADDITIONAL_DRIVE" || SHOWerror "mkfs.exfat additional drive" ;;
-				ntfs)  mkfs.ntfs -f -L "$ADD_LABEL" "$ADDITIONAL_DRIVE" || SHOWerror "mkfs.ntfs additional drive" ;;
+				ext4)	mkfs.ext4 -F -L "$ADD_LABEL" "$ADDITIONAL_DRIVE" || SHOWerror "mkfs.ext4 additional drive" ;;
+				btrfs)	mkfs.btrfs -f -L "$ADD_LABEL" "$ADDITIONAL_DRIVE" || SHOWerror "mkfs.btrfs additional drive" ;;
+				exfat)	mkfs.exfat -n "$ADD_LABEL" "$ADDITIONAL_DRIVE" || SHOWerror "mkfs.exfat additional drive" ;;
+				ntfs)	mkfs.ntfs -f -L "$ADD_LABEL" "$ADDITIONAL_DRIVE" || SHOWerror "mkfs.ntfs additional drive" ;;
 			esac
 		fi
 		mkdir -p /mnt/media/HDD && mount "$ADDITIONAL_DRIVE" /mnt/media/HDD || SHOWerror "Mount additional drive"
