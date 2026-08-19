@@ -60,6 +60,18 @@ GPUsel () {
 Pacman_Locked() {
 	[[ -f /var/lib/pacman/db.lck || -f /mnt/var/lib/pacman/db.lck ]] && { echo -e "Pacman is blocked. Removing lockfiles..."; rm -f /var/lib/pacman/db.lck /mnt/var/lib/pacman/db.lck; } || echo "No locked database"
 }
+AdditionalDriveSel () {
+	YesNoSel "Do you want to configure a secondary drive/partition for /media/HDD?"
+	if [[ "$CC" -eq 1 ]]; then ADD_SETUP=1
+		YesNoSel "WARNING: Do you want to format this secondary drive? (All data will be lost)"
+		if [[ "$CC" -eq 1 ]]; then
+			ADD_FORMAT=1; MenuSel "ADD_FS" "Select the filesystem for the secondary drive" "ext4" "btrfs" "exfat" "ntfs"
+			TextPromptSel "ADD_LABEL" "Enter the label for the secondary drive (leave empty for default 'DATA')"; [[ -z "$ADD_LABEL" ]] && ADD_LABEL="DATA"
+		else ADD_FORMAT=0
+		fi
+	else ADD_SETUP=0
+	fi
+}
 ArchRepoSetup () {
 	local target_conf="$1"; local cmd=(); local mirror_file="/etc/pacman.d/mirrorlist-arch"
 	[[ "$target_conf" == "/mnt/etc/pacman.conf" ]] && { cmd=( "$chroot" /mnt ); mirror_file="/mnt/etc/pacman.d/mirrorlist-arch"; }
