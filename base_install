@@ -36,7 +36,7 @@ FileSystemFormat () {
 	UNIfstab="$PIDsel=$BOOTID /boot vfat defaults 0 2\n$PIDsel=$SWAPID none swap defaults 0 0\n"
 	case "$FSsel" in
 		ext4)  mkfs.ext4 -L "$RootLabel" "$ROOT_PART" || SHOWerror "mkfs.ext4 ROOT"; ROOTID="$(blkid -s "$PIDsel" -o value "$ROOT_PART")" || SHOWerror "blkid ROOTID ext4"; mount "$ROOT_PART" /mnt || SHOWerror "mount ext4 root"; UNIfstab+="$PIDsel=$ROOTID / ext4 defaults 0 1\n" ;;
-		btrfs) modules=(btrfs); binaries='btrfs'; local SUBVolumes=( 'home' 'var_log' 'var_cache' 'snapshots' 'swap' ); local options='noatime,compress=zstd,space_cache=v2,discard=async'
+		btrfs) modules=(btrfs); binaries='btrfs'; local SUBVolumes=( 'home' 'var_log' 'var_cache' 'snapshots' ); local options='noatime,compress=zstd,space_cache=v2,discard=async'
 			   mkfs.btrfs -fL "$RootLabel" "$ROOT_PART" || SHOWerror "mkfs.btrfs ROOT"; ROOTID="$(blkid -s "$PIDsel" -o value "$ROOT_PART")" || SHOWerror "blkid ROOTID btrfs"
 			   mount "$ROOT_PART" /mnt || SHOWerror "mount btrfs root"; btrfs su cr /mnt/@ || SHOWerror "btrfs subvol @"
 			   for b in "${SUBVolumes[@]}"; do btrfs su cr /mnt/@"$b" || SHOWerror "btrfs subvol @$b"; done; umount /mnt || SHOWerror "umount btrfs root setup"
@@ -46,7 +46,6 @@ FileSystemFormat () {
 				   case "$c" in
 					   snapshots) mkdir -p /mnt/."$c" && mount -o "$options",subvol=@"$c" "$ROOT_PART" /mnt/."$c" || SHOWerror "mount @snapshots"; UNIfstab+="$PIDsel=$ROOTID /.$c btrfs $options,subvol=@$c 0 0\n" ;;
 					   var_log)   mkdir -p /mnt/var/log && mount -o "$options",subvol=@"$c" "$ROOT_PART" /mnt/var/log || SHOWerror "mount @var_log"; UNIfstab+="$PIDsel=$ROOTID /var/log btrfs $options,subvol=@$c 0 0\n" ;;
-					   swap)      ;;
 					   *)         mkdir -p /mnt/"$c" && mount -o defaults,"$options",subvol=@"$c" "$ROOT_PART" /mnt/"$c" || SHOWerror "mount @$c"; UNIfstab+="$PIDsel=$ROOTID /$c btrfs $options,subvol=@$c 0 0\n" ;;
 				   esac
 			   done ;;
@@ -56,11 +55,11 @@ FileSystemFormat () {
 	swapon "$SWAP_PART" || SHOWerror "swapon"; mkdir -p /mnt/boot; mount "$BOOT_PART" /mnt/boot || SHOWerror "mount boot partition"; lsblk -f
 }
 AdditionalDriveSetup () {
-	if [[ -n "$ADDITIONAL_DRIVE" ]]; then
-		mkdir -p /mnt/run/media/"$HNsel"/HDD && mount "$ADDITIONAL_DRIVE" /mnt/run/media/"$HNsel"/HDD || SHOWerror "Mount additional drive"
+	if [[ -n "$ADDITIONAL_DRIVE" && "$ADDITIONAL_DRIVE" != "$DRIVE" ]]; then
+		mkdir -p /mnt/media/HDD && mount "$ADDITIONAL_DRIVE" /mnt/media/HDD || SHOWerror "Mount additional drive"
 		local add_id="$(blkid -s "$PIDsel" -o value "$ADDITIONAL_DRIVE" 2>/dev/null || echo "$ADDITIONAL_DRIVE")"
 		local add_fs="$(blkid -s TYPE -o value "$ADDITIONAL_DRIVE" 2>/dev/null || echo "auto")"
-		UNIfstab+="$PIDsel=$add_id /run/media/$HNsel/HDD $add_fs defaults,noatime 0 2\n"
+		UNIfstab+="$PIDsel=$add_id /media/HDD $add_fs defaults,noatime 0 2\n"
 	fi
 }
 ArchTixSystemInstall () {
