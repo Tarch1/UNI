@@ -265,7 +265,8 @@ BootloaderSetup () {
 	esac
 }
 InstallationSetup () {
-	VBTsel=0; SetupAvaible=1; CheckandSetup=( Check_required_files UEFIsel KernelSel IRFsel BootloaderSel Pacman_Locked )
+	VBTsel=0; [[ "$(lspci | grep -Ei 'VGA|3D')" =~ (VMware|VirtualBox|Virtio|QXL) ]] && VBTsel=1
+	SetupAvaible=1; CheckandSetup=( Check_required_files UEFIsel KernelSel IRFsel BootloaderSel Pacman_Locked )
 	if command -v timedatectl >/dev/null; then timedatectl set-ntp true || true
 	elif command -v chronyd >/dev/null; then chronyd -q "pool pool.ntp.org iburst" || true
 	elif command -v ntpdate >/dev/null; then ntpdate pool.ntp.org || true; fi
@@ -281,7 +282,7 @@ InstallationSetup () {
 	if [[ "$SetupAvaible" == "1" ]]; then OperatingSystemSel
 		[[ "${OSsel,,}" == "artix" ]] && ArchRepoSel
 		[[ "${OSsel,,}" == "void" ]] && { VoidInstMethod && LibrarySel; }
-		if [[ "$VBTsel" == "1" ]]; then LANGsel='en_GB.UTF-8'; LOCsel='it_IT.UTF-8'; HNsel=tarch1; UNsel=tarch1; TZsel='Europe/Rome'; PIDsel=UUID; FSsel=btrfs; [[ "${OSsel,,}" == "void" ]] && { LIBsel="GLIBC"; VImethod="XBPS"; }
+		if [[ "$VBTsel" == "1" ]]; then LANGsel='en_GB.UTF-8'; LOCsel='it_IT.UTF-8'; HNsel=tarch1; UNsel=tarch1; TZsel='Europe/Rome'; PIDsel=UUID; FSsel=btrfs; ADD_SETUP=0; ADD_FORMAT=0; ADD_FS=""; ADD_LABEL=""; [[ "${OSsel,,}" == "void" ]] && { LIBsel="GLIBC"; VImethod="XBPS"; }
 		else local Personalization=( LocalizationSel LanguageSel TimezoneSel HostnameSel UsernameSel PartIDSel FilesystemSel AdditionalDriveSel )
 			for s in "${Personalization[@]}"; do "$s" || SHOWerror "$s"; done; fi
 		Steps=( "OSsel=$OSsel" "ARCHrepo=$ARCHrepo" "LANGsel=$LANGsel" "LOCsel=$LOCsel" "HNsel=$HNsel" "UNsel=$UNsel" "TZsel=$TZsel" "PIDsel=$PIDsel" "FSsel=$FSsel" "BLsel=$BLsel" "IRFSetup=$IRFSetup" "ADD_SETUP=$ADD_SETUP" "ADD_FORMAT=$ADD_FORMAT" "ADD_FS=$ADD_FS" "ADD_LABEL=$ADD_LABEL" )
