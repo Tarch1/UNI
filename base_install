@@ -162,10 +162,7 @@ PKGcheck () {
 	fi
 }
 KernelSetup () {
-	case "$microcodepkg" in
-		intel-ucode) echo -e 'options i915 enable_fbc=1 fastboot=0 enable_dc=4' >> /mnt/etc/modprobe.d/i915.conf || SHOWerror "i915 modprobe options" ;;
-		*) echo 'AMD or generic setup: Nothing at the moment' ;;
-	esac
+	[[ "$microcodepkg" == "intel-ucode" ]] && { mkdir -p /mnt/etc/modprobe.d && echo 'options i915 enable_fbc=1 fastboot=0 enable_dc=4' >> /mnt/etc/modprobe.d/i915.conf || SHOWerror "i915 modprobe options"; }
 	if [[ ${#nvidiadrivers[@]} -gt 0 ]]; then
 		[[ "${OSsel,,}" == "artix" ]] && { "$chroot" /mnt "$PKGmanager" -Syu "${pkgskips[@]}" nvidia-utils-openrc || SHOWerror "artix nvidia-utils-openrc"; }
 		ln -s /dev/null /mnt/etc/udev/rules.d/61-gdm.rules || SHOWerror "61-gdm udev rule link"; modules+=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)
