@@ -55,6 +55,16 @@ ArchRepoSetup () {
 	grep -q 'mirrorlist-arch' "$target_conf" || printf '\n# Arch\n[extra]\nInclude = /etc/pacman.d/mirrorlist-arch\n\n[multilib]\nInclude = /etc/pacman.d/mirrorlist-arch\n' >> "$target_conf"
 	"${cmd[@]}" pacman-key --populate artix archlinux || SHOWerror "Final pacman-key populate"
 }
+AutoOSsel () {
+	local os_id; [[ -f /etc/os-release ]] && os_id=$(grep -i '^ID=' /etc/os-release | cut -d= -f2 | tr -d '"')
+	case "${os_id,,}" in
+		arch)  OSsel="Arch" ;;
+		artix) OSsel="Artix" ;;
+		void)  OSsel="Void" ;;
+		*)     echo "Automated OS detection failed or unsupported Live OS."; OperatingSystemSel ;;
+	esac
+	echo "Detected Live OS: $OSsel"
+}
 CPUsel () {
 	if grep -q "GenuineIntel" /proc/cpuinfo; then echo 'Installing Intel microcode'; microcodepkg='intel-ucode'
 	elif grep -q "AuthenticAMD" /proc/cpuinfo; then echo 'Installing AMD microcode'; [[ "${OSsel,,}" == "void" ]] && microcodepkg='amd-ucode-firmware' || microcodepkg='amd-ucode'
