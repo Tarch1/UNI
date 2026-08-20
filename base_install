@@ -171,7 +171,7 @@ PKGcheck () {
 	if [[ "${OSsel,,}" == "void" ]]; then
 		local v_live_repos=(void-repo-nonfree); [[ "$LIBsel" == "GLIBC" ]] && v_live_repos+=(void-repo-multilib void-repo-multilib-nonfree)
 		"$PKGmanager" -y -S "${v_live_repos[@]}" || true
-		kernel=("${KSel}" "${KSel}-headers" linux-firmware-network); baselinux=(base-system base-devel); baseutils=(man-pages bash-completion kitty vim nano wget git binutils cryptsetup); fs=(dialog mtools parted gptfdisk dosfstools ntfs-3g); bootloaderutility=(efibootmgr os-prober)
+		kernel=("${KSel}" "${KSel}-headers" linux-firmware-network); baselinux=(base-system base-devel); baseutils=(man-pages bash-completion kitty vim nano wget git binutils cryptsetup); fs=(dialog mtools parted gptfdisk dosfstools ntfsprogs); bootloaderutility=(efibootmgr os-prober)
 		net=(NetworkManager iwd chrony); bluetooth=(bluez); print=(cups cups-filters cups-pdf avahi); audio=(pipewire wireplumber); hardwareacceleration=(mesa-dri mesa-vaapi mesa-vulkan-radeon); vulkan=(vulkan-loader); personalization=(); booster=()
 		elogind=(); grubbtrfs=(); apps=(telegram-desktop firefox); filemanager=(yazi pcmanfm tumbler file-roller); archive=(bzip2 cpio gzip xz 7zip tar unrar zip unzip); utility=(imv xed calc fd btop fwupd)
 	fi
