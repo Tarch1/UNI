@@ -94,6 +94,16 @@ GPUsel () {
 	elif [[ "$gpu_info" =~ (VMware|VirtualBox|Virtio|QXL) ]]; then echo "VM detected: The default Mesa driver will be installed"
 	else echo "Generic GPU: Mesa will be installed"; fi
 }
+LUKSSel () {
+	YesNoSel "Do you want to encrypt your system with LUKS (Full Disk Encryption)?"
+	if [[ "$CC" -eq 1 ]]; then LUKS_ENC=1
+		while true; do
+			read -rsp "Enter LUKS passphrase: " LUKS_PASS; echo
+			read -rsp "Verify LUKS passphrase: " LUKS_PASS2; echo
+			[[ "$LUKS_PASS" == "$LUKS_PASS2" && -n "$LUKS_PASS" ]] && { echo "Passphrase confirmed."; break; } || echo "Passphrases do not match or empty. Try again."
+		done
+	else LUKS_ENC=0; LUKS_PASS=""; fi
+}
 Pacman_Locked() {
 	[[ -f /var/lib/pacman/db.lck || -f /mnt/var/lib/pacman/db.lck ]] && { echo -e "Pacman is blocked. Removing lockfiles..."; rm -f /var/lib/pacman/db.lck /mnt/var/lib/pacman/db.lck; } || echo "No locked database"
 }
