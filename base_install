@@ -35,38 +35,52 @@ DiskPartition () {
 FileSystemFormat () {
 	BootLabel='EFI'; RootLabel='ROOT'; mkfs.fat -F32 -n "$BootLabel" "$BOOT_PART" || SHOWerror "mkfs.fat EFI"
 	BOOTID="$(blkid -s "$PIDsel" -o value "$BOOT_PART")" || SHOWerror "blkid BOOTID"
-	mkswap "$SWAP_PART" || SHOWerror "mkswap"; SWAPID="$(blkid -s "$PIDsel" -o value "$SWAP_PART")" || SHOWerror "blkid SWAPID"
+	if [[ "$LUKS_ENC" -eq 1 ]]; then
+		echo -n "$LUKS_PASS" | cryptsetup luksFormat --type luks2 -q "$ROOT_PART" -d - || SHOWerror "LUKS ROOT format"
+		echo -n "$LUKS_PASS" | cryptsetup luksOpen "$ROOT_PART" cryptroot -d - || SHOWerror "LUKS ROOT open"
+		echo -n "$LUKS_PASS" | cryptsetup luksFormat --type luks2 -q "$SWAP_PART" -d - || SHOWerror "LUKS SWAP format"
+		echo -n "$LUKS_PASS" | cryptsetup luksOpen "$SWAP_PART" cryptswap -d - || SHOWerror "LUKS SWAP open"
+		TARGET_ROOT="/dev/mapper/cryptroot"; TARGET_SWAP="/dev/mapper/cryptswap"
+		CRYPT_ROOT_UUID="$(blkid -s UUID -o value "$ROOT_PART")"; CRYPT_SWAP_UUID="$(blkid -s UUID -o value "$SWAP_PART")"
+	else TARGET_ROOT="$ROOT_PART"; TARGET_SWAP="$SWAP_PART"; fi
+	mkswap "$TARGET_SWAP" || SHOWerror "mkswap"; SWAPID="$(blkid -s "$PIDsel" -o value "$TARGET_SWAP")" || SHOWerror "blkid SWAPID"
 	UNIfstab="$PIDsel=$BOOTID /boot vfat defaults 0 2\n$PIDsel=$SWAPID none swap defaults 0 0\n"
 	case "$FSsel" in
-		ext4)	mkfs.ext4 -L "$RootLabel" "$ROOT_PART" || SHOWerror "mkfs.ext4 ROOT"; ROOTID="$(blkid -s "$PIDsel" -o value "$ROOT_PART")" || SHOWerror "blkid ROOTID ext4"; mount "$ROOT_PART" /mnt || SHOWerror "mount ext4 root"; UNIfstab+="$PIDsel=$ROOTID / ext4 defaults 0 1\n" ;;
+		ext4)	mkfs.ext4 -L "$RootLabel" "$TARGET_ROOT" || SHOWerror "mkfs.ext4 ROOT"; ROOTID="$(blkid -s "$PIDsel" -o value "$TARGET_ROOT")" || SHOWerror "blkid ROOTID ext4"; mount "$TARGET_ROOT" /mnt || SHOWerror "mount ext4 root"; UNIfstab+="$PIDsel=$ROOTID / ext4 defaults 0 1\n" ;;
 		btrfs)	modules=(btrfs); binaries='btrfs'; local SUBVolumes=( 'home' 'var_log' 'var_cache' 'snapshots' ); local options='noatime,compress=zstd,space_cache=v2,discard=async'
-				mkfs.btrfs -fL "$RootLabel" "$ROOT_PART" || SHOWerror "mkfs.btrfs ROOT"; ROOTID="$(blkid -s "$PIDsel" -o value "$ROOT_PART")" || SHOWerror "blkid ROOTID btrfs"
-				mount "$ROOT_PART" /mnt || SHOWerror "mount btrfs root"; btrfs su cr /mnt/@ || SHOWerror "btrfs subvol @"
-				for b in "${SUBVolumes[@]}"; do btrfs su cr /mnt/@"$b" || SHOWerror "btrfs subvol @$b"; done; umount /mnt || SHOWerror "umount btrfs root setup"
-				mount -o defaults,"$options",subvol=@ "$ROOT_PART" /mnt || SHOWerror "mount btrfs subvol @"
-				UNIfstab+="$PIDsel=$ROOTID / btrfs $options,subvol=@ 0 0\n"
-				for c in "${SUBVolumes[@]}"; do
-					local d_path="/$c"; [[ "$c" == "snapshots" ]] && d_path="/.$c"; [[ "$c" == "var_log" ]] && d_path="/var/log"; [[ "$c" == "var_cache" ]] && d_path="/var/cache"
-					mkdir -p "/mnt$d_path" && mount -o defaults,"$options",subvol=@"$c" "$ROOT_PART" "/mnt$d_path" || SHOWerror "mount @$c"
-					UNIfstab+="$PIDsel=$ROOTID $d_path btrfs $options,subvol=@c 0 0\n"
-				done ;;
+			mkfs.btrfs -fL "$RootLabel" "$TARGET_ROOT" || SHOWerror "mkfs.btrfs ROOT"; ROOTID="$(blkid -s "$PIDsel" -o value "$TARGET_ROOT")" || SHOWerror "blkid ROOTID btrfs"
+			mount "$TARGET_ROOT" /mnt || SHOWerror "mount btrfs root"; btrfs su cr /mnt/@ || SHOWerror "btrfs subvol @"
+			for b in "${SUBVolumes[@]}"; do btrfs su cr /mnt/@"$b" || SHOWerror "btrfs subvol @$b"; done; umount /mnt || SHOWerror "umount btrfs root setup"
+			mount -o defaults,"$options",subvol=@ "$TARGET_ROOT" /mnt || SHOWerror "mount btrfs subvol @"
+			UNIfstab+="$PIDsel=$ROOTID / btrfs $options,subvol=@ 0 0\n"
+			for c in "${SUBVolumes[@]}"; do
+				local d_path="/$c"; [[ "$c" == "snapshots" ]] && d_path="/.$c"; [[ "$c" == "var_log" ]] && d_path="/var/log"; [[ "$c" == "var_cache" ]] && d_path="/var/cache"
+				mkdir -p "/mnt$d_path" && mount -o defaults,"$options",subvol=@"$c" "$TARGET_ROOT" "/mnt$d_path" || SHOWerror "mount @$c"
+				UNIfstab+="$PIDsel=$ROOTID $d_path btrfs $options,subvol=@c 0 0\n"
+			done ;;
 		*) SHOWerror "Unsupported file system selection" ;;
 	esac
-	export BOOTID ROOTID SWAPID
-	swapon "$SWAP_PART" || SHOWerror "swapon"; mkdir -p /mnt/boot; mount "$BOOT_PART" /mnt/boot || SHOWerror "mount boot partition"; lsblk -f
+	export BOOTID ROOTID SWAPID TARGET_ROOT TARGET_SWAP CRYPT_ROOT_UUID CRYPT_SWAP_UUID
+	swapon "$TARGET_SWAP" || SHOWerror "swapon"; mkdir -p /mnt/boot; mount "$BOOT_PART" /mnt/boot || SHOWerror "mount boot partition"; lsblk -f
 }
 AdditionalDriveSetup () {
 	[[ "$ADD_SETUP" -ne 1 || -z "$ADDITIONAL_DRIVE" || "$ADDITIONAL_DRIVE" == "$DRIVE" ]] && return 0
+	local TARGET_ADD="$ADDITIONAL_DRIVE"
+	if [[ "$LUKS_ENC" -eq 1 && "$ADD_FORMAT" -eq 1 ]]; then
+		echo -n "$LUKS_PASS" | cryptsetup luksFormat --type luks2 -q "$ADDITIONAL_DRIVE" -d - || SHOWerror "LUKS ADD format"
+		echo -n "$LUKS_PASS" | cryptsetup luksOpen "$ADDITIONAL_DRIVE" cryptdata -d - || SHOWerror "LUKS ADD open"
+		TARGET_ADD="/dev/mapper/cryptdata"; CRYPT_ADD_UUID="$(blkid -s UUID -o value "$ADDITIONAL_DRIVE")"; export CRYPT_ADD_UUID
+	elif [[ "$LUKS_ENC" -eq 1 ]]; then TARGET_ADD="/dev/mapper/cryptdata"; fi
 	[[ "$ADD_FORMAT" -eq 1 ]] && case "$ADD_FS" in
-		ext4)    mkfs.ext4 -F -L "$ADD_LABEL" "$ADDITIONAL_DRIVE" || SHOWerror "mkfs.ext4 additional drive" ;;
-		btrfs)   mkfs.btrfs -f -L "$ADD_LABEL" "$ADDITIONAL_DRIVE" || SHOWerror "mkfs.btrfs additional drive" ;;
-		exfat)   mkfs.exfat -n "$ADD_LABEL" "$ADDITIONAL_DRIVE" || SHOWerror "mkfs.exfat additional drive" ;;
-		ntfs)    mkfs.ntfs -f -L "$ADD_LABEL" "$ADDITIONAL_DRIVE" || SHOWerror "mkfs.ntfs additional drive" ;;
-		*)       echo "Unsupported filesystem for additional drive: $ADD_FS" ;;
+		ext4)	mkfs.ext4 -F -L "$ADD_LABEL" "$TARGET_ADD" || SHOWerror "mkfs.ext4 additional drive" ;;
+		btrfs)	mkfs.btrfs -f -L "$ADD_LABEL" "$TARGET_ADD" || SHOWerror "mkfs.btrfs additional drive" ;;
+		exfat)	mkfs.exfat -n "$ADD_LABEL" "$TARGET_ADD" || SHOWerror "mkfs.exfat additional drive" ;;
+		ntfs)	mkfs.ntfs -f -L "$ADD_LABEL" "$TARGET_ADD" || SHOWerror "mkfs.ntfs additional drive" ;;
+		*)		echo "Unsupported filesystem for additional drive: $ADD_FS" ;;
 	esac
-	mkdir -p /mnt/media/HDD && mount "$ADDITIONAL_DRIVE" /mnt/media/HDD || SHOWerror "Mount additional drive"
-	local add_id="$(blkid -s "$PIDsel" -o value "$ADDITIONAL_DRIVE" || echo "$ADDITIONAL_DRIVE")"
-	local add_fs="$(blkid -s TYPE -o value "$ADDITIONAL_DRIVE" || echo "auto")"
+	mkdir -p /mnt/media/HDD && mount "$TARGET_ADD" /mnt/media/HDD || SHOWerror "Mount additional drive"
+	local add_id="$(blkid -s "$PIDsel" -o value "$TARGET_ADD" || echo "$TARGET_ADD")"
+	local add_fs="$(blkid -s TYPE -o value "$TARGET_ADD" || echo "auto")"
 	UNIfstab+="$PIDsel=$add_id /media/HDD $add_fs defaults,noatime 0 2\n"
 }
 ArchTixSystemInstall () {
@@ -90,6 +104,13 @@ VoidSystemInstall () {
 	for d in dev proc sys run; do mkdir -p /mnt/$d && mount --bind /$d /mnt/$d || SHOWerror "Mounting /$d filesystem"; done
 	mount --make-rslave /mnt/sys || SHOWerror "Setting sys rslave"
 	[[ "$UEFImode" -eq 1 ]] && { mkdir -p /mnt/sys/firmware/efi/efivars; mount --bind /sys/firmware/efi/efivars /mnt/sys/firmware/efi/efivars || SHOWerror "Mounting efivars filesystem"; }
+}
+CrypttabGen () {
+	[[ "$LUKS_ENC" -ne 1 ]] && return 0
+	echo -n "$LUKS_PASS" > /mnt/etc/crypt_key.bin; chmod 600 /mnt/etc/crypt_key.bin
+	echo -n "$LUKS_PASS" | cryptsetup luksAddKey -q "$SWAP_PART" /mnt/etc/crypt_key.bin -d - || SHOWerror "LUKS AddKey SWAP"
+	echo "cryptswap UUID=$CRYPT_SWAP_UUID /etc/crypt_key.bin luks" > /mnt/etc/crypttab
+	[[ -n "$CRYPT_ADD_UUID" ]] && { echo -n "$LUKS_PASS" | cryptsetup luksAddKey -q "$ADDITIONAL_DRIVE" /mnt/etc/crypt_key.bin -d - || SHOWerror "LUKS AddKey ADD"; echo "cryptdata UUID=$CRYPT_ADD_UUID /etc/crypt_key.bin luks" >> /mnt/etc/crypttab; }
 }
 FStabGen () {
 	[[ -f /mnt/etc/fstab ]] && { mv -f /mnt/etc/fstab /mnt/etc/old-fstab || SHOWerror "Backup existing fstab"; }
@@ -138,7 +159,7 @@ PackageInstall () {
 }
 PKGcheck () {
 	echo "Initializing package groups..."
-	microcode=(); [[ -n "$microcodepkg" ]] && microcode=("$microcodepkg"); kernel=("${KSel}" linux-firmware "${KSel}-headers"); baselinux=(base base-devel); baseutils=(man-db bash-completion kitty vim nano wget git binutils); booster=(); fs=(dialog mtools parted gptfdisk dosfstools gvfs-mtp ntfsprogs)
+	microcode=(); [[ -n "$microcodepkg" ]] && microcode=("$microcodepkg"); kernel=("${KSel}" linux-firmware "${KSel}-headers"); baselinux=(base base-devel); baseutils=(man-db bash-completion kitty vim nano wget git binutils cryptsetup); booster=(); fs=(dialog mtools parted gptfdisk dosfstools gvfs-mtp ntfsprogs)
 	bootloaderutility=(efibootmgr os-prober sbsigntools); net=(networkmanager iwd chrony); bluetooth=(bluez bluez-utils bluez-tools bluetui blueman); print=(cups cups-pdf system-config-printer avahi); utility=(imv xed calc fd btop adriconf fwupd)
 	[[ "${OSsel,,}" == "arch" || "${OSsel,,}" == "artix" ]] && booster=(booster)
 	if [[ "${OSsel,,}" == "artix" ]]; then local init_s="${init_sys,,}"; elogind=(elogind elogind-"$init_s" "${init_s}"-settingsd); net+=("chrony-${init_s}" "networkmanager-${init_s}"); bluetooth+=("bluez-${init_s}" bluez-cups); print+=("avahi-${init_s}" "cups-${init_s}"); else elogind=(); fi
@@ -150,7 +171,7 @@ PKGcheck () {
 	if [[ "${OSsel,,}" == "void" ]]; then
 		local v_live_repos=(void-repo-nonfree); [[ "$LIBsel" == "GLIBC" ]] && v_live_repos+=(void-repo-multilib void-repo-multilib-nonfree)
 		"$PKGmanager" -y -S "${v_live_repos[@]}" || true
-		kernel=("${KSel}" "${KSel}-headers" linux-firmware-network); baselinux=(base-system base-devel); baseutils=(man-pages bash-completion kitty vim nano wget git binutils); fs=(dialog mtools parted gptfdisk dosfstools ntfs-3g); bootloaderutility=(efibootmgr os-prober)
+		kernel=("${KSel}" "${KSel}-headers" linux-firmware-network); baselinux=(base-system base-devel); baseutils=(man-pages bash-completion kitty vim nano wget git binutils cryptsetup); fs=(dialog mtools parted gptfdisk dosfstools ntfs-3g); bootloaderutility=(efibootmgr os-prober)
 		net=(NetworkManager iwd chrony); bluetooth=(bluez); print=(cups cups-filters cups-pdf avahi); audio=(pipewire wireplumber); hardwareacceleration=(mesa-dri mesa-vaapi mesa-vulkan-radeon); vulkan=(vulkan-loader); personalization=(); booster=()
 		elogind=(); grubbtrfs=(); apps=(telegram-desktop firefox); filemanager=(yazi pcmanfm tumbler file-roller); archive=(bzip2 cpio gzip xz 7zip tar unrar zip unzip); utility=(imv xed calc fd btop fwupd)
 	fi
@@ -179,6 +200,7 @@ KernelSetup () {
 	fi
 	case "$IRFSetup" in
 		dracut)	mkdir -p /mnt/etc/dracut.conf.d || SHOWerror "mkdir dracut.conf.d"
+				[[ "$LUKS_ENC" -eq 1 ]] && { echo 'add_dracutmodules+=" crypt "' > /mnt/etc/dracut.conf.d/crypt.conf; echo 'install_items+=" /etc/crypttab /etc/crypt_key.bin "' >> /mnt/etc/dracut.conf.d/crypt.conf; }
 				[[ "${OSsel,,}" == "void" ]] && { "$chroot" /mnt "$PKGmanager" "${pkgskips[@]}" -S dracut || SHOWerror "Void dracut install"; }
 				[[ "$FSsel" == "btrfs" ]] && { echo 'add_dracutmodules+=" btrfs "' > /mnt/etc/dracut.conf.d/btrfs.conf || SHOWerror "dracut btrfs conf"; }
 				[[ ${#nvidiadrivers[@]} -gt 0 ]] && { echo 'force_drivers+=" nvidia nvidia_modeset nvidia_uvm nvidia_drm "' > /mnt/etc/dracut.conf.d/nvidia.conf || SHOWerror "dracut nvidia conf"; }
@@ -195,7 +217,7 @@ KernelSetup () {
 				printf '[Trigger]\nOperation = Install\nOperation = Upgrade\nType = Package\nTarget = %s\n\n[Action]\nDescription = Forcing Booster initramfs update...\nWhen = PostTransaction\nDepends = booster\nExec = /usr/bin/booster build --force --universal /boot/initramfs-%s.img\n' "$KSel" "$KSel" > /mnt/etc/pacman.d/hooks/95-booster-force.hook || SHOWerror "booster-force hook creation"; fi
 				local real_kver; real_kver=$(basename "$(find /mnt/usr/lib/modules/ -maxdepth 1 -mindepth 1 -type d ! -name 'extramodules*' | head -n 1)") || SHOWerror "find real_kver"
 				"$chroot" /mnt /bin/bash -c "booster build --force --universal --kernel-version=${real_kver} /boot/initramfs-${KSel}.img" || SHOWerror "booster build" ;;
-		*) local HOOKS=(base udev autodetect modconf block usr resume filesystems keyboard keymap fsck); [[ ${#nvidiadrivers[@]} -gt 0 ]] && HOOKS+=(kms)
+		*) local HOOKS=(base udev autodetect keyboard keymap modconf block); [[ "$LUKS_ENC" -eq 1 ]] && HOOKS+=(encrypt); HOOKS+=(resume filesystems fsck); [[ ${#nvidiadrivers[@]} -gt 0 ]] && HOOKS+=(kms)
 		   sed -i "/MODULES/ s/()/(${modules[*]})/" /mnt/etc/mkinitcpio.conf || SHOWerror "mkinitcpio modules inject"
 		   sed -i "/BINARIES/ s/()/($binaries)/" /mnt/etc/mkinitcpio.conf
 		   sed -i "s/^HOOKS.*/HOOKS=(${HOOKS[*]})/" /mnt/etc/mkinitcpio.conf || SHOWerror "mkinitcpio hooks inject"
@@ -226,11 +248,12 @@ AudioSetup () {
 }
 BootloaderSetup () {
 	local osi_version="${AcpiOS:-Windows 2020}"; local kname; kname=$(basename "$(find /mnt/boot/ -type f -name 'vmlinuz-*' | head -n 1)") || kname="vmlinuz-$KSel"
-	local irfs initrd_flags rootflags="" nvdrm="" nvosi=""
+	local irfs initrd_flags rootflags="" nvdrm="" nvosi="" luks_flags=""
 	[[ "${OSsel,,}" == "void" ]] && irfs="initramfs-${kname#vmlinuz-}.img" || irfs="initramfs-$KSel.img"
 	[[ "$FSsel" == "btrfs" ]] && rootflags='rootflags=subvol=@'
 	[[ ${#nvidiadrivers[@]} -gt 0 ]] && { nvdrm="nvidia-drm.modeset=1 nvidia-drm.fbdev=1"; nvosi="acpi_osi=\"$osi_version\""; }
 	[[ "$IRFSetup" == "booster" || "${OSsel,,}" == "void" ]] && initrd_flags="initrd=\\${irfs}" || initrd_flags="initrd=\\${microcodepkg}.img initrd=\\${irfs}"
+	[[ "$LUKS_ENC" -eq 1 ]] && luks_flags="cryptdevice=UUID=${CRYPT_ROOT_UUID}:cryptroot rd.luks.uuid=${CRYPT_ROOT_UUID} root=/dev/mapper/cryptroot" || luks_flags="root=${PIDsel}=$ROOTID"
 	case "$BLsel" in
 		1|REFIND|Refind|refind)
 			"$chroot" /mnt "$PKGmanager" -Sy "${pkgskips[@]}" "${refindpkg[@]}" || SHOWerror "rEFInd package install"
@@ -239,7 +262,7 @@ BootloaderSetup () {
 			cp -r "${SCRIPT_DIR}/Bootloader/Refind/themes/"* /mnt/boot/EFI/"$efifolder"/themes/ || SHOWerror "Copy rEFInd themes"
 			grep -q "theme.conf" /mnt/boot/EFI/"$efifolder"/refind.conf || echo "include themes/Blur-theme/theme.conf" >> /mnt/boot/EFI/"$efifolder"/refind.conf
 			[[ "$VBTsel" -eq 1 ]] && sed -i 's/#resolution 1024 768/resolution 1024 768/' /mnt/boot/EFI/"$efifolder"/refind.conf
-			echo "\"Standard Boot\"   \"ro root=${PIDsel}=$ROOTID resume=${PIDsel}=$SWAPID rootfstype=$FSsel $rootflags $initrd_flags $nvdrm $nvosi\"" > /mnt/boot/refind_linux.conf || SHOWerror "Write refind_linux.conf"
+			echo "\"Standard Boot\"   \"ro $luks_flags resume=${PIDsel}=$SWAPID rootfstype=$FSsel $rootflags $initrd_flags $nvdrm $nvosi\"" > /mnt/boot/refind_linux.conf || SHOWerror "Write refind_linux.conf"
 			echo '!!!Refind config and theme changed!!!' ;;
 		2|GRUB|Grub|grub)
 			[[ "$FSsel" == "btrfs" ]] && grubpkg+=("${grubbtrfs[@]}")
@@ -249,11 +272,12 @@ BootloaderSetup () {
 			mkdir -p /mnt/boot/grub/themes /mnt/usr/share/grub/themes/ || SHOWerror "mkdir GRUB themes"
 			sed -i "/GRUB_DISABLE_OS_PROBER=/ s/#//g" /mnt/etc/default/grub
 			sed -i '/GRUB_THEME=/c GRUB_THEME="/boot/grub/themes/Grub-Sekiro/theme.txt"' /mnt/etc/default/grub
-			[[ ${#nvidiadrivers[@]} -gt 0 ]] && sed -i -e "s/^GRUB_CMDLINE_LINUX=.*/GRUB_CMDLINE_LINUX=\"$nvosi\"/" -e "s/^GRUB_CMDLINE_LINUX_DEFAULT=\"\(.*\)\"/GRUB_CMDLINE_LINUX_DEFAULT=\"\1 quiet splash $nvdrm\"/" /mnt/etc/default/grub
+			sed -i "s|^GRUB_CMDLINE_LINUX=.*|GRUB_CMDLINE_LINUX=\"$nvosi $luks_flags\"|" /mnt/etc/default/grub
+			[[ ${#nvidiadrivers[@]} -gt 0 ]] && sed -i "s/^GRUB_CMDLINE_LINUX_DEFAULT=\"\(.*\)\"/GRUB_CMDLINE_LINUX_DEFAULT=\"\1 quiet splash $nvdrm\"/" /mnt/etc/default/grub
 			cp -r "${SCRIPT_DIR}/Bootloader/Grub-Sekiro" /mnt/boot/grub/themes/ && cp -r "${SCRIPT_DIR}/Bootloader/Grub-Sekiro" /mnt/usr/share/grub/themes/ || SHOWerror "Copy Sekiro theme"
 			"$chroot" /mnt grub-mkconfig -o /boot/grub/grub.cfg || SHOWerror "GRUB mkconfig execution" ;;
 		3|EFISTUB|Efistub|efistub)
-			local BLflags=" $initrd_flags ro root=${PIDsel}=$ROOTID resume=${PIDsel}=$SWAPID rootfstype=$FSsel $rootflags $nvdrm $nvosi"
+			local BLflags=" $initrd_flags ro $luks_flags resume=${PIDsel}=$SWAPID rootfstype=$FSsel $rootflags $nvdrm $nvosi"
 			local efi_dev="$DRIVE"; local efi_num="$(echo "$BOOT_PART" | grep -o '[0-9]*$')"
 			"$chroot" /mnt efibootmgr -d "$efi_dev" -p "${efi_num:-1}" -c -L "$OSsel" -l "\\$kname" -u "$BLflags" --verbose || SHOWerror "Efibootmgr execution" ;;
 	esac
@@ -277,9 +301,9 @@ InstallationSetup () {
 		[[ "${OSsel,,}" == "artix" ]] && ArchRepoSel
 		[[ "${OSsel,,}" == "void" ]] && { VoidInstMethod && LibrarySel; }
 		if [[ "$VBTsel" == "1" ]]; then LANGsel='en_GB.UTF-8'; LOCsel='it_IT.UTF-8'; HNsel=tarch1; UNsel=tarch1; TZsel='Europe/Rome'; PIDsel=UUID; FSsel=btrfs; ADD_SETUP=0; ADD_FORMAT=0; ADD_FS=""; ADD_LABEL=""; [[ "${OSsel,,}" == "void" ]] && { LIBsel="GLIBC"; VImethod="XBPS"; }
-		else local Personalization=( LocalizationSel LanguageSel TimezoneSel HostnameSel UsernameSel PartIDSel FilesystemSel AdditionalDriveSel )
+		else local Personalization=( LocalizationSel LanguageSel TimezoneSel HostnameSel UsernameSel PartIDSel FilesystemSel AdditionalDriveSel LUKSSel)
 			for s in "${Personalization[@]}"; do "$s" || SHOWerror "$s"; done; fi
-		Steps=( "OSsel=$OSsel" "ARCHrepo=$ARCHrepo" "LANGsel=$LANGsel" "LOCsel=$LOCsel" "HNsel=$HNsel" "UNsel=$UNsel" "TZsel=$TZsel" "PIDsel=$PIDsel" "FSsel=$FSsel" "BLsel=$BLsel" "IRFSetup=$IRFSetup" "ADD_SETUP=$ADD_SETUP" "ADD_FORMAT=$ADD_FORMAT" "ADD_FS=$ADD_FS" "ADD_LABEL=$ADD_LABEL" )
+		[[ "$VBTsel" == "1" ]] && ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' "$s_step" 'CrypttabGen' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'KernelSetup' 'ServiceSetup' 'UserSetup' 'BootloaderSetup' ) || ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' 'AdditionalDriveSetup' "$s_step" 'CrypttabGen' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'KernelSetup' 'ServiceSetup' 'UserSetup' 'AudioSetup' 'BootloaderSetup' )
 		[[ "${OSsel,,}" == "void" ]] && Steps+=( "LIBsel=$LIBsel" "VImethod=$VImethod" )
 		rm -f config
 		for a in "${Steps[@]}"; do echo "$a" >> config; done; cat config
