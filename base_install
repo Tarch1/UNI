@@ -273,7 +273,7 @@ InstallationSetup () {
 			else YesNoSel "Would you like to edit config file?"; [[ "$CC" -eq 1 ]] && { nano config; source config; } || { SetupAvaible=1; echo "Repeat the setup"; break; }; fi
 		done
 	fi
-	if [[ "$SetupAvaible" == "1" ]]; then OperatingSystemSel
+	if [[ "$SetupAvaible" == "1" ]]; then AutoOSsel
 		[[ "${OSsel,,}" == "artix" ]] && ArchRepoSel
 		[[ "${OSsel,,}" == "void" ]] && { VoidInstMethod && LibrarySel; }
 		if [[ "$VBTsel" == "1" ]]; then LANGsel='en_GB.UTF-8'; LOCsel='it_IT.UTF-8'; HNsel=tarch1; UNsel=tarch1; TZsel='Europe/Rome'; PIDsel=UUID; FSsel=btrfs; ADD_SETUP=0; ADD_FORMAT=0; ADD_FS=""; ADD_LABEL=""; [[ "${OSsel,,}" == "void" ]] && { LIBsel="GLIBC"; VImethod="XBPS"; }
