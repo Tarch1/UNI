@@ -41,7 +41,7 @@ AdditionalDriveSel () {
 AnotherCheck () {
 	[[ "${OSsel,,}" == "void" ]] && { echo "Skipping check (Void uses XBPS)"; return 0; }
 	local repos=(extra multilib); [[ "${OSsel,,}" == "artix" ]] && repos+=(system world galaxy)
-	pacman -Sylq "${repos[@]}" | sort > pacman_db; printf '%s\n' "${miss[@]}" | sort -u > pkg_missed
+	$PKGmanager$PKGinst$PKGupd"lq" "${repos[@]}" | sort > pacman_db; printf '%s\n' "${miss[@]}" | sort -u > pkg_missed
 	mapfile -t unlisted < <(comm -13 pacman_db pkg_missed); echo "Unlisted = ${unlisted[*]}"
 }
 ArchRepoSetup () {
@@ -51,7 +51,7 @@ ArchRepoSetup () {
 	else "${cmd[@]}" pacman-key --init; "${cmd[@]}" pacman-key --populate artix archlinux; fi
 	sed -i '/\[universe\]/,/^[[:space:]]*$/d' "$target_conf"
 	printf '\n[universe]\nServer = https://universe.artixlinux.org/$arch\nServer = https://mirror1.artixlinux.org/universe/$arch\nServer = https://mirror.pascalpuffke.de/artix-universe/$arch\nServer = https://artixlinux.qontinuum.space/artixlinux/universe/os/$arch\nServer = https://mirror1.cl.netactuate.com/artix/universe/$arch\nServer = https://ftp.crifo.org/artix-universe/$arch\n' >> "$target_conf"
-	[[ ! -f "$mirror_file" ]] && "${cmd[@]}" pacman -Sy --noconfirm artix-keyring artix-archlinux-support
+	[[ ! -f "$mirror_file" ]] && "${cmd[@]}" $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" artix-keyring artix-archlinux-support
 	grep -q 'mirrorlist-arch' "$target_conf" || printf '\n# Arch\n[extra]\nInclude = /etc/pacman.d/mirrorlist-arch\n\n[multilib]\nInclude = /etc/pacman.d/mirrorlist-arch\n' >> "$target_conf"
 	"${cmd[@]}" pacman-key --populate artix archlinux || SHOWerror "Final pacman-key populate"
 }
