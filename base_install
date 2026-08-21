@@ -97,14 +97,10 @@ ArchTixSystemInstall () {
 VoidSystemInstall () {
 	local void_repo="https://voidlinux.org"
 	[[ "${LIBsel}" == "MUSL" ]] && void_repo="${void_repo}/musl"
-	case "${VImethod}" in
-		XBPS)	mkdir -p /mnt/var/db/xbps/keys && cp -r /var/db/xbps/keys/* /mnt/var/db/xbps/keys/ || true
-				$PKGstrap base-system || SHOWerror "XBPS base-system bootstrap" ;;
-		ROOTFS)	local tarball="void-x86_64-ROOTFS.tar.xz"
-				[[ "${LIBsel}" == "MUSL" ]] && tarball="void-x86_64-musl-ROOTFS.tar.xz"
+	[[ "${VImethod}" == "XBPS" ]] && { mkdir -p /mnt/var/db/xbps/keys && cp -r /var/db/xbps/keys/* /mnt/var/db/xbps/keys/ || true; $PKGstrap base-system || SHOWerror "XBPS base-system bootstrap" ; }
+	[[ "${VImethod}" == "ROOTFS" ]] && { local tarball="void-x86_64-ROOTFS.tar.xz"; [[ "${LIBsel}" == "MUSL" ]] && tarball="void-x86_64-musl-ROOTFS.tar.xz";
 				if [ -f "${SCRIPT_DIR}/Conf_files/${tarball}" ]; then tar -xJf "${SCRIPT_DIR}/Conf_files/${tarball}" -C /mnt || SHOWerror "ROOTFS extraction"
-				else curl -Lo "/tmp/${tarball}" "${void_repo}/static/${tarball}" || SHOWerror "ROOTFS download"; tar -xJf "/tmp/${tarball}" -C /mnt && rm -f "/tmp/${tarball}" || SHOWerror "ROOTFS downloaded extraction"; fi ;;
-	esac
+				else curl -Lo "/tmp/${tarball}" "${void_repo}/static/${tarball}" || SHOWerror "ROOTFS download"; tar -xJf "/tmp/${tarball}" -C /mnt && rm -f "/tmp/${tarball}" || SHOWerror "ROOTFS downloaded extraction"; fi ; }
 	for d in dev proc sys run; do mkdir -p /mnt/$d && mount --bind /$d /mnt/$d || SHOWerror "Mounting /$d filesystem"; done
 	mount --make-rslave /mnt/sys || SHOWerror "Setting sys rslave"
 	[[ "$UEFImode" -eq 1 ]] && { mkdir -p /mnt/sys/firmware/efi/efivars; mount --bind /sys/firmware/efi/efivars /mnt/sys/firmware/efi/efivars || SHOWerror "Mounting efivars filesystem"; }
@@ -126,18 +122,9 @@ FStabGen () {
 SetupEnvironment () {
 	local keymap_val="${keylayout:-KEYMAP=it}"
 	[[ "$keymap_val" != KEYMAP=* ]] && keymap_val="KEYMAP=$keymap_val"
-	if [[ "${OSsel,,}" == "void" ]]; then
-		echo "LANG=$LOCsel" > /mnt/etc/locale.conf
-		echo "$keymap_val" > /mnt/etc/vconsole.conf
-		echo 'HARDWARECLOCK="UTC"' >> /mnt/etc/rc.conf
-		"$chroot" /mnt ln -sf /usr/share/zoneinfo/"$TZsel" /etc/localtime
-	else
-		sed -i "/\($LOCsel\|$LANGsel\)/ s/#//g" /mnt/etc/locale.gen
-		echo -e "LANG=$LOCsel\nLANGUAGE=$LANGsel\nLC_TIME=$LOCsel\nLC_ADDRESS=$LOCsel\nLC_MESSAGES=$LOCsel\nLC_CTYPE=C" >> /mnt/etc/locale.conf
-		echo "$keymap_val" > /mnt/etc/vconsole.conf
-		[[ -n "$keypath" ]] && echo "$keymap_val" > /mnt/"$keypath"
-		"$chroot" /mnt bash -c "ln -sf /usr/share/zoneinfo/$TZsel /etc/localtime; hwclock --systohc --utc || true; locale-gen"
-	fi
+	[[ "${OSsel,,}" == "void" ]] && { echo "LANG=$LOCsel" > /mnt/etc/locale.conf; echo "$keymap_val" > /mnt/etc/vconsole.conf; echo 'HARDWARECLOCK="UTC"' >> /mnt/etc/rc.conf; "$chroot" /mnt ln -sf /usr/share/zoneinfo/"$TZsel" /etc/localtime ; }
+	[[ "${OSsel,,}" != "void" ]] && { sed -i "/\($LOCsel\|$LANGsel\)/ s/#//g" /mnt/etc/locale.gen; echo -e "LANG=$LOCsel\nLANGUAGE=$LANGsel\nLC_TIME=$LOCsel\nLC_ADDRESS=$LOCsel\nLC_MESSAGES=$LOCsel\nLC_CTYPE=C" >> /mnt/etc/locale.conf;
+		echo "$keymap_val" > /mnt/etc/vconsole.conf; [[ -n "$keypath" ]] && echo "$keymap_val" > /mnt/"$keypath"; "$chroot" /mnt bash -c "ln -sf /usr/share/zoneinfo/$TZsel /etc/localtime; hwclock --systohc --utc || true; locale-gen" ; }
 	echo "$HNsel" > /mnt/etc/hostname
 	echo -e "127.0.0.1\tlocalhost\n::1\t\tlocalhost\n127.0.1.1\t$HNsel.localdomain\t$HNsel" >> /mnt/etc/hosts
 }
