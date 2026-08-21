@@ -293,9 +293,10 @@ BootloaderSetup () {
 			cp -r "${SCRIPT_DIR}/Bootloader/Grub-Sekiro" /mnt/boot/grub/themes/ && cp -r "${SCRIPT_DIR}/Bootloader/Grub-Sekiro" /mnt/usr/share/grub/themes/ || SHOWerror "Copy Sekiro theme"
 			"$chroot" /mnt grub-mkconfig -o /boot/grub/grub.cfg || SHOWerror "GRUB mkconfig execution" ;;
 		3|EFISTUB|Efistub|efistub)
+			local boot_label="${OSsel^} Linux ($FSsel)"
 			local BLflags="$initrd_flags ro $luks_flags resume=${PIDsel}=$SWAPID rootfstype=$FSsel $rootflags $nvdrm $nvosi"
 			local efi_dev="$DRIVE"; local efi_num="$(echo "$BOOT_PART" | grep -o '[0-9]*$')"
-			"$chroot" /mnt efibootmgr -d "$efi_dev" -p "${efi_num:-1}" -c -L "$OSsel" -l "\\$kname" -u "$BLflags" --verbose || SHOWerror "Efibootmgr execution" ;;
+			"$chroot" /mnt efibootmgr -d "$efi_dev" -p "${efi_num:-1}" -c -L "$boot_label" -l "\\$kname" -u "$BLflags" --verbose || SHOWerror "Efibootmgr execution"
 	esac
 }
 InstallationSetup () {
