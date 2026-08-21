@@ -58,7 +58,7 @@ FileSystemFormat () {
 			for c in "${SUBVolumes[@]}"; do
 				local d_path="/$c"; [[ "$c" == "snapshots" ]] && d_path="/.$c"; [[ "$c" == "var_log" ]] && d_path="/var/log"; [[ "$c" == "var_cache" ]] && d_path="/var/cache"
 				mkdir -p "/mnt$d_path" && mount -o defaults,"$options",subvol=@"$c" "$TARGET_ROOT" "/mnt$d_path" || SHOWerror "mount @$c"
-				UNIfstab+="$PIDsel=$ROOTID $d_path btrfs $options,subvol=@c 0 0\n"
+				UNIfstab+="$PIDsel=$ROOTID $d_path btrfs $options,subvol=@$c 0 0\n"
 			done ;;
 		*) SHOWerror "Unsupported file system selection" ;;
 	esac
@@ -122,20 +122,22 @@ FStabGen () {
 	cat /mnt/etc/fstab
 }
 SetupEnvironment () {
+	local keymap_val="${keylayout:-KEYMAP=it}"
+	[[ "$keymap_val" != KEYMAP=* ]] && keymap_val="KEYMAP=$keymap_val"
 	if [[ "${OSsel,,}" == "void" ]]; then
-		echo "LANG=$LOCsel" > /mnt/etc/locale.conf; echo "$keylayout" > /mnt/etc/vconsole.conf
+		echo "LANG=$LOCsel" > /mnt/etc/locale.conf
+		echo "$keymap_val" > /mnt/etc/vconsole.conf
 		echo 'HARDWARECLOCK="UTC"' >> /mnt/etc/rc.conf
 		"$chroot" /mnt ln -sf /usr/share/zoneinfo/"$TZsel" /etc/localtime
 	else
 		sed -i "/\($LOCsel\|$LANGsel\)/ s/#//g" /mnt/etc/locale.gen
 		echo -e "LANG=$LOCsel\nLANGUAGE=$LANGsel\nLC_TIME=$LOCsel\nLC_ADDRESS=$LOCsel\nLC_MESSAGES=$LOCsel\nLC_CTYPE=C" >> /mnt/etc/locale.conf
-		echo "$keylayout" | tee /mnt/"$keypath" /mnt/etc/vconsole.conf
-		"$chroot" /mnt ln -sf /usr/share/zoneinfo/"$TZsel" /etc/localtime
-		"$chroot" /mnt hwclock --systohc --utc || true
-		"$chroot" /mnt locale-gen
+		echo "$keymap_val" > /mnt/etc/vconsole.conf
+		[[ -n "$keypath" ]] && echo "$keymap_val" > /mnt/"$keypath"
+		"$chroot" /mnt bash -c "ln -sf /usr/share/zoneinfo/$TZsel /etc/localtime; hwclock --systohc --utc || true; locale-gen"
 	fi
 	echo "$HNsel" > /mnt/etc/hostname
-	echo -e "127.0.0.1\tlocalhost\n::1\t\tlocalhost\n127.0.1.1\t$HNsel.localdomain $HNsel" >> /mnt/etc/hosts
+	echo -e "127.0.0.1\tlocalhost\n::1\t\tlocalhost\n127.0.1.1\t$HNsel.localdomain\t$HNsel" >> /mnt/etc/hosts
 }
 PackageConfig () {
 	if [[ "${OSsel,,}" == "void" ]]; then
@@ -254,8 +256,12 @@ BootloaderSetup () {
 	[[ "${OSsel,,}" == "void" ]] && irfs="initramfs-${kname#vmlinuz-}.img" || irfs="initramfs-$KSel.img"
 	[[ "$FSsel" == "btrfs" ]] && rootflags='rootflags=subvol=@'
 	[[ ${#nvidiadrivers[@]} -gt 0 ]] && { nvdrm="nvidia-drm.modeset=1 nvidia-drm.fbdev=1"; nvosi="acpi_osi=\"$osi_version\""; }
-	[[ "$IRFSetup" == "booster" || "${OSsel,,}" == "void" ]] && initrd_flags="initrd=\\${irfs}" || initrd_flags="initrd=\\${microcodepkg}.img initrd=\\${irfs}"
-	[[ "$LUKS_ENC" -eq 1 ]] && luks_flags="cryptdevice=UUID=${CRYPT_ROOT_UUID}:cryptroot rd.luks.uuid=${CRYPT_ROOT_UUID} root=/dev/mapper/cryptroot" || luks_flags="root=${PIDsel}=$ROOTID"
+	if [[ -n "$microcodepkg" && -f "/mnt/boot/${microcodepkg}.img" ]]; then initrd_flags="initrd=\\${microcodepkg}.img initrd=\\${irfs}"
+	else initrd_flags="initrd=\\${irfs}"
+	fi
+	if [[ "$LUKS_ENC" -eq 1 ]]; then luks_flags="cryptdevice=UUID=${CRYPT_ROOT_UUID}:cryptroot rd.luks.uuid=${CRYPT_ROOT_UUID} rd.luks.name=${CRYPT_ROOT_UUID}=cryptroot root=/dev/mapper/cryptroot"
+	else luks_flags="root=${PIDsel}=$ROOTID"
+	fi
 	case "$BLsel" in
 		1|REFIND|Refind|refind)
 			"$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${refindpkg[@]}" || SHOWerror "rEFInd package install"
@@ -279,7 +285,7 @@ BootloaderSetup () {
 			cp -r "${SCRIPT_DIR}/Bootloader/Grub-Sekiro" /mnt/boot/grub/themes/ && cp -r "${SCRIPT_DIR}/Bootloader/Grub-Sekiro" /mnt/usr/share/grub/themes/ || SHOWerror "Copy Sekiro theme"
 			"$chroot" /mnt grub-mkconfig -o /boot/grub/grub.cfg || SHOWerror "GRUB mkconfig execution" ;;
 		3|EFISTUB|Efistub|efistub)
-			local BLflags=" $initrd_flags ro $luks_flags resume=${PIDsel}=$SWAPID rootfstype=$FSsel $rootflags $nvdrm $nvosi"
+			local BLflags="$initrd_flags ro $luks_flags resume=${PIDsel}=$SWAPID rootfstype=$FSsel $rootflags $nvdrm $nvosi"
 			local efi_dev="$DRIVE"; local efi_num="$(echo "$BOOT_PART" | grep -o '[0-9]*$')"
 			"$chroot" /mnt efibootmgr -d "$efi_dev" -p "${efi_num:-1}" -c -L "$OSsel" -l "\\$kname" -u "$BLflags" --verbose || SHOWerror "Efibootmgr execution" ;;
 	esac
@@ -319,7 +325,9 @@ InstallationSetup () {
 	else SHOWerror InstallationSetup; fi
 	CPUsel && GPUsel
 	local s_step; [[ "${OSsel,,}" == "void" ]] && s_step='VoidSystemInstall' || s_step='ArchTixSystemInstall'
-	[[ "$VBTsel" == "1" ]] && ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' "$s_step" 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'KernelSetup' 'ServiceSetup' 'UserSetup' 'BootloaderSetup' ) || ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' 'AdditionalDriveSetup' "$s_step" 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'KernelSetup' 'ServiceSetup' 'UserSetup' 'AudioSetup' 'BootloaderSetup' )
+	if [[ "$VBTsel" == "1" ]]; then	ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' "$s_step" 'CrypttabGen' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'KernelSetup' 'ServiceSetup' 'UserSetup' 'BootloaderSetup' )
+	else ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' 'AdditionalDriveSetup' "$s_step" 'CrypttabGen' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'KernelSetup' 'ServiceSetup' 'UserSetup' 'AudioSetup' 'BootloaderSetup' )
+	fi
 	if [[ "${OSsel,,}" != "void" ]]; then
 		PKGmanager="pacman"; PKGinst=" -S"; PKGupd="y"; PKGchk=" -Q"; PKGrmv=" -R"; PKGdpn="s"; PKGfrc="dd"
 		PKGskp=( --needed --noconfirm ); PKGrsk=( --noconfirm )
