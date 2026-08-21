@@ -110,6 +110,7 @@ VoidSystemInstall () {
 	for d in dev proc sys run; do mkdir -p /mnt/$d && mount --bind /$d /mnt/$d || SHOWerror "Mounting /$d filesystem"; done
 	mount --make-rslave /mnt/sys || SHOWerror "Setting sys rslave"
 	[[ "$UEFImode" -eq 1 ]] && { mkdir -p /mnt/sys/firmware/efi/efivars; mount --bind /sys/firmware/efi/efivars /mnt/sys/firmware/efi/efivars || SHOWerror "Mounting efivars filesystem"; }
+}
 CrypttabGen () {
 	[[ "$LUKS_ENC" -ne 1 ]] && return 0
 	echo -n "$LUKS_PASS" > /mnt/etc/crypt_key.bin
