@@ -14,7 +14,10 @@ Check_required_files () {
 	[[ ${#miss[@]} -gt 0 ]] && { echo 'Required file(s) missing:' "${miss[@]}"; exit 1; } || source additional_setup
 }
 DiskPartition () {
-	swapoff -a; umount -R /mnt || true
+	if grep -qs '/mnt' /proc/mounts; then echo "[i] Found active mount point in /mnt. Unmounting..."; umount -R /mnt || SHOWerror "DiskPartition: umount /mnt"; fi
+	if [[ $(wc -l < /proc/swaps) -gt 1 ]]; then	echo "[i] Found active Swap. Disabling...";	swapoff -a || SHOWerror "DiskPartition: swapoff"; fi
+	local mapper_devs=( 'cryptroot' 'cryptswap' 'cryptdata' )
+	for dev in "${mapper_devs[@]}"; do if [[ -b "/dev/mapper/$dev" ]]; then echo "[i] Found active LUKS volume (/dev/mapper/$dev). Closing..."; cryptsetup close "$dev" || SHOWerror "DiskPartition: cryptsetup close $dev"; fi ; done
 	$PKGmanager$PKGchk ntfs-3g &>/dev/null && $PKGmanager$PKGrmv$PKGfrc "${PKGrsk[@]}" ntfs-3g || true
 	$PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${fs[@]}" || SHOWerror "Sync fs utilities"
 	local dialog_list=(); while read -r n s; do dialog_list+=("$n" "$s"); done < <(lsblk -dlnp -o NAME,SIZE)
@@ -24,7 +27,8 @@ DiskPartition () {
 		local add_dialog_list=(); while read -r n s; do [[ "$n" != "$DRIVE" ]] && add_dialog_list+=("$n" "$s"); done < <(lsblk -dlnp -o NAME,SIZE)
 		ADDITIONAL_DRIVE="$(dialog --title "ADDITIONAL" --stdout --menu "Select secondary partition/drive (Optional - Cancel to skip)" 0 0 0 "${add_dialog_list[@]}")"
 	fi
-	umount "$DRIVE"?* || true; sgdisk -ozZ "$DRIVE" || SHOWerror "Zapping drive partition table"
+	for p in "$DRIVE"?*; do	if grep -qs "^$p " /proc/mounts; then echo "[i] Unmounting active partition $p..."; umount "$p" || SHOWerror "DiskPartition: umount $p"; fi ; done
+	sgdisk -ozZ "$DRIVE" || SHOWerror "Zapping drive partition table"
 	local total_ram_gb=$(( ($(free -m | awk '/^Mem:/{print $2}') + 1023) / 1024 )) swap_gb
 	[[ "$total_ram_gb" -le 8 ]] && swap_gb=$(( total_ram_gb + 1 )) || { [[ "$total_ram_gb" -le 32 ]] && swap_gb=$total_ram_gb || swap_gb=32; }
 	parted -sf "$DRIVE" -- mktable gpt mkpart "ESP" fat32 1MiB 513MiB mkpart "LINUX-ROOT" 513MiB -"${swap_gb}GiB" mkpart "SWAP" -"${swap_gb}GiB" 100% set 1 esp on set 3 swap on || SHOWerror "Parted GPT execution"
@@ -106,21 +110,16 @@ VoidSystemInstall () {
 	for d in dev proc sys run; do mkdir -p /mnt/$d && mount --bind /$d /mnt/$d || SHOWerror "Mounting /$d filesystem"; done
 	mount --make-rslave /mnt/sys || SHOWerror "Setting sys rslave"
 	[[ "$UEFImode" -eq 1 ]] && { mkdir -p /mnt/sys/firmware/efi/efivars; mount --bind /sys/firmware/efi/efivars /mnt/sys/firmware/efi/efivars || SHOWerror "Mounting efivars filesystem"; }
-}
 CrypttabGen () {
-    echo 0
 	[[ "$LUKS_ENC" -ne 1 ]] && return 0
-	echo 1
 	echo -n "$LUKS_PASS" > /mnt/etc/crypt_key.bin
-	echo 2
 	chmod 600 /mnt/etc/crypt_key.bin
-	echo 3
 	echo -n "$LUKS_PASS" | cryptsetup luksAddKey -q "$SWAP_PART" /mnt/etc/crypt_key.bin -d - || SHOWerror "LUKS AddKey SWAP"
-	echo 4 
 	echo "cryptswap UUID=$CRYPT_SWAP_UUID /etc/crypt_key.bin luks" > /mnt/etc/crypttab
-	echo 5
-	[[ -n "$CRYPT_ADD_UUID" ]] && { echo -n "$LUKS_PASS" | cryptsetup luksAddKey -q "$ADDITIONAL_DRIVE" /mnt/etc/crypt_key.bin -d - || SHOWerror "LUKS AddKey ADD"; echo "cryptdata UUID=$CRYPT_ADD_UUID /etc/crypt_key.bin luks" >> /mnt/etc/crypttab; }
-    echo 6
+	if [[ -n "$CRYPT_ADD_UUID" ]]; then
+		echo -n "$LUKS_PASS" | cryptsetup luksAddKey -q "$ADDITIONAL_DRIVE" /mnt/etc/crypt_key.bin -d - || SHOWerror "LUKS AddKey ADD"
+		echo "cryptdata UUID=$CRYPT_ADD_UUID /etc/crypt_key.bin luks" >> /mnt/etc/crypttab
+	fi
 }
 FStabGen () {
 	[[ -f /mnt/etc/fstab ]] && { mv -f /mnt/etc/fstab /mnt/etc/old-fstab || SHOWerror "Backup existing fstab"; }
