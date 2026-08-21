@@ -97,12 +97,12 @@ Pacman_Locked() {
 }
 TimezoneSel () {
 	while true; do
-		echo -e "\n=== Select Timezone ==="; echo "1) Europe/Rome"
+		echo -e "\n=== Select Timezone ===\n1) Europe/Rome"
 		read -rp "Type '1' or write custom format (e.g. America/New_York) ['q' to quit]: " input_val
-		if [[ "$input_val" == "1" ]]; then TZsel="Europe/Rome" ; break
-		elif [[ "$input_val" =~ ^(q|quit)$ ]]; then TZsel="" ; break
-		elif [[ -z "$input_val" ]]; then echo "Input cannot be empty."
-		else YesNoSel "Confirm timezone: $input_val ?"; [[ "$CC" -eq 1 ]] && { TZsel="$input_val"; break; }; fi
+		[[ -z "$input_val" ]] && { echo "Input cannot be empty."; continue; }
+		[[ "$input_val" == "1" ]] && { TZsel="Europe/Rome"; break; }
+		[[ "${input_val,,}" =~ ^(q|quit)$ ]] && { TZsel=""; break; }
+		YesNoSel "Confirm timezone: $input_val ?"; [[ "$CC" -eq 1 ]] && { TZsel="$input_val"; break; }
 	done
 	echo "Selected Timezone: $TZsel"
 }
