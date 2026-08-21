@@ -26,9 +26,9 @@ YesNoSel () {
 	done
 }
 AdditionalDriveSel () {
-	local avail_disks=(); while read -r name; do
-		[[ "$name" == *"loop"* || "$name" == *"sr"* ]] && continue; lsblk "$name" -n -o MOUNTPOINTS | grep -qE '/run/.*(iso|live|initramfs|miso)' && continue
-		blkid "$name"* 2>/dev/null | grep -q 'iso9660' && continue; avail_disks+=("$name");	done < <(lsblk -dpno NAME | grep -E '/dev/sd|/dev/nvme|/dev/vd|/dev/hd')
+	local avail_disks=(); while read -r name type mount; do 
+	[[ "$type" == "loop" || "$type" == "rom" || -n "$mount" ]] && continue; avail_disks+=("/dev/$name")
+	done < <(lsblk -dpno NAME,TYPE,MOUNTPOINTS)
 	if [[ "${#avail_disks[@]}" -gt 1 ]]; then
 		echo -e "\n=== Secondary drive(s) detected ==="
 		YesNoSel "WARNING: Do you want to configure and format a secondary drive? (All data will be lost)"
@@ -57,12 +57,7 @@ ArchRepoSetup () {
 }
 AutoOSsel () {
 	local os_id; [[ -f /etc/os-release ]] && os_id=$(grep -i '^ID=' /etc/os-release | cut -d= -f2 | tr -d '"')
-	case "${os_id,,}" in
-		arch)  OSsel="Arch" ;;
-		artix) OSsel="Artix" ;;
-		void)  OSsel="Void" ;;
-		*)     echo "Automated OS detection failed or unsupported Live OS."; OperatingSystemSel ;;
-	esac
+	[[ "${os_id,,}" =~ ^(arch|artix|void)$ ]] && OSsel="${os_id^}" || { echo "Automated OS detection failed or unsupported Live OS."; OperatingSystemSel; }
 	echo "Detected Live OS: $OSsel"
 }
 CPUsel () {
@@ -77,16 +72,14 @@ GPUsel () {
 	elif [[ "$gpu_info" =~ NVIDIA ]]; then YesNoSel 'Found Nvidia gpu, wanna proprietary driver? If you do not like it, Mesa is the default'
 		if [[ "$CC" -eq 1 ]]; then echo 'Setting up NVIDIA Drivers'
 			if [[ "${OSsel,,}" == "void" ]]; then
-				[[ "$LIBsel" == "MUSL" ]] && { echo "NVIDIA Proprietary is incompatible with MUSL! Forcing Mesa/Nouveau."; nvidiadrivers=(); } || nvidiadrivers=(nvidia nvidia-libs-32bit)
-			else YesNoSel 'Do you want the official NVIDIA OPEN-source kernel modules? (No = Classic Proprietary)'
-				local open_driver="$CC"; local nv_main
-				if [[ "$open_driver" -eq 1 ]]; then [[ "$KSel" == "linux" ]] && nv_main="nvidia-open" || nv_main="nvidia-open-dkms"
-				else
-					if [[ "$KSel" == "linux" ]]; then nv_main="nvidia"
+					[[ "$LIBsel" == "MUSL" ]] && { echo "NVIDIA Proprietary is incompatible with MUSL! Forcing Mesa/Nouveau."; nvidiadrivers=(); } || nvidiadrivers=(nvidia nvidia-libs-32bit)
+			else 	YesNoSel 'Do you want the official NVIDIA OPEN-source kernel modules? (No = Classic Proprietary)'
+					local nv_main
+					if [[ "$CC" -eq 1 ]]; then [[ "$KSel" == "linux" ]] && nv_main="nvidia-open" || nv_main="nvidia-open-dkms"
+					elif [[ "$KSel" == "linux" ]]; then nv_main="nvidia"
 					elif [[ "$KSel" == "linux-lts" ]]; then nv_main="nvidia-lts"
 					else nv_main="nvidia-dkms"; fi
-				fi
-				nvidiadrivers=("${nv_main}" nvidia-prime nvidia-settings nvidia-utils lib32-nvidia-utils opencl-nvidia lib32-opencl-nvidia libxnvctrl libvdpau)
+					nvidiadrivers=("${nv_main}" nvidia-prime nvidia-settings nvidia-utils lib32-nvidia-utils opencl-nvidia lib32-opencl-nvidia libxnvctrl libvdpau)
 			fi
 		else echo 'Using default Mesa'; fi
 		if command -v strings >/dev/null && [[ -f /sys/firmware/acpi/tables/DSDT ]]; then AcpiOS="$(strings /sys/firmware/acpi/tables/DSDT | grep -i 'windows ' | sort | tail -1)"; fi
@@ -121,16 +114,16 @@ TimezoneSel () {
 UEFIsel () {
 	[[ -d "/sys/firmware/efi/" ]] && { mount | grep -q "/sys/firmware/efi/efivars" || mount -t efivarfs efivarfs /sys/firmware/efi/efivars; UEFImode=1; echo 'UEFI Mode detected'; } || { UEFImode=0; echo 'BIOS Mode detected'; }
 }
-KernelSel()				{ [[ "${OSsel,,}" == "void" ]] && MenuSel "KSel" "Select preferred Kernel" "linux" "linux-lts" || MenuSel "KSel" "Select preferred Kernel" "linux" "linux-lts" "linux-hardened" "linux-zen"; }
-OperatingSystemSel()	{ MenuSel "OSsel" "Select the distro to setup" "Arch" "Artix" "Void"; }
-VoidInstMethod()		{ MenuSel "VImethod" "Select installation type" "XBPS" "ROOTFS"; }
-LibrarySel()			{ MenuSel "LIBsel" "Select base library" "GLIBC" "MUSL"; }
-LocalizationSel()		{ MenuSel "LOCsel" "Select localization" "en_US.UTF-8" "en_GB.UTF-8" "it_IT.UTF-8"; }
-LanguageSel()			{ MenuSel "LANGsel" "Select preferred Language" "en_US.UTF-8" "en_GB.UTF-8" "it_IT.UTF-8"; }
-PartIDSel()				{ MenuSel "PIDsel" "Select partition identifier" "UUID" "PARTUUID" "LABEL"; }
-FilesystemSel()			{ MenuSel "FSsel" "Select filesystem for ROOT" "ext4" "btrfs"; }
-BootloaderSel()			{ [[ "$UEFImode" -eq 0 ]] && { BLsel="grub"; echo "BIOS mode: GRUB selected automatically"; } || MenuSel "BLsel" "Select Bootloader" "refind" "grub" "efistub"; }
-HostnameSel()			{ TextPromptSel "HNsel" "Enter preferred hostname"; }
-UsernameSel()			{ TextPromptSel "UNsel" "Enter preferred username"; }
-IRFsel()				{ [[ "${OSsel,,}" == "void" ]] && { IRFSetup="dracut"; echo "Selected Initramfs: dracut"; } || MenuSel "IRFSetup" "Select preferred Initramfs Generator" "booster" "mkinitcpio" "dracut"; }
-ArchRepoSel()			{ YesNoSel "Do you want Arch repositories as well as Artix repositories?"; [[ "$CC" -eq 1 ]] && { ARCHrepo=1; echo "OK, adding Arch repositories!"; } || { ARCHrepo=''; echo "Proceeding without them..."; }; }
+KernelSel()          { [[ "${OSsel,,}" == "void" ]] && MenuSel "KSel" "Select preferred Kernel" "linux" "linux-lts" || MenuSel "KSel" "Select preferred Kernel" "linux" "linux-lts" "linux-hardened" "linux-zen"; }
+OperatingSystemSel() { MenuSel "OSsel" "Select the distro to setup" "Arch" "Artix" "Void"; }
+VoidInstMethod()     { MenuSel "VImethod" "Select installation type" "XBPS" "ROOTFS"; }
+LibrarySel()         { MenuSel "LIBsel" "Select base library" "GLIBC" "MUSL"; }
+LocalizationSel()    { MenuSel "LOCsel" "Select localization" "en_US.UTF-8" "en_GB.UTF-8" "it_IT.UTF-8"; }
+LanguageSel()        { MenuSel "LANGsel" "Select preferred Language" "en_US.UTF-8" "en_GB.UTF-8" "it_IT.UTF-8"; }
+PartIDSel()          { MenuSel "PIDsel" "Select partition identifier" "UUID" "PARTUUID" "LABEL"; }
+FilesystemSel()      { MenuSel "FSsel" "Select filesystem for ROOT" "ext4" "btrfs"; }
+BootloaderSel()      { [[ "$UEFImode" -eq 0 ]] && { BLsel="grub"; echo "BIOS mode: GRUB selected automatically"; } || MenuSel "BLsel" "Select Bootloader" "refind" "grub" "efistub"; }
+HostnameSel()        { TextPromptSel "HNsel" "Enter preferred hostname"; }
+UsernameSel()        { TextPromptSel "UNsel" "Enter preferred username"; }
+IRFsel()             { [[ "${OSsel,,}" == "void" ]] && { IRFSetup="dracut"; echo "Selected Initramfs: dracut"; } || MenuSel "IRFSetup" "Select preferred Initramfs Generator" "booster" "mkinitcpio" "dracut"; }
+ArchRepoSel()        { YesNoSel "Do you want Arch repositories as well as Artix repositories?"; [[ "$CC" -eq 1 ]] && { ARCHrepo=1; echo "OK, adding Arch repositories!"; } || { ARCHrepo=''; echo "Proceeding without them..."; }; }
