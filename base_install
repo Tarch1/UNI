@@ -148,7 +148,7 @@ PackageInstall () {
 PKGcheck () {
 	echo "Initializing package groups..."
 	microcode=(); [[ -n "$microcodepkg" ]] && microcode=("$microcodepkg"); kernel=("${KSel}" linux-firmware "${KSel}-headers"); baselinux=(base base-devel); baseutils=(man-db bash-completion kitty vim nano wget git binutils cryptsetup); booster=(); fs=(dialog mtools parted gptfdisk dosfstools gvfs-mtp ntfsprogs)
-	bootloaderutility=(efibootmgr os-prober sbsigntools); net=(networkmanager iwd chrony); bluetooth=(bluez bluez-utils bluez-tools bluetui blueman); print=(cups cups-pdf system-config-printer avahi); utility=(imv xed calc fd btop adriconf fwupd)
+	bootloaderutility=(efibootmgr os-prober sbsigntools); net=(networkmanager iwd chrony); bluetooth=(bluez bluez-utils bluez-tools bluetui blueman); print=(cups cups-pdf system-config-printer avahi); utility=(imv xed calc fd btop adriconf fwupd lact)
 	[[ "${OSsel,,}" == "arch" || "${OSsel,,}" == "artix" ]] && booster=(booster)
 	if [[ "${OSsel,,}" == "artix" ]]; then local init_s="${init_sys,,}"; elogind=(elogind elogind-"$init_s" "${init_s}"-settingsd); net+=("chrony-${init_s}" "networkmanager-${init_s}"); bluetooth+=("bluez-${init_s}" bluez-cups); print+=("avahi-${init_s}" "cups-${init_s}"); else elogind=(); fi
 	[[ "$FSsel" == "btrfs" ]] && { btrfsutility=(snapper btrfs-progs); grubbtrfs=(grub-btrfs); } || { btrfsutility=(); grubbtrfs=(); }
