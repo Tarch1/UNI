@@ -77,14 +77,10 @@ AdditionalDriveSetup () {
 		echo -n "$LUKS_PASS" | cryptsetup luksOpen "$ADDITIONAL_DRIVE" cryptdata -d - || SHOWerror "LUKS ADD open"
 		TARGET_ADD="/dev/mapper/cryptdata"; CRYPT_ADD_UUID="$(blkid -s UUID -o value "$ADDITIONAL_DRIVE")"; export CRYPT_ADD_UUID
 	elif [[ "$LUKS_ENC" -eq 1 ]]; then TARGET_ADD="/dev/mapper/cryptdata"; fi
-	if [[ "$ADD_FORMAT" -eq 1 ]]; then case "$ADD_FS" in
-			ext4)	mkfs.ext4 -F -L "$ADD_LABEL" "$TARGET_ADD" || SHOWerror "mkfs.ext4 additional drive" ;;
-			btrfs)	mkfs.btrfs -f -L "$ADD_LABEL" "$TARGET_ADD" || SHOWerror "mkfs.btrfs additional drive" ;;
-			exfat)	mkfs.exfat -n "$ADD_LABEL" "$TARGET_ADD" || SHOWerror "mkfs.exfat additional drive" ;;
-			ntfs)	mkfs.ntfs -f -L "$ADD_LABEL" "$TARGET_ADD" || SHOWerror "mkfs.ntfs additional drive" ;;
-			*)		echo "Unsupported filesystem for additional drive: $ADD_FS" ;;
-		esac
-	fi
+	[[ "$ADD_FORMAT" -eq 1 ]] && {
+		[[ ! "$ADD_FS" =~ ^(ext4|btrfs|exfat|ntfs)$ ]] && echo "Unsupported filesystem for additional drive: $ADD_FS" || {
+			local flags=(-f -L); [[ "$ADD_FS" == "ext4" ]] && flags=(-F -L); [[ "$ADD_FS" == "exfat" ]] && flags=(-n)
+			mkfs."$ADD_FS" "${flags[@]}" "$ADD_LABEL" "$TARGET_ADD" || SHOWerror "mkfs.$ADD_FS additional drive"; } ; }
 	mkdir -p /mnt/media/HDD && mount "$TARGET_ADD" /mnt/media/HDD || SHOWerror "Mount additional drive"
 	UNIfstab+="$PIDsel=$(blkid -s $PIDsel -o value $TARGET_ADD || echo $TARGET_ADD) /media/HDD $(blkid -s TYPE -o value $TARGET_ADD || echo auto) defaults,noatime 0 2\n"
 }
