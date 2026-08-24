@@ -152,21 +152,20 @@ PKGcheck () {
 	[[ "${OSsel,,}" == "void" ]] && { local v_live_repos=(void-repo-nonfree); [[ "$LIBsel" == "GLIBC" ]] && v_live_repos+=(void-repo-multilib void-repo-multilib-nonfree); $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${v_live_repos[@]}" || true; }
 	kernel=("${KSel}" "${KSel}-headers"); [[ "${OSsel,,}" == "void" ]] && kernel+=(linux-firmware-network) || kernel+=(linux-firmware)
 	baselinux=(base-devel); [[ "${OSsel,,}" == "void" ]] && baselinux+=(base-system) || baselinux+=(base)
-	baseutils=(bash-completion kitty vim nano wget git binutils cryptsetup); [[ "${OSsel,,}" == "void" ]] && baseutils+=(man-pages) || baseutils+=(man-db)
+	baseutils=(bash-completion vim nano wget git binutils cryptsetup); [[ "${OSsel,,}" == "void" ]] && baseutils+=(man-pages) || baseutils+=(man-db)
 	net=(iwd chrony); [[ "${OSsel,,}" == "void" ]] && net+=(NetworkManager) || net+=(networkmanager)
-	bluetooth=(bluez); [[ "${OSsel,,}" != "void" ]] && bluetooth+=(bluez-utils bluez-tools bluetui blueman)
+	bluetooth=(bluez); [[ "${OSsel,,}" != "void" ]] && bluetooth+=(bluez-utils bluetui blueman)
 	print=(cups cups-pdf avahi); [[ "${OSsel,,}" == "void" ]] && print+=(cups-filters) || print+=(system-config-printer)
 	audio=(pipewire wireplumber); [[ "${OSsel,,}" != "void" ]] && audio+=(pipewire-pulse pipewire-alsa pipewire-jack sof-firmware)
-	fs=(dialog mtools parted gptfdisk dosfstools ntfsprogs); [[ "${OSsel,,}" != "void" ]] && fs+=(gvfs-mtp)
-	archive=(bzip2 cpio gzip xz 7zip tar unrar zip unzip); [[ "${OSsel,,}" != "void" ]] && archive+=(lzop)
+	fs=(dialog mtools parted gptfdisk dosfstools ntfsprogs)
+	archive=(bzip2 cpio gzip xz 7zip tar unrar zip unzip); [[ "${OSsel,,}" != "void" ]] && archive+=(lzop zstd)
 	utility=(imv xed calc fd btop fwupd); [[ "${OSsel,,}" != "void" ]] && utility+=(adriconf lact)
-	apps=(telegram-desktop firefox); [[ "${OSsel,,}" != "void" ]] && apps+=(profile-sync-daemon)
+	apps=(kitty telegram-desktop firefox); [[ "${OSsel,,}" != "void" ]] && apps+=(profile-sync-daemon)
 	bootloaderutility=(efibootmgr os-prober); [[ "${OSsel,,}" != "void" ]] && bootloaderutility+=(sbsigntools)
 	personalization=(); [[ "${OSsel,,}" != "void" ]] && personalization=(cowfortune)
 	[[ "${OSsel,,}" == "void" ]] && hardwareacceleration=(mesa-dri mesa-vaapi mesa-vulkan-radeon) || hardwareacceleration=(intel-media-driver vkd3d)
 	[[ "${OSsel,,}" == "void" ]] && vulkan=(vulkan-loader) || vulkan=(vulkan-icd-loader vulkan-intel vulkan-mesa-layers)
-	filemanager=(yazi pcmanfm tumbler file-roller)
-	android=(android-tools)
+	filemanager=(yazi pcmanfm tumbler file-roller android-tools); [[ "${OSsel,,}" != "void" ]] && fs+=(gvfs-mtp)
 	elogind=(); [[ "${OSsel,,}" == "artix" ]] && { local init_s="${init_sys,,}"; elogind=(elogind elogind-"$init_s" "${init_s}"-settingsd); net+=("chrony-${init_s}" "networkmanager-${init_s}"); bluetooth+=("bluez-${init_s}" bluez-cups); print+=("avahi-${init_s}" "cups-${init_s}"); }
 	echo "Downloading remote package indexes..."
 	local remote_repo_list="/tmp/remote_pkgs.list"
