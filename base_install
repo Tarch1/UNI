@@ -89,7 +89,7 @@ ArchTixSystemInstall () {
 	local BasePKG=( "${kernel[@]}" "${baselinux[@]}" "${elogind[@]}" )
 	[[ "$FSsel" == "btrfs" ]] && BasePKG+=( "${btrfsutility[@]}" )
 	"$PKGstrap" /mnt "$microcodepkg" "${BasePKG[@]}" || SHOWerror "Arch/Artix strap base installation"
-	[[ -f /mnt/etc/pacman.conf ]] && sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 5/' /mnt/etc/pacman.conf
+	[[ -f /mnt/etc/pacman.conf ]] && sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 5/' /mnt/etc/pacman.conf || true
 }
 VoidSystemInstall () {
 	local void_repo="https://voidlinux.org"
@@ -100,14 +100,14 @@ VoidSystemInstall () {
 				else curl -Lo "/tmp/${tarball}" "${void_repo}/static/${tarball}" || SHOWerror "ROOTFS download"; tar -xJf "/tmp/${tarball}" -C /mnt && rm -f "/tmp/${tarball}" || SHOWerror "ROOTFS downloaded extraction"; fi ; }
 	for d in dev proc sys run; do mkdir -p /mnt/$d && mount --bind /$d /mnt/$d || SHOWerror "Mounting /$d filesystem"; done
 	mount --make-rslave /mnt/sys || SHOWerror "Setting sys rslave"
-	[[ "$UEFImode" -eq 1 ]] && { mkdir -p /mnt/sys/firmware/efi/efivars; mount --bind /sys/firmware/efi/efivars /mnt/sys/firmware/efi/efivars || SHOWerror "Mounting efivars filesystem"; }
+	[[ "$UEFImode" -eq 1 ]] && { mkdir -p /mnt/sys/firmware/efi/efivars; mount --bind /sys/firmware/efi/efivars /mnt/sys/firmware/efi/efivars || SHOWerror "Mounting efivars filesystem"; } || true
 }
 CrypttabGen () {
 	[[ "$LUKS_ENC" -ne 1 ]] && return 0
 	echo -n "$LUKS_PASS" > /mnt/etc/crypt_key.bin; chmod 600 /mnt/etc/crypt_key.bin
 	echo -n "$LUKS_PASS" | cryptsetup luksAddKey -q "$SWAP_PART" /mnt/etc/crypt_key.bin -d - || SHOWerror "LUKS AddKey SWAP"
 	echo "cryptswap UUID=$CRYPT_SWAP_UUID /etc/crypt_key.bin luks" > /mnt/etc/crypttab
-	[[ -n "$CRYPT_ADD_UUID" ]] && { echo -n "$LUKS_PASS" | cryptsetup luksAddKey -q "$ADDITIONAL_DRIVE" /mnt/etc/crypt_key.bin -d - || SHOWerror "LUKS AddKey ADD"; echo "cryptdata UUID=$CRYPT_ADD_UUID /etc/crypt_key.bin luks" >> /mnt/etc/crypttab; }
+	[[ -n "$CRYPT_ADD_UUID" ]] && { echo -n "$LUKS_PASS" | cryptsetup luksAddKey -q "$ADDITIONAL_DRIVE" /mnt/etc/crypt_key.bin -d - || SHOWerror "LUKS AddKey ADD"; echo "cryptdata UUID=$CRYPT_ADD_UUID /etc/crypt_key.bin luks" >> /mnt/etc/crypttab; } || true
 }
 FStabGen () {
 	[[ -f /mnt/etc/fstab ]] && { mv -f /mnt/etc/fstab /mnt/etc/old-fstab || SHOWerror "Backup existing fstab"; }
@@ -220,7 +220,7 @@ ServiceSetup () {
 	[[ "${OSsel,,}" == "void" ]] && { Services+=( NetworkManager chronyd cupsd dbus avahi-daemon bluetoothd ); [[ -d /mnt/etc/sv/tlp ]] && Services+=( tlp ); }
 	[[ "${OSsel,,}" == "void" ]] && "$chroot" /mnt bash -c "for s in ${Services[*]}; do ln -sf /etc/sv/\$s /etc/runit/runsvdir/default/; done"
 	[[ "${OSsel,,}" != "void" ]] && { for s in "${Services[@]}"; do "$chroot" /mnt "$initc0" "$initc1" "$s"; done; }
-	mkdir -p /mnt/etc/udev/rules.d/; [[ -f "${SCRIPT_DIR}/Conf_files/51-android.rules" ]] && cp "${SCRIPT_DIR}/Conf_files/51-android.rules" /mnt/etc/udev/rules.d/
+	mkdir -p /mnt/etc/udev/rules.d/; [[ -f "${SCRIPT_DIR}/Conf_files/51-android.rules" ]] && cp "${SCRIPT_DIR}/Conf_files/51-android.rules" /mnt/etc/udev/rules.d/ || true
 }
 UserSetup () {
 	"$chroot" /mnt bash -c "useradd -m -g users -G wheel,video,audio,storage,input,lp,scanner,power,kvm $UNsel && su $UNsel -c 'mkdir -p ~/.config'"
@@ -232,7 +232,7 @@ AudioSetup () {
 	"$chroot" /mnt mkdir -p /etc/pipewire/pipewire.conf.d /etc/wireplumber/wireplumber.conf.d
 	printf 'monitor.bluez.properties = { bluez5.enable-sbc-xq = true, bluez5.enable-msbc = true, bluez5.enable-hw-volume = true, bluez5.codecs = [ sbc_xq aac aptx aptx_hd ldac ] }\n' > /mnt/etc/wireplumber/wireplumber.conf.d/10-bluetooth-policy.conf
 	printf 'context.properties = { default.clock.rate = 48000, default.clock.quantum = 1024, default.clock.min-quantum = 32, default.clock.max-quantum = 2048 }\n' > /mnt/etc/pipewire/pipewire.conf.d/99-input-denoise.conf
-	[[ -f /mnt/etc/bluetooth/main.conf ]] && sed -i 's/#AutoEnable=false/AutoEnable=true/g' /mnt/etc/bluetooth/main.conf
+	[[ -f /mnt/etc/bluetooth/main.conf ]] && sed -i 's/#AutoEnable=false/AutoEnable=true/g' /mnt/etc/bluetooth/main.conf || true
 }
 BootloaderSetup () {
 	local osi_version="${AcpiOS:-Windows 2020}"; local kname; kname=$(basename "$(find /mnt/boot/ -type f -name 'vmlinuz-*' | head -n 1)") || kname="vmlinuz-$KSel"
