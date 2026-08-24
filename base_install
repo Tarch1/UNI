@@ -1,5 +1,6 @@
 #!/bin/bash
 [[ "$(id -u)" -ne 0 ]] && { echo 'Please run as root.' >&2; exit 1; }
+ping -c 1 -W 3 8.8.8.8 &>/dev/null || { echo "Network connection required. Please connect to the internet."; exit 1; }
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 exec &> >(stdbuf -oL -eL tee -a /tmp/install_$(date +%Y%m%d_%H%M%S).log)
 SHOWerror () {
