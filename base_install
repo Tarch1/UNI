@@ -134,10 +134,10 @@ PackageConfig () {
 PackageInstall () {
 	local VBTboot=(); [[ "$BLsel" == "efistub" ]] && VBTboot+=(efibootmgr); [[ "$BLsel" == "grub" ]] && VBTboot+=(grub); [[ "$BLsel" == "refind" ]] && VBTboot+=(refind); [[ "$FSsel" == "btrfs" ]] && VBTboot+=(btrfs-progs)
 	if [[ "$VBTsel" -eq 1 ]]; then [[ "${OSsel,,}" == "void" ]] && "$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${VBTboot[@]}" || "$chroot" /mnt $PKGmanager$PKGinst$PKGupd"u" "${PKGskp[@]}" "${baselinux[@]}" "${baseutils[@]}" "${elogind[@]}" "${net[@]}" "${bluetooth[@]}" "${print[@]}" "${VBTboot[@]}"
-	else	local FullPKGs=( "${microcode[@]}" "${kernel[@]}" "${baseutils[@]}" "${fs[@]}" "${bootloaderutility[@]}" "${btrfsutility[@]}" "${grubpkg[@]}" "${refindpkg[@]}" "${net[@]}" "${audio[@]}" "${bluetooth[@]}" "${android[@]}" "${print[@]}" "${apps[@]}" "${utility[@]}" "${hardwareacceleration[@]}" "${vulkan[@]}" "${filemanager[@]}" "${archive[@]}" )
+	else    local FullPKGs=( "${microcode[@]}" "${kernel[@]}" "${baseutils[@]}" "${fs[@]}" "${bootloaderutility[@]}" "${btrfsutility[@]}" "${grubpkg[@]}" "${refindpkg[@]}" "${net[@]}" "${audio[@]}" "${bluetooth[@]}" "${print[@]}" "${apps[@]}" "${utility[@]}" "${hardwareacceleration[@]}" "${vulkan[@]}" "${filemanager[@]}" "${archive[@]}" )
 			[[ ${#nvidiadrivers[@]} -gt 0 ]] && FullPKGs+=( "${nvidiadrivers[@]}" )
 			[[ -v amddrivers && ${#amddrivers[@]} -gt 0 ]] && FullPKGs+=( "${amddrivers[@]}" )
-			[[ "${OSsel,,}" == "void" ]] || FullPKGs+=( "${baselinux[@]}" "${elogind[@]}" "${grubbtrfs[@]}" "${personalization[@]}" )
+			[[ "${OSsel,,}" == "void" ]] || FullPKGs+=( "${baselinux[@]}" "${elogind[@]}" "${grubbtrfs[@]}" )
 			[[ "${OSsel,,}" == "void" ]] && "$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${FullPKGs[@]}" || "$chroot" /mnt $PKGmanager$PKGinst$PKGupd"u" "${PKGskp[@]}" "${FullPKGs[@]}"
 	fi
 }
@@ -158,19 +158,17 @@ PKGcheck () {
 	print=(cups cups-pdf avahi); [[ "${OSsel,,}" == "void" ]] && print+=(cups-filters) || print+=(system-config-printer)
 	audio=(pipewire wireplumber); [[ "${OSsel,,}" != "void" ]] && audio+=(pipewire-pulse pipewire-alsa pipewire-jack sof-firmware)
 	fs=(dialog mtools parted gptfdisk dosfstools ntfsprogs)
-	archive=(bzip2 cpio gzip xz 7zip tar unrar zip unzip); [[ "${OSsel,,}" != "void" ]] && archive+=(lzop zstd)
-	utility=(imv xed calc fd btop fwupd); [[ "${OSsel,,}" != "void" ]] && utility+=(adriconf lact)
+	archive=(bzip2 cpio gzip xz 7zip tar unrar zip unzip zstd)
+	utility=(imv featherpad libqalculate fd btop fwupd); [[ "${OSsel,,}" != "void" ]] && utility+=(lact cowfortune)
 	apps=(kitty telegram-desktop firefox); [[ "${OSsel,,}" != "void" ]] && apps+=(profile-sync-daemon)
 	bootloaderutility=(efibootmgr os-prober); [[ "${OSsel,,}" != "void" ]] && bootloaderutility+=(sbsigntools)
-	personalization=(); [[ "${OSsel,,}" != "void" ]] && personalization=(cowfortune)
 	[[ "${OSsel,,}" == "void" ]] && hardwareacceleration=(mesa-dri mesa-vaapi mesa-vulkan-radeon) || hardwareacceleration=(intel-media-driver vkd3d)
 	[[ "${OSsel,,}" == "void" ]] && vulkan=(vulkan-loader) || vulkan=(vulkan-icd-loader vulkan-intel vulkan-mesa-layers)
-	filemanager=(yazi pcmanfm tumbler file-roller android-tools); [[ "${OSsel,,}" != "void" ]] && fs+=(gvfs-mtp)
+	filemanager=(yazi pcmanfm tumbler file-roller android-tools); [[ "${OSsel,,}" != "void" ]] && filemanager+=(gvfs-mtp)
 	elogind=(); [[ "${OSsel,,}" == "artix" ]] && { local init_s="${init_sys,,}"; elogind=(elogind elogind-"$init_s" "${init_s}"-settingsd); net+=("chrony-${init_s}" "networkmanager-${init_s}"); bluetooth+=("bluez-${init_s}" bluez-cups); print+=("avahi-${init_s}" "cups-${init_s}"); }
-	echo "Downloading remote package indexes..."
-	local remote_repo_list="/tmp/remote_pkgs.list"
+	echo "Downloading remote package indexes..."; local remote_repo_list="/tmp/remote_pkgs.list"
 	[[ "${OSsel,,}" == "void" ]] && $PKGmanager$PKGchk -R -s "" | awk '{print $2}' | sed 's/-[0-9].*//' | sort -u > "$remote_repo_list" || $PKGmanager$PKGinst$PKGupd"lq" | sort -u > "$remote_repo_list"
-	local y="microcode amddrivers nvidiadrivers kernel baselinux baseutils fs bootloaderutility btrfsutility elogind grubpkg grubbtrfs refindpkg net audio bluetooth android print apps utility hardwareacceleration vulkan filemanager archive personalization booster" miss=()
+	local y="microcode amddrivers nvidiadrivers kernel baselinux baseutils fs bootloaderutility btrfsutility elogind grubpkg grubbtrfs refindpkg net audio bluetooth print apps utility hardwareacceleration vulkan filemanager archive booster" miss=()
 	for group in $y; do
 		local -n current_group="$group"; local valid_pkgs=()
 		for pkg in "${current_group[@]}"; do grep -qx "$pkg" "$remote_repo_list" && valid_pkgs+=("$pkg") || miss+=("$pkg"); done
