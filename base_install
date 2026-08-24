@@ -317,12 +317,12 @@ InstallationSetup () {
 			[[ "$initc0" == "rc-update" ]] && init_sys="openrc" || init_sys="runit"; sed -i -e 's/^#ParallelDownloads = 5/ParallelDownloads = 5/' -e '/\[lib32]/,/mirrorlist/ s/#//' /etc/pacman.conf
 			[[ "$ARCHrepo" == "1" ]] && ArchRepoSetup /etc/pacman.conf; $PKGmanager$PKGinst$PKGupd"lq" system world galaxy lib32 $([[ "$ARCHrepo" == "1" ]] && echo "universe extra multilib") | sort > pacman_db || true
 		fi
-		echo 'Running check for missing packages'; PKGcheck
 	else
 		PKGmanager="xbps"; PKGinst="-install"; PKGupd=" -S"; PKGchk="-query"; PKGrmv="-remove"; PKGdpn=" -R"; PKGfrc=" -F"
 		PKGskp=( -y -y ); PKGrsk=( -y ); keylayout='KEYMAP=it'; keypath='etc/rc.conf'; [[ "$LIBsel" == "GLIBC" ]] && VoidArch="x86_64" || VoidArch="x86_64-musl"
 		VoidRepo="https://voidlinux.org$([[ "$LIBsel" == "MUSL" ]] && echo "/musl")"; PKGstrap="$PKGmanager$PKGinst$PKGupd -R $VoidRepo -r /mnt ${PKGskp[*]}"; chroot="chroot"
 	fi
+	echo 'Running check for missing packages'; PKGcheck
 	for a in "${ArchTixSteps[@]}"; do "$a" || SHOWerror "$a"; done
 	FinishInst
 }
