@@ -61,9 +61,9 @@ AutoOSsel () {
 	echo "Detected Live OS: $OSsel"
 }
 CPUsel () {
-	if grep -q "GenuineIntel" /proc/cpuinfo; then echo 'Installing Intel microcode'; microcodepkg='intel-ucode'
-	elif grep -q "AuthenticAMD" /proc/cpuinfo; then echo 'Installing AMD microcode'; [[ "${OSsel,,}" == "void" ]] && microcodepkg='amd-ucode-firmware' || microcodepkg='amd-ucode'
-	else echo 'No microcode needed or unknown CPU'; microcodepkg=""; fi
+	local cpu_info=$(grep -m1 -Ei 'GenuineIntel|AuthenticAMD' /proc/cpuinfo); [[ "$cpu_info" =~ Intel ]] && { echo 'Installing Intel microcode'; microcodepkg='intel-ucode'; }
+	[[ "$cpu_info" =~ AMD ]] && { echo 'Installing AMD microcode'; [[ "${OSsel,,}" == "void" ]] && microcodepkg='amd-ucode-firmware' || microcodepkg='amd-ucode'; }
+	[[ ! "$cpu_info" =~ (Intel|AMD) ]] && { echo 'No microcode needed or unknown CPU'; microcodepkg=""; }
 }
 GPUsel () {
 	echo "Detecting video chipset..."
