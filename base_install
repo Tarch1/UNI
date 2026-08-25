@@ -9,7 +9,7 @@ SHOWerror () {
 	[[ "$CC" -eq 1 ]] && echo "OK, still going, see Errors file in this directory" || { echo "OK, then exit"; exit 1; }
 }
 Check_required_files () {
-	local files=( additional_setup finish_setup Bootloader/Refind/{refind.conf,refind_linux.conf,themes/Blur-theme/theme.conf} Bootloader/Grub-Eiffel/{theme.txt,select_c.png,select_e.png,select_w.png,eiffel_tower_under_construction.png,icons/arch.png} )
+	local files=( additional_setup finish_setup Bootloader/Refind/themes/Blur-theme/theme.conf Bootloader/Grub-Sekiro/{theme.txt,sekiro_1920x1080.png,select_c.png} Bootloader/Grub-Eiffel/{theme.txt,eiffel_tower_under_construction.png,select_c.png} )
 	local miss=(); for a in "${files[@]}"; do [[ ! -f "${SCRIPT_DIR}/$a" ]] && miss+=("$a"); done
 	[[ ${#miss[@]} -gt 0 ]] && { echo 'Required file(s) missing:' "${miss[@]}"; exit 1; } || source additional_setup
 }
@@ -251,16 +251,18 @@ BootloaderSetup () {
 			local ref_res="max"; [[ "$VBTsel" -eq 1 ]] && ref_res="1024 768"
 			echo -e "timeout 3\nshowtools shell, gdisk, apple_recovery, windows_recovery, mok_tool, bootorder, firmware, shutdown\nenable_mouse\nalso_scan_dirs +,@/boot\nscanfor internal,external,optical,manual,firmware\nextra_kernel_version_strings linux-hardened,linux-rt-lts,linux-zen,linux-lts,linux-rt,linux\ninclude themes/Blur-theme/theme.conf\nresolution $ref_res" >> /mnt/boot/EFI/"$efifolder"/refind.conf
 			local rl_flags="rw $luks_flags resume=${PIDsel}=$SWAPID rootfstype=$FSsel $rootflags $nvdrm $nvosi"
-			echo -e "\"Boot Standard\"\t\"$rl_flags $initrd_flags\"\n\"Boot Terminal\"\t\"$rl_flags $initrd_flags systemd.unit=multi-user.target\"" > /mnt/boot/refind_linux.conf
+			echo -e "\"Boot Standard\"\t\"$rl_flags $initrd_flags\"\n\"Boot Terminal\"\t\"$rl_flags $initrd_flags systemd.unit=multi-user.target\"" > /mnt/boot/refind_linux.conf || SHOWerror "Write refind_linux.conf"
 			echo '!!!Refind config and theme changed!!!' ;;
 		2|GRUB|Grub|grub)
 			[[ "$FSsel" == "btrfs" ]] && grubpkg+=("${grubbtrfs[@]}")
 			"$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${grubpkg[@]}" || SHOWerror "GRUB package install"
 			[[ "$UEFImode" -eq 0 ]] && "$chroot" /mnt grub-install --target=i386-pc --recheck --debug "$DRIVE" || "$chroot" /mnt grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB || SHOWerror "GRUB install"
+			local g_theme="Grub-Sekiro" # 1. Variabile per scegliere il tema al volo (Sekiro o Eiffel)
 			mkdir -p /mnt/boot/grub/themes /mnt/usr/share/grub/themes/ || SHOWerror "mkdir GRUB themes"
-			sed -i -e "/GRUB_DISABLE_OS_PROBER=/ s/#//g" -e '/GRUB_THEME=/c GRUB_THEME="/boot/grub/themes/Grub-Sekiro/theme.txt"' -e "s|^GRUB_CMDLINE_LINUX=.*|GRUB_CMDLINE_LINUX=\"$nvosi $luks_flags\"|" /mnt/etc/default/grub
+			cp -r "${SCRIPT_DIR}/Bootloader/$g_theme" /mnt/boot/grub/themes/ && cp -r "${SCRIPT_DIR}/Bootloader/$g_theme" /mnt/usr/share/grub/themes/ || SHOWerror "Copy GRUB theme"
+			local g_res="1920x1080,1024x768,auto"; [[ "$VBTsel" -eq 1 ]] && g_res="1024x768,auto"
+			sed -i -e "/GRUB_DISABLE_OS_PROBER=/ s/#//g" -e "s/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=3/" -e "s/^#GRUB_GFXMODE=.*/GRUB_GFXMODE=$g_res/" -e '/GRUB_THEME=/c GRUB_THEME="/boot/grub/themes/'"$g_theme"'/theme.txt"' -e "s|^GRUB_CMDLINE_LINUX=.*|GRUB_CMDLINE_LINUX=\"$nvosi $luks_flags\"|" /mnt/etc/default/grub
 			[[ ${#nvidiadrivers[@]} -gt 0 ]] && sed -i "s/^GRUB_CMDLINE_LINUX_DEFAULT=\"\(.*\)\"/GRUB_CMDLINE_LINUX_DEFAULT=\"\1 quiet splash $nvdrm\"/" /mnt/etc/default/grub
-			cp -r "${SCRIPT_DIR}/Bootloader/Grub-Sekiro" /mnt/boot/grub/themes/ && cp -r "${SCRIPT_DIR}/Bootloader/Grub-Sekiro" /mnt/usr/share/grub/themes/ || SHOWerror "Copy Sekiro theme"
 			"$chroot" /mnt grub-mkconfig -o /boot/grub/grub.cfg || SHOWerror "GRUB mkconfig execution" ;;
 		3|EFISTUB|Efistub|efistub)
 			local boot_label="${OSsel^} Linux ($FSsel)"
