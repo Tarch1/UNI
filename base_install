@@ -199,7 +199,7 @@ KernelSetup () {
 					else local r_kver; r_kver="$(basename "$(find /mnt/usr/lib/modules/ -maxdepth 1 -mindepth 1 -type d | head -n 1)")"; "$chroot" /mnt dracut --kver "$r_kver" --force /boot/initramfs-"$KSel".img || SHOWerror "dracut build"; fi ;;
 		booster)	[[ ${#booster[@]} -gt 0 ]] && { "$chroot" /mnt $PKGmanager$PKGinst$PKGupd"u" "${PKGskp[@]}" "${booster[@]}" || SHOWerror "install booster"; }
 					[[ "${OSsel,,}" != "void" ]] && { "$chroot" /mnt $PKGmanager$PKGrmv"n"$PKGdpn "${PKGrsk[@]}" mkinitcpio || SHOWerror "purge mkinitcpio"; }
-					local b_opts="mount_timeout: 10s\nvconsole: true\nresume: /dev/disk/by-uuid/${SWAPID}\nmodules: ahci,ata_piix,sd_mod,nvme"
+					local b_opts="mount_timeout: 3m\nvconsole: true\nresume: /dev/disk/by-uuid/${SWAPID}\nmodules: ahci,ata_piix,sd_mod,nvme"
 					[[ "$FSsel" == "btrfs" ]] && b_opts="${b_opts},btrfs"
 					[[ ${#nvidiadrivers[@]} -gt 0 ]] && b_opts="${b_opts},nvidia,nvidia_modeset,nvidia_uvm,nvidia_drm"
 					echo -e "$b_opts" > /mnt/etc/booster.yaml || SHOWerror "booster.yaml write"
