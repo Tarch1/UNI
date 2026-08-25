@@ -248,9 +248,10 @@ BootloaderSetup () {
 			"$chroot" /mnt refind-install || SHOWerror "rEFInd execution"; [[ "$UEFImode" -eq 1 ]] && efifolder='refind' || efifolder='BOOT'
 			mkdir -p /mnt/boot/EFI/"$efifolder"/themes || SHOWerror "mkdir rEFInd themes"
 			cp -r "${SCRIPT_DIR}/Bootloader/Refind/themes/"* /mnt/boot/EFI/"$efifolder"/themes/ || SHOWerror "Copy rEFInd themes"
-			grep -q "theme.conf" /mnt/boot/EFI/"$efifolder"/refind.conf || echo "include themes/Blur-theme/theme.conf" >> /mnt/boot/EFI/"$efifolder"/refind.conf
-			[[ "$VBTsel" -eq 1 ]] && sed -i 's/#resolution 1024 768/resolution 1024 768/' /mnt/boot/EFI/"$efifolder"/refind.conf
-			echo "\"Standard Boot\"   \"ro $luks_flags resume=${PIDsel}=$SWAPID rootfstype=$FSsel $rootflags $initrd_flags $nvdrm $nvosi\"" > /mnt/boot/refind_linux.conf || SHOWerror "Write refind_linux.conf"
+			local ref_res="max"; [[ "$VBTsel" -eq 1 ]] && ref_res="1024 768"
+			echo -e "timeout 3\nshowtools shell, gdisk, apple_recovery, windows_recovery, mok_tool, bootorder, firmware, shutdown\nenable_mouse\nalso_scan_dirs +,@/boot\nscanfor internal,external,optical,manual,firmware\nextra_kernel_version_strings linux-hardened,linux-rt-lts,linux-zen,linux-lts,linux-rt,linux\ninclude themes/Blur-theme/theme.conf\nresolution $ref_res" >> /mnt/boot/EFI/"$efifolder"/refind.conf
+			local rl_flags="rw $luks_flags resume=${PIDsel}=$SWAPID rootfstype=$FSsel $rootflags $nvdrm $nvosi"
+			echo -e "\"Boot Standard\"\t\"$rl_flags $initrd_flags\"\n\"Boot Terminal\"\t\"$rl_flags $initrd_flags systemd.unit=multi-user.target\"" > /mnt/boot/refind_linux.conf
 			echo '!!!Refind config and theme changed!!!' ;;
 		2|GRUB|Grub|grub)
 			[[ "$FSsel" == "btrfs" ]] && grubpkg+=("${grubbtrfs[@]}")
