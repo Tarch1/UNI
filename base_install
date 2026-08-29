@@ -163,6 +163,10 @@ PKGcheck () {
 	fs=(dialog mtools parted gptfdisk dosfstools ntfsprogs)
 	archive=(bzip2 cpio gzip xz 7zip tar unrar zip unzip zstd)
 	utility=(imv featherpad libqalculate fd btop fwupd); [[ "${OSsel,,}" != "void" ]] && utility+=(lact cowfortune)
+	if ls /sys/class/power_supply/BAT* &>/dev/null; then
+		[[ "${OSsel,,}" == "arch" ]] && utility+=(power-profiles-daemon) || utility+=(tlp)
+		[[ "$microcodepkg" == "intel-ucode" ]] && utility+=(thermald)
+	fi
 	apps=(kitty telegram-desktop firefox); [[ "${OSsel,,}" != "void" ]] && apps+=(profile-sync-daemon)
 	bootloaderutility=(efibootmgr os-prober); [[ "${OSsel,,}" != "void" ]] && bootloaderutility+=(sbsigntools)
 	[[ "${OSsel,,}" == "void" ]] && hardwareacceleration=(mesa-dri mesa-vaapi mesa-vulkan-radeon) || hardwareacceleration=(intel-media-driver vkd3d)
@@ -217,9 +221,9 @@ KernelSetup () {
 	esac
 }
 ServiceSetup () {
-	[[ "${OSsel,,}" == "artix" ]] && { Services+=( NetworkManager chronyd openrc-settingsd cupsd avahi-daemon bluetoothd ); [[ -f /mnt/etc/init.d/tlp ]] && Services+=( tlp ); [[ -v nvidiadrivers && -f /mnt/etc/init.d/nvidia-persistenced ]] && Services+=( nvidia-persistenced ); }
-	[[ "${OSsel,,}" == "arch" ]] && { Services+=( NetworkManager chronyd cups avahi-daemon bluetooth ); [[ -f /mnt/usr/lib/systemd/system/tlp.service ]] && Services+=( tlp ); }
-	[[ "${OSsel,,}" == "void" ]] && { Services+=( NetworkManager chronyd cupsd dbus avahi-daemon bluetoothd ); [[ -d /mnt/etc/sv/tlp ]] && Services+=( tlp ); }
+	[[ "${OSsel,,}" == "artix" ]] && { Services+=( NetworkManager chronyd openrc-settingsd cupsd avahi-daemon bluetoothd ); [[ -f /mnt/etc/init.d/tlp ]] && Services+=( tlp ); [[ -f /mnt/etc/init.d/thermald ]] && Services+=( thermald ); [[ -v nvidiadrivers && -f /mnt/etc/init.d/nvidia-persistenced ]] && Services+=( nvidia-persistenced ); }
+	[[ "${OSsel,,}" == "arch" ]] && { Services+=( NetworkManager chronyd cups avahi-daemon bluetooth ); [[ -f /mnt/usr/lib/systemd/system/power-profiles-daemon.service ]] && Services+=( power-profiles-daemon ); [[ -f /mnt/usr/lib/systemd/system/thermald.service ]] && Services+=( thermald ); }
+	[[ "${OSsel,,}" == "void" ]] && { Services+=( NetworkManager chronyd cupsd dbus avahi-daemon bluetoothd ); [[ -d /mnt/etc/sv/tlp ]] && Services+=( tlp ); [[ -d /mnt/etc/sv/thermald ]] && Services+=( thermald ); }
 	[[ "${OSsel,,}" == "void" ]] && "$chroot" /mnt bash -c "for s in ${Services[*]}; do ln -sf /etc/sv/\$s /etc/runit/runsvdir/default/; done"
 	[[ "${OSsel,,}" != "void" ]] && { for s in "${Services[@]}"; do "$chroot" /mnt "$initc0" "$initc1" "$s"; done; }
 	mkdir -p /mnt/etc/udev/rules.d/; [[ -f "${SCRIPT_DIR}/Conf_files/51-android.rules" ]] && cp "${SCRIPT_DIR}/Conf_files/51-android.rules" /mnt/etc/udev/rules.d/ || true
