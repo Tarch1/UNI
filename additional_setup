@@ -114,7 +114,7 @@ LocalizationSel()    { MenuSel "LOCsel" "Select localization" "en_US.UTF-8" "en_
 LanguageSel()        { MenuSel "LANGsel" "Select preferred Language" "en_US.UTF-8" "en_GB.UTF-8" "it_IT.UTF-8"; }
 PartIDSel()          { MenuSel "PIDsel" "Select partition identifier" "UUID" "PARTUUID" "LABEL"; }
 FilesystemSel()      { MenuSel "FSsel" "Select filesystem for ROOT" "ext4" "btrfs"; }
-BootloaderSel()      { [[ "$UEFImode" -eq 0 ]] && { BLsel="grub"; echo "BIOS mode: GRUB selected automatically"; } || MenuSel "BLsel" "Select Bootloader" "refind" "grub" "efistub"; }
+BootloaderSel()      { [[ "$UEFImode" -eq 0 ]] && { BLsel="grub"; echo "BIOS mode: GRUB selected automatically"; return 0; }; local bl_options=( "refind" "grub" "efistub" "limine" ); [[ "${OSsel,,}" == "arch" ]] && bl_options+=( "systemd-boot" "uki" ); MenuSel "BLsel" "Select Bootloader" "${bl_options[@]}"; }
 HostnameSel()        { TextPromptSel "HNsel" "Enter preferred hostname"; }
 UsernameSel()        { TextPromptSel "UNsel" "Enter preferred username"; }
 IRFsel()             { [[ "${OSsel,,}" == "void" ]] && { IRFSetup="dracut"; echo "Selected Initramfs: dracut"; } || MenuSel "IRFSetup" "Select preferred Initramfs Generator" "booster" "mkinitcpio" "dracut"; }
