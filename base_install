@@ -167,6 +167,8 @@ PKGcheck () {
 		[[ "${OSsel,,}" == "arch" ]] && utility+=(power-profiles-daemon) || utility+=(tlp)
 		[[ "$microcodepkg" == "intel-ucode" ]] && utility+=(thermald)
 	fi
+	[[ "${GPUMANAGERsel,,}" == "envycontrol" ]] && utility+=(envycontrol)
+	[[ "${GPUMANAGERsel,,}" == "cardwire" ]] && utility+=(cardwire)
 	apps=(kitty telegram-desktop firefox); [[ "${OSsel,,}" != "void" ]] && apps+=(profile-sync-daemon)
 	bootloaderutility=(efibootmgr os-prober); [[ "${OSsel,,}" != "void" ]] && bootloaderutility+=(sbsigntools)
 	[[ "${OSsel,,}" == "void" ]] && hardwareacceleration=(mesa-dri mesa-vaapi mesa-vulkan-radeon) || hardwareacceleration=(intel-media-driver vkd3d)
@@ -224,6 +226,12 @@ ServiceSetup () {
 	[[ "${OSsel,,}" == "artix" ]] && { Services+=( NetworkManager chronyd openrc-settingsd cupsd avahi-daemon bluetoothd ); [[ -f /mnt/etc/init.d/tlp ]] && Services+=( tlp ); [[ -f /mnt/etc/init.d/thermald ]] && Services+=( thermald ); [[ -v nvidiadrivers && -f /mnt/etc/init.d/nvidia-persistenced ]] && Services+=( nvidia-persistenced ); }
 	[[ "${OSsel,,}" == "arch" ]] && { Services+=( NetworkManager chronyd cups avahi-daemon bluetooth ); [[ -f /mnt/usr/lib/systemd/system/power-profiles-daemon.service ]] && Services+=( power-profiles-daemon ); [[ -f /mnt/usr/lib/systemd/system/thermald.service ]] && Services+=( thermald ); }
 	[[ "${OSsel,,}" == "void" ]] && { Services+=( NetworkManager chronyd cupsd dbus avahi-daemon bluetoothd ); [[ -d /mnt/etc/sv/tlp ]] && Services+=( tlp ); [[ -d /mnt/etc/sv/thermald ]] && Services+=( thermald ); }
+	
+	if [[ "${GPUMANAGERsel,,}" == "cardwire" ]]; then
+		[[ "${OSsel,,}" == "artix" ]] && { echo -e '#!/sbin/openrc-run\nname="Cardwire GPU Manager"\ncommand="/usr/bin/cardwire"\ncommand_background="yes"\npidfile="/run/${RC_SVCNAME}.pid"\ndepend() {\n    need localmount devfs\n    after bootmisc\n}' > /mnt/etc/init.d/cardwire; chmod +x /mnt/etc/init.d/cardwire; }
+		[[ "${OSsel,,}" == "void" ]] && { mkdir -p /mnt/etc/sv/cardwire; echo -e '#!/bin/sh\nexec /usr/bin/cardwire' > /mnt/etc/sv/cardwire/run; chmod +x /mnt/etc/sv/cardwire/run; }
+		Services+=( cardwire )
+	fi
 	[[ "${OSsel,,}" == "void" ]] && "$chroot" /mnt bash -c "for s in ${Services[*]}; do ln -sf /etc/sv/\$s /etc/runit/runsvdir/default/; done"
 	[[ "${OSsel,,}" != "void" ]] && { for s in "${Services[@]}"; do "$chroot" /mnt "$initc0" "$initc1" "$s"; done; }
 	mkdir -p /mnt/etc/udev/rules.d/; [[ -f "${SCRIPT_DIR}/Conf_files/51-android.rules" ]] && cp "${SCRIPT_DIR}/Conf_files/51-android.rules" /mnt/etc/udev/rules.d/ || true
@@ -246,6 +254,7 @@ BootloaderSetup () {
 	[[ "${OSsel,,}" == "void" ]] && irfs="initramfs-${kname#vmlinuz-}.img" || irfs="initramfs-$KSel.img"
 	[[ "$FSsel" == "btrfs" ]] && rootflags='rootflags=subvol=@'
 	[[ ${#nvidiadrivers[@]} -gt 0 ]] && { nvdrm="nvidia-drm.modeset=1 nvidia-drm.fbdev=1"; nvosi="acpi_osi=\"$osi_version\""; }
+	[[ "${GPUMANAGERsel,,}" == "cardwire" ]] && nvosi="$nvosi lsm=lockdown,capability,landlock,bpf"
 	[[ -n "$microcodepkg" && -f "/mnt/boot/${microcodepkg}.img" ]] && initrd_flags="initrd=\\${microcodepkg}.img initrd=\\${irfs}" || initrd_flags="initrd=\\${irfs}"
 	[[ "$LUKS_ENC" -eq 1 ]] && luks_flags="cryptdevice=UUID=${CRYPT_ROOT_UUID}:cryptroot rd.luks.uuid=${CRYPT_ROOT_UUID} rd.luks.name=${CRYPT_ROOT_UUID}=cryptroot root=/dev/mapper/cryptroot" || luks_flags="root=${PIDsel}=$ROOTID"
 	case "${BLsel,,}" in
@@ -323,6 +332,7 @@ InstallationSetup () {
 		else local Personalization=( LocalizationSel LanguageSel TimezoneSel HostnameSel UsernameSel PartIDSel FilesystemSel AdditionalDriveSel LUKSSel )
 			for s in "${Personalization[@]}"; do "$s" || SHOWerror "$s"; done; fi
 		Steps=( "OSsel=$OSsel" "ARCHrepo=$ARCHrepo" "LANGsel=$LANGsel" "LOCsel=$LOCsel" "HNsel=$HNsel" "UNsel=$UNsel" "TZsel=$TZsel" "PIDsel=$PIDsel" "FSsel=$FSsel" "BLsel=$BLsel" "IRFSetup=$IRFSetup" "ADD_SETUP=$ADD_SETUP" "ADD_FORMAT=$ADD_FORMAT" "ADD_FS=$ADD_FS" "ADD_LABEL=$ADD_LABEL" "LUKS_ENC=$LUKS_ENC" )
+		[[ -n "$GPUMANAGERsel" ]] && Steps+=( "GPUMANAGERsel=$GPUMANAGERsel" )
 		[[ "${OSsel,,}" == "void" ]] && Steps+=( "LIBsel=$LIBsel" "VImethod=$VImethod" )
 		rm -f config; for a in "${Steps[@]}"; do echo "$a" >> config; done; cat config
 		while true; do
