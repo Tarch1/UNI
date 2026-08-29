@@ -70,13 +70,13 @@ GPUsel () {
 	local gpu_info=$(lspci | grep -Ei 'VGA|3D')
 	[[ "$gpu_info" =~ (AMD|Radeon) ]] && { [[ "${OSsel,,}" == "void" ]] && amddrivers=(xf86-video-amdgpu mesa-dri vulkan-loader mesa-vulkan-radeon) || amddrivers=(amdgpu mesa vulkan-radeon libva-mesa-driver); }
 	[[ "$gpu_info" =~ (VMware|VirtualBox|Virtio|QXL) ]] && echo "VM detected: The default Mesa driver will be installed"
-	[[ "$gpu_info" =~ NVIDIA ]] && [[ "${OSsel,,}" == "void" ]] && { [[ "$LIBsel" == "MUSL" ]] && { nvidiadrivers=(); echo 'MUSL selection detected, forcing Mesa/Nouveau.'; } || { nvidiadrivers=(nvidia nvidia-libs-32bit); echo 'NVIDIA selected'; }; }
+	[[ "$gpu_info" =~ NVIDIA ]] && [[ "${OSsel,,}" == "void" ]] && { [[ "$LIBsel" == "MUSL" ]] && { nvidiadrivers=(); echo 'MUSL selection detected, forcing Mesa/Nouveau.'; } || { nvidiadrivers=(nvidia nvidia-libs-32bit); MenuSel "GPUMANAGERsel" "Select NVIDIA Optimus Manager" "Native" "Envycontrol" "Cardwire"; echo 'NVIDIA selected'; }; }
 	[[ "$gpu_info" =~ NVIDIA ]] && [[ "${OSsel,,}" != "void" ]] && { MenuSel "NVsel" "NVIDIA gpu found, choose driver" "OPEN" "NOUVEAU" "PROPRIETARY" "MESA";
 		[[ "$NVsel" =~ (MESA|NOUVEAU) ]] && echo "Using default Mesa/Nouveau"
 		[[ "$NVsel" =~ (OPEN|PROPRIETARY) ]] && { local nv_main="nvidia-dkms";
 			[[ "$NVsel" == "OPEN" ]] && { [[ "$KSel" == "linux" ]] && nv_main="nvidia-open" || nv_main="nvidia-open-dkms"; }
 			[[ "$NVsel" == "PROPRIETARY" ]] && { [[ "$KSel" == "linux" ]] && nv_main="nvidia"; [[ "$KSel" == "linux-lts" ]] && nv_main="nvidia-lts"; }
-			nvidiadrivers=("${nv_main}" nvidia-prime nvidia-settings nvidia-utils lib32-nvidia-utils opencl-nvidia lib32-opencl-nvidia libxnvctrl libvdpau); echo "Setting up NVIDIA $NVsel Drivers"; } ; }
+			nvidiadrivers=("${nv_main}" nvidia-prime nvidia-settings nvidia-utils lib32-nvidia-utils opencl-nvidia lib32-opencl-nvidia libxnvctrl libvdpau); echo "Setting up NVIDIA $NVsel Drivers"; MenuSel "GPUMANAGERsel" "Select NVIDIA Optimus Manager" "Native" "Envycontrol" "Cardwire"; } ; }
 	[[ "$gpu_info" =~ NVIDIA ]] && command -v strings >/dev/null && [[ -f /sys/firmware/acpi/tables/DSDT ]] && AcpiOS="$(strings /sys/firmware/acpi/tables/DSDT | grep -i 'windows ' | sort | tail -1)"
 	[[ ! "$gpu_info" =~ (AMD|Radeon|VMware|VirtualBox|Virtio|QXL|NVIDIA) ]] && echo "Generic/Intel GPU: Mesa will be installed"
 }
