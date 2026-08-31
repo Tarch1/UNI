@@ -9,7 +9,7 @@ SHOWerror () {
 	[[ "$CC" -eq 1 ]] && echo "OK, still going, see Errors file in this directory" || { echo "OK, then exit"; exit 1; }
 }
 Check_required_files () {
-	local files=( additional_setup finish_setup Bootloader/Refind/themes/Blur-theme/theme.conf Bootloader/Grub-Sekiro/{theme.txt,sekiro_1920x1080.png,select_c.png} Bootloader/Grub-Eiffel/{theme.txt,eiffel_tower_under_construction.png,select_c.png} )
+	local files=( additional_setup Bootloader/Refind/themes/Blur-theme/theme.conf Bootloader/Grub-Sekiro/{theme.txt,sekiro_1920x1080.png,select_c.png} Bootloader/Grub-Eiffel/{theme.txt,eiffel_tower_under_construction.png,select_c.png} )
 	local miss=(); for a in "${files[@]}"; do [[ ! -f "${SCRIPT_DIR}/$a" ]] && miss+=("$a"); done
 	[[ ${#miss[@]} -gt 0 ]] && { echo 'Required file(s) missing:' "${miss[@]}"; exit 1; } || source additional_setup
 }
@@ -134,7 +134,7 @@ PackageConfig () {
 }
 PackageInstall () {
 	local VBTboot=(); [[ "${BLsel,,}" =~ ^(efistub|limine|systemd-boot|uki)$ ]] && VBTboot+=(efibootmgr); [[ "${BLsel,,}" == "grub" ]] && VBTboot+=(grub); [[ "${BLsel,,}" == "refind" ]] && VBTboot+=(refind); [[ "${BLsel,,}" == "limine" ]] && VBTboot+=(limine); [[ "${BLsel,,}" == "uki" ]] && VBTboot+=(systemd-ukify); [[ "$FSsel" == "btrfs" ]] && VBTboot+=(btrfs-progs)
-	if [[ "$VBTsel" -eq 1 ]]; then [[ "${OSsel,,}" == "void" ]] && "$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${VBTboot[@]}" || "$chroot" /mnt $PKGmanager$PKGinst$PKGupd"u" "${PKGskp[@]}" "${baselinux[@]}" "${baseutils[@]}" "${elogind[@]}" "${net[@]}" "${bluetooth[@]}" "${print[@]}" "${VBTboot[@]}"
+	if [[ "$VBTsel" -eq 1 ]]; then [[ "${OSsel,,}" == "void" ]] && "$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${VBTboot[@]}" || "$chroot" /mnt $PKGmanager$PKGinst$PKGupd"u" "${PKGskp[@]}" "${baselinux[@]}" "${baseutils[@]}" "${elogind[@]}" "${net[@]}" "${bluetooth[@]}" "${print[@]}" "${VBTboot[@]}" "${desktoppkg[@]}" "${displaymanagerpkg[@]}"
 	else    local FullPKGs=( "${microcode[@]}" "${kernel[@]}" "${baseutils[@]}" "${fs[@]}" "${bootloaderutility[@]}" "${btrfsutility[@]}" "${grubpkg[@]}" "${refindpkg[@]}" "${liminepkg[@]}" "${ukipkg[@]}" "${net[@]}" "${audio[@]}" "${bluetooth[@]}" "${print[@]}" "${apps[@]}" "${utility[@]}" "${hardwareacceleration[@]}" "${vulkan[@]}" "${filemanager[@]}" "${archive[@]}" "${desktoppkg[@]}" "${displaymanagerpkg[@]}" )
 			[[ ${#nvidiadrivers[@]} -gt 0 ]] && FullPKGs+=( "${nvidiadrivers[@]}" )
 			[[ -v amddrivers && ${#amddrivers[@]} -gt 0 ]] && FullPKGs+=( "${amddrivers[@]}" )
@@ -153,24 +153,13 @@ PKGcheck () {
 	booster=(); [[ "${OSsel,,}" != "void" ]] && booster=(booster)
 	[[ ! -v nvidiadrivers ]] && nvidiadrivers=(); [[ ! -v amddrivers ]] && amddrivers=()
 	[[ "${OSsel,,}" == "void" ]] && { local v_live_repos=(void-repo-nonfree); [[ "$LIBsel" == "GLIBC" ]] && v_live_repos+=(void-repo-multilib void-repo-multilib-nonfree); $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${v_live_repos[@]}" || true; }
-	
-	case "$DEsel" in
-		KDE)      desktoppkg=(plasma-meta dolphin konsole xdg-desktop-portal-kde) ;;
-		GNOME)    desktoppkg=(gnome gnome-tweaks xdg-desktop-portal-gnome) ;;
-		LXQt)     desktoppkg=(lxqt xdg-desktop-portal-lxqt) ;;
-		COSMIC)   desktoppkg=(cosmic xdg-desktop-portal-cosmic) ;;
-		Hyprland) desktoppkg=(hyprland fuzzel waybar swaync hyprlock hypridle polkit-kde-agent xdg-desktop-portal-hyprland xdg-desktop-portal-gtk) ;;
-		Niri)     desktoppkg=(niri fuzzel waybar swaync hyprlock hypridle polkit-kde-agent xdg-desktop-portal-gnome xdg-desktop-portal-gtk) ;;
-		None|*)   desktoppkg=() ;;
-	esac
-	case "$DMsel" in
-		Ly)       displaymanagerpkg=(ly) ;;
-		Greetd)   displaymanagerpkg=(greetd tuigreet) ;;
-		SDDM)     displaymanagerpkg=(sddm) ;;
-		GDM)      displaymanagerpkg=(gdm) ;;
-		None|*)   displaymanagerpkg=() ;;
-	esac
-
+	desktoppkg=(); [[ "$DEsel" == "KDE" ]] && desktoppkg=(plasma-meta dolphin konsole xdg-desktop-portal-kde)
+	[[ "$DEsel" == "GNOME" ]] && desktoppkg=(gnome gnome-tweaks xdg-desktop-portal-gnome)
+	[[ "$DEsel" == "LXQt" ]] && desktoppkg=(lxqt xdg-desktop-portal-lxqt)
+	[[ "$DEsel" == "COSMIC" ]] && desktoppkg=(cosmic xdg-desktop-portal-cosmic)
+	[[ "$DEsel" == "Hyprland" ]] && desktoppkg=(hyprland fuzzel waybar swaync hyprlock hypridle polkit-kde-agent xdg-desktop-portal-hyprland xdg-desktop-portal-gtk)
+	[[ "$DEsel" == "Niri" ]] && desktoppkg=(niri fuzzel waybar swaync hyprlock hypridle polkit-kde-agent xdg-desktop-portal-gnome xdg-desktop-portal-gtk)
+	displaymanagerpkg=(); [[ "${DMsel,,}" == "ly" ]] && displaymanagerpkg=(ly); [[ "${DMsel,,}" == "greetd" ]] && displaymanagerpkg=(greetd tuigreet); [[ "${DMsel,,}" == "sddm" ]] && displaymanagerpkg=(sddm); [[ "${DMsel,,}" == "gdm" ]] && displaymanagerpkg=(gdm)
 	kernel=("${KSel}" "${KSel}-headers"); [[ "${OSsel,,}" == "void" ]] && kernel+=(linux-firmware-network) || kernel+=(linux-firmware)
 	baselinux=(base-devel); [[ "${OSsel,,}" == "void" ]] && baselinux+=(base-system) || baselinux+=(base)
 	baseutils=(bash-completion vim nano wget git binutils cryptsetup); [[ "${OSsel,,}" == "void" ]] && baseutils+=(man-pages) || baseutils+=(man-db)
@@ -180,15 +169,10 @@ PKGcheck () {
 	audio=(pipewire wireplumber); [[ "${OSsel,,}" != "void" ]] && audio+=(pipewire-pulse pipewire-alsa pipewire-jack sof-firmware)
 	fs=(dialog mtools parted gptfdisk dosfstools ntfsprogs)
 	archive=(bzip2 cpio gzip xz 7zip tar unrar zip unzip zstd)
-	
 	utility=(imv featherpad libqalculate fd btop fwupd); [[ "${OSsel,,}" != "void" ]] && utility+=(lact cowfortune)
-	if ls /sys/class/power_supply/BAT* &>/dev/null; then
-		[[ "${OSsel,,}" == "arch" ]] && utility+=(power-profiles-daemon) || utility+=(tlp)
-		[[ "$microcodepkg" == "intel-ucode" ]] && utility+=(thermald)
-	fi
+	if ls /sys/class/power_supply/BAT* &>/dev/null; then [[ "${OSsel,,}" == "arch" ]] && utility+=(power-profiles-daemon) || utility+=(tlp); [[ "$microcodepkg" == "intel-ucode" ]] && utility+=(thermald); fi
 	[[ "${GPUMANAGERsel,,}" == "envycontrol" ]] && utility+=(envycontrol)
 	[[ "${GPUMANAGERsel,,}" == "cardwire" ]] && utility+=(cardwire)
-
 	apps=(kitty telegram-desktop firefox); [[ "${OSsel,,}" != "void" ]] && apps+=(profile-sync-daemon)
 	bootloaderutility=(efibootmgr os-prober); [[ "${OSsel,,}" != "void" ]] && bootloaderutility+=(sbsigntools)
 	[[ "${OSsel,,}" == "void" ]] && hardwareacceleration=(mesa-dri mesa-vaapi mesa-vulkan-radeon) || hardwareacceleration=(intel-media-driver vkd3d)
@@ -267,6 +251,22 @@ UserSetup () {
 	sed -i 's/^#\s*\(%wheel ALL=(ALL:ALL) ALL\)/\1/' /mnt/etc/sudoers
 	echo "Choose password for user: $UNsel"; while true; do "$chroot" /mnt passwd "$UNsel" && break || echo "Error: Try again..."; done
 	echo "Choose password for root"; while true; do "$chroot" /mnt passwd && break || echo "Error: Try again..."; done
+	
+	echo "Copying configuration files..."
+	if [[ "${OSsel,,}" == "void" ]]; then mkdir -p /mnt/etc/bash && [[ -f "${SCRIPT_DIR}/Conf_files/bashrc" ]] && cp "${SCRIPT_DIR}/Conf_files/bashrc" /mnt/home/"$UNsel"/.bashrc
+	else mkdir -p /mnt/etc/bash/bashrc.d && [[ -f "${SCRIPT_DIR}/Conf_files/bashrc" ]] && cp "${SCRIPT_DIR}/Conf_files/bashrc" /mnt/etc/bash/bashrc.d/"$UNsel".bashrc; fi
+	
+	[[ -f "${SCRIPT_DIR}/Conf_files/kitty.conf" ]] && { mkdir -p /mnt/home/"$UNsel"/.config/kitty && cp "${SCRIPT_DIR}/Conf_files/kitty.conf" /mnt/home/"$UNsel"/.config/kitty/; }
+	[[ -f "${SCRIPT_DIR}/Conf_files/nanorc" ]] && cp "${SCRIPT_DIR}/Conf_files/nanorc" /mnt/etc/nanorc || true
+	echo 'export MOZ_ENABLE_WAYLAND=1' >> /mnt/home/"$UNsel"/.profile
+
+	if [[ "$DEsel" == "Hyprland" || "$DEsel" == "Niri" ]]; then
+		for conf in Fuzzel Waybar Swaync Hyprlock; do
+			[[ -d "${SCRIPT_DIR}/Conf_files/$conf" ]] && cp -r "${SCRIPT_DIR}/Conf_files/$conf" /mnt/home/"$UNsel"/.config/"${conf,,}"
+		done
+		[[ "$DEsel" == "Hyprland" && -d "${SCRIPT_DIR}/Conf_files/Hyprland" ]] && cp -r "${SCRIPT_DIR}/Conf_files/Hyprland" /mnt/home/"$UNsel"/.config/hypr
+		[[ "$DEsel" == "Niri" && -d "${SCRIPT_DIR}/Conf_files/Niri" ]] && cp -r "${SCRIPT_DIR}/Conf_files/Niri" /mnt/home/"$UNsel"/.config/niri
+	fi
 }
 AudioSetup () {
 	"$chroot" /mnt mkdir -p /etc/pipewire/pipewire.conf.d /etc/wireplumber/wireplumber.conf.d
@@ -390,20 +390,15 @@ InstallationSetup () {
 		PKGskp=( -y -y ); PKGrsk=( -y ); keylayout='KEYMAP=it'; keypath='etc/rc.conf'; [[ "$LIBsel" == "GLIBC" ]] && VoidArch="x86_64" || VoidArch="x86_64-musl"
 		VoidRepo="https://voidlinux.org$([[ "$LIBsel" == "MUSL" ]] && echo "/musl")"; PKGstrap="$PKGmanager$PKGinst$PKGupd -R $VoidRepo -r /mnt ${PKGskp[*]}"; chroot="chroot"
 	fi
+	
 	echo 'Running check for missing packages'; PKGcheck
 	for a in "${ArchTixSteps[@]}"; do "$a" || SHOWerror "$a"; done
-	FinishInst
-}
-FinishInst () {
-	echo -e " INSTALLATION COMPLETED \n A copy of the script will be placed in your user home directory"
-	if [[ "${OSsel,,}" == "void" ]]; then mkdir -p /mnt/etc/bash && [[ -f "${SCRIPT_DIR}/Conf_files/bashrc" ]] && cp "${SCRIPT_DIR}/Conf_files/bashrc" /mnt/home/"$UNsel"/.bashrc || SHOWerror "Void Bashrc Copy"
-	else mkdir -p /mnt/etc/bash/bashrc.d && [[ -f "${SCRIPT_DIR}/Conf_files/bashrc" ]] && cp "${SCRIPT_DIR}/Conf_files/bashrc" /mnt/etc/bash/bashrc.d/"$UNsel".bashrc || SHOWerror "ArchTix Bashrc Copy"; fi
-	mkdir -p /mnt/home/"$UNsel" && cp -r "${SCRIPT_DIR}" /mnt/home/"$UNsel"/ || SHOWerror "Installer Directory Copy"
-	[[ -f /mnt/home/"$UNsel"/"${SCRIPT_DIR##*/}"/finish_setup ]] && sed -i "s/ArchTixUser/$UNsel/g" /mnt/home/"$UNsel"/"${SCRIPT_DIR##*/}"/finish_setup || SHOWerror "Sed finish_setup"
-	echo 'export MOZ_ENABLE_WAYLAND=1' > /mnt/home/"$UNsel"/.profile || SHOWerror "Profile Wayland Export"
+	
+	echo -e "\n=== INSTALLATION COMPLETED ==="
+	"$chroot" /mnt chown -hR "$UNsel":users /home/"$UNsel" || SHOWerror "Chown Home Directory"
 	[[ "$(wc -l < Errors)" -gt 1 ]] && { echo -e "\n[!] Some errors logged during installation:" && cat Errors && cp Errors /mnt/var/log/installer_errors.log; } || echo "[+] Clean installation: zero errors detected."
-	"$chroot" /mnt chown -hR "$UNsel":users /home/"$UNsel" || SHOWerror "Chown Home Directory"; YesNoSel "Reboot system"
+	YesNoSel "Reboot system"
 	[[ "$CC" -eq 1 ]] && { umount -R -l /mnt || true; reboot; } || { echo "OK"; exit 0; }
 }
+
 InstallationSetup
-cat Errors
