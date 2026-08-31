@@ -135,7 +135,7 @@ PackageConfig () {
 PackageInstall () {
 	local VBTboot=(); [[ "${BLsel,,}" =~ ^(efistub|limine|systemd-boot|uki)$ ]] && VBTboot+=(efibootmgr); [[ "${BLsel,,}" == "grub" ]] && VBTboot+=(grub); [[ "${BLsel,,}" == "refind" ]] && VBTboot+=(refind); [[ "${BLsel,,}" == "limine" ]] && VBTboot+=(limine); [[ "${BLsel,,}" == "uki" ]] && VBTboot+=(systemd-ukify); [[ "$FSsel" == "btrfs" ]] && VBTboot+=(btrfs-progs)
 	if [[ "$VBTsel" -eq 1 ]]; then [[ "${OSsel,,}" == "void" ]] && "$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${VBTboot[@]}" || "$chroot" /mnt $PKGmanager$PKGinst$PKGupd"u" "${PKGskp[@]}" "${baselinux[@]}" "${baseutils[@]}" "${elogind[@]}" "${net[@]}" "${bluetooth[@]}" "${print[@]}" "${VBTboot[@]}"
-	else    local FullPKGs=( "${microcode[@]}" "${kernel[@]}" "${baseutils[@]}" "${fs[@]}" "${bootloaderutility[@]}" "${btrfsutility[@]}" "${grubpkg[@]}" "${refindpkg[@]}" "${liminepkg[@]}" "${ukipkg[@]}" "${net[@]}" "${audio[@]}" "${bluetooth[@]}" "${print[@]}" "${apps[@]}" "${utility[@]}" "${hardwareacceleration[@]}" "${vulkan[@]}" "${filemanager[@]}" "${archive[@]}" )
+	else    local FullPKGs=( "${microcode[@]}" "${kernel[@]}" "${baseutils[@]}" "${fs[@]}" "${bootloaderutility[@]}" "${btrfsutility[@]}" "${grubpkg[@]}" "${refindpkg[@]}" "${liminepkg[@]}" "${ukipkg[@]}" "${net[@]}" "${audio[@]}" "${bluetooth[@]}" "${print[@]}" "${apps[@]}" "${utility[@]}" "${hardwareacceleration[@]}" "${vulkan[@]}" "${filemanager[@]}" "${archive[@]}" "${desktoppkg[@]}" "${displaymanagerpkg[@]}" )
 			[[ ${#nvidiadrivers[@]} -gt 0 ]] && FullPKGs+=( "${nvidiadrivers[@]}" )
 			[[ -v amddrivers && ${#amddrivers[@]} -gt 0 ]] && FullPKGs+=( "${amddrivers[@]}" )
 			[[ "${OSsel,,}" == "void" ]] || FullPKGs+=( "${baselinux[@]}" "${elogind[@]}" "${grubbtrfs[@]}" )
@@ -153,6 +153,24 @@ PKGcheck () {
 	booster=(); [[ "${OSsel,,}" != "void" ]] && booster=(booster)
 	[[ ! -v nvidiadrivers ]] && nvidiadrivers=(); [[ ! -v amddrivers ]] && amddrivers=()
 	[[ "${OSsel,,}" == "void" ]] && { local v_live_repos=(void-repo-nonfree); [[ "$LIBsel" == "GLIBC" ]] && v_live_repos+=(void-repo-multilib void-repo-multilib-nonfree); $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${v_live_repos[@]}" || true; }
+	
+	case "$DEsel" in
+		KDE)      desktoppkg=(plasma-meta dolphin konsole xdg-desktop-portal-kde) ;;
+		GNOME)    desktoppkg=(gnome gnome-tweaks xdg-desktop-portal-gnome) ;;
+		LXQt)     desktoppkg=(lxqt xdg-desktop-portal-lxqt) ;;
+		COSMIC)   desktoppkg=(cosmic xdg-desktop-portal-cosmic) ;;
+		Hyprland) desktoppkg=(hyprland fuzzel waybar swaync hyprlock hypridle polkit-kde-agent xdg-desktop-portal-hyprland xdg-desktop-portal-gtk) ;;
+		Niri)     desktoppkg=(niri fuzzel waybar swaync hyprlock hypridle polkit-kde-agent xdg-desktop-portal-gnome xdg-desktop-portal-gtk) ;;
+		None|*)   desktoppkg=() ;;
+	esac
+	case "$DMsel" in
+		Ly)       displaymanagerpkg=(ly) ;;
+		Greetd)   displaymanagerpkg=(greetd tuigreet) ;;
+		SDDM)     displaymanagerpkg=(sddm) ;;
+		GDM)      displaymanagerpkg=(gdm) ;;
+		None|*)   displaymanagerpkg=() ;;
+	esac
+
 	kernel=("${KSel}" "${KSel}-headers"); [[ "${OSsel,,}" == "void" ]] && kernel+=(linux-firmware-network) || kernel+=(linux-firmware)
 	baselinux=(base-devel); [[ "${OSsel,,}" == "void" ]] && baselinux+=(base-system) || baselinux+=(base)
 	baseutils=(bash-completion vim nano wget git binutils cryptsetup); [[ "${OSsel,,}" == "void" ]] && baseutils+=(man-pages) || baseutils+=(man-db)
@@ -162,6 +180,7 @@ PKGcheck () {
 	audio=(pipewire wireplumber); [[ "${OSsel,,}" != "void" ]] && audio+=(pipewire-pulse pipewire-alsa pipewire-jack sof-firmware)
 	fs=(dialog mtools parted gptfdisk dosfstools ntfsprogs)
 	archive=(bzip2 cpio gzip xz 7zip tar unrar zip unzip zstd)
+	
 	utility=(imv featherpad libqalculate fd btop fwupd); [[ "${OSsel,,}" != "void" ]] && utility+=(lact cowfortune)
 	if ls /sys/class/power_supply/BAT* &>/dev/null; then
 		[[ "${OSsel,,}" == "arch" ]] && utility+=(power-profiles-daemon) || utility+=(tlp)
@@ -169,6 +188,7 @@ PKGcheck () {
 	fi
 	[[ "${GPUMANAGERsel,,}" == "envycontrol" ]] && utility+=(envycontrol)
 	[[ "${GPUMANAGERsel,,}" == "cardwire" ]] && utility+=(cardwire)
+
 	apps=(kitty telegram-desktop firefox); [[ "${OSsel,,}" != "void" ]] && apps+=(profile-sync-daemon)
 	bootloaderutility=(efibootmgr os-prober); [[ "${OSsel,,}" != "void" ]] && bootloaderutility+=(sbsigntools)
 	[[ "${OSsel,,}" == "void" ]] && hardwareacceleration=(mesa-dri mesa-vaapi mesa-vulkan-radeon) || hardwareacceleration=(intel-media-driver vkd3d)
@@ -177,7 +197,7 @@ PKGcheck () {
 	elogind=(); [[ "${OSsel,,}" == "artix" ]] && { local init_s="${init_sys,,}"; elogind=(elogind elogind-"$init_s" "${init_s}"-settingsd); net+=("chrony-${init_s}" "networkmanager-${init_s}"); bluetooth+=("bluez-${init_s}" bluez-cups); print+=("avahi-${init_s}" "cups-${init_s}"); }
 	echo "Downloading remote package indexes..."; local remote_repo_list="/tmp/remote_pkgs.list"
 	[[ "${OSsel,,}" == "void" ]] && $PKGmanager$PKGchk -R -s "" | awk '{print $2}' | sed 's/-[0-9].*//' | sort -u > "$remote_repo_list" || $PKGmanager$PKGinst$PKGupd"lq" | sort -u > "$remote_repo_list"
-	local y="microcode amddrivers nvidiadrivers kernel baselinux baseutils fs bootloaderutility btrfsutility elogind grubpkg grubbtrfs refindpkg liminepkg ukipkg net audio bluetooth print apps utility hardwareacceleration vulkan filemanager archive booster" miss=()
+	local y="microcode amddrivers nvidiadrivers kernel baselinux baseutils fs bootloaderutility btrfsutility elogind grubpkg grubbtrfs refindpkg liminepkg ukipkg net audio bluetooth print apps utility hardwareacceleration vulkan filemanager archive booster desktoppkg displaymanagerpkg" miss=()
 	for group in $y; do
 		local -n current_group="$group"; local valid_pkgs=()
 		for pkg in "${current_group[@]}"; do grep -qx "$pkg" "$remote_repo_list" && valid_pkgs+=("$pkg") || miss+=("$pkg"); done
@@ -227,11 +247,17 @@ ServiceSetup () {
 	[[ "${OSsel,,}" == "arch" ]] && { Services+=( NetworkManager chronyd cups avahi-daemon bluetooth ); [[ -f /mnt/usr/lib/systemd/system/power-profiles-daemon.service ]] && Services+=( power-profiles-daemon ); [[ -f /mnt/usr/lib/systemd/system/thermald.service ]] && Services+=( thermald ); }
 	[[ "${OSsel,,}" == "void" ]] && { Services+=( NetworkManager chronyd cupsd dbus avahi-daemon bluetoothd ); [[ -d /mnt/etc/sv/tlp ]] && Services+=( tlp ); [[ -d /mnt/etc/sv/thermald ]] && Services+=( thermald ); }
 	
+	[[ "${DMsel,,}" == "ly" ]] && Services+=(ly)
+	[[ "${DMsel,,}" == "greetd" ]] && Services+=(greetd)
+	[[ "${DMsel,,}" == "sddm" ]] && Services+=(sddm)
+	[[ "${DMsel,,}" == "gdm" ]] && Services+=(gdm)
+
 	if [[ "${GPUMANAGERsel,,}" == "cardwire" ]]; then
 		[[ "${OSsel,,}" == "artix" ]] && { echo -e '#!/sbin/openrc-run\nname="Cardwire GPU Manager"\ncommand="/usr/bin/cardwire"\ncommand_background="yes"\npidfile="/run/${RC_SVCNAME}.pid"\ndepend() {\n    need localmount devfs\n    after bootmisc\n}' > /mnt/etc/init.d/cardwire; chmod +x /mnt/etc/init.d/cardwire; }
 		[[ "${OSsel,,}" == "void" ]] && { mkdir -p /mnt/etc/sv/cardwire; echo -e '#!/bin/sh\nexec /usr/bin/cardwire' > /mnt/etc/sv/cardwire/run; chmod +x /mnt/etc/sv/cardwire/run; }
 		Services+=( cardwire )
 	fi
+
 	[[ "${OSsel,,}" == "void" ]] && "$chroot" /mnt bash -c "for s in ${Services[*]}; do ln -sf /etc/sv/\$s /etc/runit/runsvdir/default/; done"
 	[[ "${OSsel,,}" != "void" ]] && { for s in "${Services[@]}"; do "$chroot" /mnt "$initc0" "$initc1" "$s"; done; }
 	mkdir -p /mnt/etc/udev/rules.d/; [[ -f "${SCRIPT_DIR}/Conf_files/51-android.rules" ]] && cp "${SCRIPT_DIR}/Conf_files/51-android.rules" /mnt/etc/udev/rules.d/ || true
@@ -257,6 +283,7 @@ BootloaderSetup () {
 	[[ "${GPUMANAGERsel,,}" == "cardwire" ]] && nvosi="$nvosi lsm=lockdown,capability,landlock,bpf"
 	[[ -n "$microcodepkg" && -f "/mnt/boot/${microcodepkg}.img" ]] && initrd_flags="initrd=\\${microcodepkg}.img initrd=\\${irfs}" || initrd_flags="initrd=\\${irfs}"
 	[[ "$LUKS_ENC" -eq 1 ]] && luks_flags="cryptdevice=UUID=${CRYPT_ROOT_UUID}:cryptroot rd.luks.uuid=${CRYPT_ROOT_UUID} rd.luks.name=${CRYPT_ROOT_UUID}=cryptroot root=/dev/mapper/cryptroot" || luks_flags="root=${PIDsel}=$ROOTID"
+	
 	case "${BLsel,,}" in
 		refind)
 			"$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${refindpkg[@]}" || SHOWerror "rEFInd package install"
@@ -329,9 +356,9 @@ InstallationSetup () {
 		[[ "${OSsel,,}" == "artix" ]] && ArchRepoSel
 		[[ "${OSsel,,}" == "void" ]] && { VoidInstMethod && LibrarySel; }
 		if [[ "$VBTsel" == "1" ]]; then LANGsel='en_GB.UTF-8'; LOCsel='it_IT.UTF-8'; HNsel=tarch1; UNsel=tarch1; TZsel='Europe/Rome'; PIDsel=UUID; FSsel=btrfs; ADD_SETUP=0; ADD_FORMAT=0; ADD_FS=""; ADD_LABEL=""; LUKSSel; [[ "${OSsel,,}" == "void" ]] && { LIBsel="GLIBC"; VImethod="XBPS"; }
-		else local Personalization=( LocalizationSel LanguageSel TimezoneSel HostnameSel UsernameSel PartIDSel FilesystemSel AdditionalDriveSel LUKSSel )
+		else local Personalization=( LocalizationSel LanguageSel TimezoneSel HostnameSel UsernameSel PartIDSel FilesystemSel AdditionalDriveSel LUKSSel DesktopEnvSel DisplayManagerSel )
 			for s in "${Personalization[@]}"; do "$s" || SHOWerror "$s"; done; fi
-		Steps=( "OSsel=$OSsel" "ARCHrepo=$ARCHrepo" "LANGsel=$LANGsel" "LOCsel=$LOCsel" "HNsel=$HNsel" "UNsel=$UNsel" "TZsel=$TZsel" "PIDsel=$PIDsel" "FSsel=$FSsel" "BLsel=$BLsel" "IRFSetup=$IRFSetup" "ADD_SETUP=$ADD_SETUP" "ADD_FORMAT=$ADD_FORMAT" "ADD_FS=$ADD_FS" "ADD_LABEL=$ADD_LABEL" "LUKS_ENC=$LUKS_ENC" )
+		Steps=( "OSsel=$OSsel" "ARCHrepo=$ARCHrepo" "LANGsel=$LANGsel" "LOCsel=$LOCsel" "HNsel=$HNsel" "UNsel=$UNsel" "TZsel=$TZsel" "PIDsel=$PIDsel" "FSsel=$FSsel" "BLsel=$BLsel" "IRFSetup=$IRFSetup" "ADD_SETUP=$ADD_SETUP" "ADD_FORMAT=$ADD_FORMAT" "ADD_FS=$ADD_FS" "ADD_LABEL=$ADD_LABEL" "LUKS_ENC=$LUKS_ENC" "DEsel=$DEsel" "DMsel=$DMsel" )
 		[[ -n "$GPUMANAGERsel" ]] && Steps+=( "GPUMANAGERsel=$GPUMANAGERsel" )
 		[[ "${OSsel,,}" == "void" ]] && Steps+=( "LIBsel=$LIBsel" "VImethod=$VImethod" )
 		rm -f config; for a in "${Steps[@]}"; do echo "$a" >> config; done; cat config
