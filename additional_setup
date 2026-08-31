@@ -119,3 +119,5 @@ HostnameSel()        { TextPromptSel "HNsel" "Enter preferred hostname"; }
 UsernameSel()        { TextPromptSel "UNsel" "Enter preferred username"; }
 IRFsel()             { [[ "${OSsel,,}" == "void" ]] && { IRFSetup="dracut"; echo "Selected Initramfs: dracut"; } || MenuSel "IRFSetup" "Select preferred Initramfs Generator" "booster" "mkinitcpio" "dracut"; }
 ArchRepoSel()        { YesNoSel "Do you want Arch repositories as well as Artix repositories?"; [[ "$CC" -eq 1 ]] && { ARCHrepo=1; echo "OK, adding Arch repositories!"; } || { ARCHrepo=''; echo "Proceeding without them..."; }; }
+DesktopEnvSel()      { MenuSel "DEsel" "Select Desktop Environment / Window Manager" "KDE" "GNOME" "LXQt" "COSMIC" "Hyprland" "Niri" "None"; }
+DisplayManagerSel()  { MenuSel "DMsel" "Select Display Manager" "Ly" "Greetd" "SDDM" "GDM" "None"; }
