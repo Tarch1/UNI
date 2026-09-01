@@ -24,3 +24,8 @@ target = "~/.config/fuzzel/colors.ini"
 [[entry]]
 template = "colors-waybar.css"
 target = "~/.config/wallust/colors-waybar.css"
+
+# Template per Niri
+[[entry]]
+template = "config.kdl"
+target = "~/.config/niri/config.kdl"
