@@ -177,7 +177,7 @@ PKGcheck () {
 	bootloaderutility=(efibootmgr os-prober); [[ "${OSsel,,}" != "void" ]] && bootloaderutility+=(sbsigntools)
 	[[ "${OSsel,,}" == "void" ]] && hardwareacceleration=(mesa-dri mesa-vaapi mesa-vulkan-radeon) || hardwareacceleration=(intel-media-driver vkd3d)
 	[[ "${OSsel,,}" == "void" ]] && vulkan=(vulkan-loader) || vulkan=(vulkan-icd-loader vulkan-intel vulkan-mesa-layers)
-	filemanager=(yazi pcmanfm tumbler file-roller android-tools); [[ "${OSsel,,}" != "void" ]] && filemanager+=(gvfs-mtp)
+	filemanager=(yazi pcmanfm-qt tumbler file-roller android-tools); [[ "${OSsel,,}" != "void" ]] && filemanager+=(gvfs-mtp)
 	elogind=(); [[ "${OSsel,,}" == "artix" ]] && { local init_s="${init_sys,,}"; elogind=(elogind elogind-"$init_s" "${init_s}"-settingsd); net+=("chrony-${init_s}" "networkmanager-${init_s}"); bluetooth+=("bluez-${init_s}" bluez-cups); print+=("avahi-${init_s}" "cups-${init_s}"); }
 	echo "Downloading remote package indexes..."; local remote_repo_list="/tmp/remote_pkgs.list"
 	[[ "${OSsel,,}" == "void" ]] && $PKGmanager$PKGchk -R -s "" | awk '{print $2}' | sed 's/-[0-9].*//' | sort -u > "$remote_repo_list" || $PKGmanager$PKGinst$PKGupd"lq" | sort -u > "$remote_repo_list"
