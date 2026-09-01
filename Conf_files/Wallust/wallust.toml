@@ -19,3 +19,8 @@ target = "~/.config/kitty/colors.conf"
 [[entry]]
 template = "colors-fuzzel.ini"
 target = "~/.config/fuzzel/colors.ini"
+
+# Template per Waybar
+[[entry]]
+template = "colors-waybar.css"
+target = "~/.config/wallust/colors-waybar.css"
