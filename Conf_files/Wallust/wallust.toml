@@ -1,0 +1,21 @@
+# ~/.config/wallust/wallust.toml
+
+backend = "fastkmeans"
+color_space = "lab"
+palette = "dark16"
+check_contrast = true
+
+# Template per Hyprland
+[[entry]]
+template = "colors-hyprland.conf"
+target = "~/.config/hypr/colors.conf"
+
+# Template per Kitty
+[[entry]]
+template = "colors-kitty.conf"
+target = "~/.config/kitty/colors.conf"
+
+# Template per Fuzzel
+[[entry]]
+template = "colors-fuzzel.ini"
+target = "~/.config/fuzzel/colors.ini"
