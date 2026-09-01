@@ -1,0 +1,144 @@
+// Conf_files/Niri/config.kdl
+
+// --- AUTOSTART ---
+// Niri avvia i processi in parallelo all'avvio.
+spawn-at-startup "waybar"
+spawn-at-startup "swaync"
+spawn-at-startup "swww-daemon"
+spawn-at-startup "hypridle"
+spawn-at-startup "/usr/lib/polkit-kde-authentication-agent-1"
+
+// --- INPUT ---
+input {
+    keyboard {
+        xkb {
+            layout "it"
+        }
+    }
+    touchpad {
+        tap
+        natural-scroll
+    }
+}
+
+// --- LAYOUT & ESTETICA ---
+layout {
+    gaps 16
+    center-focused-column "never"
+
+    // Impostazioni del "nastro"
+    default-column-width { proportion 0.5; }
+
+    focus-ring {
+        width 2
+        // Questo colore lo sostituiremo con Wallust in seguito!
+        active-color "#8be9fd"
+        inactive-color "#595959"
+    }
+
+    border {
+        off
+    }
+}
+
+// --- ANIMAZIONI ---
+animations {
+    // Animazioni fluide e morbide tipiche di Niri
+    workspace-switch {
+        spring damping=0.15 stiffness=1000 epsilon=0.0001
+    }
+    window-open {
+        duration-ms 150
+        curve "ease-out-expo"
+    }
+}
+
+// --- REGOLE FINESTRE ---
+window-rule {
+    geometry-corner-radius 10
+    clip-to-geometry true
+}
+
+// --- SCORCIATOIE DA TASTIERA ---
+binds {
+    // Programmi principali
+    Mod+Return { spawn "kitty"; }
+    Mod+Space  { spawn "fuzzel"; }
+    Mod+E      { spawn "kitty" "-e" "yazi"; }
+    Mod+B      { spawn "firefox"; }
+    Mod+L      { spawn "hyprlock"; }
+    Mod+N      { spawn "swaync-client" "-t" "-sw"; }
+
+    // Sistema e Finestre
+    Mod+Q { close-window; }
+    Mod+Shift+M { quit; }
+
+    // Navigazione a scorrimento (Cuore di Niri)
+    Mod+Left  { focus-column-left; }
+    Mod+Right { focus-column-right; }
+    Mod+Up    { focus-window-up; }
+    Mod+Down  { focus-window-down; }
+
+    // Spostare le finestre nel nastro
+    Mod+Shift+Left  { move-column-left; }
+    Mod+Shift+Right { move-column-right; }
+    Mod+Shift+Up    { move-window-up; }
+    Mod+Shift+Down  { move-window-down; }
+
+    // Workspaces
+    Mod+1 { focus-workspace 1; }
+    Mod+2 { focus-workspace 2; }
+    Mod+3 { focus-workspace 3; }
+    Mod+4 { focus-workspace 4; }
+    Mod+5 { focus-workspace 5; }
+    Mod+6 { focus-workspace 6; }
+    Mod+7 { focus-workspace 7; }
+    Mod+8 { focus-workspace 8; }
+    Mod+9 { focus-workspace 9; }
+
+    Mod+Shift+1 { move-column-to-workspace 1; }
+    Mod+Shift+2 { move-column-to-workspace 2; }
+    Mod+Shift+3 { move-column-to-workspace 3; }
+    Mod+Shift+4 { move-column-to-workspace 4; }
+
+    // Tasti Multimediali
+    XF86AudioRaiseVolume allow-when-locked=true { spawn "wpctl" "set-volume" "-l" "1" "@DEFAULT_AUDIO_SINK@" "5%+"; }
+    XF86AudioLowerVolume allow-when-locked=true { spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "5%-"; }
+    XF86AudioMute        allow-when-locked=true { spawn "wpctl" "set-mute" "@DEFAULT_AUDIO_SINK@" "toggle"; }
+    XF86AudioMicMute     allow-when-locked=true { spawn "wpctl" "set-mute" "@DEFAULT_AUDIO_SOURCE@" "toggle"; }
+
+    // Luminosità
+    XF86MonBrightnessUp   allow-when-locked=true { spawn "brightnessctl" "s" "5%+"; }
+    XF86MonBrightnessDown allow-when-locked=true { spawn "brightnessctl" "s" "5%-"; }
+
+    // Player
+    XF86AudioPlay allow-when-locked=true { spawn "playerctl" "play-pause"; }
+    XF86AudioNext allow-when-locked=true { spawn "playerctl" "next"; }
+    XF86AudioPrev allow-when-locked=true { spawn "playerctl" "previous"; }
+}
+
+// --- REGOLE LIVELLI (BLUR) ---
+layer-rule {
+    // Sfoca lo sfondo dietro Waybar
+    match namespace="^waybar$"
+    background-effect {
+        blur true
+    }
+}
+
+layer-rule {
+    // Sfoca lo sfondo dietro Swaync (il centro notifiche e i popup)
+    match namespace="^swaync-control-center$"
+    match namespace="^swaync-notification-window$"
+    background-effect {
+        blur true
+    }
+}
+
+layer-rule {
+    // Sfoca lo sfondo dietro Fuzzel (il launcher)
+    match namespace="^launcher$"
+    background-effect {
+        blur true
+    }
+}
