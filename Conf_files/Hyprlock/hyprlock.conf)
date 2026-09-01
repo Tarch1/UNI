@@ -1,0 +1,39 @@
+# Conf_files/Hyprlock/hyprlock.conf
+
+# Importiamo gli stessi colori che Wallust genera per Hyprland
+source = ~/.config/hypr/colors.conf
+
+background {
+    monitor =
+    path = screenshot
+    blur_passes = 3
+    blur_size = 8
+}
+
+input-field {
+    monitor =
+    size = 250, 50
+    outline_thickness = 3
+    dots_size = 0.33
+    dots_spacing = 0.15
+    outer_color = $color4
+    inner_color = $background
+    font_color = $foreground
+    fade_on_empty = true
+    placeholder_text = <i>Password...</i>
+    hide_input = false
+    position = 0, -20
+    halign = center
+    valign = center
+}
+
+label {
+    monitor =
+    text = cmd[update:1000] echo "<b><big> $(date +"%H:%M") </big></b>"
+    color = $foreground
+    font_size = 64
+    font_family = JetBrainsMono Nerd Font
+    position = 0, 80
+    halign = center
+    valign = center
+}
