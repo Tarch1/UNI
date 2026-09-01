@@ -5,6 +5,7 @@
 spawn-at-startup "waybar"
 spawn-at-startup "swaync"
 spawn-at-startup "swww-daemon"
+spawn-at-startup "bash" "-c" "~/.config/wallpapers/theme-switcher.sh"
 spawn-at-startup "hypridle"
 spawn-at-startup "/usr/lib/polkit-kde-authentication-agent-1"
 
