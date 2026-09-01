@@ -1,0 +1,88 @@
+{
+    "layer": "top",
+    "position": "top",
+    "margin-top": 8,
+    "margin-left": 15,
+    "margin-right": 15,
+    "height": 40,
+    "spacing": 8,
+    "modules-left": [
+        "hyprland/workspaces",
+        "niri/workspaces"
+    ],
+    "modules-center": [
+        "clock"
+    ],
+    "modules-right": [
+        "temperature",
+        "backlight",
+        "pulseaudio",
+        "pulseaudio#microphone",
+        "bluetooth",
+        "network",
+        "battery"
+    ],
+
+    /* WORKSPACES */
+    "hyprland/workspaces": {
+        "format": "{icon}",
+        "format-icons": { "active": "", "default": "", "empty": "" },
+        "persistent-workspaces": { "*": 0 }
+    },
+    "niri/workspaces": {
+        "format": "{icon}",
+        "format-icons": { "active": "", "default": "", "empty": "" }
+    },
+
+    /* CLOCK & NOTIFICATIONS */
+    "clock": {
+        "format": "  {:%H:%M     %d %b}",
+        "tooltip-format": "<tt><small>{calendar}</small></tt>",
+        "on-click": "swaync-client -t -sw"
+    },
+
+    /* HARDWARE & STATUS */
+    "temperature": {
+        "critical-threshold": 80,
+        "format": "{icon} {temperatureC}°C",
+        "format-icons": ["", "", ""]
+    },
+    "backlight": {
+        "format": "{icon} {percent}%",
+        "format-icons": ["󰃞", "󰃟", "󰃠"]
+    },
+    "pulseaudio": {
+        "format": "{icon} {volume}%",
+        "format-muted": "󰖁 Muto",
+        "format-icons": ["󰕿", "󰖀", "󰕾"],
+        "on-click": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle",
+        "on-click-right": "pavucontrol"
+    },
+    "pulseaudio#microphone": {
+        "format": "{format_source}",
+        "format-source": " {volume}%",
+        "format-source-muted": " Muto",
+        "on-click": "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle",
+        "on-click-right": "pavucontrol"
+    },
+    "bluetooth": {
+        "format": " {status}",
+        "format-connected": " {device_alias}",
+        "on-click": "rfkill toggle bluetooth",
+        "on-click-right": "blueman-manager"
+    },
+    "network": {
+        "format-wifi": "  {signalStrength}%",
+        "format-ethernet": "󰈀  LAN",
+        "format-disconnected": "󰤭  Offline",
+        "on-click": "nmcli radio wifi toggle",
+        "on-click-right": "kitty -e nmtui"
+    },
+    "battery": {
+        "states": { "warning": 30, "critical": 15 },
+        "format": "{icon} {capacity}%",
+        "format-charging": "󰂄 {capacity}%",
+        "format-plugged": " {capacity}%",
+        "format-icons": ["󰂎", "󰁺", "󰁻", "󰁼", "󰁽", "󰁾", "󰁿", "󰂀", "󰂁", "󰂂", "󰁹"]
+    }
+}

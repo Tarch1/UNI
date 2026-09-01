@@ -1,0 +1,52 @@
+@import "../../wallust/colors-waybar.css";
+
+* {
+    border: none;
+    border-radius: 0;
+    font-family: "monospace", "JetBrainsMono Nerd Font", "Font Awesome 6 Free";
+    font-size: 13px;
+    font-weight: bold;
+}
+
+window#waybar {
+    background-color: @background;
+    color: @foreground;
+    border-radius: 30px; /* Crea l'effetto Pillola */
+    border: 2px solid @color4; /* Bordo colorato dinamico */
+}
+
+/* Rende trasparenti i contenitori interni */
+.modules-left, .modules-center, .modules-right {
+    background: transparent;
+}
+
+#workspaces button {
+    color: @foreground;
+    padding: 0 8px;
+    background: transparent;
+    border-radius: 15px;
+    transition: all 0.2s ease;
+}
+
+#workspaces button.active {
+    color: @color2; /* Colore acceso per il workspace attuale */
+}
+
+#clock, #temperature, #backlight, #pulseaudio, #bluetooth, #network, #battery {
+    padding: 0 10px;
+    margin: 4px 2px;
+    border-radius: 20px;
+}
+
+#clock {
+    color: @color4;
+}
+
+#clock:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+#battery.warning { color: #ff9e64; }
+#battery.critical { color: @color1; animation: blink 1s steps(5, start) infinite; }
+
+@keyframes blink { to { color: transparent; } }
