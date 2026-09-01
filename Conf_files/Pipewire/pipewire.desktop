@@ -1,6 +1,0 @@
-[Desktop Entry]
-Type=Application
-Exec=/usr/bin/pipewire & /usr/bin/pipewire-pulse
-Hidden=false
-NoDisplay=false
-X-GNOME-Autostart-enabled=true
