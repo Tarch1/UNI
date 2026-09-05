@@ -169,7 +169,7 @@ PKGcheck () {
 	audio=(pipewire wireplumber); [[ "${OSsel,,}" != "void" ]] && audio+=(pipewire-pulse pipewire-alsa pipewire-jack sof-firmware)
 	fs=(dialog mtools parted gptfdisk dosfstools ntfsprogs)
 	archive=(bzip2 cpio gzip xz 7zip tar unrar zip unzip zstd)
-	utility=(imv featherpad libqalculate fd btop fwupd fastfetch); [[ "${OSsel,,}" != "void" ]] && utility+=(lact cowfortune)
+	utility=(imv featherpad libqalculate fd btop fwupd fastfetch grim slurp wl-clipboard swappy); [[ "${OSsel,,}" != "void" ]] && utility+=(lact cowfortune pacman-contrib)
 	if ls /sys/class/power_supply/BAT* &>/dev/null; then [[ "${OSsel,,}" == "arch" ]] && utility+=(power-profiles-daemon) || utility+=(tlp); [[ "$microcodepkg" == "intel-ucode" ]] && utility+=(thermald); fi
 	[[ "${GPUMANAGERsel,,}" == "envycontrol" ]] && utility+=(envycontrol)
 	[[ "${GPUMANAGERsel,,}" == "cardwire" ]] && utility+=(cardwire)
@@ -228,11 +228,11 @@ KernelSetup () {
 }
 ServiceSetup () {
 	[[ "${OSsel,,}" == "artix" ]] && { Services+=( NetworkManager chronyd openrc-settingsd cupsd avahi-daemon bluetoothd ); [[ -f /mnt/etc/init.d/tlp ]] && Services+=( tlp ); [[ -f /mnt/etc/init.d/thermald ]] && Services+=( thermald ); [[ -v nvidiadrivers && -f /mnt/etc/init.d/nvidia-persistenced ]] && Services+=( nvidia-persistenced ); }
-	[[ "${OSsel,,}" == "arch" ]] && { Services+=( NetworkManager chronyd cups avahi-daemon bluetooth ); [[ -f /mnt/usr/lib/systemd/system/power-profiles-daemon.service ]] && Services+=( power-profiles-daemon ); [[ -f /mnt/usr/lib/systemd/system/thermald.service ]] && Services+=( thermald ); }
+	[[ "${OSsel,,}" == "arch" ]] && { Services+=( NetworkManager chronyd cups avahi-daemon bluetooth paccache.timer ); [[ -f /mnt/usr/lib/systemd/system/power-profiles-daemon.service ]] && Services+=( power-profiles-daemon ); [[ -f /mnt/usr/lib/systemd/system/thermald.service ]] && Services+=( thermald ); }
 	[[ "${OSsel,,}" == "void" ]] && { Services+=( NetworkManager chronyd cupsd dbus avahi-daemon bluetoothd ); [[ -d /mnt/etc/sv/tlp ]] && Services+=( tlp ); [[ -d /mnt/etc/sv/thermald ]] && Services+=( thermald ); }
 	[[ "${DMsel,,}" =~ ^(ly|greetd|sddm|gdm)$ ]] && Services+=("${DMsel,,}")
 	if [[ "${GPUMANAGERsel,,}" == "cardwire" ]]; then
-		[[ "${OSsel,,}" == "artix" ]] && { echo -e '#!/sbin/openrc-run\nname="Cardwire GPU Manager"\ncommand="/usr/bin/cardwire"\ncommand_background="yes"\npidfile="/run/${RC_SVCNAME}.pid"\ndepend() {\n    need localmount devfs\n    after bootmisc\n}' > /mnt/etc/init.d/cardwire; chmod +x /mnt/etc/init.d/cardwire; }
+		[[ "${OSsel,,}" == "artix" ]] && { echo -e '#!/sbin/openrc-run\nname="Cardwire GPU Manager"\ncommand="/usr/bin/cardwire"\ncommand_background="yes"\npidfile="/run/${RC_SVCNAME}.pid"\ndepend() {\n\tneed localmount devfs\n\tafter bootmisc\n}' > /mnt/etc/init.d/cardwire; chmod +x /mnt/etc/init.d/cardwire; }
 		[[ "${OSsel,,}" == "void" ]] && { mkdir -p /mnt/etc/sv/cardwire; echo -e '#!/bin/sh\nexec /usr/bin/cardwire' > /mnt/etc/sv/cardwire/run; chmod +x /mnt/etc/sv/cardwire/run; }
 		Services+=( cardwire )
 	fi
