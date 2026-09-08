@@ -251,7 +251,6 @@ ServiceSetup () {
 	}
 	mkdir -p /mnt/etc/udev/rules.d/; [[ -f "${SCRIPT_DIR}/Conf_files/51-android.rules" ]] && cp "${SCRIPT_DIR}/Conf_files/51-android.rules" /mnt/etc/udev/rules.d/ || true
 }
-}
 UserSetup () {
 	"$chroot" /mnt bash -c "useradd -m -g users -G wheel,video,audio,storage,input,lp,scanner,power,kvm $UNsel && su $UNsel -c 'mkdir -p ~/.config'"
 	sed -i 's/^#\s*\(%wheel ALL=(ALL:ALL) ALL\)/\1/' /mnt/etc/sudoers
@@ -350,43 +349,36 @@ BootloaderSetup () {
 }
 InstallationSetup () {
 	VBTsel=0; [[ "$(lspci | grep -Ei 'VGA|3D')" =~ (VMware|VirtualBox|Virtio|QXL) ]] && VBTsel=1
-	SetupAvaible=1; CheckandSetup=( Check_required_files UEFIsel KernelSel IRFsel BootloaderSel Pacman_Locked )
+	CheckandSetup=( Check_required_files UEFIsel KernelSel IRFsel BootloaderSel Pacman_Locked )
 	if command -v timedatectl >/dev/null; then timedatectl set-ntp true || true
 	elif command -v chronyd >/dev/null; then chronyd -q "pool pool.ntp.org iburst" || true
 	elif command -v ntpdate >/dev/null; then ntpdate pool.ntp.org || true; fi
 	echo 'List of all errors occurred during the installation process:' > Errors
 	for c in "${CheckandSetup[@]}"; do "$c" || SHOWerror "$c"; done
-	if [[ -s config ]]; then
-		while true; do
-			cat config && YesNoSel "It's correct?"
-			if [[ "$CC" -eq 1 ]]; then SetupAvaible=0; source config; break
-			else YesNoSel "Would you like to edit config file?"; [[ "$CC" -eq 1 ]] && { nano config; source config; } || { SetupAvaible=1; echo "Repeat the setup"; break; }; fi
-		done
+	AutoOSsel
+	[[ "${OSsel,,}" == "artix" ]] && ArchRepoSel
+	[[ "${OSsel,,}" == "void" ]] && { VoidInstMethod && LibrarySel; }
+	if [[ "$VBTsel" == "1" ]]; then 
+		LANGsel='en_GB.UTF-8'; LOCsel='it_IT.UTF-8'; HNsel=tarch1; UNsel=tarch1; TZsel='Europe/Rome'; PIDsel=UUID; FSsel=btrfs; ADD_SETUP=0; ADD_FORMAT=0; ADD_FS=""; ADD_LABEL=""; LUKSSel; DesktopEnvSel; DisplayManagerSel; 
+		[[ "${OSsel,,}" == "void" ]] && { LIBsel="GLIBC"; VImethod="XBPS"; }
+	else 
+		local Personalization=( LocalizationSel LanguageSel TimezoneSel HostnameSel UsernameSel PartIDSel FilesystemSel AdditionalDriveSel LUKSSel DesktopEnvSel DisplayManagerSel )
+		for s in "${Personalization[@]}"; do "$s" || SHOWerror "$s"; done
 	fi
-	if [[ "$SetupAvaible" == "1" ]]; then AutoOSsel
-		[[ "${OSsel,,}" == "artix" ]] && ArchRepoSel
-		[[ "${OSsel,,}" == "void" ]] && { VoidInstMethod && LibrarySel; }
-		if [[ "$VBTsel" == "1" ]]; then LANGsel='en_GB.UTF-8'; LOCsel='it_IT.UTF-8'; HNsel=tarch1; UNsel=tarch1; TZsel='Europe/Rome'; PIDsel=UUID; FSsel=btrfs; ADD_SETUP=0; ADD_FORMAT=0; ADD_FS=""; ADD_LABEL=""; LUKSSel; DesktopEnvSel; DisplayManagerSel; [[ "${OSsel,,}" == "void" ]] && { LIBsel="GLIBC"; VImethod="XBPS"; }
-		else local Personalization=( LocalizationSel LanguageSel TimezoneSel HostnameSel UsernameSel PartIDSel FilesystemSel AdditionalDriveSel LUKSSel DesktopEnvSel DisplayManagerSel )
-			for s in "${Personalization[@]}"; do "$s" || SHOWerror "$s"; done; fi
-		Steps=( "OSsel=$OSsel" "ARCHrepo=$ARCHrepo" "LANGsel=$LANGsel" "LOCsel=$LOCsel" "HNsel=$HNsel" "UNsel=$UNsel" "TZsel=$TZsel" "PIDsel=$PIDsel" "FSsel=$FSsel" "BLsel=$BLsel" "IRFSetup=$IRFSetup" "ADD_SETUP=$ADD_SETUP" "ADD_FORMAT=$ADD_FORMAT" "ADD_FS=$ADD_FS" "ADD_LABEL=$ADD_LABEL" "LUKS_ENC=$LUKS_ENC" "DEsel=$DEsel" "DMsel=$DMsel" )
-		[[ -n "$GPUMANAGERsel" ]] && Steps+=( "GPUMANAGERsel=$GPUMANAGERsel" )
-		[[ "${OSsel,,}" == "void" ]] && Steps+=( "LIBsel=$LIBsel" "VImethod=$VImethod" )
-		rm -f config; for a in "${Steps[@]}"; do echo "$a" >> config; done; cat config
-		while true; do
-			YesNoSel "It's correct?"
-			if [[ "$CC" -eq 1 ]]; then echo 'Proceeding...'; break
-			else YesNoSel "Would you like to edit config file? (CRTL+S to save)"; [[ "$CC" -eq 1 ]] && { nano config; source config; cat config; } || { echo "Then start again"; SHOWerror "Second attempt"; }; fi
-		done
-	elif [[ "$SetupAvaible" == "0" && -s config ]]; then echo 'Setup loaded'
-	else SHOWerror InstallationSetup; fi
 	CPUsel && GPUsel
+	echo -e "\n=== CONFIGURATION SUMMARY ==="
+	echo "OS: $OSsel | Kernel: $KSel | Initramfs: $IRFSetup | Bootloader: $BLsel"
+	echo "User: $UNsel | Hostname: $HNsel | Locale: $LOCsel | Timezone: $TZsel"
+	echo "Filesystem: $FSsel | Partition ID: $PIDsel | LUKS: $LUKS_ENC"
+	echo "Desktop Environment: $DEsel | Display Manager: $DMsel"
+	[[ -n "$microcodepkg" ]] && echo "Microcode: $microcodepkg"
+	[[ ${#nvidiadrivers[@]} -gt 0 ]] && echo "NVIDIA Driver: $NVsel | Manager: $GPUMANAGERsel"
+	[[ ${#amddrivers[@]} -gt 0 ]] && echo "AMD Drivers included"
+	[[ "$VBTsel" -eq 1 ]] && echo "Virtual Machine Mode: ON"
+	echo "============================="
+	YesNoSel "Is this configuration correct to proceed with partitioning?"
+	[[ "$CC" -eq 1 ]] && echo "Proceeding with installation..." || { echo "Installation aborted by user."; exit 1; }
 	local s_step; [[ "${OSsel,,}" == "void" ]] && s_step='VoidSystemInstall' || s_step='ArchTixSystemInstall'
-	local ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' )
-	[[ "$VBTsel" -eq 0 ]] && ArchTixSteps+=( 'AdditionalDriveSetup' )
-	ArchTixSteps+=( "$s_step" 'CrypttabGen' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'KernelSetup' 'ServiceSetup' 'UserSetup' )
-	[[ "$VBTsel" -eq 0 ]] && ArchTixSteps+=( 'AudioSetup' )
-	ArchTixSteps+=( 'BootloaderSetup' )
 	if [[ "${OSsel,,}" != "void" ]]; then
 		PKGmanager="pacman"; PKGinst=" -S"; PKGupd="y"; PKGchk=" -Q"; PKGrmv=" -R"; PKGdpn="s"; PKGfrc="dd"
 		PKGskp=( --needed --noconfirm ); PKGrsk=( --noconfirm ); keylayout='KEYMAP=it'; chroot="${OSsel,,}-chroot"
@@ -402,15 +394,17 @@ InstallationSetup () {
 		PKGskp=( -y -y ); PKGrsk=( -y ); keylayout='KEYMAP=it'; keypath='etc/rc.conf'; [[ "$LIBsel" == "GLIBC" ]] && VoidArch="x86_64" || VoidArch="x86_64-musl"
 		VoidRepo="https://voidlinux.org$([[ "$LIBsel" == "MUSL" ]] && echo "/musl")"; PKGstrap="$PKGmanager$PKGinst$PKGupd -R $VoidRepo -r /mnt ${PKGskp[*]}"; chroot="chroot"
 	fi
-	
 	echo 'Running check for missing packages'; PKGcheck
+	local ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' )
+	[[ "$VBTsel" -eq 0 ]] && ArchTixSteps+=( 'AdditionalDriveSetup' )
+	ArchTixSteps+=( "$s_step" 'CrypttabGen' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'KernelSetup' 'ServiceSetup' 'UserSetup' )
+	[[ "$VBTsel" -eq 0 ]] && ArchTixSteps+=( 'AudioSetup' )
+	ArchTixSteps+=( 'BootloaderSetup' )
 	for a in "${ArchTixSteps[@]}"; do "$a" || SHOWerror "$a"; done
-	
 	echo -e "\n=== INSTALLATION COMPLETED ==="
 	"$chroot" /mnt chown -hR "$UNsel":users /home/"$UNsel" || SHOWerror "Chown Home Directory"
 	[[ "$(wc -l < Errors)" -gt 1 ]] && { echo -e "\n[!] Some errors logged during installation:" && cat Errors && cp Errors /mnt/var/log/installer_errors.log; } || echo "[+] Clean installation: zero errors detected."
 	YesNoSel "Reboot system"
 	[[ "$CC" -eq 1 ]] && { umount -R -l /mnt || true; reboot; } || { echo "OK"; exit 0; }
 }
-
 InstallationSetup
