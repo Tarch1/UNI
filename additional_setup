@@ -62,7 +62,7 @@ CPUsel () {
 GPUsel () {
 	echo "Detecting video chipset..."
 	local gpu_info=$(lspci | grep -Ei 'VGA|3D')
-	[[ "$gpu_info" =~ (AMD|Radeon) ]] && { [[ "${OSsel,,}" == "void" ]] && amddrivers=(xf86-video-amdgpu mesa-dri vulkan-loader mesa-vulkan-radeon) || amddrivers=(amdgpu mesa vulkan-radeon libva-mesa-driver); }
+	[[ "$gpu_info" =~ (AMD|Radeon) ]] && { [[ "${OSsel,,}" == "void" ]] && amddrivers=(mesa-dri vulkan-loader mesa-vulkan-radeon) || amddrivers=(amdgpu mesa vulkan-radeon libva-mesa-driver); }
 	[[ "$gpu_info" =~ (VMware|VirtualBox|Virtio|QXL) ]] && echo "VM detected: The default Mesa driver will be installed"
 	[[ "$gpu_info" =~ NVIDIA ]] && [[ "${OSsel,,}" == "void" ]] && { [[ "$LIBsel" == "MUSL" ]] && { nvidiadrivers=(); echo 'MUSL selection detected, forcing Mesa/Nouveau.'; } || { nvidiadrivers=(nvidia nvidia-libs-32bit); MenuSel "GPUMANAGERsel" "Select NVIDIA Optimus Manager" "Native" "Envycontrol" "Cardwire"; echo 'NVIDIA selected'; }; }
 	[[ "$gpu_info" =~ NVIDIA ]] && [[ "${OSsel,,}" != "void" ]] && { MenuSel "NVsel" "NVIDIA gpu found, choose driver" "OPEN" "NOUVEAU" "PROPRIETARY" "MESA";
