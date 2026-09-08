@@ -32,7 +32,7 @@ apply_theme() {
         hyprctl hyprpaper wallpaper ",$wall"
     else
         # Per Niri e gli altri usiamo swww
-        swww img "$wall" --transition-type wipe --transition-duration 2
+        awww img "$wall" --transition-type grow --transition-pos 0.5,0.5
     fi
 
     # 2. Wallust estrae i colori e genera i file (Usa palette scura se siamo nella cartella night)
