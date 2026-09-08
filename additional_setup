@@ -38,12 +38,6 @@ AdditionalDriveSel () {
 		else ADD_SETUP=0; ADD_FORMAT=0; ADD_FS=""; ADD_LABEL=""; fi
 	else ADD_SETUP=0; ADD_FORMAT=0; ADD_FS=""; ADD_LABEL=""; fi
 }
-AnotherCheck () {
-	[[ "${OSsel,,}" == "void" ]] && { echo "Skipping check (Void uses XBPS)"; return 0; }
-	local repos=(extra multilib); [[ "${OSsel,,}" == "artix" ]] && repos+=(system world galaxy)
-	$PKGmanager$PKGinst$PKGupd"lq" "${repos[@]}" | sort > pacman_db; printf '%s\n' "${miss[@]}" | sort -u > pkg_missed
-	mapfile -t unlisted < <(comm -13 pacman_db pkg_missed); echo "Unlisted = ${unlisted[*]}"
-}
 ArchRepoSetup () {
 	local target_conf="$1"; local cmd=(); local mirror_file="/etc/pacman.d/mirrorlist-arch"
 	[[ "$target_conf" == "/mnt/etc/pacman.conf" ]] && { cmd=( "$chroot" /mnt ); mirror_file="/mnt/etc/pacman.d/mirrorlist-arch"; }
