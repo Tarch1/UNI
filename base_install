@@ -240,16 +240,24 @@ ServiceSetup () {
 		[[ "${OSsel,,}" == "void" ]] && { mkdir -p /mnt/etc/sv/cardwire; echo -e '#!/bin/sh\nexec /usr/bin/cardwire' > /mnt/etc/sv/cardwire/run; chmod +x /mnt/etc/sv/cardwire/run; }
 		Services+=( cardwire ) ; }
 	[[ "${OSsel,,}" == "void" ]] && "$chroot" /mnt bash -c "for s in ${Services[*]}; do ln -sf /etc/sv/\$s /etc/runit/runsvdir/default/; done"
-	[[ "${OSsel,,}" != "void" ]] && { for s in "${Services[@]}"; do "$chroot" /mnt "$initc0" "$initc1" "$s"; done; }
+	[[ "${OSsel,,}" != "void" ]] && { 
+		for s in "${Services[@]}"; do 
+			if [[ "${OSsel,,}" == "artix" && "$init_sys" == "runit" ]]; then
+				"$chroot" /mnt ln -sf /etc/runit/sv/"$s" /etc/runit/runsvdir/default/
+			else
+				"$chroot" /mnt "$initc0" "$initc1" "$s"
+			fi
+		done
+	}
 	mkdir -p /mnt/etc/udev/rules.d/; [[ -f "${SCRIPT_DIR}/Conf_files/51-android.rules" ]] && cp "${SCRIPT_DIR}/Conf_files/51-android.rules" /mnt/etc/udev/rules.d/ || true
+}
 }
 UserSetup () {
 	"$chroot" /mnt bash -c "useradd -m -g users -G wheel,video,audio,storage,input,lp,scanner,power,kvm $UNsel && su $UNsel -c 'mkdir -p ~/.config'"
 	sed -i 's/^#\s*\(%wheel ALL=(ALL:ALL) ALL\)/\1/' /mnt/etc/sudoers
 	echo "Choose password for user: $UNsel"; while true; do "$chroot" /mnt passwd "$UNsel" && break || echo "Error: Try again..."; done
 	echo "Choose password for root"; while true; do "$chroot" /mnt passwd && break || echo "Error: Try again..."; done
-	echo "Installing Trizen AUR helper..."
-	"$chroot" /mnt sudo -u "$UNsel" bash -c "git clone https://aur.archlinux.org/trizen.git /tmp/trizen && cd /tmp/trizen && makepkg -si --noconfirm" || SHOWerror "Trizen setup"
+	[[ "${OSsel,,}" != "void" ]] && { "$chroot" /mnt sudo -u "$UNsel" bash -c "git clone https://aur.archlinux.org/trizen.git /tmp/trizen && cd /tmp/trizen && makepkg -si --noconfirm" || SHOWerror "Trizen setup" }
 	echo "Copying configuration files..."
 	if [[ "${OSsel,,}" == "void" ]]; then mkdir -p /mnt/etc/bash && [[ -f "${SCRIPT_DIR}/Conf_files/bashrc" ]] && cp "${SCRIPT_DIR}/Conf_files/bashrc" /mnt/home/"$UNsel"/.bashrc
 	else 
@@ -260,9 +268,9 @@ UserSetup () {
 	echo -e 'include "/usr/share/nano/*.nanorc"\nset linenumbers' > /mnt/etc/nanorc
 	echo 'export MOZ_ENABLE_WAYLAND=1' >> /mnt/home/"$UNsel"/.profile
 	if [[ "$DEsel" == "Hyprland" || "$DEsel" == "Niri" ]]; then
-		if [[ "${OSsel,,}" == "void" ]]; then "$chroot" /mnt curl -Lo /usr/bin/wallust "https://github.com/explosion-mental/wallust/releases/latest/download/wallust-x86_64-unknown-linux-musl" && "$chroot" /mnt chmod +x /usr/bin/wallust
+		if [[ "${OSsel,,}" == "void" ]]; then
+			"$chroot" /mnt curl -Lo /usr/bin/wallust "https://github.com/explosion-mental/wallust/releases/latest/download/wallust-x86_64-unknown-linux-musl" && "$chroot" /mnt chmod +x /usr/bin/wallust
 		else
-			"$chroot" /mnt sudo -u "$UNsel" bash -c "git clone https://aur.archlinux.org/trizen.git /tmp/trizen && cd /tmp/trizen && makepkg -si --noconfirm" || SHOWerror "Trizen setup"
 			"$chroot" /mnt sudo -u "$UNsel" trizen -S --noconfirm --noedit wallust || SHOWerror "Wallust install"
 		fi
 		for conf in Fuzzel Waybar Swaync Hyprlock Wallust Wallpapers; do [[ -d "${SCRIPT_DIR}/Conf_files/$conf" ]] && cp -r "${SCRIPT_DIR}/Conf_files/$conf" /mnt/home/"$UNsel"/.config/"${conf,,}"; done
@@ -384,8 +392,9 @@ InstallationSetup () {
 		PKGskp=( --needed --noconfirm ); PKGrsk=( --noconfirm ); keylayout='KEYMAP=it'; chroot="${OSsel,,}-chroot"
 		if [[ "${OSsel,,}" == "arch" ]]; then keypath='etc/vconsole.conf'; PKGstrap=pacstrap; FSTABgen=genfstab; initc0=systemctl; initc1=enable
 			sed -i -e 's/^#ParallelDownloads = 5/ParallelDownloads = 5/' -e '/\[multilib]/,/mirrorlist/ s/#//' /etc/pacman.conf; $PKGmanager$PKGinst$PKGupd"lq" core extra multilib | sort > pacman_db || true
-		elif [[ "${OSsel,,}" == "artix" ]]; then keypath='etc/conf.d/keymaps'; PKGstrap=basestrap; FSTABgen=fstabgen; initc0='rc-update'; initc1=add
-			[[ "$initc0" == "rc-update" ]] && init_sys="openrc" || init_sys="runit"; sed -i -e 's/^#ParallelDownloads = 5/ParallelDownloads = 5/' -e '/\[lib32]/,/mirrorlist/ s/#//' /etc/pacman.conf
+		elif [[ "${OSsel,,}" == "artix" ]]; then keypath='etc/conf.d/keymaps'; PKGstrap=basestrap; FSTABgen=fstabgen;
+			if [[ -d /run/runit ]]; then init_sys="runit"; else init_sys="openrc"; initc0='rc-update'; initc1='add'; fi
+			sed -i -e 's/^#ParallelDownloads = 5/ParallelDownloads = 5/' -e '/\[lib32]/,/mirrorlist/ s/#//' /etc/pacman.conf
 			[[ "$ARCHrepo" == "1" ]] && ArchRepoSetup /etc/pacman.conf; $PKGmanager$PKGinst$PKGupd"lq" system world galaxy lib32 $([[ "$ARCHrepo" == "1" ]] && echo "universe extra multilib") | sort > pacman_db || true
 		fi
 	else
