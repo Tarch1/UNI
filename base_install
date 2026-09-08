@@ -87,8 +87,9 @@ AdditionalDriveSetup () {
 }
 ArchTixSystemInstall () {
 	local BasePKG=( "${kernel[@]}" "${baselinux[@]}" "${elogind[@]}" )
+	[[ -n "$microcodepkg" ]] && BasePKG+=( "$microcodepkg" )
 	[[ "$FSsel" == "btrfs" ]] && BasePKG+=( "${btrfsutility[@]}" )
-	"$PKGstrap" /mnt "$microcodepkg" "${BasePKG[@]}" || SHOWerror "Arch/Artix strap base installation"
+	"$PKGstrap" /mnt "${BasePKG[@]}" || SHOWerror "Arch/Artix strap base installation"
 	[[ -f /mnt/etc/pacman.conf ]] && sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 5/' /mnt/etc/pacman.conf || true
 }
 VoidSystemInstall () {
@@ -101,6 +102,7 @@ VoidSystemInstall () {
 	for d in dev proc sys run; do mkdir -p /mnt/$d && mount --bind /$d /mnt/$d || SHOWerror "Mounting /$d filesystem"; done
 	mount --make-rslave /mnt/sys || SHOWerror "Setting sys rslave"
 	[[ "$UEFImode" -eq 1 ]] && { mkdir -p /mnt/sys/firmware/efi/efivars; mount --bind /sys/firmware/efi/efivars /mnt/sys/firmware/efi/efivars || SHOWerror "Mounting efivars filesystem"; } || true
+	cp /etc/resolv.conf /mnt/etc/resolv.conf || true
 }
 CrypttabGen () {
 	[[ "$LUKS_ENC" -ne 1 ]] && return 0
@@ -198,7 +200,7 @@ PKGcheck () {
 KernelSetup () {
 	[[ "$microcodepkg" == "intel-ucode" ]] && { mkdir -p /mnt/etc/modprobe.d && echo 'options i915 enable_fbc=1 fastboot=0 enable_dc=4' > /mnt/etc/modprobe.d/i915.conf || SHOWerror "i915 modprobe options"; }
 	if [[ ${#nvidiadrivers[@]} -gt 0 ]]; then
-		[[ "${OSsel,,}" == "artix" ]] && { "$chroot" /mnt $PKGmanager$PKGinst$PKGupd"u" "${PKGskp[@]}" nvidia-utils-openrc || SHOWerror "artix nvidia-utils-openrc"; }
+		[[ "${OSsel,,}" == "artix" ]] && { "$chroot" /mnt $PKGmanager$PKGinst$PKGupd"u" "${PKGskp[@]}" "nvidia-utils-${init_sys}" || SHOWerror "artix nvidia-utils"; }
 		ln -s /dev/null /mnt/etc/udev/rules.d/61-gdm.rules || SHOWerror "61-gdm udev rule link"; modules+=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)
 		echo -e "options nvidia-drm modeset=1 fbdev=1\noptions nvidia NVreg_DynamicPowerManagement=0x02 NVreg_UsePageAttributeTable=1 NVreg_EnablePCIeGen3=1" > /mnt/etc/modprobe.d/nvidia.conf || SHOWerror "nvidia modprobe options"
 	fi
@@ -228,15 +230,15 @@ KernelSetup () {
 	esac
 }
 ServiceSetup () {
-	[[ "${OSsel,,}" == "artix" ]] && { Services+=( NetworkManager chronyd openrc-settingsd cupsd avahi-daemon bluetoothd ); [[ -f /mnt/etc/init.d/tlp ]] && Services+=( tlp ); [[ -f /mnt/etc/init.d/thermald ]] && Services+=( thermald ); [[ -v nvidiadrivers && -f /mnt/etc/init.d/nvidia-persistenced ]] && Services+=( nvidia-persistenced ); }
+	[[ "${OSsel,,}" == "artix" ]] && { Services+=( NetworkManager chronyd dbus elogind cupsd avahi-daemon bluetoothd ); [[ "$init_sys" == "openrc" ]] && Services+=( openrc-settingsd ); [[ -f /mnt/usr/bin/tlp ]] && Services+=( tlp ); [[ -f /mnt/usr/bin/thermald || -f /mnt/usr/sbin/thermald ]] && Services+=( thermald ); [[ -v nvidiadrivers && -f /mnt/usr/bin/nvidia-persistenced ]] && Services+=( nvidia-persistenced ); }
 	[[ "${OSsel,,}" == "arch" ]] && { Services+=( NetworkManager chronyd cups avahi-daemon bluetooth paccache.timer ); [[ -f /mnt/usr/lib/systemd/system/power-profiles-daemon.service ]] && Services+=( power-profiles-daemon ); [[ -f /mnt/usr/lib/systemd/system/thermald.service ]] && Services+=( thermald ); }
-	[[ "${OSsel,,}" == "void" ]] && { Services+=( NetworkManager chronyd cupsd dbus avahi-daemon bluetoothd ); [[ -d /mnt/etc/sv/tlp ]] && Services+=( tlp ); [[ -d /mnt/etc/sv/thermald ]] && Services+=( thermald ); }
+	[[ "${OSsel,,}" == "void" ]] && { Services+=( NetworkManager chronyd cupsd dbus avahi-daemon bluetoothd ); [[ -f /mnt/usr/bin/tlp ]] && Services+=( tlp ); [[ -f /mnt/usr/bin/thermald || -f /mnt/usr/sbin/thermald ]] && Services+=( thermald ); }
 	[[ "${DMsel,,}" =~ ^(ly|greetd|sddm|gdm)$ ]] && Services+=("${DMsel,,}")
-	if [[ "${GPUMANAGERsel,,}" == "cardwire" ]]; then
-		[[ "${OSsel,,}" == "artix" ]] && { echo -e '#!/sbin/openrc-run\nname="Cardwire GPU Manager"\ncommand="/usr/bin/cardwire"\ncommand_background="yes"\npidfile="/run/${RC_SVCNAME}.pid"\ndepend() {\n\tneed localmount devfs\n\tafter bootmisc\n}' > /mnt/etc/init.d/cardwire; chmod +x /mnt/etc/init.d/cardwire; }
+	[[ "${GPUMANAGERsel,,}" == "cardwire" ]] && {
+		[[ "${OSsel,,}" == "artix" && "$init_sys" == "openrc" ]] && { echo -e '#!/sbin/openrc-run\nname="Cardwire GPU Manager"\ncommand="/usr/bin/cardwire"\ncommand_background="yes"\npidfile="/run/${RC_SVCNAME}.pid"\ndepend() {\n\tneed localmount devfs\n\tafter bootmisc\n}' > /mnt/etc/init.d/cardwire; chmod +x /mnt/etc/init.d/cardwire; }
+		[[ "${OSsel,,}" == "artix" && "$init_sys" != "openrc" ]] && { mkdir -p /mnt/etc/runit/sv/cardwire; echo -e '#!/bin/sh\nexec /usr/bin/cardwire' > /mnt/etc/runit/sv/cardwire/run; chmod +x /mnt/etc/runit/sv/cardwire/run; }
 		[[ "${OSsel,,}" == "void" ]] && { mkdir -p /mnt/etc/sv/cardwire; echo -e '#!/bin/sh\nexec /usr/bin/cardwire' > /mnt/etc/sv/cardwire/run; chmod +x /mnt/etc/sv/cardwire/run; }
-		Services+=( cardwire )
-	fi
+		Services+=( cardwire ) ; }
 	[[ "${OSsel,,}" == "void" ]] && "$chroot" /mnt bash -c "for s in ${Services[*]}; do ln -sf /etc/sv/\$s /etc/runit/runsvdir/default/; done"
 	[[ "${OSsel,,}" != "void" ]] && { for s in "${Services[@]}"; do "$chroot" /mnt "$initc0" "$initc1" "$s"; done; }
 	mkdir -p /mnt/etc/udev/rules.d/; [[ -f "${SCRIPT_DIR}/Conf_files/51-android.rules" ]] && cp "${SCRIPT_DIR}/Conf_files/51-android.rules" /mnt/etc/udev/rules.d/ || true
@@ -258,7 +260,11 @@ UserSetup () {
 	echo -e 'include "/usr/share/nano/*.nanorc"\nset linenumbers' > /mnt/etc/nanorc
 	echo 'export MOZ_ENABLE_WAYLAND=1' >> /mnt/home/"$UNsel"/.profile
 	if [[ "$DEsel" == "Hyprland" || "$DEsel" == "Niri" ]]; then
-		"$chroot" /mnt sudo -u "$UNsel" trizen -S --noconfirm --noedit wallust || SHOWerror "Wallust install"
+		if [[ "${OSsel,,}" == "void" ]]; then "$chroot" /mnt curl -Lo /usr/bin/wallust "https://github.com/explosion-mental/wallust/releases/latest/download/wallust-x86_64-unknown-linux-musl" && "$chroot" /mnt chmod +x /usr/bin/wallust
+		else
+			"$chroot" /mnt sudo -u "$UNsel" bash -c "git clone https://aur.archlinux.org/trizen.git /tmp/trizen && cd /tmp/trizen && makepkg -si --noconfirm" || SHOWerror "Trizen setup"
+			"$chroot" /mnt sudo -u "$UNsel" trizen -S --noconfirm --noedit wallust || SHOWerror "Wallust install"
+		fi
 		for conf in Fuzzel Waybar Swaync Hyprlock Wallust Wallpapers; do [[ -d "${SCRIPT_DIR}/Conf_files/$conf" ]] && cp -r "${SCRIPT_DIR}/Conf_files/$conf" /mnt/home/"$UNsel"/.config/"${conf,,}"; done
 		[[ "$DEsel" == "Hyprland" && -d "${SCRIPT_DIR}/Conf_files/Hyprland" ]] && cp -r "${SCRIPT_DIR}/Conf_files/Hyprland" /mnt/home/"$UNsel"/.config/hypr && touch /mnt/home/"$UNsel"/.config/hypr/hyprpaper.conf
 		[[ "$DEsel" == "Niri" && -d "${SCRIPT_DIR}/Conf_files/Niri" ]] && cp -r "${SCRIPT_DIR}/Conf_files/Niri" /mnt/home/"$UNsel"/.config/niri
