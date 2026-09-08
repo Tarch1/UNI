@@ -172,7 +172,7 @@ PKGcheck () {
 	audio=(pipewire wireplumber); [[ "${OSsel,,}" != "void" ]] && audio+=(pipewire-pulse pipewire-alsa pipewire-jack sof-firmware)
 	fs=(dialog mtools parted gptfdisk dosfstools ntfsprogs)
 	archive=(bzip2 cpio gzip xz 7zip tar unrar zip unzip zstd)
-	utility=(imv featherpad libqalculate fd btop fwupd fastfetch grim slurp wl-clipboard swappy swww xorg-xwayland); [[ "${OSsel,,}" != "void" ]] && utility+=(lact cowfortune pacman-contrib)
+	utility=(imv featherpad libqalculate fd btop fwupd fastfetch grim slurp wl-clipboard swappy awww xorg-xwayland); [[ "${OSsel,,}" != "void" ]] && utility+=(lact cowfortune pacman-contrib)
 	if ls /sys/class/power_supply/BAT* &>/dev/null; then [[ "${OSsel,,}" == "arch" ]] && utility+=(power-profiles-daemon) || utility+=(tlp); [[ "$microcodepkg" == "intel-ucode" ]] && utility+=(thermald); fi
 	[[ "${GPUMANAGERsel,,}" == "envycontrol" ]] && utility+=(envycontrol)
 	[[ "${GPUMANAGERsel,,}" == "cardwire" ]] && utility+=(cardwire)
