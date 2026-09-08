@@ -268,7 +268,7 @@ UserSetup () {
 	echo 'export MOZ_ENABLE_WAYLAND=1' >> /mnt/home/"$UNsel"/.profile
 	if [[ "$DEsel" == "Hyprland" || "$DEsel" == "Niri" ]]; then
 		if [[ "${OSsel,,}" == "void" ]]; then
-			"$chroot" /mnt curl -Lo /usr/bin/wallust "https://github.com/explosion-mental/wallust/releases/latest/download/wallust-x86_64-unknown-linux-musl" && "$chroot" /mnt chmod +x /usr/bin/wallust
+			"$chroot" /mnt wget -O /usr/bin/wallust "https://github.com/explosion-mental/wallust/releases/latest/download/wallust-x86_64-unknown-linux-musl" && "$chroot" /mnt chmod +x /usr/bin/wallust
 		else
 			"$chroot" /mnt sudo -u "$UNsel" trizen -S --noconfirm --noedit wallust || SHOWerror "Wallust install"
 		fi
@@ -349,33 +349,27 @@ BootloaderSetup () {
 }
 InstallationSetup () {
 	VBTsel=0; [[ "$(lspci | grep -Ei 'VGA|3D')" =~ (VMware|VirtualBox|Virtio|QXL) ]] && VBTsel=1
-	CheckandSetup=( Check_required_files UEFIsel KernelSel IRFsel BootloaderSel Pacman_Locked )
-	if command -v timedatectl >/dev/null; then timedatectl set-ntp true || true
-	elif command -v chronyd >/dev/null; then chronyd -q "pool pool.ntp.org iburst" || true
-	elif command -v ntpdate >/dev/null; then ntpdate pool.ntp.org || true; fi
+	{ command -v timedatectl &>/dev/null && timedatectl set-ntp true; } || { command -v chronyd &>/dev/null && chronyd -q "pool pool.ntp.org iburst"; } || { command -v ntpdate &>/dev/null && ntpdate pool.ntp.org; } || true
 	echo 'List of all errors occurred during the installation process:' > Errors
+	CheckandSetup=( Check_required_files AutoOSsel UEFIsel KernelSel IRFsel BootloaderSel Pacman_Locked )
 	for c in "${CheckandSetup[@]}"; do "$c" || SHOWerror "$c"; done
-	AutoOSsel
-	[[ "${OSsel,,}" == "artix" ]] && ArchRepoSel
-	[[ "${OSsel,,}" == "void" ]] && { VoidInstMethod && LibrarySel; }
+	CPUsel && GPUsel
 	if [[ "$VBTsel" == "1" ]]; then 
 		LANGsel='en_GB.UTF-8'; LOCsel='it_IT.UTF-8'; HNsel=tarch1; UNsel=tarch1; TZsel='Europe/Rome'; PIDsel=UUID; FSsel=btrfs; ADD_SETUP=0; ADD_FORMAT=0; ADD_FS=""; ADD_LABEL=""; LUKSSel; DesktopEnvSel; DisplayManagerSel; 
+		[[ "${OSsel,,}" == "artix" ]] && ARCHrepo=1
 		[[ "${OSsel,,}" == "void" ]] && { LIBsel="GLIBC"; VImethod="XBPS"; }
 	else 
+		[[ "${OSsel,,}" == "artix" ]] && ArchRepoSel
+		[[ "${OSsel,,}" == "void" ]] && { VoidInstMethod && LibrarySel; }
 		local Personalization=( LocalizationSel LanguageSel TimezoneSel HostnameSel UsernameSel PartIDSel FilesystemSel AdditionalDriveSel LUKSSel DesktopEnvSel DisplayManagerSel )
 		for s in "${Personalization[@]}"; do "$s" || SHOWerror "$s"; done
 	fi
-	CPUsel && GPUsel
-	echo -e "\n=== CONFIGURATION SUMMARY ==="
-	echo "OS: $OSsel | Kernel: $KSel | Initramfs: $IRFSetup | Bootloader: $BLsel"
-	echo "User: $UNsel | Hostname: $HNsel | Locale: $LOCsel | Timezone: $TZsel"
-	echo "Filesystem: $FSsel | Partition ID: $PIDsel | LUKS: $LUKS_ENC"
-	echo "Desktop Environment: $DEsel | Display Manager: $DMsel"
-	[[ -n "$microcodepkg" ]] && echo "Microcode: $microcodepkg"
-	[[ ${#nvidiadrivers[@]} -gt 0 ]] && echo "NVIDIA Driver: $NVsel | Manager: $GPUMANAGERsel"
-	[[ ${#amddrivers[@]} -gt 0 ]] && echo "AMD Drivers included"
-	[[ "$VBTsel" -eq 1 ]] && echo "Virtual Machine Mode: ON"
-	echo "============================="
+	local sum="\n=== CONFIGURATION SUMMARY ===\nOS: $OSsel | Kernel: $KSel | Initramfs: $IRFSetup | Bootloader: $BLsel\nUser: $UNsel | Hostname: $HNsel | Locale: $LOCsel | Timezone: $TZsel\nFilesystem: $FSsel | Partition ID: $PIDsel | LUKS: $LUKS_ENC\nDesktop: $DEsel | DM: $DMsel\n"
+	[[ -n "$microcodepkg" ]] && sum+="Microcode: $microcodepkg\n"
+	[[ ${#nvidiadrivers[@]} -gt 0 ]] && sum+="NVIDIA Driver: $NVsel | Manager: $GPUMANAGERsel\n"
+	[[ ${#amddrivers[@]} -gt 0 ]] && sum+="AMD Drivers included\n"
+	[[ "$VBTsel" -eq 1 ]] && sum+="Virtual Machine Mode: ON\n"
+	echo -e "${sum}============================="
 	YesNoSel "Is this configuration correct to proceed with partitioning?"
 	[[ "$CC" -eq 1 ]] && echo "Proceeding with installation..." || { echo "Installation aborted by user."; exit 1; }
 	local s_step; [[ "${OSsel,,}" == "void" ]] && s_step='VoidSystemInstall' || s_step='ArchTixSystemInstall'
