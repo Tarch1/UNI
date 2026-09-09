@@ -157,6 +157,7 @@ PKGcheck () {
 	displaymanagerpkg=(); [[ "${DMsel,,}" == "ly" ]] && displaymanagerpkg=(ly); [[ "${DMsel,,}" == "greetd" ]] && displaymanagerpkg=(greetd tuigreet); [[ "${DMsel,,}" == "sddm" ]] && displaymanagerpkg=(sddm); [[ "${DMsel,,}" == "gdm" ]] && displaymanagerpkg=(gdm)
 	[[ "${OSsel,,}" == "artix" && "${DMsel,,}" != "none" ]] && displaymanagerpkg+=("${DMsel,,}-${init_sys}")
 	kernel=("${KSel}" "${KSel}-headers"); [[ "${OSsel,,}" == "void" ]] && kernel+=(linux-firmware-network) || kernel+=(linux-firmware)
+	[[ "${OSsel,,}" != "void" ]] && { [[ "$IRFSetup" == "booster" ]] && kernel+=(booster); [[ "$IRFSetup" == "dracut" ]] && kernel+=(dracut); }
 	baselinux=(base-devel); [[ "${OSsel,,}" == "void" ]] && baselinux+=(base-system) || baselinux+=(base); [[ "${OSsel,,}" == "artix" ]] && baselinux+=("${init_sys,,}")
 	baseutils=(bash-completion vim nano wget git binutils cryptsetup rsync); [[ "${OSsel,,}" == "void" ]] && baseutils+=(man-pages) || baseutils+=(man-db)
 	net=(iwd chrony); [[ "${OSsel,,}" == "void" ]] && net+=(NetworkManager) || net+=(networkmanager)
@@ -200,21 +201,20 @@ KernelSetup () {
 	case "$IRFSetup" in
 		dracut)		mkdir -p /mnt/etc/dracut.conf.d || SHOWerror "mkdir dracut.conf.d"
 					[[ "$LUKS_ENC" -eq 1 ]] && echo -e 'add_dracutmodules+=" crypt "\ninstall_items+=" /etc/crypttab /etc/crypt_key.bin "' > /mnt/etc/dracut.conf.d/crypt.conf
-					[[ "${OSsel,,}" == "void" ]] && { "$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" dracut || SHOWerror "Void dracut install"; }
 					[[ "$FSsel" == "btrfs" ]] && echo 'add_dracutmodules+=" btrfs "' > /mnt/etc/dracut.conf.d/btrfs.conf
 					[[ ${#nvidiadrivers[@]} -gt 0 ]] && echo 'force_drivers+=" nvidia nvidia_modeset nvidia_uvm nvidia_drm "' > /mnt/etc/dracut.conf.d/nvidia.conf
-					if [[ "${OSsel,,}" == "void" ]]; then "$chroot" /mnt xbps-reconfigure -f "$KSel" || SHOWerror "xbps-reconfigure dracut"
-					else local r_kver; r_kver="$(basename "$(find /mnt/usr/lib/modules/ -maxdepth 1 -mindepth 1 -type d | head -n 1)")"; "$chroot" /mnt dracut --kver "$r_kver" --force /boot/initramfs-"$KSel".img || SHOWerror "dracut build"; fi ;;
-		booster)	[[ ${#booster[@]} -gt 0 ]] && { "$chroot" /mnt $PKGmanager$PKGinst$PKGupd"u" "${PKGskp[@]}" "${booster[@]}" || SHOWerror "install booster"; }
-					[[ "${OSsel,,}" != "void" ]] && { "$chroot" /mnt $PKGmanager$PKGrmv"n"$PKGdpn "${PKGrsk[@]}" mkinitcpio || SHOWerror "purge mkinitcpio"; }
-					local b_opts="mount_timeout: 3m\nvconsole: true\nresume: /dev/disk/by-uuid/${SWAPID}\nmodules: ahci,ata_piix,sd_mod,nvme"
+					if [[ "${OSsel,,}" == "void" ]]; then 
+						"$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" dracut || SHOWerror "Void dracut install"
+						"$chroot" /mnt xbps-reconfigure -f "$KSel" || SHOWerror "xbps-reconfigure dracut"
+					else 
+						local r_kver; r_kver="$(basename "$(find /mnt/usr/lib/modules/ -maxdepth 1 -mindepth 1 -type d | head -n 1)")"
+						"$chroot" /mnt dracut --kver "$r_kver" --force /boot/initramfs-"$KSel".img || SHOWerror "dracut build"
+					fi ;;
+		booster)	local b_opts="mount_timeout: 3m\nvconsole: true\nresume: /dev/disk/by-uuid/${SWAPID}\nmodules: ahci,ata_piix,sd_mod,nvme"
 					[[ "$FSsel" == "btrfs" ]] && b_opts="${b_opts},btrfs"
 					[[ ${#nvidiadrivers[@]} -gt 0 ]] && b_opts="${b_opts},nvidia,nvidia_modeset,nvidia_uvm,nvidia_drm"
 					echo -e "$b_opts" > /mnt/etc/booster.yaml || SHOWerror "booster.yaml write"
-					if [[ "${OSsel,,}" != "void" ]]; then
-						mkdir -p /mnt/etc/pacman.d/hooks || SHOWerror "mkdir pacman hooks"
-						printf '[Trigger]\nOperation = Install\nOperation = Upgrade\nType = Package\nTarget = %s\n\n[Action]\nDescription = Forcing Booster initramfs update...\nWhen = PostTransaction\nDepends = booster\nExec = /usr/bin/booster build --force --universal /boot/initramfs-%s.img\n' "$KSel" "$KSel" > /mnt/etc/pacman.d/hooks/95-booster-force.hook || SHOWerror "booster-force hook creation"
-					fi
+					if [[ "${OSsel,,}" != "void" ]]; then mkdir -p /mnt/etc/pacman.d/hooks || SHOWerror "mkdir pacman hooks"; printf '[Trigger]\nOperation = Install\nOperation = Upgrade\nType = Package\nTarget = %s\n\n[Action]\nDescription = Forcing Booster initramfs update...\nWhen = PostTransaction\nDepends = booster\nExec = /usr/bin/booster build --force --universal /boot/initramfs-%s.img\n' "$KSel" "$KSel" > /mnt/etc/pacman.d/hooks/95-booster-force.hook || SHOWerror "booster-force hook creation"; fi
 					local real_kver; real_kver=$(basename "$(find /mnt/usr/lib/modules/ -maxdepth 1 -mindepth 1 -type d ! -name 'extramodules*' | head -n 1)") || SHOWerror "find real_kver"
 					"$chroot" /mnt /bin/bash -c "booster build --force --universal --kernel-version=${real_kver} /boot/initramfs-${KSel}.img" || SHOWerror "booster build" ;;
 		*)			local HOOKS=(base udev autodetect keyboard keymap modconf block); [[ "$LUKS_ENC" -eq 1 ]] && HOOKS+=(encrypt); HOOKS+=(resume filesystems fsck); [[ ${#nvidiadrivers[@]} -gt 0 ]] && HOOKS+=(kms)
