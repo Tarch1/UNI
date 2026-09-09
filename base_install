@@ -342,7 +342,7 @@ BootloaderSetup () {
 }
 InstallationSetup () {
 	VBTsel=0; [[ "$(lspci | grep -Ei 'VGA|3D')" =~ (VMware|VirtualBox|Virtio|QXL) ]] && VBTsel=1
-	{ command -v timedatectl &>/dev/null && timedatectl set-ntp true; } || { command -v chronyd &>/dev/null && chronyd -q "pool pool.ntp.org iburst"; } || { command -v ntpdate &>/dev/null && ntpdate pool.ntp.org; } || true
+	{ command -v timedatectl &>/dev/null && timedatectl set-ntp true &>/dev/null; } || { command -v chronyc &>/dev/null && chronyc makestep &>/dev/null; } || { command -v chronyd &>/dev/null && chronyd -q "pool pool.ntp.org iburst" &>/dev/null; } || { command -v ntpdate &>/dev/null && ntpdate pool.ntp.org &>/dev/null; } || true
 	echo 'List of all errors occurred during the installation process:' > Errors
 	CheckandSetup=( Check_required_files AutoOSsel UEFIsel KernelSel IRFsel BootloaderSel Pacman_Locked )
 	for c in "${CheckandSetup[@]}"; do "$c" || SHOWerror "$c"; done
