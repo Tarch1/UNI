@@ -266,15 +266,19 @@ UserSetup () {
 	echo 'export MOZ_ENABLE_WAYLAND=1' >> /mnt/home/"$UNsel"/.profile
 	if [[ "$DEsel" == "Hyprland" || "$DEsel" == "Niri" ]]; then
 		echo "Installing Wallust binary directly from GitHub..."
-		ASSET_PATH=$(curl -sL https://github.com/explosion-mental/wallust/releases/latest | grep -o 'href="/explosion-mental/wallust/releases/download/[^"]*x86_64-unknown-linux-musl[^"]*"' | head -n 1 | sed 's/href="//; s/"//')
-		curl -sLo /mnt/tmp/wallust_dl "https://github.com$ASSET_PATH"
+		LATEST_URL=$(curl -Ls -o /dev/null -w %{url_effective} "https://github.com/explosion-mental/wallust/releases/latest")
+		WALLUST_VER=$(basename "$LATEST_URL")
+		[[ -z "$WALLUST_VER" || "$WALLUST_VER" == "latest" ]] && WALLUST_VER="3.5.2"
+		WALLUST_VER="${WALLUST_VER#v}" # Rimuove l'eventuale "v" iniziale se presente
+		DOWNLOAD_URL="https://github.com/explosion-mental/wallust/releases/download/${WALLUST_VER}/wallust-${WALLUST_VER}-x86_64-unknown-linux-musl.tar.gz"
+		curl -sLo /mnt/tmp/wallust_dl "$DOWNLOAD_URL"
 		if tar -tf /mnt/tmp/wallust_dl &>/dev/null; then
 			tar -xzf /mnt/tmp/wallust_dl -C /mnt/tmp/
 			find /mnt/tmp/ -maxdepth 2 -type f -name "wallust" -exec mv {} /mnt/usr/bin/wallust \;
+			chmod +x /mnt/usr/bin/wallust || SHOWerror "Wallust chmod"
 		else
-			mv /mnt/tmp/wallust_dl /mnt/usr/bin/wallust
+			SHOWerror "Wallust download failed (Ricevuta pagina HTML invece del binario)"
 		fi
-		chmod +x /mnt/usr/bin/wallust || SHOWerror "Wallust binary installation"
 		for conf in Fuzzel Waybar Swaync Hyprlock Wallust Wallpapers; do [[ -d "${SCRIPT_DIR}/Conf_files/$conf" ]] && cp -r "${SCRIPT_DIR}/Conf_files/$conf" /mnt/home/"$UNsel"/.config/"${conf,,}"; done
 		[[ "$DEsel" == "Hyprland" && -d "${SCRIPT_DIR}/Conf_files/Hyprland" ]] && cp -r "${SCRIPT_DIR}/Conf_files/Hyprland" /mnt/home/"$UNsel"/.config/hypr && touch /mnt/home/"$UNsel"/.config/hypr/hyprpaper.conf
 		[[ "$DEsel" == "Niri" && -d "${SCRIPT_DIR}/Conf_files/Niri" ]] && cp -r "${SCRIPT_DIR}/Conf_files/Niri" /mnt/home/"$UNsel"/.config/niri
