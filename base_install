@@ -359,19 +359,48 @@ InstallationSetup () {
 		[[ "${OSsel,,}" == "artix" ]] && { ARCHrepo=1; INITsel="OpenRC"; }
 		[[ "${OSsel,,}" == "void" ]] && { LIBsel="GLIBC"; VImethod="XBPS"; INITsel="Runit"; }
 	else 
-		[[ "${OSsel,,}" == "artix" ]] && ArchRepoSel
-		[[ "${OSsel,,}" == "void" ]] && { VoidInstMethod && LibrarySel; INITsel="Runit"; }
-		local Personalization=( LocalizationSel LanguageSel TimezoneSel HostnameSel UsernameSel PartIDSel FilesystemSel AdditionalDriveSel LUKSSel DesktopEnvSel DisplayManagerSel InitSystemSel )
+		[[ "${OSsel,,}" == "artix" ]] && { ArchRepoSel; InitSystemSel; }
+		[[ "${OSsel,,}" == "void" ]] && { VoidInstMethod; LibrarySel; INITsel="Runit"; }
+		local Personalization=( LocalizationSel LanguageSel TimezoneSel HostnameSel UsernameSel PartIDSel FilesystemSel AdditionalDriveSel LUKSSel DesktopEnvSel DisplayManagerSel )
 		for s in "${Personalization[@]}"; do "$s" || SHOWerror "$s"; done
 	fi
-	local sum="\n=== CONFIGURATION SUMMARY ===\nOS: $OSsel | Init: $INITsel | Kernel: $KSel | Initramfs: $IRFSetup | Bootloader: $BLsel\nUser: $UNsel | Hostname: $HNsel | Locale: $LOCsel | Timezone: $TZsel\nFilesystem: $FSsel | Partition ID: $PIDsel | LUKS: $LUKS_ENC\nDesktop: $DEsel | DM: $DMsel\n"
-	[[ -n "$microcodepkg" ]] && sum+="Microcode: $microcodepkg\n"
-	[[ ${#nvidiadrivers[@]} -gt 0 ]] && sum+="NVIDIA Driver: $NVsel | Manager: $GPUMANAGERsel\n"
-	[[ ${#amddrivers[@]} -gt 0 ]] && sum+="AMD Drivers included\n"
-	[[ "$VBTsel" -eq 1 ]] && sum+="Virtual Machine Mode: ON\n"
-	echo -e "${sum}============================="
-	YesNoSel "Is this configuration correct to proceed with partitioning?"
-	[[ "$CC" -eq 1 ]] && echo "Proceeding with installation..." || { echo "Installation aborted by user."; exit 1; }
+	while true; do
+		local sum="\n=== CONFIGURATION SUMMARY ===\nOS: $OSsel | Init: $INITsel | Kernel: $KSel | Initramfs: $IRFSetup | Bootloader: $BLsel\nUser: $UNsel | Hostname: $HNsel | Locale: $LOCsel | Timezone: $TZsel\nFilesystem: $FSsel | Partition ID: $PIDsel | LUKS: $LUKS_ENC\nDesktop: $DEsel | DM: $DMsel\n"
+		[[ -n "$microcodepkg" ]] && sum+="Microcode: $microcodepkg\n"
+		[[ ${#nvidiadrivers[@]} -gt 0 ]] && sum+="NVIDIA Driver: $NVsel | Manager: $GPUMANAGERsel\n"
+		[[ ${#amddrivers[@]} -gt 0 ]] && sum+="AMD Drivers included\n"
+		[[ "$VBTsel" -eq 1 ]] && sum+="Virtual Machine Mode: ON\n"
+		echo -e "${sum}============================="
+		YesNoSel "Is this configuration correct to proceed with partitioning?"
+		[[ "$CC" -eq 1 ]] && { echo "Proceeding with installation..."; break; }
+		local edit_options=( "Kernel" "Initramfs" "Bootloader" "Hostname" "Username" "Locale/Language" "Timezone" "Filesystem" "Partition ID" "LUKS" "Desktop" "Display Manager" )
+		[[ "${OSsel,,}" == "artix" ]] && edit_options+=( "Init System" "Arch Repos" )
+		[[ "${OSsel,,}" == "void" ]] && edit_options+=( "Library" "Install Method" )
+		[[ ${#nvidiadrivers[@]} -gt 0 ]] && edit_options+=( "NVIDIA Driver" "GPU Manager" )
+		edit_options+=( "Abort Installation" )
+		MenuSel "EDIT_CHOICE" "What would you like to change?" "${edit_options[@]}"
+		case "$EDIT_CHOICE" in
+			"Kernel") KernelSel ;;
+			"Initramfs") IRFsel ;;
+			"Bootloader") BootloaderSel ;;
+			"Hostname") HostnameSel ;;
+			"Username") UsernameSel ;;
+			"Locale/Language") LocalizationSel; LanguageSel ;;
+			"Timezone") TimezoneSel ;;
+			"Filesystem") FilesystemSel ;;
+			"Partition ID") PartIDSel ;;
+			"LUKS") LUKSSel ;;
+			"Desktop") DesktopEnvSel ;;
+			"Display Manager") DisplayManagerSel ;;
+			"Init System") InitSystemSel ;;
+			"Arch Repos") ArchRepoSel ;;
+			"Library") LibrarySel ;;
+			"Install Method") VoidInstMethod ;;
+			"NVIDIA Driver") MenuSel "NVsel" "Choose driver" "OPEN" "NOUVEAU" "PROPRIETARY" "MESA" ;;
+			"GPU Manager") MenuSel "GPUMANAGERsel" "Select Optimus Manager" "Native" "Envycontrol" "Cardwire" ;;
+			"Abort Installation") exit 1 ;;
+		esac
+	done
 	local s_step; [[ "${OSsel,,}" == "void" ]] && s_step='VoidSystemInstall' || s_step='ArchTixSystemInstall'
 	if [[ "${OSsel,,}" != "void" ]]; then
 		PKGmanager="pacman"; PKGinst=" -S"; PKGupd="y"; PKGchk=" -Q"; PKGrmv=" -R"; PKGdpn="s"; PKGfrc="dd"
