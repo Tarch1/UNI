@@ -266,12 +266,15 @@ UserSetup () {
 	echo 'export MOZ_ENABLE_WAYLAND=1' >> /mnt/home/"$UNsel"/.profile
 	if [[ "$DEsel" == "Hyprland" || "$DEsel" == "Niri" ]]; then
 		echo "Installing Wallust binary directly from GitHub..."
-		"$chroot" /mnt bash -c '
-			curl -sLo /tmp/wallust.tar.gz "https://github.com/explosion-mental/wallust/releases/latest/download/wallust-x86_64-unknown-linux-musl.tar.gz"
-			tar -xzf /tmp/wallust.tar.gz -C /tmp/
-			find /tmp -type f -name "wallust" -exec mv {} /usr/bin/wallust \;
-			chmod +x /usr/bin/wallust
-		' || SHOWerror "Wallust binary installation"
+		ASSET_PATH=$(curl -sL https://github.com/explosion-mental/wallust/releases/latest | grep -o 'href="/explosion-mental/wallust/releases/download/[^"]*x86_64-unknown-linux-musl[^"]*"' | head -n 1 | sed 's/href="//; s/"//')
+		curl -sLo /mnt/tmp/wallust_dl "https://github.com$ASSET_PATH"
+		if tar -tf /mnt/tmp/wallust_dl &>/dev/null; then
+			tar -xzf /mnt/tmp/wallust_dl -C /mnt/tmp/
+			find /mnt/tmp/ -maxdepth 2 -type f -name "wallust" -exec mv {} /mnt/usr/bin/wallust \;
+		else
+			mv /mnt/tmp/wallust_dl /mnt/usr/bin/wallust
+		fi
+		chmod +x /mnt/usr/bin/wallust || SHOWerror "Wallust binary installation"
 		for conf in Fuzzel Waybar Swaync Hyprlock Wallust Wallpapers; do [[ -d "${SCRIPT_DIR}/Conf_files/$conf" ]] && cp -r "${SCRIPT_DIR}/Conf_files/$conf" /mnt/home/"$UNsel"/.config/"${conf,,}"; done
 		[[ "$DEsel" == "Hyprland" && -d "${SCRIPT_DIR}/Conf_files/Hyprland" ]] && cp -r "${SCRIPT_DIR}/Conf_files/Hyprland" /mnt/home/"$UNsel"/.config/hypr && touch /mnt/home/"$UNsel"/.config/hypr/hyprpaper.conf
 		[[ "$DEsel" == "Niri" && -d "${SCRIPT_DIR}/Conf_files/Niri" ]] && cp -r "${SCRIPT_DIR}/Conf_files/Niri" /mnt/home/"$UNsel"/.config/niri
