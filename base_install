@@ -223,7 +223,7 @@ KernelSetup () {
 	esac
 }
 ServiceSetup () {
-	[[ "${OSsel,,}" == "artix" ]] && { Services+=( NetworkManager chronyd dbus elogind cupsd avahi-daemon bluetoothd ); [[ "$init_sys" == "openrc" ]] && Services+=( openrc-settingsd ); [[ -f /mnt/usr/bin/tlp ]] && Services+=( tlp ); [[ -f /mnt/usr/bin/thermald || -f /mnt/usr/sbin/thermald ]] && Services+=( thermald ); [[ -v nvidiadrivers && -f /mnt/usr/bin/nvidia-persistenced ]] && Services+=( nvidia-persistenced ); }
+	[[ "${OSsel,,}" == "artix" ]] && { Services+=( NetworkManager chrony dbus elogind cupsd avahi-daemon bluetoothd ); [[ "$init_sys" == "openrc" ]] && Services+=( openrc-settingsd ); [[ -f /mnt/usr/bin/tlp ]] && Services+=( tlp ); [[ -f /mnt/usr/bin/thermald || -f /mnt/usr/sbin/thermald ]] && Services+=( thermald ); [[ -v nvidiadrivers && -f /mnt/usr/bin/nvidia-persistenced ]] && Services+=( nvidia-persistenced ); }
 	[[ "${OSsel,,}" == "arch" ]] && { Services+=( NetworkManager chronyd cups avahi-daemon bluetooth paccache.timer ); [[ -f /mnt/usr/lib/systemd/system/power-profiles-daemon.service ]] && Services+=( power-profiles-daemon ); [[ -f /mnt/usr/lib/systemd/system/thermald.service ]] && Services+=( thermald ); }
 	[[ "${OSsel,,}" == "void" ]] && { Services+=( NetworkManager chronyd cupsd dbus avahi-daemon bluetoothd ); [[ -f /mnt/usr/bin/tlp ]] && Services+=( tlp ); [[ -f /mnt/usr/bin/thermald || -f /mnt/usr/sbin/thermald ]] && Services+=( thermald ); }
 	[[ "${DMsel,,}" =~ ^(ly|greetd|sddm|gdm)$ ]] && Services+=("${DMsel,,}")
@@ -260,11 +260,7 @@ UserSetup () {
 	echo -e 'include "/usr/share/nano/*.nanorc"\nset linenumbers' > /mnt/etc/nanorc
 	echo 'export MOZ_ENABLE_WAYLAND=1' >> /mnt/home/"$UNsel"/.profile
 	if [[ "$DEsel" == "Hyprland" || "$DEsel" == "Niri" ]]; then
-		if [[ "${OSsel,,}" == "void" ]]; then
-			"$chroot" /mnt wget -O /usr/bin/wallust "https://github.com/explosion-mental/wallust/releases/latest/download/wallust-x86_64-unknown-linux-musl" && "$chroot" /mnt chmod +x /usr/bin/wallust
-		else
-			"$chroot" /mnt sudo -u "$UNsel" trizen -S --noconfirm --noedit wallust || SHOWerror "Wallust install"
-		fi
+		"$chroot" /mnt wget -qO /usr/bin/wallust "https://github.com/explosion-mental/wallust/releases/latest/download/wallust-x86_64-unknown-linux-musl" && "$chroot" /mnt chmod +x /usr/bin/wallust || SHOWerror "Wallust binary download"
 		for conf in Fuzzel Waybar Swaync Hyprlock Wallust Wallpapers; do [[ -d "${SCRIPT_DIR}/Conf_files/$conf" ]] && cp -r "${SCRIPT_DIR}/Conf_files/$conf" /mnt/home/"$UNsel"/.config/"${conf,,}"; done
 		[[ "$DEsel" == "Hyprland" && -d "${SCRIPT_DIR}/Conf_files/Hyprland" ]] && cp -r "${SCRIPT_DIR}/Conf_files/Hyprland" /mnt/home/"$UNsel"/.config/hypr && touch /mnt/home/"$UNsel"/.config/hypr/hyprpaper.conf
 		[[ "$DEsel" == "Niri" && -d "${SCRIPT_DIR}/Conf_files/Niri" ]] && cp -r "${SCRIPT_DIR}/Conf_files/Niri" /mnt/home/"$UNsel"/.config/niri
