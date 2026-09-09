@@ -100,18 +100,19 @@ TimezoneSel () {
 UEFIsel () {
 	[[ -d "/sys/firmware/efi/" ]] && { mount | grep -q "/sys/firmware/efi/efivars" || mount -t efivarfs efivarfs /sys/firmware/efi/efivars; UEFImode=1; echo 'UEFI Mode detected'; } || { UEFImode=0; echo 'BIOS Mode detected'; }
 }
-KernelSel()          { [[ "${OSsel,,}" == "void" ]] && MenuSel "KSel" "Select preferred Kernel" "linux" "linux-lts" || MenuSel "KSel" "Select preferred Kernel" "linux" "linux-lts" "linux-hardened" "linux-zen"; }
-OperatingSystemSel() { MenuSel "OSsel" "Select the distro to setup" "Arch" "Artix" "Void"; }
-VoidInstMethod()     { MenuSel "VImethod" "Select installation type" "XBPS" "ROOTFS"; }
-LibrarySel()         { MenuSel "LIBsel" "Select base library" "GLIBC" "MUSL"; }
-LocalizationSel()    { MenuSel "LOCsel" "Select localization" "en_US.UTF-8" "en_GB.UTF-8" "it_IT.UTF-8"; }
-LanguageSel()        { MenuSel "LANGsel" "Select preferred Language" "en_US.UTF-8" "en_GB.UTF-8" "it_IT.UTF-8"; }
-PartIDSel()          { MenuSel "PIDsel" "Select partition identifier" "UUID" "PARTUUID" "LABEL"; }
-FilesystemSel()      { MenuSel "FSsel" "Select filesystem for ROOT" "ext4" "btrfs"; }
-BootloaderSel()      { [[ "$UEFImode" -eq 0 ]] && { BLsel="grub"; echo "BIOS mode: GRUB selected automatically"; return 0; }; local bl_options=( "refind" "grub" "efistub" "limine" ); [[ "${OSsel,,}" == "arch" ]] && bl_options+=( "systemd-boot" "uki" ); MenuSel "BLsel" "Select Bootloader" "${bl_options[@]}"; }
-HostnameSel()        { TextPromptSel "HNsel" "Enter preferred hostname"; }
-UsernameSel()        { TextPromptSel "UNsel" "Enter preferred username"; }
-IRFsel()             { [[ "${OSsel,,}" == "void" ]] && { IRFSetup="dracut"; echo "Selected Initramfs: dracut"; } || MenuSel "IRFSetup" "Select preferred Initramfs Generator" "booster" "mkinitcpio" "dracut"; }
 ArchRepoSel()        { YesNoSel "Do you want Arch repositories as well as Artix repositories?"; [[ "$CC" -eq 1 ]] && { ARCHrepo=1; echo "OK, adding Arch repositories!"; } || { ARCHrepo=''; echo "Proceeding without them..."; }; }
+BootloaderSel()      { [[ "$UEFImode" -eq 0 ]] && { BLsel="grub"; echo "BIOS mode: GRUB selected automatically"; return 0; }; local bl_options=( "refind" "grub" "efistub" "limine" ); [[ "${OSsel,,}" == "arch" ]] && bl_options+=( "systemd-boot" "uki" ); MenuSel "BLsel" "Select Bootloader" "${bl_options[@]}"; }
 DesktopEnvSel()      { MenuSel "DEsel" "Select Desktop Environment / Window Manager" "KDE" "GNOME" "LXQt" "COSMIC" "Hyprland" "Niri" "None"; }
 DisplayManagerSel()  { MenuSel "DMsel" "Select Display Manager" "Ly" "Greetd" "SDDM" "GDM" "None"; }
+FilesystemSel()      { MenuSel "FSsel" "Select filesystem for ROOT" "ext4" "btrfs"; }
+HostnameSel()        { TextPromptSel "HNsel" "Enter preferred hostname"; }
+InitSystemSel()      { [[ "${OSsel,,}" == "artix" ]] && MenuSel "INITsel" "Select preferred Init System for Artix" "OpenRC" "Runit" "s6" "dinit" || INITsel="systemd"; }
+IRFsel()             { [[ "${OSsel,,}" == "void" ]] && { IRFSetup="dracut"; echo "Selected Initramfs: dracut"; } || MenuSel "IRFSetup" "Select preferred Initramfs Generator" "booster" "mkinitcpio" "dracut"; }
+KernelSel()          { [[ "${OSsel,,}" == "void" ]] && MenuSel "KSel" "Select preferred Kernel" "linux" "linux-lts" || MenuSel "KSel" "Select preferred Kernel" "linux" "linux-lts" "linux-hardened" "linux-zen"; }
+LibrarySel()         { MenuSel "LIBsel" "Select base library" "GLIBC" "MUSL"; }
+LanguageSel()        { MenuSel "LANGsel" "Select preferred Language" "en_US.UTF-8" "en_GB.UTF-8" "it_IT.UTF-8"; }
+LocalizationSel()    { MenuSel "LOCsel" "Select localization" "en_US.UTF-8" "en_GB.UTF-8" "it_IT.UTF-8"; }
+OperatingSystemSel() { MenuSel "OSsel" "Select the distro to setup" "Arch" "Artix" "Void"; }
+PartIDSel()          { MenuSel "PIDsel" "Select partition identifier" "UUID" "PARTUUID" "LABEL"; }
+UsernameSel()        { TextPromptSel "UNsel" "Enter preferred username"; }
+VoidInstMethod()     { MenuSel "VImethod" "Select installation type" "XBPS" "ROOTFS"; }
