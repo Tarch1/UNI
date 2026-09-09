@@ -365,7 +365,7 @@ InstallationSetup () {
 		for s in "${Personalization[@]}"; do "$s" || SHOWerror "$s"; done
 	fi
 	while true; do
-		local sum="\n=== CONFIGURATION SUMMARY ===\nOS: $OSsel | Init: $INITsel | Kernel: $KSel | Initramfs: $IRFSetup | Bootloader: $BLsel\nUser: $UNsel | Hostname: $HNsel | Locale: $LOCsel | Timezone: $TZsel\nFilesystem: $FSsel | Partition ID: $PIDsel | LUKS: $LUKS_ENC\nDesktop: $DEsel | DM: $DMsel\n"
+		local sum="\n=== CONFIGURATION SUMMARY ===\nOS: $OSsel | Init: $INITsel | Kernel: $KSel | Initramfs: $IRFSetup | Bootloader: $BLsel\nUser: $UNsel | Hostname: $HNsel | Locale: $LOCsel | Language: $LANGsel | Timezone: $TZsel\nFilesystem: $FSsel | Partition ID: $PIDsel | Luks encryption: $LUKS_ENC\nDesktop: $DEsel | DM: $DMsel\n"
 		[[ -n "$microcodepkg" ]] && sum+="Microcode: $microcodepkg\n"
 		[[ ${#nvidiadrivers[@]} -gt 0 ]] && sum+="NVIDIA Driver: $NVsel | Manager: $GPUMANAGERsel\n"
 		[[ ${#amddrivers[@]} -gt 0 ]] && sum+="AMD Drivers included\n"
@@ -373,7 +373,7 @@ InstallationSetup () {
 		echo -e "${sum}============================="
 		YesNoSel "Is this configuration correct to proceed with partitioning?"
 		[[ "$CC" -eq 1 ]] && { echo "Proceeding with installation..."; break; }
-		local edit_options=( "Kernel" "Initramfs" "Bootloader" "Hostname" "Username" "Locale/Language" "Timezone" "Filesystem" "Partition ID" "LUKS" "Desktop" "Display Manager" )
+		local edit_options=( "Kernel" "Initramfs" "Bootloader" "Hostname" "Username" "Locale" "Language" "Timezone" "Filesystem" "Partition ID" "LUKS" "Desktop" "Display Manager" )
 		[[ "${OSsel,,}" == "artix" ]] && edit_options+=( "Init System" "Arch Repos" )
 		[[ "${OSsel,,}" == "void" ]] && edit_options+=( "Library" "Install Method" )
 		[[ ${#nvidiadrivers[@]} -gt 0 ]] && edit_options+=( "NVIDIA Driver" "GPU Manager" )
@@ -385,7 +385,8 @@ InstallationSetup () {
 			"Bootloader") BootloaderSel ;;
 			"Hostname") HostnameSel ;;
 			"Username") UsernameSel ;;
-			"Locale/Language") LocalizationSel; LanguageSel ;;
+			"Locale") LocalizationSel ;;
+			"Language") LanguageSel ;;
 			"Timezone") TimezoneSel ;;
 			"Filesystem") FilesystemSel ;;
 			"Partition ID") PartIDSel ;;
