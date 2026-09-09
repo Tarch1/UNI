@@ -50,12 +50,12 @@ AdditionalDriveSel() {
 }
 ArchRepoSetup () {
 	local target_conf="$1"; local cmd=(); local mirror_file="/etc/pacman.d/mirrorlist-arch"
-	[[ "$target_conf" == "/mnt/etc/pacman.conf" ]] && { cmd=( "$chroot" /mnt ); mirror_file="/mnt/etc/pacman.d/mirrorlist-arch"; }
+	if [[ "$target_conf" == "/mnt/etc/pacman.conf" ]]; then cmd=( "$chroot" /mnt ) ; mirror_file="/mnt/etc/pacman.d/mirrorlist-arch" ; fi
 	if [[ ${#cmd[@]} -eq 0 ]]; then rm -rf /etc/pacman.d/gnupg; mkdir -p /etc/pacman.d/gnupg; chmod 700 /etc/pacman.d/gnupg ; pacman-key --init; pacman-key --populate artix
 	else "${cmd[@]}" pacman-key --init; "${cmd[@]}" pacman-key --populate artix ; fi
 	sed -i '/\[universe\]/,/^[[:space:]]*$/d' "$target_conf"
 	printf '\n[universe]\nServer = https://universe.artixlinux.org/$arch\nServer = https://mirror1.artixlinux.org/universe/$arch\nServer = https://mirror.pascalpuffke.de/artix-universe/$arch\nServer = https://artixlinux.qontinuum.space/artixlinux/universe/os/$arch\nServer = https://mirror1.cl.netactuate.com/artix/universe/$arch\nServer = https://ftp.crifo.org/artix-universe/$arch\n' >> "$target_conf"
-	[[ ! -f "$mirror_file" ]] && "${cmd[@]}" pacman -Sy --noconfirm artix-keyring archlinux-keyring artix-archlinux-support || SHOWerror "Keyrings installation"
+	if [[ ! -f "$mirror_file" ]]; then "${cmd[@]}" pacman -Sy --noconfirm artix-keyring archlinux-keyring artix-archlinux-support || SHOWerror "Keyrings installation" ; fi
 	grep -q 'mirrorlist-arch' "$target_conf" || printf '\n# Arch\n[extra]\nInclude = /etc/pacman.d/mirrorlist-arch\n\n[multilib]\nInclude = /etc/pacman.d/mirrorlist-arch\n' >> "$target_conf"
 	"${cmd[@]}" pacman-key --populate artix archlinux || SHOWerror "Final pacman-key populate"
 }
