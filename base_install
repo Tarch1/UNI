@@ -164,7 +164,7 @@ PKGcheck () {
 	displaymanagerpkg=(); [[ "${DMsel,,}" == "ly" ]] && displaymanagerpkg=(ly); [[ "${DMsel,,}" == "greetd" ]] && displaymanagerpkg=(greetd tuigreet); [[ "${DMsel,,}" == "sddm" ]] && displaymanagerpkg=(sddm); [[ "${DMsel,,}" == "gdm" ]] && displaymanagerpkg=(gdm)
 	[[ "${OSsel,,}" == "artix" && "${DMsel,,}" != "none" ]] && displaymanagerpkg+=("${DMsel,,}-${init_sys}")
 	kernel=("${KSel}" "${KSel}-headers"); [[ "${OSsel,,}" == "void" ]] && kernel+=(linux-firmware-network) || kernel+=(linux-firmware)
-	baselinux=(base-devel); [[ "${OSsel,,}" == "void" ]] && baselinux+=(base-system) || baselinux+=(base)
+	baselinux=(base-devel); [[ "${OSsel,,}" == "void" ]] && baselinux+=(base-system) || baselinux+=(base); [[ "${OSsel,,}" == "artix" ]] && baselinux+=("${init_sys,,}")
 	baseutils=(bash-completion vim nano wget git binutils cryptsetup rsync); [[ "${OSsel,,}" == "void" ]] && baseutils+=(man-pages) || baseutils+=(man-db)
 	net=(iwd chrony); [[ "${OSsel,,}" == "void" ]] && net+=(NetworkManager) || net+=(networkmanager)
 	bluetooth=(bluez); [[ "${OSsel,,}" != "void" ]] && bluetooth+=(bluez-utils bluetui blueman)
@@ -242,10 +242,13 @@ ServiceSetup () {
 	[[ "${OSsel,,}" == "void" ]] && "$chroot" /mnt bash -c "for s in ${Services[*]}; do ln -sf /etc/sv/\$s /etc/runit/runsvdir/default/; done"
 	[[ "${OSsel,,}" != "void" ]] && { 
 		for s in "${Services[@]}"; do 
-			if [[ "${OSsel,,}" == "artix" && "$init_sys" == "runit" ]]; then
-				"$chroot" /mnt ln -sf /etc/runit/sv/"$s" /etc/runit/runsvdir/default/
+			if [[ "${OSsel,,}" == "artix" ]]; then
+				if [[ "$init_sys" == "runit" ]]; then "$chroot" /mnt ln -sf /etc/runit/sv/"$s" /etc/runit/runsvdir/default/
+				elif [[ "$init_sys" == "s6" ]]; then "$chroot" /mnt touch /etc/s6/adminsv/default/contents.d/"$s"
+				elif [[ "$init_sys" == "dinit" ]]; then "$chroot" /mnt ln -sf ../"$s" /etc/dinit.d/boot.d/
+				else "$chroot" /mnt rc-update add "$s" default; fi
 			else
-				"$chroot" /mnt "$initc0" "$initc1" "$s"
+				"$chroot" /mnt systemctl enable "$s"
 			fi
 		done
 	}
@@ -356,15 +359,15 @@ InstallationSetup () {
 	CPUsel && GPUsel
 	if [[ "$VBTsel" == "1" ]]; then 
 		LANGsel='en_GB.UTF-8'; LOCsel='it_IT.UTF-8'; HNsel=tarch1; UNsel=tarch1; TZsel='Europe/Rome'; PIDsel=UUID; FSsel=btrfs; ADD_SETUP=0; ADD_FORMAT=0; ADD_FS=""; ADD_LABEL=""; LUKSSel; DesktopEnvSel; DisplayManagerSel; 
-		[[ "${OSsel,,}" == "artix" ]] && ARCHrepo=1
-		[[ "${OSsel,,}" == "void" ]] && { LIBsel="GLIBC"; VImethod="XBPS"; }
+		[[ "${OSsel,,}" == "artix" ]] && { ARCHrepo=1; INITsel="OpenRC"; }
+		[[ "${OSsel,,}" == "void" ]] && { LIBsel="GLIBC"; VImethod="XBPS"; INITsel="Runit"; }
 	else 
 		[[ "${OSsel,,}" == "artix" ]] && ArchRepoSel
-		[[ "${OSsel,,}" == "void" ]] && { VoidInstMethod && LibrarySel; }
-		local Personalization=( LocalizationSel LanguageSel TimezoneSel HostnameSel UsernameSel PartIDSel FilesystemSel AdditionalDriveSel LUKSSel DesktopEnvSel DisplayManagerSel )
+		[[ "${OSsel,,}" == "void" ]] && { VoidInstMethod && LibrarySel; INITsel="Runit"; }
+		local Personalization=( LocalizationSel LanguageSel TimezoneSel HostnameSel UsernameSel PartIDSel FilesystemSel AdditionalDriveSel LUKSSel DesktopEnvSel DisplayManagerSel InitSystemSel )
 		for s in "${Personalization[@]}"; do "$s" || SHOWerror "$s"; done
 	fi
-	local sum="\n=== CONFIGURATION SUMMARY ===\nOS: $OSsel | Kernel: $KSel | Initramfs: $IRFSetup | Bootloader: $BLsel\nUser: $UNsel | Hostname: $HNsel | Locale: $LOCsel | Timezone: $TZsel\nFilesystem: $FSsel | Partition ID: $PIDsel | LUKS: $LUKS_ENC\nDesktop: $DEsel | DM: $DMsel\n"
+	local sum="\n=== CONFIGURATION SUMMARY ===\nOS: $OSsel | Init: $INITsel | Kernel: $KSel | Initramfs: $IRFSetup | Bootloader: $BLsel\nUser: $UNsel | Hostname: $HNsel | Locale: $LOCsel | Timezone: $TZsel\nFilesystem: $FSsel | Partition ID: $PIDsel | LUKS: $LUKS_ENC\nDesktop: $DEsel | DM: $DMsel\n"
 	[[ -n "$microcodepkg" ]] && sum+="Microcode: $microcodepkg\n"
 	[[ ${#nvidiadrivers[@]} -gt 0 ]] && sum+="NVIDIA Driver: $NVsel | Manager: $GPUMANAGERsel\n"
 	[[ ${#amddrivers[@]} -gt 0 ]] && sum+="AMD Drivers included\n"
@@ -376,10 +379,9 @@ InstallationSetup () {
 	if [[ "${OSsel,,}" != "void" ]]; then
 		PKGmanager="pacman"; PKGinst=" -S"; PKGupd="y"; PKGchk=" -Q"; PKGrmv=" -R"; PKGdpn="s"; PKGfrc="dd"
 		PKGskp=( --needed --noconfirm ); PKGrsk=( --noconfirm ); keylayout='KEYMAP=it'; chroot="${OSsel,,}-chroot"
-		if [[ "${OSsel,,}" == "arch" ]]; then keypath='etc/vconsole.conf'; PKGstrap=pacstrap; FSTABgen=genfstab; initc0=systemctl; initc1=enable
+		if [[ "${OSsel,,}" == "arch" ]]; then keypath='etc/vconsole.conf'; PKGstrap=pacstrap; FSTABgen=genfstab; init_sys="systemd"
 			sed -i -e 's/^#ParallelDownloads = 5/ParallelDownloads = 5/' -e '/\[multilib]/,/mirrorlist/ s/#//' /etc/pacman.conf; $PKGmanager$PKGinst$PKGupd"lq" core extra multilib | sort > pacman_db || true
-		elif [[ "${OSsel,,}" == "artix" ]]; then keypath='etc/conf.d/keymaps'; PKGstrap=basestrap; FSTABgen=fstabgen;
-			if [[ -d /run/runit ]]; then init_sys="runit"; else init_sys="openrc"; initc0='rc-update'; initc1='add'; fi
+		elif [[ "${OSsel,,}" == "artix" ]]; then keypath='etc/conf.d/keymaps'; PKGstrap=basestrap; FSTABgen=fstabgen; init_sys="${INITsel,,}"
 			sed -i -e 's/^#ParallelDownloads = 5/ParallelDownloads = 5/' -e '/\[lib32]/,/mirrorlist/ s/#//' /etc/pacman.conf
 			[[ "$ARCHrepo" == "1" ]] && ArchRepoSetup /etc/pacman.conf; $PKGmanager$PKGinst$PKGupd"lq" system world galaxy lib32 $([[ "$ARCHrepo" == "1" ]] && echo "universe extra multilib") | sort > pacman_db || true
 		fi
