@@ -20,13 +20,6 @@ DiskPartition () {
 	for dev in "${mapper_devs[@]}"; do [[ -b "/dev/mapper/$dev" ]] && { echo "[i] Found active LUKS volume (/dev/mapper/$dev). Closing..."; cryptsetup close "$dev" || SHOWerror "DiskPartition: cryptsetup close $dev"; }; done
 	$PKGmanager$PKGchk ntfs-3g &>/dev/null && $PKGmanager$PKGrmv$PKGfrc "${PKGrsk[@]}" ntfs-3g || true
 	$PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${fs[@]}" || SHOWerror "Sync fs utilities"
-	local dialog_list=(); while read -r n s; do dialog_list+=("$n" "$s"); done < <(lsblk -dlnp -o NAME,SIZE)
-	DRIVE=$(dialog --title "OS INSTALLATION" --stdout --menu "Select preferred drive" 0 0 0 "${dialog_list[@]}")
-	[[ -z "$DRIVE" ]] && exit 1
-	if [[ "$VBTsel" -eq 0 && "$ADD_SETUP" -eq 1 ]]; then
-		local add_dialog_list=(); while read -r n s; do [[ "$n" != "$DRIVE" ]] && add_dialog_list+=("$n" "$s"); done < <(lsblk -dlnp -o NAME,SIZE)
-		ADDITIONAL_DRIVE="$(dialog --title "ADDITIONAL" --stdout --menu "Select secondary partition/drive (Optional - Cancel to skip)" 0 0 0 "${add_dialog_list[@]}")"
-	fi
 	for p in "$DRIVE"?*; do if grep -qs "^$p " /proc/mounts; then echo "[i] Unmounting active partition $p..."; umount "$p" || SHOWerror "DiskPartition: umount $p"; fi; done
 	sgdisk -ozZ "$DRIVE" || SHOWerror "Zapping drive partition table"
 	local total_ram_gb=$(( ($(free -m | awk '/^Mem:/{print $2}') + 1023) / 1024 )) swap_gb
@@ -354,8 +347,9 @@ InstallationSetup () {
 	CheckandSetup=( Check_required_files AutoOSsel UEFIsel KernelSel IRFsel BootloaderSel Pacman_Locked )
 	for c in "${CheckandSetup[@]}"; do "$c" || SHOWerror "$c"; done
 	CPUsel && GPUsel
+	PrimaryDriveSel # Chiamata prima del check VM per garantire che il disco esista
 	if [[ "$VBTsel" == "1" ]]; then 
-		LANGsel='en_GB.UTF-8'; LOCsel='it_IT.UTF-8'; HNsel=tarch1; UNsel=tarch1; TZsel='Europe/Rome'; PIDsel=UUID; FSsel=btrfs; ADD_SETUP=0; ADD_FORMAT=0; ADD_FS=""; ADD_LABEL=""; LUKSSel; DesktopEnvSel; DisplayManagerSel; 
+		LANGsel='en_GB.UTF-8'; LOCsel='it_IT.UTF-8'; HNsel=tarch1; UNsel=tarch1; TZsel='Europe/Rome'; PIDsel=UUID; FSsel=btrfs; ADD_SETUP=0; ADD_FORMAT=0; ADD_FS=""; ADD_LABEL=""; ADDITIONAL_DRIVE=""; LUKSSel; DesktopEnvSel; DisplayManagerSel; 
 		[[ "${OSsel,,}" == "artix" ]] && { ARCHrepo=1; INITsel="OpenRC"; }
 		[[ "${OSsel,,}" == "void" ]] && { LIBsel="GLIBC"; VImethod="XBPS"; INITsel="Runit"; }
 	else 
@@ -365,7 +359,7 @@ InstallationSetup () {
 		for s in "${Personalization[@]}"; do "$s" || SHOWerror "$s"; done
 	fi
 	while true; do
-		local sum="\n=== CONFIGURATION SUMMARY ===\nOS: $OSsel | Init: $INITsel | Kernel: $KSel | Initramfs: $IRFSetup | Bootloader: $BLsel\nUser: $UNsel | Hostname: $HNsel | Locale: $LOCsel | Language: $LANGsel | Timezone: $TZsel\nFilesystem: $FSsel | Partition ID: $PIDsel | Luks encryption: $LUKS_ENC\nDesktop: $DEsel | DM: $DMsel\n"
+		local sum="\n=== CONFIGURATION SUMMARY ===\nOS: $OSsel | Init: $INITsel | Kernel: $KSel | Initramfs: $IRFSetup | Bootloader: $BLsel\nOS Drive: $DRIVE | Sec. Drive: ${ADDITIONAL_DRIVE:-None}\nUser: $UNsel | Hostname: $HNsel | Locale: $LOCsel | Language: $LANGsel | Timezone: $TZsel\nFilesystem: $FSsel | Partition ID: $PIDsel | LUKS: $LUKS_ENC\nDesktop: $DEsel | DM: $DMsel\n"
 		[[ -n "$microcodepkg" ]] && sum+="Microcode: $microcodepkg\n"
 		[[ ${#nvidiadrivers[@]} -gt 0 ]] && sum+="NVIDIA Driver: $NVsel | Manager: $GPUMANAGERsel\n"
 		[[ ${#amddrivers[@]} -gt 0 ]] && sum+="AMD Drivers included\n"
@@ -373,13 +367,15 @@ InstallationSetup () {
 		echo -e "${sum}============================="
 		YesNoSel "Is this configuration correct to proceed with partitioning?"
 		[[ "$CC" -eq 1 ]] && { echo "Proceeding with installation..."; break; }
-		local edit_options=( "Kernel" "Initramfs" "Bootloader" "Hostname" "Username" "Locale" "Language" "Timezone" "Filesystem" "Partition ID" "LUKS" "Desktop" "Display Manager" )
+		local edit_options=( "OS Drive" "Secondary Drive" "Kernel" "Initramfs" "Bootloader" "Hostname" "Username" "Locale" "Language" "Timezone" "Filesystem" "Partition ID" "LUKS" "Desktop" "Display Manager" )
 		[[ "${OSsel,,}" == "artix" ]] && edit_options+=( "Init System" "Arch Repos" )
 		[[ "${OSsel,,}" == "void" ]] && edit_options+=( "Library" "Install Method" )
 		[[ ${#nvidiadrivers[@]} -gt 0 ]] && edit_options+=( "NVIDIA Driver" "GPU Manager" )
 		edit_options+=( "Abort Installation" )
 		MenuSel "EDIT_CHOICE" "What would you like to change?" "${edit_options[@]}"
 		case "$EDIT_CHOICE" in
+			"OS Drive") PrimaryDriveSel ;;
+			"Secondary Drive") AdditionalDriveSel ;;
 			"Kernel") KernelSel ;;
 			"Initramfs") IRFsel ;;
 			"Bootloader") BootloaderSel ;;
