@@ -267,8 +267,7 @@ UserSetup () {
 	if [[ "$DEsel" == "Hyprland" || "$DEsel" == "Niri" ]]; then
 		echo "Installing Wallust binary directly from GitHub..."
 		"$chroot" /mnt bash -c '
-			URL=$(curl -s https://api.github.com/repos/explosion-mental/wallust/releases/latest | grep browser_download_url | grep x86_64-unknown-linux-musl.tar.gz | cut -d "\"" -f 4)
-			curl -sLo /tmp/wallust.tar.gz "$URL"
+			curl -sLo /tmp/wallust.tar.gz "https://github.com/explosion-mental/wallust/releases/latest/download/wallust-x86_64-unknown-linux-musl.tar.gz"
 			tar -xzf /tmp/wallust.tar.gz -C /tmp/
 			find /tmp -type f -name "wallust" -exec mv {} /usr/bin/wallust \;
 			chmod +x /usr/bin/wallust
