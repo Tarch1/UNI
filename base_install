@@ -249,7 +249,12 @@ UserSetup () {
 	sed -i 's/^#\s*\(%wheel ALL=(ALL:ALL) ALL\)/\1/' /mnt/etc/sudoers
 	echo "Choose password for user: $UNsel"; while true; do "$chroot" /mnt passwd "$UNsel" && break || echo "Error: Try again..."; done
 	echo "Choose password for root"; while true; do "$chroot" /mnt passwd && break || echo "Error: Try again..."; done
-	[[ "${OSsel,,}" != "void" ]] && { "$chroot" /mnt sudo -u "$UNsel" bash -c "git clone https://aur.archlinux.org/trizen.git /tmp/trizen && cd /tmp/trizen && makepkg -si --noconfirm" || SHOWerror "Trizen setup" ; }
+	[[ "${OSsel,,}" != "void" ]] && { 
+		echo "Installing Trizen AUR helper..."
+		echo "%wheel ALL=(ALL:ALL) NOPASSWD: ALL" > /mnt/etc/sudoers.d/99-installer-temp
+		"$chroot" /mnt sudo -u "$UNsel" bash -c "git clone https://aur.archlinux.org/trizen.git /tmp/trizen && cd /tmp/trizen && makepkg -si --noconfirm" || SHOWerror "Trizen setup" 
+		rm -f /mnt/etc/sudoers.d/99-installer-temp
+	}
 	echo "Copying configuration files..."
 	if [[ "${OSsel,,}" == "void" ]]; then mkdir -p /mnt/etc/bash && [[ -f "${SCRIPT_DIR}/Conf_files/bashrc" ]] && cp "${SCRIPT_DIR}/Conf_files/bashrc" /mnt/home/"$UNsel"/.bashrc
 	else 
@@ -260,7 +265,14 @@ UserSetup () {
 	echo -e 'include "/usr/share/nano/*.nanorc"\nset linenumbers' > /mnt/etc/nanorc
 	echo 'export MOZ_ENABLE_WAYLAND=1' >> /mnt/home/"$UNsel"/.profile
 	if [[ "$DEsel" == "Hyprland" || "$DEsel" == "Niri" ]]; then
-		"$chroot" /mnt wget -qO /usr/bin/wallust "https://github.com/explosion-mental/wallust/releases/latest/download/wallust-x86_64-unknown-linux-musl" && "$chroot" /mnt chmod +x /usr/bin/wallust || SHOWerror "Wallust binary download"
+		echo "Installing Wallust binary directly from GitHub..."
+		"$chroot" /mnt bash -c '
+			URL=$(curl -s https://api.github.com/repos/explosion-mental/wallust/releases/latest | grep browser_download_url | grep x86_64-unknown-linux-musl.tar.gz | cut -d "\"" -f 4)
+			curl -sLo /tmp/wallust.tar.gz "$URL"
+			tar -xzf /tmp/wallust.tar.gz -C /tmp/
+			find /tmp -type f -name "wallust" -exec mv {} /usr/bin/wallust \;
+			chmod +x /usr/bin/wallust
+		' || SHOWerror "Wallust binary installation"
 		for conf in Fuzzel Waybar Swaync Hyprlock Wallust Wallpapers; do [[ -d "${SCRIPT_DIR}/Conf_files/$conf" ]] && cp -r "${SCRIPT_DIR}/Conf_files/$conf" /mnt/home/"$UNsel"/.config/"${conf,,}"; done
 		[[ "$DEsel" == "Hyprland" && -d "${SCRIPT_DIR}/Conf_files/Hyprland" ]] && cp -r "${SCRIPT_DIR}/Conf_files/Hyprland" /mnt/home/"$UNsel"/.config/hypr && touch /mnt/home/"$UNsel"/.config/hypr/hyprpaper.conf
 		[[ "$DEsel" == "Niri" && -d "${SCRIPT_DIR}/Conf_files/Niri" ]] && cp -r "${SCRIPT_DIR}/Conf_files/Niri" /mnt/home/"$UNsel"/.config/niri
