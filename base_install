@@ -13,7 +13,7 @@ Check_required_files () {
 	local miss=(); for a in "${files[@]}"; do [[ ! -f "${SCRIPT_DIR}/$a" ]] && miss+=("$a"); done
 	[[ ${#miss[@]} -gt 0 ]] && { echo 'Required file(s) missing:' "${miss[@]}"; exit 1; } || source additional_setup
 }
-DiskPartition () {
+DiskPartition() {
 	if grep -qs '/mnt' /proc/mounts; then echo "[i] Found active mount point in /mnt. Unmounting..."; umount -R /mnt || SHOWerror "DiskPartition: umount /mnt"; fi
 	if [[ $(wc -l < /proc/swaps) -gt 1 ]]; then echo "[i] Found active Swap. Disabling..."; swapoff -a || SHOWerror "DiskPartition: swapoff"; fi
 	local mapper_devs=( 'cryptroot' 'cryptswap' 'cryptdata' )
@@ -21,17 +21,25 @@ DiskPartition () {
 	$PKGmanager$PKGchk ntfs-3g &>/dev/null && $PKGmanager$PKGrmv$PKGfrc "${PKGrsk[@]}" ntfs-3g || true
 	$PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${fs[@]}" || SHOWerror "Sync fs utilities"
 	for p in "$DRIVE"?*; do if grep -qs "^$p " /proc/mounts; then echo "[i] Unmounting active partition $p..."; umount "$p" || SHOWerror "DiskPartition: umount $p"; fi; done
-	sgdisk -ozZ "$DRIVE" || SHOWerror "Zapping drive partition table"
+	sgdisk -ozZ "$DRIVE" || SHOWerror "Zapping primary drive partition table"
 	local total_ram_gb=$(( ($(free -m | awk '/^Mem:/{print $2}') + 1023) / 1024 )) swap_gb
 	[[ "$total_ram_gb" -le 8 ]] && swap_gb=$(( total_ram_gb + 1 )) || { [[ "$total_ram_gb" -le 32 ]] && swap_gb=$total_ram_gb || swap_gb=32; }
-	parted -sf "$DRIVE" -- mktable gpt mkpart "ESP" fat32 1MiB 513MiB mkpart "LINUX-ROOT" 513MiB -"${swap_gb}GiB" mkpart "SWAP" -"${swap_gb}GiB" 100% set 1 esp on set 3 swap on || SHOWerror "Parted GPT execution"
+	parted -sf "$DRIVE" -- mktable gpt mkpart "ESP" fat32 1MiB 513MiB mkpart "LINUX-ROOT" 513MiB -"${swap_gb}GiB" mkpart "SWAP" -"${swap_gb}GiB" 100% set 1 esp on set 3 swap on || SHOWerror "Parted primary GPT execution"
 	udevadm settle || sleep 1
 	local p=""; [[ "$DRIVE" =~ [0-9]$ ]] && p="p"; BOOT_PART="${DRIVE}${p}1"; ROOT_PART="${DRIVE}${p}2"; SWAP_PART="${DRIVE}${p}3"
 	DEVICE="${DRIVE##*/}"; echo "DRIVE=$DRIVE DEVICE=$DEVICE"
+	if [[ "$ADD_SETUP" -eq 1 && -n "$ADDITIONAL_DRIVE" ]]; then
+		for ap in "$ADDITIONAL_DRIVE"?*; do if grep -qs "^$ap " /proc/mounts; then echo "[i] Unmounting $ap..."; umount "$ap" || SHOWerror "DiskPartition: umount $ap"; fi; done
+		sgdisk -ozZ "$ADDITIONAL_DRIVE" || SHOWerror "Zapping secondary drive partition table"
+		parted -sf "$ADDITIONAL_DRIVE" -- mktable gpt mkpart "DATA" 1MiB 100% || SHOWerror "Parted secondary GPT execution"
+		udevadm settle || sleep 1
+		local ap_p=""; [[ "$ADDITIONAL_DRIVE" =~ [0-9]$ ]] && ap_p="p"
+		ADD_PART="${ADDITIONAL_DRIVE}${ap_p}1"
+	fi
 	[[ -z "$DRIVE" || -z "$DEVICE" ]] && { echo "No partition were created, check the installer. Closing installation!"; exit 1; } || echo 'We can proceed with the formatting of file system'
-	sleep 1; echo -e " BP=$BOOT_PART RP=$ROOT_PART PID=$PIDsel"; lsblk -f
+	sleep 1; echo -e " BP=$BOOT_PART RP=$ROOT_PART AP=$ADD_PART PID=$PIDsel"; lsblk -f
 }
-FileSystemFormat () {
+FileSystemFormat() {
 	BootLabel='EFI'; RootLabel='ROOT'; mkfs.fat -F32 -n "$BootLabel" "$BOOT_PART" || SHOWerror "mkfs.fat EFI"
 	BOOTID="$(blkid -s "$PIDsel" -o value "$BOOT_PART")" || SHOWerror "blkid BOOTID"
 	if [[ "$LUKS_ENC" -eq 1 ]]; then
@@ -61,22 +69,22 @@ FileSystemFormat () {
 		*) 		SHOWerror "Unsupported file system selection" ;;
 	esac
 	export BOOTID ROOTID SWAPID TARGET_ROOT TARGET_SWAP CRYPT_ROOT_UUID CRYPT_SWAP_UUID
-	swapon "$TARGET_SWAP" || SHOWerror "swapon"; mkdir -p /mnt/boot; mount "$BOOT_PART" /mnt/boot || SHOWerror "mount boot partition"; lsblk -f
-}
-AdditionalDriveSetup () {
-	[[ "$ADD_SETUP" -ne 1 || -z "$ADDITIONAL_DRIVE" || "$ADDITIONAL_DRIVE" == "$DRIVE" ]] && return 0
-	local TARGET_ADD="$ADDITIONAL_DRIVE"
-	if [[ "$LUKS_ENC" -eq 1 && "$ADD_FORMAT" -eq 1 ]]; then
-		echo -n "$LUKS_PASS" | cryptsetup luksFormat --type luks2 -q "$ADDITIONAL_DRIVE" -d - || SHOWerror "LUKS ADD format"
-		echo -n "$LUKS_PASS" | cryptsetup luksOpen "$ADDITIONAL_DRIVE" cryptdata -d - || SHOWerror "LUKS ADD open"
-		TARGET_ADD="/dev/mapper/cryptdata"; CRYPT_ADD_UUID="$(blkid -s UUID -o value "$ADDITIONAL_DRIVE")"; export CRYPT_ADD_UUID
-	elif [[ "$LUKS_ENC" -eq 1 ]]; then TARGET_ADD="/dev/mapper/cryptdata"; fi
-	[[ "$ADD_FORMAT" -eq 1 ]] && {
-		[[ ! "$ADD_FS" =~ ^(ext4|btrfs|exfat|ntfs)$ ]] && echo "Unsupported filesystem for additional drive: $ADD_FS" || {
+	swapon "$TARGET_SWAP" || SHOWerror "swapon"; mkdir -p /mnt/boot; mount "$BOOT_PART" /mnt/boot || SHOWerror "mount boot partition"
+	if [[ "$ADD_SETUP" -eq 1 && -n "$ADD_PART" ]]; then
+		local TARGET_ADD="$ADD_PART"
+		if [[ "$LUKS_ENC" -eq 1 && "$ADD_FORMAT" -eq 1 ]]; then
+			echo -n "$LUKS_PASS" | cryptsetup luksFormat --type luks2 -q "$ADD_PART" -d - || SHOWerror "LUKS ADD format"
+			echo -n "$LUKS_PASS" | cryptsetup luksOpen "$ADD_PART" cryptdata -d - || SHOWerror "LUKS ADD open"
+			TARGET_ADD="/dev/mapper/cryptdata"; CRYPT_ADD_UUID="$(blkid -s UUID -o value "$ADD_PART")"; export CRYPT_ADD_UUID
+		elif [[ "$LUKS_ENC" -eq 1 ]]; then TARGET_ADD="/dev/mapper/cryptdata"; fi
+		if [[ "$ADD_FORMAT" -eq 1 ]]; then
 			local flags=(-f -L); [[ "$ADD_FS" == "ext4" ]] && flags=(-F -L); [[ "$ADD_FS" == "exfat" ]] && flags=(-n)
-			mkfs."$ADD_FS" "${flags[@]}" "$ADD_LABEL" "$TARGET_ADD" || SHOWerror "mkfs.$ADD_FS additional drive"; } ; }
-	mkdir -p /mnt/media/HDD && mount "$TARGET_ADD" /mnt/media/HDD || SHOWerror "Mount additional drive"
-	UNIfstab+="$PIDsel=$(blkid -s $PIDsel -o value $TARGET_ADD || echo $TARGET_ADD) /media/HDD $(blkid -s TYPE -o value $TARGET_ADD || echo auto) defaults,noatime 0 2\n"
+			mkfs."$ADD_FS" "${flags[@]}" "$ADD_LABEL" "$TARGET_ADD" || SHOWerror "mkfs.$ADD_FS additional drive"
+		fi
+		mkdir -p /mnt/media/HDD && mount "$TARGET_ADD" /mnt/media/HDD || SHOWerror "Mount additional drive"
+		UNIfstab+="$PIDsel=$(blkid -s $PIDsel -o value $TARGET_ADD || echo $TARGET_ADD) /media/HDD $(blkid -s TYPE -o value $TARGET_ADD || echo auto) defaults,noatime 0 2\n"
+	fi
+	lsblk -f
 }
 ArchTixSystemInstall () {
 	local BasePKG=( "${kernel[@]}" "${baselinux[@]}" "${elogind[@]}" )
@@ -353,7 +361,7 @@ InstallationSetup () {
 	CheckandSetup=( Check_required_files AutoOSsel UEFIsel KernelSel IRFsel BootloaderSel Pacman_Locked )
 	for c in "${CheckandSetup[@]}"; do "$c" || SHOWerror "$c"; done
 	CPUsel && GPUsel
-	PrimaryDriveSel # Chiamata prima del check VM per garantire che il disco esista
+	DriveSelection
 	if [[ "$VBTsel" == "1" ]]; then 
 		LANGsel='en_GB.UTF-8'; LOCsel='it_IT.UTF-8'; HNsel=tarch1; UNsel=tarch1; TZsel='Europe/Rome'; PIDsel=UUID; FSsel=btrfs; ADD_SETUP=0; ADD_FORMAT=0; ADD_FS=""; ADD_LABEL=""; ADDITIONAL_DRIVE=""; LUKSSel; DesktopEnvSel; DisplayManagerSel; 
 		[[ "${OSsel,,}" == "artix" ]] && { ARCHrepo=1; INITsel="OpenRC"; }
@@ -361,7 +369,7 @@ InstallationSetup () {
 	else 
 		[[ "${OSsel,,}" == "artix" ]] && { ArchRepoSel; InitSystemSel; }
 		[[ "${OSsel,,}" == "void" ]] && { VoidInstMethod; LibrarySel; INITsel="Runit"; }
-		local Personalization=( LocalizationSel LanguageSel TimezoneSel HostnameSel UsernameSel PartIDSel FilesystemSel AdditionalDriveSel LUKSSel DesktopEnvSel DisplayManagerSel )
+		local Personalization=( LocalizationSel LanguageSel TimezoneSel HostnameSel UsernameSel PartIDSel FilesystemSel LUKSSel DesktopEnvSel DisplayManagerSel )
 		for s in "${Personalization[@]}"; do "$s" || SHOWerror "$s"; done
 	fi
 	while true; do
@@ -373,15 +381,14 @@ InstallationSetup () {
 		echo -e "${sum}============================="
 		YesNoSel "Is this configuration correct to proceed with partitioning?"
 		[[ "$CC" -eq 1 ]] && { echo "Proceeding with installation..."; break; }
-		local edit_options=( "OS Drive" "Secondary Drive" "Kernel" "Initramfs" "Bootloader" "Hostname" "Username" "Locale" "Language" "Timezone" "Filesystem" "Partition ID" "LUKS" "Desktop" "Display Manager" )
+		local edit_options=( "Drive Selection" "Kernel" "Initramfs" "Bootloader" "Hostname" "Username" "Locale" "Language" "Timezone" "Filesystem" "Partition ID" "LUKS" "Desktop" "Display Manager" )
 		[[ "${OSsel,,}" == "artix" ]] && edit_options+=( "Init System" "Arch Repos" )
 		[[ "${OSsel,,}" == "void" ]] && edit_options+=( "Library" "Install Method" )
 		[[ ${#nvidiadrivers[@]} -gt 0 ]] && edit_options+=( "NVIDIA Driver" "GPU Manager" )
 		edit_options+=( "Abort Installation" )
 		MenuSel "EDIT_CHOICE" "What would you like to change?" "${edit_options[@]}"
 		case "$EDIT_CHOICE" in
-			"OS Drive") PrimaryDriveSel ;;
-			"Secondary Drive") AdditionalDriveSel ;;
+			"Drive Selection") DriveSelection ;;
 			"Kernel") KernelSel ;;
 			"Initramfs") IRFsel ;;
 			"Bootloader") BootloaderSel ;;
@@ -421,7 +428,6 @@ InstallationSetup () {
 	fi
 	echo 'Running check for missing packages'; PKGcheck
 	local ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' )
-	[[ "$VBTsel" -eq 0 ]] && ArchTixSteps+=( 'AdditionalDriveSetup' )
 	ArchTixSteps+=( "$s_step" 'CrypttabGen' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'KernelSetup' 'ServiceSetup' 'UserSetup' )
 	[[ "$VBTsel" -eq 0 ]] && ArchTixSteps+=( 'AudioSetup' )
 	ArchTixSteps+=( 'BootloaderSetup' )
