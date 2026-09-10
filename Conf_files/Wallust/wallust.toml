@@ -1,6 +1,6 @@
 # ~/.config/wallust/wallust.toml
 
-backend = "fastkmeans"
+backend = "kmeans"
 color_space = "lab"
 palette = "dark16"
 check_contrast = true
@@ -22,7 +22,7 @@ target = "~/.config/fuzzel/colors.ini"
 
 # Template per Waybar
 [[entry]]
-template = "colors-waybar.css"
+template = "colors-waybar.conf"
 target = "~/.config/wallust/colors-waybar.css"
 
 # Template per Niri
