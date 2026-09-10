@@ -25,29 +25,6 @@ YesNoSel () {
 		else echo "Please answer 'yes' (y) or 'no' (n)." ; fi
 	done
 }
-AdditionalDriveSel() {
-	local avail_disks=(); local display_options=()
-	while read -r name size type; do
-		[[ "$type" == "loop" || "$type" == "rom" || "$name" == "$DRIVE" ]] && continue
-		avail_disks+=("$name"); display_options+=("$name ($size)")
-	done < <(lsblk -dpno NAME,SIZE,TYPE)
-	
-	if [[ "${#avail_disks[@]}" -gt 0 ]]; then
-		echo -e "\n=== Secondary drive(s) detected ==="
-		YesNoSel "Do you want to format and mount a secondary drive? (All data will be lost)"
-		if [[ "$CC" -eq 1 ]]; then
-			ADD_SETUP=1; ADD_FORMAT=1
-			while true; do
-				echo -e "\n=== Select Secondary Drive ==="
-				for i in "${!display_options[@]}"; do echo "$((i+1))) ${display_options[$i]}"; done
-				read -rp "Choice: " choice
-				[[ "$choice" =~ ^[0-9]+$ && "$choice" -le "${#display_options[@]}" && "$choice" -gt 0 ]] && { ADDITIONAL_DRIVE="${avail_disks[$((choice-1))]}"; echo "Selected: $ADDITIONAL_DRIVE"; break; } || echo "Invalid choice."
-			done
-			MenuSel "ADD_FS" "Select the filesystem for the secondary drive" "ext4" "btrfs" "exfat" "ntfs"
-			TextPromptSel "ADD_LABEL" "Enter label for the secondary drive (leave empty for 'DATA')"; [[ -z "$ADD_LABEL" ]] && ADD_LABEL="DATA"
-		else ADD_SETUP=0; ADD_FORMAT=0; ADD_FS=""; ADD_LABEL=""; ADDITIONAL_DRIVE=""; fi
-	else ADD_SETUP=0; ADD_FORMAT=0; ADD_FS=""; ADD_LABEL=""; ADDITIONAL_DRIVE=""; fi
-}
 ArchRepoSetup () {
 	local target_conf="$1"; local cmd=(); local mirror_file="/etc/pacman.d/mirrorlist-arch"
 	if [[ "$target_conf" == "/mnt/etc/pacman.conf" ]]; then cmd=( "$chroot" /mnt ) ; mirror_file="/mnt/etc/pacman.d/mirrorlist-arch" ; fi
@@ -68,6 +45,42 @@ CPUsel () {
 	local cpu_info=$(grep -m1 -Ei 'GenuineIntel|AuthenticAMD' /proc/cpuinfo); [[ "$cpu_info" =~ Intel ]] && { echo 'Installing Intel microcode'; microcodepkg='intel-ucode'; }
 	[[ "$cpu_info" =~ AMD ]] && { echo 'Installing AMD microcode'; [[ "${OSsel,,}" == "void" ]] && microcodepkg='amd-ucode-firmware' || microcodepkg='amd-ucode'; }
 	[[ ! "$cpu_info" =~ (Intel|AMD) ]] && { echo 'No microcode needed or unknown CPU'; microcodepkg=""; }
+}
+DriveSelection() {
+	local avail_disks=() display_options=()
+	while read -r name size type; do
+		[[ "$type" == "loop" || "$type" == "rom" ]] && continue
+		avail_disks+=("$name"); display_options+=("$name ($size)")
+	done < <(lsblk -dpno NAME,SIZE,TYPE)
+	[[ ${#avail_disks[@]} -eq 0 ]] && { echo "No drives detected!"; exit 1; }
+	while true; do
+		echo -e "\n=== Select Target Drive for OS ==="
+		for i in "${!display_options[@]}"; do echo "$((i+1))) ${display_options[$i]}"; done
+		read -rp "Choice: " choice
+		[[ "$choice" =~ ^[0-9]+$ && "$choice" -le "${#display_options[@]}" && "$choice" -gt 0 ]] && { DRIVE="${avail_disks[$((choice-1))]}"; echo "Selected: $DRIVE"; break; } || echo "Invalid choice."
+	done
+	local add_avail=() add_disp=()
+	for i in "${!avail_disks[@]}"; do
+		[[ "${avail_disks[$i]}" == "$DRIVE" ]] && continue
+		add_avail+=("${avail_disks[$i]}"); add_disp+=("${display_options[$i]}")
+	done
+	ADD_SETUP=0; ADD_FORMAT=0; ADD_FS=""; ADD_LABEL=""; ADDITIONAL_DRIVE=""
+	if [[ ${#add_avail[@]} -gt 0 ]]; then
+		echo -e "\n=== Secondary drive(s) detected ==="
+		YesNoSel "Do you want to format and mount a secondary drive? (All data will be lost)"
+		if [[ "$CC" -eq 1 ]]; then
+			ADD_SETUP=1; ADD_FORMAT=1
+			while true; do
+				echo -e "\n=== Select Secondary Drive ==="
+				for i in "${!add_disp[@]}"; do echo "$((i+1))) ${add_disp[$i]}"; done
+				read -rp "Choice: " choice
+				[[ "$choice" =~ ^[0-9]+$ && "$choice" -le "${#add_disp[@]}" && "$choice" -gt 0 ]] && { ADDITIONAL_DRIVE="${add_avail[$((choice-1))]}"; echo "Selected: $ADDITIONAL_DRIVE"; break; } || echo "Invalid choice."
+			done
+			MenuSel "ADD_FS" "Select the filesystem for the secondary drive" "ext4" "btrfs" "exfat" "ntfs"
+			TextPromptSel "ADD_LABEL" "Enter label for the secondary drive (leave empty for 'DATA')"
+			[[ -z "$ADD_LABEL" ]] && ADD_LABEL="DATA"
+		fi
+	fi
 }
 GPUsel () {
 	echo "Detecting video chipset..."
@@ -96,21 +109,6 @@ LUKSSel () {
 }
 Pacman_Locked() {
 	[[ -f /var/lib/pacman/db.lck || -f /mnt/var/lib/pacman/db.lck ]] && { echo -e "Pacman is blocked. Removing lockfiles..."; rm -f /var/lib/pacman/db.lck /mnt/var/lib/pacman/db.lck; } || echo "No locked database"
-}
-PrimaryDriveSel() {
-	local avail_disks=(); local display_options=()
-	while read -r name size type; do
-		[[ "$type" == "loop" || "$type" == "rom" ]] && continue
-		avail_disks+=("$name"); display_options+=("$name ($size)")
-	done < <(lsblk -dpno NAME,SIZE,TYPE)
-	[[ ${#avail_disks[@]} -eq 0 ]] && { echo "No drives detected!"; exit 1; }
-	
-	while true; do
-		echo -e "\n=== Select Target Drive for OS ==="
-		for i in "${!display_options[@]}"; do echo "$((i+1))) ${display_options[$i]}"; done
-		read -rp "Choice: " choice
-		[[ "$choice" =~ ^[0-9]+$ && "$choice" -le "${#display_options[@]}" && "$choice" -gt 0 ]] && { DRIVE="${avail_disks[$((choice-1))]}"; echo "Selected: $DRIVE"; break; } || echo "Invalid choice."
-	done
 }
 TimezoneSel () {
 	while true; do
