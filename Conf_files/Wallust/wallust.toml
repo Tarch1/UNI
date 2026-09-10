@@ -1,31 +1,24 @@
-# ~/.config/wallust/wallust.toml
-
 backend = "kmeans"
 color_space = "lab"
 palette = "dark16"
 check_contrast = true
 
-# Template per Hyprland
-[[entry]]
+[templates.hyprland]
 template = "colors-hyprland.conf"
 target = "~/.config/hypr/colors.conf"
 
-# Template per Kitty
-[[entry]]
+[templates.kitty]
 template = "colors-kitty.conf"
 target = "~/.config/kitty/colors.conf"
 
-# Template per Fuzzel
-[[entry]]
+[templates.fuzzel]
 template = "colors-fuzzel.ini"
 target = "~/.config/fuzzel/colors.ini"
 
-# Template per Waybar
-[[entry]]
+[templates.waybar]
 template = "colors-waybar.conf"
 target = "~/.config/wallust/colors-waybar.css"
 
-# Template per Niri
-[[entry]]
+[templates.niri]
 template = "config.kdl"
 target = "~/.config/niri/config.kdl"
