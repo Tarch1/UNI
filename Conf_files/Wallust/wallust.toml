@@ -20,5 +20,5 @@ template = "colors-waybar.conf"
 target = "~/.config/wallust/colors-waybar.css"
 
 [templates.niri]
-template = "config.kdl"
+template = "niri.config"
 target = "~/.config/niri/config.kdl"
