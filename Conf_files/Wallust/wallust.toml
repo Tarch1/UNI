@@ -12,7 +12,7 @@ template = "colors-kitty.conf"
 target = "~/.config/kitty/colors.conf"
 
 [templates.fuzzel]
-template = "colors-fuzzel.ini"
+template = "colors-fuzzel.conf"
 target = "~/.config/fuzzel/colors.ini"
 
 [templates.waybar]
