@@ -266,18 +266,17 @@ UserSetup () {
 	echo 'export MOZ_ENABLE_WAYLAND=1' >> /mnt/home/"$UNsel"/.profile
 	if [[ "$DEsel" == "Hyprland" || "$DEsel" == "Niri" ]]; then
 		echo "Installing Wallust binary directly from Codeberg..."
-		WALLUST_VER=$(curl -sL https://codeberg.org/api/v1/repos/explosion-mental/wallust/releases/latest | grep -o '"tag_name": *"[^"]*"' | head -n 1 | cut -d '"' -f 4)
-		[[ -z "$WALLUST_VER" ]] && WALLUST_VER="3.5.2"
-		WALLUST_VER="${WALLUST_VER#v}" # Rimuove la v iniziale per sicurezza
-		DOWNLOAD_URL="https://codeberg.org/explosion-mental/wallust/releases/download/${WALLUST_VER}/wallust-${WALLUST_VER}-x86_64-unknown-linux-musl.tar.gz"
-		curl -sLo /mnt/tmp/wallust_dl "$DOWNLOAD_URL"
-		if tar -tf /mnt/tmp/wallust_dl &>/dev/null; then
-			tar -xzf /mnt/tmp/wallust_dl -C /mnt/tmp/
-			find /mnt/tmp/ -maxdepth 2 -type f -name "wallust" -exec mv {} /mnt/usr/bin/wallust \;
-			chmod +x /mnt/usr/bin/wallust || SHOWerror "Wallust chmod"
+		API_URL=$(curl -s https://codeberg.org/api/v1/repos/explosion-mental/wallust/releases/latest | grep -o '"browser_download_url": *"[^"]*"' | grep 'x86_64-unknown-linux-musl.tar.gz' | cut -d '"' -f 4)
+		[[ -z "$API_URL" ]] && SHOWerror "Wallust URL not found on Codeberg"
+		curl -sA "Mozilla/5.0" -L -o /tmp/wallust_dl.tar.gz "$API_URL"
+		if tar -tf /tmp/wallust_dl.tar.gz &>/dev/null; then
+			tar -xzf /tmp/wallust_dl.tar.gz -C /tmp/
+			mv /tmp/wallust /mnt/usr/bin/wallust
+			chmod +x /mnt/usr/bin/wallust || SHOWerror "Wallust chmod failed"
 		else
-			SHOWerror "Wallust download failed - Damaged file"
+			SHOWerror "Wallust download failed (Corrupted file or HTML)"
 		fi
+		echo "Copying configuration files..."
 		for conf in Fuzzel Waybar Swaync Hyprlock Wallust Wallpapers; do [[ -d "${SCRIPT_DIR}/Conf_files/$conf" ]] && cp -r "${SCRIPT_DIR}/Conf_files/$conf" /mnt/home/"$UNsel"/.config/"${conf,,}"; done
 		[[ "$DEsel" == "Hyprland" && -d "${SCRIPT_DIR}/Conf_files/Hyprland" ]] && cp -r "${SCRIPT_DIR}/Conf_files/Hyprland" /mnt/home/"$UNsel"/.config/hypr && touch /mnt/home/"$UNsel"/.config/hypr/hyprpaper.conf
 		[[ "$DEsel" == "Niri" && -d "${SCRIPT_DIR}/Conf_files/Niri" ]] && cp -r "${SCRIPT_DIR}/Conf_files/Niri" /mnt/home/"$UNsel"/.config/niri
