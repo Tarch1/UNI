@@ -265,19 +265,18 @@ UserSetup () {
 	echo -e 'include "/usr/share/nano/*.nanorc"\nset linenumbers' > /mnt/etc/nanorc
 	echo 'export MOZ_ENABLE_WAYLAND=1' >> /mnt/home/"$UNsel"/.profile
 	if [[ "$DEsel" == "Hyprland" || "$DEsel" == "Niri" ]]; then
-		echo "Installing Wallust binary directly from GitHub..."
-		LATEST_URL=$(curl -Ls -o /dev/null -w %{url_effective} "https://github.com/explosion-mental/wallust/releases/latest")
-		WALLUST_VER=$(basename "$LATEST_URL")
-		[[ -z "$WALLUST_VER" || "$WALLUST_VER" == "latest" ]] && WALLUST_VER="3.5.2"
-		WALLUST_VER="${WALLUST_VER#v}" # Rimuove l'eventuale "v" iniziale se presente
-		DOWNLOAD_URL="https://github.com/explosion-mental/wallust/releases/download/${WALLUST_VER}/wallust-${WALLUST_VER}-x86_64-unknown-linux-musl.tar.gz"
+		echo "Installing Wallust binary directly from Codeberg..."
+		WALLUST_VER=$(curl -sL https://codeberg.org/api/v1/repos/explosion-mental/wallust/releases/latest | grep -o '"tag_name": *"[^"]*"' | head -n 1 | cut -d '"' -f 4)
+		[[ -z "$WALLUST_VER" ]] && WALLUST_VER="3.5.2"
+		WALLUST_VER="${WALLUST_VER#v}" # Rimuove la v iniziale per sicurezza
+		DOWNLOAD_URL="https://codeberg.org/explosion-mental/wallust/releases/download/${WALLUST_VER}/wallust-${WALLUST_VER}-x86_64-unknown-linux-musl.tar.gz"
 		curl -sLo /mnt/tmp/wallust_dl "$DOWNLOAD_URL"
 		if tar -tf /mnt/tmp/wallust_dl &>/dev/null; then
 			tar -xzf /mnt/tmp/wallust_dl -C /mnt/tmp/
 			find /mnt/tmp/ -maxdepth 2 -type f -name "wallust" -exec mv {} /mnt/usr/bin/wallust \;
 			chmod +x /mnt/usr/bin/wallust || SHOWerror "Wallust chmod"
 		else
-			SHOWerror "Wallust download failed (Ricevuta pagina HTML invece del binario)"
+			SHOWerror "Wallust download failed - Damaged file"
 		fi
 		for conf in Fuzzel Waybar Swaync Hyprlock Wallust Wallpapers; do [[ -d "${SCRIPT_DIR}/Conf_files/$conf" ]] && cp -r "${SCRIPT_DIR}/Conf_files/$conf" /mnt/home/"$UNsel"/.config/"${conf,,}"; done
 		[[ "$DEsel" == "Hyprland" && -d "${SCRIPT_DIR}/Conf_files/Hyprland" ]] && cp -r "${SCRIPT_DIR}/Conf_files/Hyprland" /mnt/home/"$UNsel"/.config/hypr && touch /mnt/home/"$UNsel"/.config/hypr/hyprpaper.conf
