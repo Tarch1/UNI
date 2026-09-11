@@ -262,12 +262,7 @@ UserSetup () {
 	sed -i 's/^#\s*\(%wheel ALL=(ALL:ALL) ALL\)/\1/' /mnt/etc/sudoers
 	echo "Choose password for user: $UNsel"; while true; do "$chroot" /mnt passwd "$UNsel" && break || echo "Error: Try again..."; done
 	echo "Choose password for root"; while true; do "$chroot" /mnt passwd && break || echo "Error: Try again..."; done
-	[[ "${OSsel,,}" != "void" ]] && { 
-		echo "Installing Trizen AUR helper..."
-		echo "%wheel ALL=(ALL:ALL) NOPASSWD: ALL" > /mnt/etc/sudoers.d/99-installer-temp
-		"$chroot" /mnt sudo -u "$UNsel" bash -c "git clone https://aur.archlinux.org/trizen.git /tmp/trizen && cd /tmp/trizen && makepkg -si --noconfirm" || SHOWerror "Trizen setup" 
-		rm -f /mnt/etc/sudoers.d/99-installer-temp
-	}
+	[[ "${OSsel,,}" != "void" ]] && { echo "%wheel ALL=(ALL:ALL) NOPASSWD: ALL" > /mnt/etc/sudoers.d/99-installer-temp ; "$chroot" /mnt sudo -u "$UNsel" bash -c "git clone https://aur.archlinux.org/trizen.git /tmp/trizen && cd /tmp/trizen && makepkg -si --noconfirm" || SHOWerror "Trizen setup" ; rm -f /mnt/etc/sudoers.d/99-installer-temp ; }
 	echo "Copying configuration files..."
 	if [[ "${OSsel,,}" == "void" ]]; then mkdir -p /mnt/etc/bash && [[ -f "${SCRIPT_DIR}/Conf_files/bashrc" ]] && cp "${SCRIPT_DIR}/Conf_files/bashrc" /mnt/home/"$UNsel"/.bashrc
 	else 
@@ -294,6 +289,11 @@ UserSetup () {
 		[[ "$DEsel" == "Hyprland" && -d "${SCRIPT_DIR}/Conf_files/Hyprland" ]] && cp -r "${SCRIPT_DIR}/Conf_files/Hyprland" /mnt/home/"$UNsel"/.config/hypr && touch /mnt/home/"$UNsel"/.config/hypr/hyprpaper.conf
 		[[ "$DEsel" == "Niri" && -d "${SCRIPT_DIR}/Conf_files/Niri" ]] && cp -r "${SCRIPT_DIR}/Conf_files/Niri" /mnt/home/"$UNsel"/.config/niri
 		"$chroot" /mnt chmod +x /home/"$UNsel"/.config/wallpapers/theme-switcher.sh
+		if [[ "${OSsel,,}" != "arch" && "$init_sys" != "systemd" ]]; then
+			local h_conf="/mnt/home/$UNsel/.config/hypr/hyprland.conf" n_conf="/mnt/home/$UNsel/.config/niri/config.kdl"
+			[[ "$DEsel" == "Hyprland" && -f "$h_conf" ]] && sed -i '1i exec-once = pipewire & wireplumber & pipewire-pulse' "$h_conf"
+			[[ "$DEsel" == "Niri" && -f "$n_conf" ]] && for p in pipewire wireplumber pipewire-pulse; do sed -i "/spawn-at-startup \"waybar\"/i \tspawn-at-startup \"$p\"" "$n_conf"; done
+		fi
 	fi
 }
 AudioSetup () {
@@ -301,6 +301,7 @@ AudioSetup () {
 	printf 'monitor.bluez.properties = { bluez5.enable-sbc-xq = true, bluez5.enable-msbc = true, bluez5.enable-hw-volume = true, bluez5.codecs = [ sbc_xq aac aptx aptx_hd ldac ] }\n' > /mnt/etc/wireplumber/wireplumber.conf.d/10-bluetooth-policy.conf
 	printf 'context.properties = { default.clock.rate = 48000, default.clock.quantum = 1024, default.clock.min-quantum = 32, default.clock.max-quantum = 2048 }\n' > /mnt/etc/pipewire/pipewire.conf.d/99-input-denoise.conf
 	[[ -f /mnt/etc/bluetooth/main.conf ]] && sed -i 's/#AutoEnable=false/AutoEnable=true/g' /mnt/etc/bluetooth/main.conf || true
+	if [[ "$init_sys" == "systemd" || "${OSsel,,}" == "arch" ]]; then "$chroot" /mnt systemctl --global enable pipewire.socket pipewire-pulse.socket wireplumber.service || true ; fi
 }
 BootloaderSetup () {
 	local osi_version="${AcpiOS:-Windows 2020}"; local kname; kname=$(basename "$(find /mnt/boot/ -type f -name 'vmlinuz-*' | head -n 1)") || kname="vmlinuz-$KSel"
