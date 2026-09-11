@@ -87,7 +87,7 @@ FileSystemFormat() {
 	lsblk -f
 }
 ArchTixSystemInstall () {
-	local BasePKG=( "${kernel[@]}" "${baselinux[@]}" "${elogind[@]}" )
+	local BasePKG=( "${kernel[@]}" "${baselinux[@]}" "${logind[@]}" )
 	[[ -n "$microcodepkg" ]] && BasePKG+=( "$microcodepkg" )
 	[[ "$FSsel" == "btrfs" ]] && BasePKG+=( "${btrfsutility[@]}" )
 	"$PKGstrap" /mnt "${BasePKG[@]}" || SHOWerror "Arch/Artix strap base installation"
@@ -137,11 +137,11 @@ PackageConfig () {
 }
 PackageInstall () {
 	local VBTboot=(); [[ "${BLsel,,}" =~ ^(efistub|limine|systemd-boot|uki)$ ]] && VBTboot+=(efibootmgr); [[ "${BLsel,,}" == "grub" ]] && VBTboot+=(grub); [[ "${BLsel,,}" == "refind" ]] && VBTboot+=(refind); [[ "${BLsel,,}" == "limine" ]] && VBTboot+=(limine); [[ "${BLsel,,}" == "uki" ]] && VBTboot+=(systemd-ukify); [[ "$FSsel" == "btrfs" ]] && VBTboot+=(btrfs-progs)
-	if [[ "$VBTsel" -eq 1 ]]; then [[ "${OSsel,,}" == "void" ]] && "$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${VBTboot[@]}" || "$chroot" /mnt $PKGmanager$PKGinst$PKGupd"u" "${PKGskp[@]}" "${baselinux[@]}" "${baseutils[@]}" "${elogind[@]}" "${net[@]}" "${bluetooth[@]}" "${print[@]}" "${VBTboot[@]}" "${utility[@]}" "${apps[@]}" "${filemanager[@]}" "${archive[@]}" "${desktoppkg[@]}" "${displaymanagerpkg[@]}"
-	else    local FullPKGs=( "${microcode[@]}" "${kernel[@]}" "${baseutils[@]}" "${fs[@]}" "${bootloaderutility[@]}" "${btrfsutility[@]}" "${grubpkg[@]}" "${refindpkg[@]}" "${liminepkg[@]}" "${ukipkg[@]}" "${net[@]}" "${audio[@]}" "${bluetooth[@]}" "${print[@]}" "${apps[@]}" "${utility[@]}" "${hardwareacceleration[@]}" "${vulkan[@]}" "${filemanager[@]}" "${archive[@]}" "${desktoppkg[@]}" "${displaymanagerpkg[@]}" )
+	if [[ "$VBTsel" -eq 1 ]]; then [[ "${OSsel,,}" == "void" ]] && "$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${VBTboot[@]}" || "$chroot" /mnt $PKGmanager$PKGinst$PKGupd"u" "${PKGskp[@]}" "${baselinux[@]}" "${baseutils[@]}" "${logind[@]}" "${net[@]}" "${bluetooth[@]}" "${print[@]}" "${VBTboot[@]}" "${utility[@]}" "${apps[@]}" "${filemanager[@]}" "${archive[@]}" "${desktoppkg[@]}" "${displaymanagerpkg[@]}"
+	else	local FullPKGs=( "${microcode[@]}" "${kernel[@]}" "${baseutils[@]}" "${fs[@]}" "${bootloaderutility[@]}" "${btrfsutility[@]}" "${grubpkg[@]}" "${refindpkg[@]}" "${liminepkg[@]}" "${ukipkg[@]}" "${net[@]}" "${audio[@]}" "${bluetooth[@]}" "${print[@]}" "${apps[@]}" "${utility[@]}" "${hardwareacceleration[@]}" "${vulkan[@]}" "${filemanager[@]}" "${archive[@]}" "${desktoppkg[@]}" "${displaymanagerpkg[@]}" )
 			[[ ${#nvidiadrivers[@]} -gt 0 ]] && FullPKGs+=( "${nvidiadrivers[@]}" )
 			[[ -v amddrivers && ${#amddrivers[@]} -gt 0 ]] && FullPKGs+=( "${amddrivers[@]}" )
-			[[ "${OSsel,,}" == "void" ]] || FullPKGs+=( "${baselinux[@]}" "${elogind[@]}" "${grubbtrfs[@]}" )
+			[[ "${OSsel,,}" == "void" ]] || FullPKGs+=( "${baselinux[@]}" "${logind[@]}" "${grubbtrfs[@]}" )
 			[[ "${OSsel,,}" == "void" ]] && "$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${FullPKGs[@]}" || "$chroot" /mnt $PKGmanager$PKGinst$PKGupd"u" "${PKGskp[@]}" "${FullPKGs[@]}"
 	fi
 }
@@ -183,10 +183,11 @@ PKGcheck () {
 	[[ "${OSsel,,}" == "void" ]] && hardwareacceleration=(mesa-dri mesa-vaapi mesa-vulkan-radeon) || hardwareacceleration=(intel-media-driver vkd3d)
 	[[ "${OSsel,,}" == "void" ]] && vulkan=(vulkan-loader) || vulkan=(vulkan-icd-loader vulkan-intel vulkan-mesa-layers)
 	filemanager=(yazi pcmanfm-qt tumbler file-roller android-tools); [[ "${OSsel,,}" != "void" ]] && filemanager+=(gvfs-mtp)
-	elogind=(); [[ "${OSsel,,}" == "artix" ]] && { local init_s="${init_sys,,}"; elogind=(elogind elogind-"$init_s" "${init_s}"-settingsd); net+=("chrony-${init_s}" "networkmanager-${init_s}"); bluetooth+=("bluez-${init_s}" bluez-cups); print+=("avahi-${init_s}" "cups-${init_s}"); }
+	logind=(); [[ "${OSsel,,}" == "artix" ]] && { local init_s="${init_sys,,}"; logind=(elogind elogind-"$init_s" "${init_s}"-settingsd); net+=("chrony-${init_s}" "networkmanager-${init_s}"); bluetooth+=("bluez-${init_s}" bluez-cups); print+=("avahi-${init_s}" "cups-${init_s}"); }
+	[[ "${OSsel,,}" == "void" ]] && logind=(seatd)
 	echo "Downloading remote package indexes..."; local remote_repo_list="/tmp/remote_pkgs.list"
 	[[ "${OSsel,,}" == "void" ]] && $PKGmanager$PKGchk -R -s "" | awk '{print $2}' | sed 's/-[0-9].*//' | sort -u > "$remote_repo_list" || $PKGmanager$PKGinst$PKGupd"lq" | sort -u > "$remote_repo_list"
-	local y="microcode amddrivers nvidiadrivers kernel baselinux baseutils fs bootloaderutility btrfsutility elogind grubpkg grubbtrfs refindpkg liminepkg ukipkg net audio bluetooth print apps utility hardwareacceleration vulkan filemanager archive booster desktoppkg displaymanagerpkg" miss=()
+	local y="microcode amddrivers nvidiadrivers kernel baselinux baseutils fs bootloaderutility btrfsutility logind grubpkg grubbtrfs refindpkg liminepkg ukipkg net audio bluetooth print apps utility hardwareacceleration vulkan filemanager archive booster desktoppkg displaymanagerpkg" miss=()
 	for group in $y; do
 		local -n current_group="$group"; local valid_pkgs=()
 		for pkg in "${current_group[@]}"; do grep -qx "$pkg" "$remote_repo_list" && valid_pkgs+=("$pkg") || miss+=("$pkg"); done
@@ -218,11 +219,11 @@ KernelSetup () {
 						local r_kver; r_kver="$(basename "$(find /mnt/usr/lib/modules/ -maxdepth 1 -mindepth 1 -type d | head -n 1)")"
 						"$chroot" /mnt dracut --kver "$r_kver" --force /boot/initramfs-"$KSel".img || SHOWerror "dracut build"
 					fi ;;
-		booster)	local b_opts="mount_timeout: 3m\nvconsole: true\nresume: /dev/disk/by-uuid/${SWAPID}\nmodules: ahci,ata_piix,sd_mod,nvme"
+		booster)	local b_opts="universal: true\nmount_timeout: 3m\nvconsole: true\nresume: /dev/disk/by-uuid/${SWAPID}\nmodules: ahci,ata_piix,sd_mod,nvme"
 					[[ "$FSsel" == "btrfs" ]] && b_opts="${b_opts},btrfs"
 					[[ ${#nvidiadrivers[@]} -gt 0 ]] && b_opts="${b_opts},nvidia,nvidia_modeset,nvidia_uvm,nvidia_drm"
 					echo -e "$b_opts" > /mnt/etc/booster.yaml || SHOWerror "booster.yaml write"
-					if [[ "${OSsel,,}" != "void" ]]; then mkdir -p /mnt/etc/pacman.d/hooks || SHOWerror "mkdir pacman hooks"; printf '[Trigger]\nOperation = Install\nOperation = Upgrade\nType = Package\nTarget = %s\n\n[Action]\nDescription = Forcing Booster initramfs update...\nWhen = PostTransaction\nDepends = booster\nExec = /usr/bin/booster build --force --universal /boot/initramfs-%s.img\n' "$KSel" "$KSel" > /mnt/etc/pacman.d/hooks/95-booster-force.hook || SHOWerror "booster-force hook creation"; fi
+					if [[ "${OSsel,,}" != "void" ]]; then mkdir -p /mnt/etc/pacman.d/hooks || SHOWerror "mkdir pacman hooks"; printf "[Trigger]\nOperation = Install\nOperation = Upgrade\nType = Package\nTarget = linux\nTarget = linux-*\n\n[Action]\nDescription = Forcing Booster initramfs update...\nWhen = PostTransaction\nDepends = booster\nNeedsTargets\nExec = /bin/bash -c 'while read -r pkg; do for d in /usr/lib/modules/*; do if [[ -f \"\$d/pkgbase\" && \"\$(<\"\$d/pkgbase\")\" == \"\$pkg\" ]]; then kver=\"\${d##*/}\"; /usr/bin/booster build --force --universal --kernel-version=\"\$kver\" \"/boot/initramfs-\${pkg}.img\"; break; fi; done; done'\n" > /mnt/etc/pacman.d/hooks/95-booster-force.hook || SHOWerror "booster-force hook creation"; fi
 					local real_kver; real_kver=$(basename "$(find /mnt/usr/lib/modules/ -maxdepth 1 -mindepth 1 -type d ! -name 'extramodules*' | head -n 1)") || SHOWerror "find real_kver"
 					"$chroot" /mnt /bin/bash -c "booster build --force --universal --kernel-version=${real_kver} /boot/initramfs-${KSel}.img" || SHOWerror "booster build" ;;
 		*)			local HOOKS=(base udev autodetect keyboard keymap modconf block); [[ "$LUKS_ENC" -eq 1 ]] && HOOKS+=(encrypt); HOOKS+=(resume filesystems fsck); [[ ${#nvidiadrivers[@]} -gt 0 ]] && HOOKS+=(kms)
@@ -233,7 +234,7 @@ KernelSetup () {
 ServiceSetup () {
 	[[ "${OSsel,,}" == "artix" ]] && { Services+=( NetworkManager chrony dbus elogind cupsd avahi-daemon bluetoothd ); [[ "$init_sys" == "openrc" ]] && Services+=( openrc-settingsd ); [[ -f /mnt/usr/bin/tlp ]] && Services+=( tlp ); [[ -f /mnt/usr/bin/thermald || -f /mnt/usr/sbin/thermald ]] && Services+=( thermald ); [[ -v nvidiadrivers && -f /mnt/usr/bin/nvidia-persistenced ]] && Services+=( nvidia-persistenced ); }
 	[[ "${OSsel,,}" == "arch" ]] && { Services+=( NetworkManager chronyd cups avahi-daemon bluetooth paccache.timer ); [[ -f /mnt/usr/lib/systemd/system/power-profiles-daemon.service ]] && Services+=( power-profiles-daemon ); [[ -f /mnt/usr/lib/systemd/system/thermald.service ]] && Services+=( thermald ); }
-	[[ "${OSsel,,}" == "void" ]] && { Services+=( NetworkManager chronyd cupsd dbus avahi-daemon bluetoothd ); [[ -f /mnt/usr/bin/tlp ]] && Services+=( tlp ); [[ -f /mnt/usr/bin/thermald || -f /mnt/usr/sbin/thermald ]] && Services+=( thermald ); }
+	[[ "${OSsel,,}" == "void" ]] && { Services+=( NetworkManager chronyd cupsd dbus avahi-daemon bluetoothd seatd ); [[ -f /mnt/usr/bin/tlp ]] && Services+=( tlp ); [[ -f /mnt/usr/bin/thermald || -f /mnt/usr/sbin/thermald ]] && Services+=( thermald ); }
 	[[ "${DMsel,,}" =~ ^(ly|greetd|sddm|gdm)$ ]] && Services+=("${DMsel,,}")
 	[[ "${GPUMANAGERsel,,}" == "cardwire" ]] && {
 		[[ "${OSsel,,}" == "artix" && "$init_sys" == "openrc" ]] && { echo -e '#!/sbin/openrc-run\nname="Cardwire GPU Manager"\ncommand="/usr/bin/cardwire"\ncommand_background="yes"\npidfile="/run/${RC_SVCNAME}.pid"\ndepend() {\n\tneed localmount devfs\n\tafter bootmisc\n}' > /mnt/etc/init.d/cardwire; chmod +x /mnt/etc/init.d/cardwire; }
@@ -242,18 +243,19 @@ ServiceSetup () {
 		Services+=( cardwire ) ; }
 	for s in "${Services[@]}"; do
 		case "${OSsel,,}:$init_sys" in
-			void:*)      "$chroot" /mnt ln -sf /etc/sv/"$s" /etc/runit/runsvdir/default/ ;;
-			arch:*)      "$chroot" /mnt systemctl enable "$s" ;;
-			artix:runit) "$chroot" /mnt ln -sf /etc/runit/sv/"$s" /etc/runit/runsvdir/default/ ;;
-			artix:s6)    "$chroot" /mnt touch /etc/s6/adminsv/default/contents.d/"$s" ;;
-			artix:dinit) "$chroot" /mnt ln -sf ../"$s" /etc/dinit.d/boot.d/ ;;
-			artix:*)     "$chroot" /mnt rc-update add "$s" default ;;
+			void:*)			"$chroot" /mnt ln -sf /etc/sv/"$s" /etc/runit/runsvdir/default/ ;;
+			arch:*)			"$chroot" /mnt systemctl enable "$s" ;;
+			artix:runit)	"$chroot" /mnt ln -sf /etc/runit/sv/"$s" /etc/runit/runsvdir/default/ ;;
+			artix:s6)		"$chroot" /mnt touch /etc/s6/adminsv/default/contents.d/"$s" ;;
+			artix:dinit)	"$chroot" /mnt ln -sf ../"$s" /etc/dinit.d/boot.d/ ;;
+			artix:*)		"$chroot" /mnt rc-update add "$s" default ;;
 		esac
 	done
 	mkdir -p /mnt/etc/udev/rules.d/; [[ -f "${SCRIPT_DIR}/Conf_files/51-android.rules" ]] && cp "${SCRIPT_DIR}/Conf_files/51-android.rules" /mnt/etc/udev/rules.d/ || true
 }
 UserSetup () {
 	"$chroot" /mnt bash -c "useradd -m -g users -G wheel,video,audio,storage,input,lp,scanner,power,kvm $UNsel && su $UNsel -c 'mkdir -p ~/.config'"
+	[[ "${OSsel,,}" == "void" ]] && "$chroot" /mnt usermod -aG _seatd "$UNsel"
 	sed -i 's/^#\s*\(%wheel ALL=(ALL:ALL) ALL\)/\1/' /mnt/etc/sudoers
 	echo "Choose password for user: $UNsel"; while true; do "$chroot" /mnt passwd "$UNsel" && break || echo "Error: Try again..."; done
 	echo "Choose password for root"; while true; do "$chroot" /mnt passwd && break || echo "Error: Try again..."; done
