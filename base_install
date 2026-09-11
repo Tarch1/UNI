@@ -292,7 +292,7 @@ UserSetup () {
 		if [[ "${OSsel,,}" != "arch" && "$init_sys" != "systemd" ]]; then
 			local h_conf="/mnt/home/$UNsel/.config/hypr/hyprland.conf" n_conf="/mnt/home/$UNsel/.config/niri/config.kdl"
 			[[ "$DEsel" == "Hyprland" && -f "$h_conf" ]] && sed -i '1i exec-once = pipewire & wireplumber & pipewire-pulse' "$h_conf"
-			[[ "$DEsel" == "Niri" && -f "$n_conf" ]] && for p in pipewire wireplumber pipewire-pulse; do sed -i "/spawn-at-startup \"waybar\"/i \tspawn-at-startup \"$p\"" "$n_conf"; done
+			[[ "$DEsel" == "Niri" && -f "$n_conf" ]] && sed -i '/^hotkey-overlay/i \spawn-at-startup "pipewire"\nspawn-at-startup "wireplumber"\nspawn-at-startup "pipewire-pulse"' "$n_conf"
 		fi
 	fi
 }
