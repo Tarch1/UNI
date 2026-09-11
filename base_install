@@ -66,7 +66,7 @@ FileSystemFormat() {
 					mkdir -p "/mnt$d_path" && mount -o defaults,"$options",subvol=@"$c" "$TARGET_ROOT" "/mnt$d_path" || SHOWerror "mount @$c"
 					UNIfstab+="$PIDsel=$ROOTID $d_path btrfs $options,subvol=@$c 0 0\n"
 				done ; umount /tmp/btrpool && rmdir /tmp/btrpool ;;
-		*) 		SHOWerror "Unsupported file system selection" ;;
+		*)		SHOWerror "Unsupported file system selection" ;;
 	esac
 	export BOOTID ROOTID SWAPID TARGET_ROOT TARGET_SWAP CRYPT_ROOT_UUID CRYPT_SWAP_UUID
 	swapon "$TARGET_SWAP" || SHOWerror "swapon"; mkdir -p /mnt/boot; mount "$BOOT_PART" /mnt/boot || SHOWerror "mount boot partition"
@@ -82,7 +82,7 @@ FileSystemFormat() {
 			mkfs."$ADD_FS" "${flags[@]}" "$ADD_LABEL" "$TARGET_ADD" || SHOWerror "mkfs.$ADD_FS additional drive"
 		fi
 		mkdir -p /mnt/media/HDD && mount "$TARGET_ADD" /mnt/media/HDD || SHOWerror "Mount additional drive"
-		UNIfstab+="$PIDsel=$(blkid -s $PIDsel -o value $TARGET_ADD || echo $TARGET_ADD) /media/HDD $(blkid -s TYPE -o value $TARGET_ADD || echo auto) defaults,noatime 0 2\n"
+		UNIfstab+="$PIDsel=$(blkid -s $PIDsel -o value $TARGET_ADD || echo $TARGET_ADD) /media/HDD $(blkid -s TYPE -o value $TARGET_ADD || echo auto) defaults,noatime,nofail 0 2\n"
 	fi
 	lsblk -f
 }
@@ -110,7 +110,7 @@ CrypttabGen () {
 	echo -n "$LUKS_PASS" > /mnt/etc/crypt_key.bin; chmod 600 /mnt/etc/crypt_key.bin
 	echo -n "$LUKS_PASS" | cryptsetup luksAddKey -q "$SWAP_PART" /mnt/etc/crypt_key.bin -d - || SHOWerror "LUKS AddKey SWAP"
 	echo "cryptswap UUID=$CRYPT_SWAP_UUID /etc/crypt_key.bin luks" > /mnt/etc/crypttab
-	[[ -n "$CRYPT_ADD_UUID" ]] && { echo -n "$LUKS_PASS" | cryptsetup luksAddKey -q "$ADDITIONAL_DRIVE" /mnt/etc/crypt_key.bin -d - || SHOWerror "LUKS AddKey ADD"; echo "cryptdata UUID=$CRYPT_ADD_UUID /etc/crypt_key.bin luks" >> /mnt/etc/crypttab; } || true
+	[[ -n "$CRYPT_ADD_UUID" ]] && { echo -n "$LUKS_PASS" | cryptsetup luksAddKey -q "$ADDITIONAL_DRIVE" /mnt/etc/crypt_key.bin -d - || SHOWerror "LUKS AddKey ADD"; echo "cryptdata UUID=$CRYPT_ADD_UUID /etc/crypt_key.bin luks,nofail" >> /mnt/etc/crypttab; } || true
 }
 FStabGen () {
 	[[ -f /mnt/etc/fstab ]] && { mv -f /mnt/etc/fstab /mnt/etc/old-fstab || SHOWerror "Backup existing fstab"; }
@@ -136,14 +136,17 @@ PackageConfig () {
 	"$chroot" /mnt $PKGmanager$PKGinst$PKGupd
 }
 PackageInstall () {
-	local VBTboot=(); [[ "${BLsel,,}" =~ ^(efistub|limine|systemd-boot|uki)$ ]] && VBTboot+=(efibootmgr); [[ "${BLsel,,}" == "grub" ]] && VBTboot+=(grub); [[ "${BLsel,,}" == "refind" ]] && VBTboot+=(refind); [[ "${BLsel,,}" == "limine" ]] && VBTboot+=(limine); [[ "${BLsel,,}" == "uki" ]] && VBTboot+=(systemd-ukify); [[ "$FSsel" == "btrfs" ]] && VBTboot+=(btrfs-progs)
-	if [[ "$VBTsel" -eq 1 ]]; then [[ "${OSsel,,}" == "void" ]] && "$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${VBTboot[@]}" || "$chroot" /mnt $PKGmanager$PKGinst$PKGupd"u" "${PKGskp[@]}" "${baselinux[@]}" "${baseutils[@]}" "${logind[@]}" "${net[@]}" "${bluetooth[@]}" "${print[@]}" "${VBTboot[@]}" "${utility[@]}" "${apps[@]}" "${filemanager[@]}" "${archive[@]}" "${desktoppkg[@]}" "${displaymanagerpkg[@]}"
-	else	local FullPKGs=( "${microcode[@]}" "${kernel[@]}" "${baseutils[@]}" "${fs[@]}" "${bootloaderutility[@]}" "${btrfsutility[@]}" "${grubpkg[@]}" "${refindpkg[@]}" "${liminepkg[@]}" "${ukipkg[@]}" "${net[@]}" "${audio[@]}" "${bluetooth[@]}" "${print[@]}" "${apps[@]}" "${utility[@]}" "${hardwareacceleration[@]}" "${vulkan[@]}" "${filemanager[@]}" "${archive[@]}" "${desktoppkg[@]}" "${displaymanagerpkg[@]}" )
-			[[ ${#nvidiadrivers[@]} -gt 0 ]] && FullPKGs+=( "${nvidiadrivers[@]}" )
-			[[ -v amddrivers && ${#amddrivers[@]} -gt 0 ]] && FullPKGs+=( "${amddrivers[@]}" )
-			[[ "${OSsel,,}" == "void" ]] || FullPKGs+=( "${baselinux[@]}" "${logind[@]}" "${grubbtrfs[@]}" )
-			[[ "${OSsel,,}" == "void" ]] && "$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${FullPKGs[@]}" || "$chroot" /mnt $PKGmanager$PKGinst$PKGupd"u" "${PKGskp[@]}" "${FullPKGs[@]}"
+	local FinalPKGs=( "${baseutils[@]}" "${fs[@]}" "${bootloaderutility[@]}" "${btrfsutility[@]}" "${grubpkg[@]}" "${refindpkg[@]}" "${liminepkg[@]}" "${ukipkg[@]}" "${net[@]}" "${audio[@]}" "${bluetooth[@]}" "${print[@]}" "${apps[@]}" "${utility[@]}" "${filemanager[@]}" "${archive[@]}" "${desktoppkg[@]}" "${displaymanagerpkg[@]}" "${logind[@]}" )
+	if [[ "$VBTsel" -eq 1 ]]; then
+		[[ "${OSsel,,}" != "void" ]] && FinalPKGs=( "${baselinux[@]}" "${FinalPKGs[@]}" )
+	else
+		FinalPKGs+=( "${microcode[@]}" "${kernel[@]}" "${hardwareacceleration[@]}" "${vulkan[@]}" )
+		[[ ${#nvidiadrivers[@]} -gt 0 ]] && FinalPKGs+=( "${nvidiadrivers[@]}" )
+		[[ -v amddrivers && ${#amddrivers[@]} -gt 0 ]] && FinalPKGs+=( "${amddrivers[@]}" )
+		[[ "${OSsel,,}" != "void" ]] && FinalPKGs+=( "${baselinux[@]}" "${grubbtrfs[@]}" )
 	fi
+	if [[ "${OSsel,,}" == "void" ]]; then "$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${FinalPKGs[@]}"
+	else "$chroot" /mnt $PKGmanager$PKGinst$PKGupd"u" "${PKGskp[@]}" "${FinalPKGs[@]}";	fi
 }
 PKGcheck () {
 	echo "Initializing package groups..."
