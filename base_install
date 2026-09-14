@@ -185,7 +185,7 @@ PKGcheck () {
 	archive=(bzip2 cpio gzip xz 7zip tar unrar zip unzip zstd)
 	utility=(imv featherpad libqalculate fd btop fwupd fastfetch grim slurp wl-clipboard swappy awww xorg-xwayland); [[ "${OSsel,,}" != "void" ]] && utility+=(lact cowfortune pacman-contrib)
 	if ls /sys/class/power_supply/BAT* &>/dev/null; then [[ "${OSsel,,}" == "arch" ]] && utility+=(power-profiles-daemon) || utility+=(tlp); [[ "$microcodepkg" == "intel-ucode" ]] && utility+=(thermald); fi
-	[[ "$VBTsel" -eq 1 ]] && { [[ "${OSsel,,}" == "void" ]] && utility+=(virtualbox-os-guest) || { utility+=(virtualbox-guest-utils); [[ "${OSsel,,}" == "artix" ]] && utility+=("virtualbox-guest-utils-${init_sys}"); }; }
+	[[ "$VBTsel" -eq 1 ]] && { [[ "${OSsel,,}" == "void" ]] && utility+=(virtualbox-os-guest) || utility+=(virtualbox-guest-utils); }
 	[[ "${GPUMANAGERsel,,}" == "envycontrol" ]] && utility+=(envycontrol)
 	[[ "${GPUMANAGERsel,,}" == "cardwire" ]] && utility+=(cardwire)
 	apps=(kitty telegram-desktop firefox); [[ "${OSsel,,}" != "void" ]] && apps+=(profile-sync-daemon)
@@ -256,7 +256,7 @@ ServiceSetup () {
 	[[ "${OSsel,,}" == "artix" ]] && { Services+=( NetworkManager chrony dbus elogind cupsd avahi-daemon bluetoothd ); [[ "$init_sys" == "openrc" ]] && Services+=( openrc-settingsd ); [[ -f /mnt/usr/bin/tlp ]] && Services+=( tlp ); [[ -f /mnt/usr/bin/thermald || -f /mnt/usr/sbin/thermald ]] && Services+=( thermald ); [[ -v nvidiadrivers && -f /mnt/usr/bin/nvidia-persistenced ]] && Services+=( nvidia-persistenced ); }
 	[[ "${OSsel,,}" == "arch" ]] && { Services+=( NetworkManager chronyd cups avahi-daemon bluetooth paccache.timer ); [[ -f /mnt/usr/lib/systemd/system/power-profiles-daemon.service ]] && Services+=( power-profiles-daemon ); [[ -f /mnt/usr/lib/systemd/system/thermald.service ]] && Services+=( thermald ); }
 	[[ "${OSsel,,}" == "void" ]] && { Services+=( NetworkManager chronyd cupsd dbus avahi-daemon bluetoothd seatd ); [[ -f /mnt/usr/bin/tlp ]] && Services+=( tlp ); [[ -f /mnt/usr/bin/thermald || -f /mnt/usr/sbin/thermald ]] && Services+=( thermald ); }
-	[[ "$VBTsel" -eq 1 ]] && { [[ "${OSsel,,}" == "artix" ]] && Services+=( virtualbox-guest-additions ) || Services+=( vboxservice ); }
+	[[ "$VBTsel" -eq 1 ]] && [[ "${OSsel,,}" != "artix" ]] && Services+=( vboxservice )
 	[[ "${DMsel,,}" =~ ^(ly|greetd|sddm|gdm)$ ]] && Services+=("${DMsel,,}")
 	[[ "${GPUMANAGERsel,,}" == "cardwire" ]] && {
 		[[ "${OSsel,,}" == "artix" && "$init_sys" == "openrc" ]] && { echo -e '#!/sbin/openrc-run\nname="Cardwire GPU Manager"\ncommand="/usr/bin/cardwire"\ncommand_background="yes"\npidfile="/run/${RC_SVCNAME}.pid"\ndepend() {\n\tneed localmount devfs\n\tafter bootmisc\n}' > /mnt/etc/init.d/cardwire; chmod +x /mnt/etc/init.d/cardwire; }
