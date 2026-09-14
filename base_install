@@ -315,8 +315,8 @@ UserSetup () {
 			[[ "$DEsel" == "Hyprland" && -f "$h_conf" ]] && sed -i '1i exec-once = VBoxClient --clipboard' "$h_conf"
 		fi
 		if [[ "${OSsel,,}" != "arch" && "$init_sys" != "systemd" ]]; then
-			[[ "$DEsel" == "Hyprland" && -f "$h_conf" ]] && sed -i '1i exec-once = pipewire & wireplumber & pipewire-pulse' "$h_conf"
-			[[ "$DEsel" == "Niri" && -f "$n_conf" ]] && sed -i '/^hotkey-overlay/i \spawn-at-startup "pipewire"\nspawn-at-startup "wireplumber"\nspawn-at-startup "pipewire-pulse"' "$n_conf"
+			[[ "$DEsel" == "Hyprland" && -f "$h_conf" ]] && sed -i '1i exec-once = bash -c "pipewire & sleep 1; wireplumber & pipewire-pulse &"' "$h_conf"
+			[[ "$DEsel" == "Niri" && -f "$n_conf" ]] && sed -i '/^hotkey-overlay/i \spawn-at-startup "bash" "-c" "pipewire & sleep 1; wireplumber & pipewire-pulse &"' "$n_conf"
 		fi
 	fi
 }
