@@ -185,6 +185,7 @@ PKGcheck () {
 	archive=(bzip2 cpio gzip xz 7zip tar unrar zip unzip zstd)
 	utility=(imv featherpad libqalculate fd btop fwupd fastfetch grim slurp wl-clipboard swappy awww xorg-xwayland); [[ "${OSsel,,}" != "void" ]] && utility+=(lact cowfortune pacman-contrib)
 	if ls /sys/class/power_supply/BAT* &>/dev/null; then [[ "${OSsel,,}" == "arch" ]] && utility+=(power-profiles-daemon) || utility+=(tlp); [[ "$microcodepkg" == "intel-ucode" ]] && utility+=(thermald); fi
+	[[ "$VBTsel" -eq 1 ]] && { [[ "${OSsel,,}" == "void" ]] && utility+=(virtualbox-os-guest) || { utility+=(virtualbox-guest-utils); [[ "${OSsel,,}" == "artix" ]] && utility+=("virtualbox-guest-utils-${init_sys}"); }; }
 	[[ "${GPUMANAGERsel,,}" == "envycontrol" ]] && utility+=(envycontrol)
 	[[ "${GPUMANAGERsel,,}" == "cardwire" ]] && utility+=(cardwire)
 	apps=(kitty telegram-desktop firefox); [[ "${OSsel,,}" != "void" ]] && apps+=(profile-sync-daemon)
@@ -255,6 +256,7 @@ ServiceSetup () {
 	[[ "${OSsel,,}" == "artix" ]] && { Services+=( NetworkManager chrony dbus elogind cupsd avahi-daemon bluetoothd ); [[ "$init_sys" == "openrc" ]] && Services+=( openrc-settingsd ); [[ -f /mnt/usr/bin/tlp ]] && Services+=( tlp ); [[ -f /mnt/usr/bin/thermald || -f /mnt/usr/sbin/thermald ]] && Services+=( thermald ); [[ -v nvidiadrivers && -f /mnt/usr/bin/nvidia-persistenced ]] && Services+=( nvidia-persistenced ); }
 	[[ "${OSsel,,}" == "arch" ]] && { Services+=( NetworkManager chronyd cups avahi-daemon bluetooth paccache.timer ); [[ -f /mnt/usr/lib/systemd/system/power-profiles-daemon.service ]] && Services+=( power-profiles-daemon ); [[ -f /mnt/usr/lib/systemd/system/thermald.service ]] && Services+=( thermald ); }
 	[[ "${OSsel,,}" == "void" ]] && { Services+=( NetworkManager chronyd cupsd dbus avahi-daemon bluetoothd seatd ); [[ -f /mnt/usr/bin/tlp ]] && Services+=( tlp ); [[ -f /mnt/usr/bin/thermald || -f /mnt/usr/sbin/thermald ]] && Services+=( thermald ); }
+	[[ "$VBTsel" -eq 1 ]] && { [[ "${OSsel,,}" == "artix" ]] && Services+=( virtualbox-guest-additions ) || Services+=( vboxservice ); }
 	[[ "${DMsel,,}" =~ ^(ly|greetd|sddm|gdm)$ ]] && Services+=("${DMsel,,}")
 	[[ "${GPUMANAGERsel,,}" == "cardwire" ]] && {
 		[[ "${OSsel,,}" == "artix" && "$init_sys" == "openrc" ]] && { echo -e '#!/sbin/openrc-run\nname="Cardwire GPU Manager"\ncommand="/usr/bin/cardwire"\ncommand_background="yes"\npidfile="/run/${RC_SVCNAME}.pid"\ndepend() {\n\tneed localmount devfs\n\tafter bootmisc\n}' > /mnt/etc/init.d/cardwire; chmod +x /mnt/etc/init.d/cardwire; }
@@ -303,11 +305,15 @@ UserSetup () {
 		fi
 		echo "Copying configuration files..."
 		for conf in Fuzzel Waybar Swaync Hyprlock Wallust Wallpapers; do [[ -d "${SCRIPT_DIR}/Conf_files/$conf" ]] && cp -r "${SCRIPT_DIR}/Conf_files/$conf" /mnt/home/"$UNsel"/.config/"${conf,,}"; done
+		touch /mnt/home/"$UNsel"/.config/wallust/colors-waybar.css
 		[[ "$DEsel" == "Hyprland" && -d "${SCRIPT_DIR}/Conf_files/Hyprland" ]] && cp -r "${SCRIPT_DIR}/Conf_files/Hyprland" /mnt/home/"$UNsel"/.config/hypr && touch /mnt/home/"$UNsel"/.config/hypr/hyprpaper.conf
 		[[ "$DEsel" == "Niri" && -d "${SCRIPT_DIR}/Conf_files/Niri" ]] && cp -r "${SCRIPT_DIR}/Conf_files/Niri" /mnt/home/"$UNsel"/.config/niri
 		"$chroot" /mnt chmod +x /home/"$UNsel"/.config/wallpapers/theme-switcher.sh
 		local h_conf="/mnt/home/$UNsel/.config/hypr/hyprland.conf" n_conf="/mnt/home/$UNsel/.config/niri/config.kdl"
-		[[ "$VBTsel" -eq 1 && "$DEsel" == "Niri" && -f "$n_conf" ]] && echo -e '\nenvironment {\n\tLIBGL_ALWAYS_SOFTWARE "1"\n}' >> "$n_conf"
+		if [[ "$VBTsel" -eq 1 ]]; then
+			[[ "$DEsel" == "Niri" && -f "$n_conf" ]] && { echo -e '\nenvironment {\n\tLIBGL_ALWAYS_SOFTWARE "1"\n}' >> "$n_conf"; sed -i '/^hotkey-overlay/i \spawn-at-startup "VBoxClient" "--clipboard"' "$n_conf"; }
+			[[ "$DEsel" == "Hyprland" && -f "$h_conf" ]] && sed -i '1i exec-once = VBoxClient --clipboard' "$h_conf"
+		fi
 		if [[ "${OSsel,,}" != "arch" && "$init_sys" != "systemd" ]]; then
 			[[ "$DEsel" == "Hyprland" && -f "$h_conf" ]] && sed -i '1i exec-once = pipewire & wireplumber & pipewire-pulse' "$h_conf"
 			[[ "$DEsel" == "Niri" && -f "$n_conf" ]] && sed -i '/^hotkey-overlay/i \spawn-at-startup "pipewire"\nspawn-at-startup "wireplumber"\nspawn-at-startup "pipewire-pulse"' "$n_conf"
@@ -330,7 +336,6 @@ BootloaderSetup () {
 	[[ "${GPUMANAGERsel,,}" == "cardwire" ]] && nvosi="$nvosi lsm=lockdown,capability,landlock,bpf"
 	[[ -n "$microcodepkg" && -f "/mnt/boot/${microcodepkg}.img" ]] && initrd_flags="initrd=\\${microcodepkg}.img initrd=\\${irfs}" || initrd_flags="initrd=\\${irfs}"
 	[[ "$LUKS_ENC" -eq 1 ]] && luks_flags="cryptdevice=UUID=${CRYPT_ROOT_UUID}:cryptroot rd.luks.uuid=${CRYPT_ROOT_UUID} rd.luks.name=${CRYPT_ROOT_UUID}=cryptroot root=/dev/mapper/cryptroot" || luks_flags="root=${PIDsel}=$ROOTID"
-	
 	case "${BLsel,,}" in
 		refind)			"$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${refindpkg[@]}" || SHOWerror "BootloaderSetup: install refind"
 						"$chroot" /mnt refind-install || SHOWerror "BootloaderSetup: refind-install"
