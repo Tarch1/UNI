@@ -311,12 +311,12 @@ UserSetup () {
 		"$chroot" /mnt chmod +x /home/"$UNsel"/.config/wallpapers/theme-switcher.sh
 		local h_conf="/mnt/home/$UNsel/.config/hypr/hyprland.conf" n_conf="/mnt/home/$UNsel/.config/niri/config.kdl"
 		if [[ "$VBTsel" -eq 1 ]]; then
-			[[ "$DEsel" == "Niri" && -f "$n_conf" ]] && { echo -e '\nenvironment {\n\tLIBGL_ALWAYS_SOFTWARE "1"\n}' >> "$n_conf"; sed -i '1i \spawn-at-startup "VBoxClient" "--clipboard"' "$n_conf"; }
-			[[ "$DEsel" == "Hyprland" && -f "$h_conf" ]] && sed -i '1i exec-once = VBoxClient --clipboard' "$h_conf"
+			[[ "$DEsel" == "Niri" && -f "$n_conf" ]] && { echo -e '\nenvironment {\n\tLIBGL_ALWAYS_SOFTWARE "1"\n}' >> "$n_conf"; sed -i -e '/spawn-at-startup/{i\spawn-at-startup "VBoxClient" "--clipboard"' -e ':a;n;ba}' "$n_conf"; }
+			[[ "$DEsel" == "Hyprland" && -f "$h_conf" ]] && sed -i -e '/exec-once/{i\exec-once = VBoxClient --clipboard' -e ':a;n;ba}' "$h_conf"
 		fi
 		if [[ "${OSsel,,}" != "arch" && "$init_sys" != "systemd" ]]; then
-			[[ "$DEsel" == "Hyprland" && -f "$h_conf" ]] && sed -i '1i exec-once = bash -c "pipewire & sleep 1; wireplumber & pipewire-pulse &"' "$h_conf"
-			[[ "$DEsel" == "Niri" && -f "$n_conf" ]] && sed -i '1i \spawn-at-startup "bash" "-c" "pipewire & sleep 1; wireplumber & pipewire-pulse &"' "$n_conf"
+			[[ "$DEsel" == "Hyprland" && -f "$h_conf" ]] && sed -i -e '/exec-once/{i\exec-once = bash -c "pipewire & sleep 1; wireplumber & pipewire-pulse &"' -e ':a;n;ba}' "$h_conf"
+			[[ "$DEsel" == "Niri" && -f "$n_conf" ]] && sed -i -e '/spawn-at-startup/{i\spawn-at-startup "bash" "-c" "pipewire & sleep 1; wireplumber & pipewire-pulse &"' -e ':a;n;ba}' "$n_conf"
 		fi
 	fi
 }
