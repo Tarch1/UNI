@@ -142,7 +142,7 @@ PackageConfig () {
 	"$chroot" /mnt $PKGmanager$PKGinst$PKGupd
 }
 PackageInstall () {
-	local FinalPKGs=( "${baseutils[@]}" "${fs[@]}" "${bootloaderutility[@]}" "${btrfsutility[@]}" "${grubpkg[@]}" "${refindpkg[@]}" "${liminepkg[@]}" "${ukipkg[@]}" "${net[@]}" "${audio[@]}" "${bluetooth[@]}" "${print[@]}" "${apps[@]}" "${utility[@]}" "${filemanager[@]}" "${archive[@]}" "${desktoppkg[@]}" "${displaymanagerpkg[@]}" "${logind[@]}" )
+	local FinalPKGs=( "${baseutils[@]}" "${fs[@]}" "${bootloaderutility[@]}" "${btrfsutility[@]}" "${grubpkg[@]}" "${refindpkg[@]}" "${liminepkg[@]}" "${ukipkg[@]}" "${net[@]}" "${audio[@]}" "${bluetooth[@]}" "${print[@]}" "${apps[@]}" "${utility[@]}" "${filemanager[@]}" "${archive[@]}" "${desktoppkg[@]}" "${displaymanagerpkg[@]}" "${logind[@]}" "${fonts[@]}" )
 	if [[ "$VBTsel" -eq 1 ]]; then
 		[[ "${OSsel,,}" != "void" ]] && FinalPKGs=( "${baselinux[@]}" "${FinalPKGs[@]}" )
 	else
@@ -188,6 +188,7 @@ PKGcheck () {
 	[[ "${GPUMANAGERsel,,}" == "envycontrol" ]] && utility+=(envycontrol)
 	[[ "${GPUMANAGERsel,,}" == "cardwire" ]] && utility+=(cardwire)
 	apps=(kitty telegram-desktop firefox); [[ "${OSsel,,}" != "void" ]] && apps+=(profile-sync-daemon)
+	[[ "${OSsel,,}" == "void" ]] && fonts=(nerd-fonts) || fonts=(ttf-jetbrains-mono-nerd)
 	bootloaderutility=(efibootmgr os-prober); [[ "${OSsel,,}" != "void" ]] && bootloaderutility+=(sbsigntools)
 	[[ "${OSsel,,}" == "void" ]] && hardwareacceleration=(mesa-dri mesa-vaapi mesa-vulkan-radeon) || hardwareacceleration=(intel-media-driver vkd3d)
 	[[ "${OSsel,,}" == "void" ]] && vulkan=(vulkan-loader) || vulkan=(vulkan-icd-loader vulkan-intel vulkan-mesa-layers)
@@ -196,7 +197,7 @@ PKGcheck () {
 	[[ "${OSsel,,}" == "void" ]] && logind=(seatd)
 	echo "Downloading remote package indexes..."; local remote_repo_list="/tmp/remote_pkgs.list"
 	[[ "${OSsel,,}" == "void" ]] && $PKGmanager$PKGchk -R -s "" | awk '{print $2}' | sed 's/-[0-9].*//' | sort -u > "$remote_repo_list" || $PKGmanager$PKGinst$PKGupd"lq" | sort -u > "$remote_repo_list"
-	local y="microcode amddrivers nvidiadrivers kernel baselinux baseutils fs bootloaderutility btrfsutility logind grubpkg grubbtrfs refindpkg liminepkg ukipkg net audio bluetooth print apps utility hardwareacceleration vulkan filemanager archive booster desktoppkg displaymanagerpkg" miss=()
+	local y="microcode amddrivers nvidiadrivers kernel baselinux baseutils fs bootloaderutility btrfsutility logind grubpkg grubbtrfs refindpkg liminepkg ukipkg net audio bluetooth print apps utility hardwareacceleration vulkan filemanager archive booster desktoppkg displaymanagerpkg fonts" miss=()
 	for group in $y; do
 		local -n current_group="$group"; local valid_pkgs=()
 		for pkg in "${current_group[@]}"; do grep -qx "$pkg" "$remote_repo_list" && valid_pkgs+=("$pkg") || miss+=("$pkg"); done
