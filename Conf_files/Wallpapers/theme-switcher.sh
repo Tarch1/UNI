@@ -4,7 +4,6 @@ DAY_DIR="$WALL_DIR/day"
 NIGHT_DIR="$WALL_DIR/night"
 CURRENT_WALL=""
 CURRENT_THEME=""
-
 apply_theme() {
 	local theme="$1"
 	local target_dir="$2"
@@ -35,7 +34,6 @@ apply_theme() {
 	swaync-client -rs
 	CURRENT_THEME="$theme"
 }
-
 sleep 3
 while true; do
 	HOUR=$(date +%H)
@@ -48,5 +46,8 @@ while true; do
 			apply_theme "night" "$NIGHT_DIR"
 		fi
 	fi
-	sleep 300
+	if ! pgrep -x waybar > /dev/null; then
+		waybar &
+	fi
+	sleep 10
 done
