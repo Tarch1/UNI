@@ -223,21 +223,30 @@ KernelSetup () {
 					[[ "$LUKS_ENC" -eq 1 ]] && echo -e 'add_dracutmodules+=" crypt "\ninstall_items+=" /etc/crypttab /etc/crypt_key.bin "' > /mnt/etc/dracut.conf.d/crypt.conf
 					[[ "$FSsel" == "btrfs" ]] && echo 'add_dracutmodules+=" btrfs "' > /mnt/etc/dracut.conf.d/btrfs.conf
 					[[ ${#nvidiadrivers[@]} -gt 0 ]] && echo 'force_drivers+=" nvidia nvidia_modeset nvidia_uvm nvidia_drm "' > /mnt/etc/dracut.conf.d/nvidia.conf
+					local dracut_flag="--hostonly"
+					[[ "$INITRAMFS_MODE" == "Universal (Portable to other PCs)" ]] && dracut_flag="--no-hostonly"
 					if [[ "${OSsel,,}" == "void" ]]; then 
 						"$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" dracut || SHOWerror "KernelSetup: dracut install"
+						echo "hostonly=\"$( [[ "$INITRAMFS_MODE" == "Universal (Portable to other PCs)" ]] && echo "no" || echo "yes" )\"" > /mnt/etc/dracut.conf.d/hostonly.conf
 						"$chroot" /mnt xbps-reconfigure -f "$KSel" || SHOWerror "KernelSetup: xbps-reconfigure"
 					else 
 						local r_kver; r_kver="$(basename "$(find /mnt/usr/lib/modules/ -maxdepth 1 -mindepth 1 -type d | head -n 1)")"
-						"$chroot" /mnt dracut --kver "$r_kver" --force /boot/initramfs-"$KSel".img || SHOWerror "KernelSetup: dracut build"
+						"$chroot" /mnt dracut $dracut_flag --kver "$r_kver" --force /boot/initramfs-"$KSel".img || SHOWerror "KernelSetup: dracut build"
 					fi ;;
-		booster)	local b_opts="universal: true\nmount_timeout: 3m\nvconsole: true\nresume: /dev/disk/by-uuid/${SWAPID}\nmodules: ahci,ata_piix,sd_mod,nvme"
+		booster)	local b_opts="mount_timeout: 3m\nvconsole: true\nresume: /dev/disk/by-uuid/${SWAPID}\nmodules: ahci,ata_piix,sd_mod,nvme"
+					local b_flag=""
+					[[ "$INITRAMFS_MODE" == "Universal (Portable to other PCs)" ]] && { b_opts="universal: true\n$b_opts"; b_flag="--universal"; }
 					[[ "$FSsel" == "btrfs" ]] && b_opts="${b_opts},btrfs"
 					[[ ${#nvidiadrivers[@]} -gt 0 ]] && b_opts="${b_opts},nvidia,nvidia_modeset,nvidia_uvm,nvidia_drm"
 					echo -e "$b_opts" > /mnt/etc/booster.yaml || SHOWerror "KernelSetup: write booster.yaml"
-					if [[ "${OSsel,,}" != "void" ]]; then mkdir -p /mnt/etc/pacman.d/hooks || SHOWerror "KernelSetup: mkdir hooks" ; printf "[Trigger]\nOperation = Install\nOperation = Upgrade\nType = Package\nTarget = linux\nTarget = linux-*\n\n[Action]\nDescription = Forcing Booster initramfs update...\nWhen = PostTransaction\nDepends = booster\nNeedsTargets\nExec = /bin/bash -c 'while read -r pkg; do for d in /usr/lib/modules/*; do if [[ -f \"\$d/pkgbase\" && \"\$(<\"\$d/pkgbase\")\" == \"\$pkg\" ]]; then kver=\"\${d##*/}\"; /usr/bin/booster build --force --universal --kernel-version=\"\$kver\" \"/boot/initramfs-\${pkg}.img\"; break; fi; done; done'\n" > /mnt/etc/pacman.d/hooks/95-booster-force.hook || SHOWerror "KernelSetup: write booster hook" ; fi
+					if [[ "${OSsel,,}" != "void" ]]; then mkdir -p /mnt/etc/pacman.d/hooks || SHOWerror "KernelSetup: mkdir hooks"; printf "[Trigger]\nOperation = Install\nOperation = Upgrade\nType = Package\nTarget = linux\nTarget = linux-*\n\n[Action]\nDescription = Forcing Booster initramfs update...\nWhen = PostTransaction\nDepends = booster\nNeedsTargets\nExec = /bin/bash -c 'while read -r pkg; do for d in /usr/lib/modules/*; do if [[ -f \"\$d/pkgbase\" && \"\$(<\"\$d/pkgbase\")\" == \"\$pkg\" ]]; then kver=\"\${d##*/}\"; /usr/bin/booster build --force $b_flag --kernel-version=\"\$kver\" \"/boot/initramfs-\${pkg}.img\"; break; fi; done; done'\n" > /mnt/etc/pacman.d/hooks/95-booster-force.hook || SHOWerror "KernelSetup: write booster hook" ; fi
 					local real_kver; real_kver=$(basename "$(find /mnt/usr/lib/modules/ -maxdepth 1 -mindepth 1 -type d ! -name 'extramodules*' | head -n 1)") || SHOWerror "KernelSetup: find real_kver"
-					"$chroot" /mnt /bin/bash -c "booster build --force --universal --kernel-version=${real_kver} /boot/initramfs-${KSel}.img" || SHOWerror "KernelSetup: booster build" ;;
-		*)			local HOOKS=(base udev autodetect keyboard keymap modconf block); [[ "$LUKS_ENC" -eq 1 ]] && HOOKS+=(encrypt); HOOKS+=(resume filesystems fsck); [[ ${#nvidiadrivers[@]} -gt 0 ]] && HOOKS+=(kms)
+					"$chroot" /mnt /bin/bash -c "booster build --force $b_flag --kernel-version=${real_kver} /boot/initramfs-${KSel}.img" || SHOWerror "KernelSetup: booster build" ;;
+		*)			local HOOKS=(base udev keyboard keymap modconf block)
+					[[ "$INITRAMFS_MODE" == "Universal (Portable to other PCs)" ]] && HOOKS+=(keyboard)
+					[[ "$LUKS_ENC" -eq 1 ]] && HOOKS+=(encrypt)
+					HOOKS+=(resume filesystems fsck)
+					[[ ${#nvidiadrivers[@]} -gt 0 ]] && HOOKS+=(kms)
 					sed -i -e "/MODULES/ s/()/(${modules[*]})/" -e "/BINARIES/ s/()/($binaries)/" -e "s/^HOOKS.*/HOOKS=(${HOOKS[*]})/" /mnt/etc/mkinitcpio.conf || SHOWerror "KernelSetup: sed mkinitcpio.conf"
 					"$chroot" /mnt mkinitcpio -p "$KSel" || SHOWerror "KernelSetup: mkinitcpio build" ;;
 	esac
