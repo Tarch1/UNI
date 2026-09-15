@@ -171,7 +171,7 @@ PKGcheck () {
 	[[ "$DEsel" == "COSMIC" ]] && desktoppkg=(cosmic xdg-desktop-portal-cosmic)
 	[[ "$DEsel" == "Hyprland" ]] && desktoppkg=(hyprland fuzzel waybar swaync hyprlock hypridle polkit-kde-agent xdg-desktop-portal-hyprland xdg-desktop-portal-gtk)
 	[[ "$DEsel" == "Niri" ]] && desktoppkg=(niri fuzzel waybar swaync hyprlock hypridle polkit-kde-agent xdg-desktop-portal-gnome xdg-desktop-portal-gtk xwayland-satellite)
-	displaymanagerpkg=(); [[ "${DMsel,,}" == "ly" ]] && displaymanagerpkg=(ly); [[ "${DMsel,,}" == "greetd" ]] && displaymanagerpkg=(greetd tuigreet); [[ "${DMsel,,}" == "sddm" ]] && displaymanagerpkg=(sddm); [[ "${DMsel,,}" == "gdm" ]] && displaymanagerpkg=(gdm)
+	displaymanagerpkg=(); [[ "${DMsel,,}" == "ly" ]] && displaymanagerpkg=(ly); [[ "${DMsel,,}" == "greetd" ]] && displaymanagerpkg=(greetd greetd-tuigreet); [[ "${DMsel,,}" == "sddm" ]] && displaymanagerpkg=(sddm); [[ "${DMsel,,}" == "gdm" ]] && displaymanagerpkg=(gdm)
 	[[ "${OSsel,,}" == "artix" && "${DMsel,,}" != "none" ]] && displaymanagerpkg+=("${DMsel,,}-${init_sys}")
 	kernel=("${KSel}" "${KSel}-headers"); [[ "${OSsel,,}" == "void" ]] && kernel+=(linux-firmware-network) || kernel+=(linux-firmware)
 	[[ "${OSsel,,}" != "void" ]] && { [[ "$IRFSetup" == "booster" ]] && kernel+=(booster); [[ "$IRFSetup" == "dracut" ]] && kernel+=(dracut); }
