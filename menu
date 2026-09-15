@@ -42,9 +42,9 @@ AutoOSsel () {
 	echo "Detected Live OS: $OSsel"
 }
 CPUsel () {
-	local cpu_info=$(grep -m1 -Ei 'GenuineIntel|AuthenticAMD' /proc/cpuinfo); [[ "$cpu_info" =~ Intel ]] && { echo 'Installing Intel microcode'; microcodepkg='intel-ucode'; }
-	[[ "$cpu_info" =~ AMD ]] && { echo 'Installing AMD microcode'; [[ "${OSsel,,}" == "void" ]] && microcodepkg='amd-ucode-firmware' || microcodepkg='amd-ucode'; }
-	[[ ! "$cpu_info" =~ (Intel|AMD) ]] && { echo 'No microcode needed or unknown CPU'; microcodepkg=""; }
+	local cpu_info=$(grep -m1 -Ei 'GenuineIntel|AuthenticAMD' /proc/cpuinfo); [[ "$cpu_info" =~ Intel ]] && { echo 'Installing Intel microcode'; UCODEsel='intel-ucode'; }
+	[[ "$cpu_info" =~ AMD ]] && { echo 'Installing AMD microcode'; [[ "${OSsel,,}" == "void" ]] && UCODEsel='amd-ucode-firmware' || UCODEsel='amd-ucode'; }
+	[[ ! "$cpu_info" =~ (Intel|AMD) ]] && { echo 'No microcode needed or unknown CPU'; UCODEsel=""; }
 }
 DriveSelection() {
 	local avail_disks=() display_options=()
@@ -123,20 +123,20 @@ TimezoneSel () {
 UEFIsel () {
 	[[ -d "/sys/firmware/efi/" ]] && { mount | grep -q "/sys/firmware/efi/efivars" || mount -t efivarfs efivarfs /sys/firmware/efi/efivars; UEFImode=1; echo 'UEFI Mode detected'; } || { UEFImode=0; echo 'BIOS Mode detected'; }
 }
-ArchRepoSel()		{ YesNoSel "Do you want Arch repositories as well as Artix repositories?"; [[ "$CC" -eq 1 ]] && { ARCHrepo=1; echo "OK, adding Arch repositories!"; } || { ARCHrepo=''; echo "Proceeding without them..."; }; }
-BootloaderSel()		{ [[ "$UEFImode" -eq 0 ]] && { BLsel="grub"; echo "BIOS mode: GRUB selected automatically"; return 0; }; local bl_options=( "refind" "grub" "efistub" "limine" ); [[ "${OSsel,,}" == "arch" ]] && bl_options+=( "systemd-boot" "uki" ); MenuSel "BLsel" "Select Bootloader" "${bl_options[@]}"; }
-DesktopEnvSel()		{ MenuSel "DEsel" "Select Desktop Environment / Window Manager" "KDE" "GNOME" "LXQt" "COSMIC" "Hyprland" "Niri" "None"; }
-DisplayManagerSel()	{ MenuSel "DMsel" "Select Display Manager" "Ly" "Greetd" "SDDM" "GDM" "None"; }
-FilesystemSel()		{ MenuSel "FSsel" "Select filesystem for ROOT" "ext4" "btrfs"; }
-HostnameSel()		{ TextPromptSel "HNsel" "Enter preferred hostname"; }
-InitSystemSel()		{ [[ "${OSsel,,}" == "artix" ]] && MenuSel "INITsel" "Select preferred Init System for Artix" "OpenRC" "Runit" "s6" "dinit" || INITsel="systemd"; }
-IRFsel()			{ [[ "${OSsel,,}" == "void" ]] && { IRFSetup="dracut"; echo "Selected Initramfs: dracut"; } || MenuSel "IRFSetup" "Select preferred Initramfs Generator" "booster" "mkinitcpio" "dracut"; }
-IRFSModeSel()		{ MenuSel "IRFSMode" "Select preferred Initramfs Mode, if universal for all PC or just for this one" "Host" "Universal"; }
-KernelSel()			{ [[ "${OSsel,,}" == "void" ]] && MenuSel "KSel" "Select preferred Kernel" "linux" "linux-lts" || MenuSel "KSel" "Select preferred Kernel" "linux" "linux-lts" "linux-hardened" "linux-zen"; }
-LibrarySel()		{ MenuSel "LIBsel" "Select base library" "GLIBC" "MUSL"; }
-LanguageSel()		{ MenuSel "LANGsel" "Select preferred Language" "en_US.UTF-8" "en_GB.UTF-8" "it_IT.UTF-8"; }
-LocalizationSel()	{ MenuSel "LOCsel" "Select localization" "en_US.UTF-8" "en_GB.UTF-8" "it_IT.UTF-8"; }
-OperatingSystemSel(){ MenuSel "OSsel" "Select the distro to setup" "Arch" "Artix" "Void"; }
-PartIDSel()			{ MenuSel "PIDsel" "Select partition identifier" "UUID" "PARTUUID" "LABEL"; }
-UsernameSel()		{ TextPromptSel "UNsel" "Enter preferred username"; }
-VoidInstMethod()	{ MenuSel "VImethod" "Select installation type" "XBPS" "ROOTFS"; }
+ArchRepoSel()			{ YesNoSel "Do you want Arch repositories as well as Artix repositories?"; [[ "$CC" -eq 1 ]] && { ARCHrepo=1; echo "OK, adding Arch repositories!"; } || { ARCHrepo=''; echo "Proceeding without them..."; }; }
+BootloaderSel()			{ [[ "$UEFImode" -eq 0 ]] && { BLsel="grub"; echo "BIOS mode: GRUB selected automatically"; return 0; }; local bl_options=( "refind" "grub" "efistub" "limine" ); [[ "${OSsel,,}" == "arch" ]] && bl_options+=( "systemd-boot" "uki" ); MenuSel "BLsel" "Select Bootloader" "${bl_options[@]}"; }
+DesktopEnvSel()			{ MenuSel "DEsel" "Select Desktop Environment / Window Manager" "KDE" "GNOME" "LXQt" "COSMIC" "Hyprland" "Niri" "None"; }
+DisplayManagerSel()		{ MenuSel "DMsel" "Select Display Manager" "Ly" "Greetd" "SDDM" "GDM" "None"; }
+FilesystemSel()			{ MenuSel "FSsel" "Select filesystem for ROOT" "ext4" "btrfs"; }
+HostnameSel()			{ TextPromptSel "HNsel" "Enter preferred hostname"; }
+InitSystemSel()			{ [[ "${OSsel,,}" == "artix" ]] && MenuSel "INITsel" "Select preferred Init System for Artix" "OpenRC" "Runit" "s6" "dinit" || INITsel="systemd"; }
+IRFsel()				{ [[ "${OSsel,,}" == "void" ]] && { IRFSetup="dracut"; echo "Selected Initramfs: dracut"; } || MenuSel "IRFSetup" "Select preferred Initramfs Generator" "booster" "mkinitcpio" "dracut"; }
+IRFSModeSel()			{ MenuSel "IRFSMode" "Select preferred Initramfs Mode, if universal for all PC or just for this one" "Host" "Universal"; }
+KernelSel()				{ [[ "${OSsel,,}" == "void" ]] && MenuSel "KSel" "Select preferred Kernel" "linux" "linux-lts" || MenuSel "KSel" "Select preferred Kernel" "linux" "linux-lts" "linux-hardened" "linux-zen"; }
+LibrarySel()			{ MenuSel "LIBsel" "Select base library" "GLIBC" "MUSL"; }
+LanguageSel()			{ MenuSel "LANGsel" "Select preferred Language" "en_US.UTF-8" "en_GB.UTF-8" "it_IT.UTF-8"; }
+LocalizationSel()		{ MenuSel "LOCsel" "Select localization" "en_US.UTF-8" "en_GB.UTF-8" "it_IT.UTF-8"; }
+OperatingSystemSel()	{ MenuSel "OSsel" "Select the distro to setup" "Arch" "Artix" "Void"; }
+PartIDSel()				{ MenuSel "PIDsel" "Select partition identifier" "UUID" "PARTUUID" "LABEL"; }
+UsernameSel()			{ TextPromptSel "UNsel" "Enter preferred username"; }
+VoidInstMethod()     { MenuSel "VImethod" "Select installation type" "XBPS" "ROOTFS"; }
