@@ -173,7 +173,7 @@ PKGcheck () {
 	booster=(); [[ "${OSsel,,}" != "void" ]] && booster=(booster)
 	btrfsutility=(); [[ "$FSsel" == "btrfs" ]] && btrfsutility=(snapper btrfs-progs)
 	desktop=(); [[ "$DEsel" == "KDE" ]] && desktop=(plasma-meta dolphin konsole xdg-desktop-portal-kde); [[ "$DEsel" == "GNOME" ]] && desktop=(gnome gnome-tweaks xdg-desktop-portal-gnome); [[ "$DEsel" == "LXQt" ]] && desktop=(lxqt xdg-desktop-portal-lxqt); [[ "$DEsel" == "COSMIC" ]] && desktop=(cosmic xdg-desktop-portal-cosmic); [[ "$DEsel" == "Hyprland" ]] && desktop=(hyprland fuzzel waybar swaync hyprlock hypridle polkit-kde-agent xdg-desktop-portal-hyprland xdg-desktop-portal-gtk); [[ "$DEsel" == "Niri" ]] && desktop=(niri fuzzel waybar swaync hyprlock hypridle polkit-kde-agent xdg-desktop-portal-gnome xdg-desktop-portal-gtk xwayland-satellite)
-	displaymanager=(); [[ "${DMsel,,}" == "ly" ]] && displaymanager=(ly); [[ "${DMsel,,}" == "greetd" ]] && displaymanager=(greetd greetd-tuigreet); [[ "${DMsel,,}" == "sddm" ]] && displaymanager=(sddm); [[ "${DMsel,,}" == "gdm" ]] && displaymanager=(gdm); [[ "${OSsel,,}" == "artix" && "${DMsel,,}" != "none" ]] && displaymanager+=("${DMsel,,}-${init_sys,,}")
+	displaymanager=(); [[ "${DMsel,,}" == "ly" ]] && displaymanager=(ly); [[ "${DMsel,,}" == "greetd" ]] && displaymanager=(greetd greetd-tuigreet); [[ "${DMsel,,}" == "lightdm" ]] && displaymanager=(lightdm lightdm-gtk-greeter lightdm-gtk-greeter-settings); [[ "${DMsel,,}" == "sddm" ]] && displaymanager=(sddm); [[ "${DMsel,,}" == "gdm" ]] && displaymanager=(gdm); [[ "${OSsel,,}" == "artix" && "${DMsel,,}" != "none" ]] && displaymanager+=("${DMsel,,}-${init_sys,,}")
 	filemanager=(yazi pcmanfm-qt tumbler file-roller android-tools); [[ "${OSsel,,}" != "void" ]] && filemanager+=(gvfs-mtp)
 	fonts=(); [[ "${OSsel,,}" == "void" ]] && fonts=(nerd-fonts) || fonts=(ttf-jetbrains-mono-nerd)
 	fs=(dialog mtools parted gptfdisk dosfstools ntfs-3g)
@@ -210,7 +210,6 @@ KernelSetup () {
 	[[ "$UCODEsel" == "intel-ucode" ]] && { mkdir -p /mnt/etc/modprobe.d && echo 'options i915 enable_fbc=1 fastboot=0 enable_dc=4' > /mnt/etc/modprobe.d/i915.conf || SHOWerror "KernelSetup: write i915.conf"; }
 	if [[ ${#nvidiadrivers[@]} -gt 0 ]]; then
 		[[ "${OSsel,,}" == "artix" ]] && { "$chroot" /mnt $PKGmanager$PKGinst$PKGupd"u" "${PKGskp[@]}" "nvidia-utils-${init_sys}" || SHOWerror "KernelSetup: install nvidia-utils"; }
-		ln -s /dev/null /mnt/etc/udev/rules.d/61-gdm.rules || SHOWerror "KernelSetup: ln 61-gdm.rules"
 		modules+=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)
 		echo -e "options nvidia-drm modeset=1 fbdev=1\noptions nvidia NVreg_DynamicPowerManagement=0x02 NVreg_UsePageAttributeTable=1 NVreg_EnablePCIeGen3=1" > /mnt/etc/modprobe.d/nvidia.conf || SHOWerror "KernelSetup: write nvidia.conf"
 	fi
@@ -252,7 +251,7 @@ ServiceSetup () {
 	[[ "${OSsel,,}" == "arch" ]] && { Services+=( NetworkManager chronyd cups avahi-daemon bluetooth paccache.timer ); [[ -f /mnt/usr/lib/systemd/system/power-profiles-daemon.service ]] && Services+=( power-profiles-daemon ); [[ -f /mnt/usr/lib/systemd/system/thermald.service ]] && Services+=( thermald ); }
 	[[ "${OSsel,,}" == "void" ]] && { Services+=( NetworkManager chronyd cupsd dbus avahi-daemon bluetoothd seatd ); [[ -f /mnt/usr/bin/tlp ]] && Services+=( tlp ); [[ -f /mnt/usr/bin/thermald || -f /mnt/usr/sbin/thermald ]] && Services+=( thermald ); }
 	[[ "$VBTsel" -eq 1 ]] && [[ "${OSsel,,}" != "artix" ]] && Services+=( vboxservice )
-	[[ "${DMsel,,}" =~ ^(ly|greetd|sddm|gdm)$ ]] && Services+=("${DMsel,,}")
+	[[ "${DMsel,,}" =~ ^(ly|greetd|lightdm|sddm|gdm)$ ]] && Services+=("${DMsel,,}")
 	[[ "${GPUMANAGERsel,,}" == "cardwire" ]] && {
 		[[ "${OSsel,,}" == "artix" && "$init_sys" == "openrc" ]] && { echo -e '#!/sbin/openrc-run\nname="Cardwire GPU Manager"\ncommand="/usr/bin/cardwire"\ncommand_background="yes"\npidfile="/run/${RC_SVCNAME}.pid"\ndepend() {\n\tneed localmount devfs\n\tafter bootmisc\n}' > /mnt/etc/init.d/cardwire; chmod +x /mnt/etc/init.d/cardwire; }
 		[[ "${OSsel,,}" == "artix" && "$init_sys" != "openrc" ]] && { mkdir -p /mnt/etc/runit/sv/cardwire; echo -e '#!/bin/sh\nexec /usr/bin/cardwire' > /mnt/etc/runit/sv/cardwire/run; chmod +x /mnt/etc/runit/sv/cardwire/run; }
@@ -270,6 +269,9 @@ ServiceSetup () {
 	done
 	mkdir -p /mnt/etc/udev/rules.d/; [[ -f "${SCRIPT_DIR}/Conf_files/51-android.rules" ]] && cp "${SCRIPT_DIR}/Conf_files/51-android.rules" /mnt/etc/udev/rules.d/ || true
 	if [[ "${DMsel,,}" == "greetd" ]]; then	local t_cmd="tuigreet --time --cmd " ; [[ "$DEsel" == "Hyprland" ]] && t_cmd+="Hyprland" ; [[ "$DEsel" == "Niri" ]] && { [[ "$init_sys" =~ ^(systemd|dinit)$ ]] && t_cmd+="niri-session" || t_cmd+="'niri --session'"; } ; "$chroot" /mnt sed -i -e "s|^command = .*|command = \"$t_cmd\"|" -e 's/^vt = .*/vt = 7/' /etc/greetd/config.toml || true ; fi
+	if [[ "$init_sys" != "systemd" && "$init_sys" != "dinit" ]]; then
+		[[ "$DEsel" =~ ^(Niri|Hyprland)$ ]] && { local x_cmd="Hyprland"; [[ "$DEsel" == "Niri" ]] && x_cmd="niri --session"; [[ -f /mnt/usr/share/wayland-sessions/${DEsel,,}.desktop ]] && "$chroot" /mnt sed -i "s/^Exec=.*/Exec=dbus-run-session $x_cmd/" /usr/share/wayland-sessions/${DEsel,,}.desktop; } || true
+	fi
 }
 UserSetup () {
 	"$chroot" /mnt bash -c "useradd -m -g users -G wheel,video,audio,storage,input,lp,scanner,power,kvm $UNsel && su $UNsel -c 'mkdir -p ~/.config'"
@@ -361,9 +363,9 @@ BootloaderSetup () {
 						local efi_dev="$DRIVE"; local efi_num="$(echo "$BOOT_PART" | grep -o '[0-9]*$')"
 						mkdir -p /mnt/boot/EFI/BOOT || SHOWerror "BootloaderSetup: mkdir limine BOOT"
 						cp /mnt/usr/share/limine/BOOTX64.EFI /mnt/boot/EFI/BOOT/ || SHOWerror "BootloaderSetup: cp limine EFI"
-						local lim_ucode=""; [[ -n "$UCODEsel" ]] && lim_ucode="module_path: boot():/${UCODEsel}.img\n	"
+						local lim_ucode=""; [[ -n "$UCODEsel" ]] && lim_ucode="module_path: boot():/${UCODEsel}.img\n    "
 						local lim_flags="rw $luks_flags resume=${PIDsel}=$SWAPID rootfstype=$FSsel $rootflags $nvdrm $nvosi"
-						echo -e "timeout: 3\n\n/Linux (${OSsel^})\n	protocol: linux\n	kernel_path: boot():/${kname}\n	${lim_ucode}module_path: boot():/${irfs}\n	cmdline: ${lim_flags}" > /mnt/boot/limine.conf || SHOWerror "BootloaderSetup: write limine.conf"
+						echo -e "timeout: 3\n\n/Linux (${OSsel^})\n    protocol: linux\n    kernel_path: boot():/${kname}\n    ${lim_ucode}module_path: boot():/${irfs}\n    cmdline: ${lim_flags}" > /mnt/boot/limine.conf || SHOWerror "BootloaderSetup: write limine.conf"
 						"$chroot" /mnt efibootmgr -c -d "$efi_dev" -p "${efi_num:-1}" -L "Limine Bootloader" -l '\EFI\BOOT\BOOTX64.EFI' || SHOWerror "BootloaderSetup: efibootmgr limine" ;;
 		systemd-boot)	"$chroot" /mnt bootctl --path=/boot install || SHOWerror "BootloaderSetup: bootctl install"
 						echo -e "default arch.conf\ntimeout 3\nconsole-mode max\neditor no" > /mnt/boot/loader/loader.conf || SHOWerror "BootloaderSetup: write loader.conf"
