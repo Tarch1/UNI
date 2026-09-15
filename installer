@@ -113,10 +113,16 @@ VoidSystemInstall () {
 }
 CrypttabGen () {
 	[[ "$LUKS_ENC" -ne 1 ]] && return 0
-	echo -n "$LUKS_PASS" > /mnt/etc/crypt_key.bin; chmod 600 /mnt/etc/crypt_key.bin
+	echo -n "$LUKS_PASS" > /mnt/etc/crypt_key.bin || SHOWerror "CrypttabGen: create crypt_key.bin"
+	chmod 600 /mnt/etc/crypt_key.bin || SHOWerror "CrypttabGen: chmod crypt_key.bin"
 	echo -n "$LUKS_PASS" | cryptsetup luksAddKey -q "$SWAP_PART" /mnt/etc/crypt_key.bin -d - || SHOWerror "CrypttabGen: luksAddKey swap"
-	echo "cryptswap UUID=$CRYPT_SWAP_UUID /etc/crypt_key.bin luks" > /mnt/etc/crypttab
-	[[ -n "$CRYPT_ADD_UUID" ]] && { echo -n "$LUKS_PASS" | cryptsetup luksAddKey -q "$ADDITIONAL_DRIVE" /mnt/etc/crypt_key.bin -d - || SHOWerror "CrypttabGen: luksAddKey add"; echo "cryptdata UUID=$CRYPT_ADD_UUID /etc/crypt_key.bin luks,nofail" >> /mnt/etc/crypttab; } || true
+	[[ "${OSsel,,}" == "artix" && "$init_sys" == "openrc" ]] && { echo -e "target='cryptswap'\nsource='/dev/disk/by-uuid/$CRYPT_SWAP_UUID'\nkey='/etc/crypt_key.bin'" > /mnt/etc/conf.d/dmcrypt || SHOWerror "CrypttabGen: write conf.d/dmcrypt swap"; }
+	[[ "${OSsel,,}" != "artix" || "$init_sys" != "openrc" ]] && { echo "cryptswap UUID=$CRYPT_SWAP_UUID /etc/crypt_key.bin luks" > /mnt/etc/crypttab || SHOWerror "CrypttabGen: write crypttab swap"; }
+	[[ -n "$CRYPT_ADD_UUID" ]] && {
+		echo -n "$LUKS_PASS" | cryptsetup luksAddKey -q "$ADDITIONAL_DRIVE" /mnt/etc/crypt_key.bin -d - || SHOWerror "CrypttabGen: luksAddKey add"
+		[[ "${OSsel,,}" == "artix" && "$init_sys" == "openrc" ]] && { echo -e "\ntarget='cryptdata'\nsource='/dev/disk/by-uuid/$CRYPT_ADD_UUID'\nkey='/etc/crypt_key.bin'" >> /mnt/etc/conf.d/dmcrypt || SHOWerror "CrypttabGen: write conf.d/dmcrypt add"; }
+		[[ "${OSsel,,}" != "artix" || "$init_sys" != "openrc" ]] && { echo "cryptdata UUID=$CRYPT_ADD_UUID /etc/crypt_key.bin luks,nofail" >> /mnt/etc/crypttab || SHOWerror "CrypttabGen: write crypttab add"; }
+	} || true
 }
 FStabGen () {
 	[[ -f /mnt/etc/fstab ]] && { mv -f /mnt/etc/fstab /mnt/etc/old-fstab || SHOWerror "FStabGen: mv fstab"; }
