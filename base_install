@@ -184,6 +184,7 @@ PKGcheck () {
 	fs=(dialog mtools parted gptfdisk dosfstools ntfsprogs)
 	archive=(bzip2 cpio gzip xz 7zip tar unrar zip unzip zstd)
 	utility=(imv featherpad libqalculate fd btop fwupd fastfetch grim slurp wl-clipboard swappy awww xorg-xwayland); [[ "${OSsel,,}" != "void" ]] && utility+=(lact cowfortune pacman-contrib)
+	[[ "${OSsel,,}" == "artix" && "$LUKS_ENC" -eq 1 ]] && utility+=("cryptsetup-${init_sys,,}")
 	if ls /sys/class/power_supply/BAT* &>/dev/null; then [[ "${OSsel,,}" == "arch" ]] && utility+=(power-profiles-daemon) || utility+=(tlp); [[ "$microcodepkg" == "intel-ucode" ]] && utility+=(thermald); fi
 	[[ "$VBTsel" -eq 1 ]] && { [[ "${OSsel,,}" == "void" ]] && utility+=(virtualbox-os-guest) || utility+=(virtualbox-guest-utils); }
 	[[ "${GPUMANAGERsel,,}" == "envycontrol" ]] && utility+=(envycontrol)
@@ -253,7 +254,7 @@ KernelSetup () {
 	esac
 }
 ServiceSetup () {
-	[[ "${OSsel,,}" == "artix" ]] && { Services+=( NetworkManager chrony dbus elogind cupsd avahi-daemon bluetoothd ); [[ "$init_sys" == "openrc" ]] && Services+=( openrc-settingsd ); [[ -f /mnt/usr/bin/tlp ]] && Services+=( tlp ); [[ -f /mnt/usr/bin/thermald || -f /mnt/usr/sbin/thermald ]] && Services+=( thermald ); [[ -v nvidiadrivers && -f /mnt/usr/bin/nvidia-persistenced ]] && Services+=( nvidia-persistenced ); }
+	[[ "${OSsel,,}" == "artix" ]] && { Services+=( NetworkManager chrony dbus elogind cupsd avahi-daemon bluetoothd ); [[ "$LUKS_ENC" -eq 1 ]] && Services+=( dmcrypt ); [[ "$init_sys" == "openrc" ]] && Services+=( openrc-settingsd ); [[ -f /mnt/usr/bin/tlp ]] && Services+=( tlp ); [[ -f /mnt/usr/bin/thermald || -f /mnt/usr/sbin/thermald ]] && Services+=( thermald ); [[ -v nvidiadrivers && -f /mnt/usr/bin/nvidia-persistenced ]] && Services+=( nvidia-persistenced ); }
 	[[ "${OSsel,,}" == "arch" ]] && { Services+=( NetworkManager chronyd cups avahi-daemon bluetooth paccache.timer ); [[ -f /mnt/usr/lib/systemd/system/power-profiles-daemon.service ]] && Services+=( power-profiles-daemon ); [[ -f /mnt/usr/lib/systemd/system/thermald.service ]] && Services+=( thermald ); }
 	[[ "${OSsel,,}" == "void" ]] && { Services+=( NetworkManager chronyd cupsd dbus avahi-daemon bluetoothd seatd ); [[ -f /mnt/usr/bin/tlp ]] && Services+=( tlp ); [[ -f /mnt/usr/bin/thermald || -f /mnt/usr/sbin/thermald ]] && Services+=( thermald ); }
 	[[ "$VBTsel" -eq 1 ]] && [[ "${OSsel,,}" != "artix" ]] && Services+=( vboxservice )
@@ -270,10 +271,11 @@ ServiceSetup () {
 			artix:runit)	"$chroot" /mnt ln -sf /etc/runit/sv/"$s" /etc/runit/runsvdir/default/ ;;
 			artix:s6)		"$chroot" /mnt touch /etc/s6/adminsv/default/contents.d/"$s" ;;
 			artix:dinit)	"$chroot" /mnt ln -sf ../"$s" /etc/dinit.d/boot.d/ ;;
-			artix:*)		"$chroot" /mnt rc-update add "$s" default ;;
+			artix:*)		[[ "$s" == "dmcrypt" ]] && "$chroot" /mnt rc-update add "$s" boot || "$chroot" /mnt rc-update add "$s" default ;;
 		esac
 	done
 	mkdir -p /mnt/etc/udev/rules.d/; [[ -f "${SCRIPT_DIR}/Conf_files/51-android.rules" ]] && cp "${SCRIPT_DIR}/Conf_files/51-android.rules" /mnt/etc/udev/rules.d/ || true
+	if [[ "${DMsel,,}" == "greetd" ]]; then	local t_cmd="tuigreet --time --cmd " ; [[ "$DEsel" == "Hyprland" ]] && t_cmd+="Hyprland" ; [[ "$DEsel" == "Niri" ]] && t_cmd+="niri-session" ; "$chroot" /mnt sed -i -e "s|^command = .*|command = \"$t_cmd\"|" -e 's/^vt = .*/vt = 7/' /etc/greetd/config.toml || true ; fi
 }
 UserSetup () {
 	"$chroot" /mnt bash -c "useradd -m -g users -G wheel,video,audio,storage,input,lp,scanner,power,kvm $UNsel && su $UNsel -c 'mkdir -p ~/.config'"
