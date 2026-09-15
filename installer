@@ -263,7 +263,7 @@ ServiceSetup () {
 		esac
 	done
 	mkdir -p /mnt/etc/udev/rules.d/; [[ -f "${SCRIPT_DIR}/Conf_files/51-android.rules" ]] && cp "${SCRIPT_DIR}/Conf_files/51-android.rules" /mnt/etc/udev/rules.d/ || true
-	if [[ "${DMsel,,}" == "greetd" ]]; then	local t_cmd="tuigreet --time --cmd " ; [[ "$DEsel" == "Hyprland" ]] && t_cmd+="Hyprland" ; [[ "$DEsel" == "Niri" ]] && t_cmd+="niri-session" ; "$chroot" /mnt sed -i -e "s|^command = .*|command = \"$t_cmd\"|" -e 's/^vt = .*/vt = 7/' /etc/greetd/config.toml || true ; fi
+	if [[ "${DMsel,,}" == "greetd" ]]; then	local t_cmd="tuigreet --time --cmd " ; [[ "$DEsel" == "Hyprland" ]] && t_cmd+="Hyprland" ; [[ "$DEsel" == "Niri" ]] && { [[ "$init_sys" =~ ^(systemd|dinit)$ ]] && t_cmd+="niri-session" || t_cmd+="'niri --session'"; } ; "$chroot" /mnt sed -i -e "s|^command = .*|command = \"$t_cmd\"|" -e 's/^vt = .*/vt = 7/' /etc/greetd/config.toml || true ; fi
 }
 UserSetup () {
 	"$chroot" /mnt bash -c "useradd -m -g users -G wheel,video,audio,storage,input,lp,scanner,power,kvm $UNsel && su $UNsel -c 'mkdir -p ~/.config'"
