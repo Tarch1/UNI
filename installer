@@ -9,9 +9,9 @@ SHOWerror () {
 	[[ "$CC" -eq 1 ]] && echo "OK, still going, see Errors file in this directory" || { echo "OK, then exit"; exit 1; }
 }
 Check_required_files () {
-	local files=( additional_setup Bootloader/Refind/themes/Blur-theme/theme.conf Bootloader/Grub-Sekiro/{theme.txt,sekiro_1920x1080.png,select_c.png} Bootloader/Grub-Eiffel/{theme.txt,eiffel_tower_under_construction.png,select_c.png} )
+	local files=( menu Bootloader/Refind/themes/Blur-theme/theme.conf Bootloader/Grub-Sekiro/{theme.txt,sekiro_1920x1080.png,select_c.png} Bootloader/Grub-Eiffel/{theme.txt,eiffel_tower_under_construction.png,select_c.png} )
 	local miss=(); for a in "${files[@]}"; do [[ ! -f "${SCRIPT_DIR}/$a" ]] && miss+=("$a"); done
-	[[ ${#miss[@]} -gt 0 ]] && { echo 'Required file(s) missing:' "${miss[@]}"; exit 1; } || source additional_setup
+	[[ ${#miss[@]} -gt 0 ]] && { echo 'Required file(s) missing:' "${miss[@]}"; exit 1; } || source menu
 }
 DiskPartition() {
 	if grep -qs '/mnt' /proc/mounts; then echo "[i] Found active mount point in /mnt. Unmounting..."; umount -R /mnt || SHOWerror "DiskPartition: umount /mnt"; fi
@@ -94,7 +94,7 @@ FileSystemFormat() {
 }
 ArchTixSystemInstall () {
 	local BasePKG=( "${kernel[@]}" "${baselinux[@]}" "${logind[@]}" )
-	[[ -n "$microcodepkg" ]] && BasePKG+=( "$microcodepkg" )
+	[[ -n "$UCODEsel" ]] && BasePKG+=( "$UCODEsel" )
 	[[ "$FSsel" == "btrfs" ]] && BasePKG+=( "${btrfsutility[@]}" )
 	"$PKGstrap" /mnt "${BasePKG[@]}" || SHOWerror "ArchTixSystemInstall: pkgstrap"
 	[[ -f /mnt/etc/pacman.conf ]] && sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 5/' /mnt/etc/pacman.conf || true
@@ -142,7 +142,7 @@ PackageConfig () {
 	"$chroot" /mnt $PKGmanager$PKGinst$PKGupd
 }
 PackageInstall () {
-	local FinalPKGs=( "${baseutils[@]}" "${fs[@]}" "${bootloaderutility[@]}" "${btrfsutility[@]}" "${grubpkg[@]}" "${refindpkg[@]}" "${liminepkg[@]}" "${ukipkg[@]}" "${net[@]}" "${audio[@]}" "${bluetooth[@]}" "${print[@]}" "${apps[@]}" "${utility[@]}" "${filemanager[@]}" "${archive[@]}" "${desktoppkg[@]}" "${displaymanagerpkg[@]}" "${logind[@]}" "${fonts[@]}" )
+	local FinalPKGs=( "${baseutils[@]}" "${fs[@]}" "${bootloaderutility[@]}" "${btrfsutility[@]}" "${grub[@]}" "${refind[@]}" "${limine[@]}" "${uki[@]}" "${net[@]}" "${audio[@]}" "${bluetooth[@]}" "${print[@]}" "${apps[@]}" "${utility[@]}" "${filemanager[@]}" "${archive[@]}" "${desktop[@]}" "${displaymanager[@]}" "${logind[@]}" "${fonts[@]}" )
 	if [[ "$VBTsel" -eq 1 ]]; then
 		[[ "${OSsel,,}" != "void" ]] && FinalPKGs=( "${baselinux[@]}" "${FinalPKGs[@]}" )
 	else
@@ -166,28 +166,28 @@ PKGcheck () {
 	bootloaderutility=(efibootmgr os-prober); [[ "${OSsel,,}" != "void" ]] && bootloaderutility+=(sbsigntools)
 	booster=(); [[ "${OSsel,,}" != "void" ]] && booster=(booster)
 	btrfsutility=(); [[ "$FSsel" == "btrfs" ]] && btrfsutility=(snapper btrfs-progs)
-	desktoppkg=(); [[ "$DEsel" == "KDE" ]] && desktoppkg=(plasma-meta dolphin konsole xdg-desktop-portal-kde); [[ "$DEsel" == "GNOME" ]] && desktoppkg=(gnome gnome-tweaks xdg-desktop-portal-gnome); [[ "$DEsel" == "LXQt" ]] && desktoppkg=(lxqt xdg-desktop-portal-lxqt); [[ "$DEsel" == "COSMIC" ]] && desktoppkg=(cosmic xdg-desktop-portal-cosmic); [[ "$DEsel" == "Hyprland" ]] && desktoppkg=(hyprland fuzzel waybar swaync hyprlock hypridle polkit-kde-agent xdg-desktop-portal-hyprland xdg-desktop-portal-gtk); [[ "$DEsel" == "Niri" ]] && desktoppkg=(niri fuzzel waybar swaync hyprlock hypridle polkit-kde-agent xdg-desktop-portal-gnome xdg-desktop-portal-gtk xwayland-satellite)
-	displaymanagerpkg=(); [[ "${DMsel,,}" == "ly" ]] && displaymanagerpkg=(ly); [[ "${DMsel,,}" == "greetd" ]] && displaymanagerpkg=(greetd greetd-tuigreet); [[ "${DMsel,,}" == "sddm" ]] && displaymanagerpkg=(sddm); [[ "${DMsel,,}" == "gdm" ]] && displaymanagerpkg=(gdm); [[ "${OSsel,,}" == "artix" && "${DMsel,,}" != "none" ]] && displaymanagerpkg+=("${DMsel,,}-${init_sys,,}")
+	desktop=(); [[ "$DEsel" == "KDE" ]] && desktop=(plasma-meta dolphin konsole xdg-desktop-portal-kde); [[ "$DEsel" == "GNOME" ]] && desktop=(gnome gnome-tweaks xdg-desktop-portal-gnome); [[ "$DEsel" == "LXQt" ]] && desktop=(lxqt xdg-desktop-portal-lxqt); [[ "$DEsel" == "COSMIC" ]] && desktop=(cosmic xdg-desktop-portal-cosmic); [[ "$DEsel" == "Hyprland" ]] && desktop=(hyprland fuzzel waybar swaync hyprlock hypridle polkit-kde-agent xdg-desktop-portal-hyprland xdg-desktop-portal-gtk); [[ "$DEsel" == "Niri" ]] && desktop=(niri fuzzel waybar swaync hyprlock hypridle polkit-kde-agent xdg-desktop-portal-gnome xdg-desktop-portal-gtk xwayland-satellite)
+	displaymanager=(); [[ "${DMsel,,}" == "ly" ]] && displaymanager=(ly); [[ "${DMsel,,}" == "greetd" ]] && displaymanager=(greetd greetd-tuigreet); [[ "${DMsel,,}" == "sddm" ]] && displaymanager=(sddm); [[ "${DMsel,,}" == "gdm" ]] && displaymanager=(gdm); [[ "${OSsel,,}" == "artix" && "${DMsel,,}" != "none" ]] && displaymanager+=("${DMsel,,}-${init_sys,,}")
 	filemanager=(yazi pcmanfm-qt tumbler file-roller android-tools); [[ "${OSsel,,}" != "void" ]] && filemanager+=(gvfs-mtp)
 	fonts=(); [[ "${OSsel,,}" == "void" ]] && fonts=(nerd-fonts) || fonts=(ttf-jetbrains-mono-nerd)
 	fs=(dialog mtools parted gptfdisk dosfstools ntfs-3g)
+	grub=(); [[ "${BLsel,,}" == "grub" ]] && grub=(grub)
 	grubbtrfs=(); [[ "$FSsel" == "btrfs" && "${OSsel,,}" != "void" ]] && grubbtrfs=(grub-btrfs)
-	grubpkg=(); [[ "${BLsel,,}" == "grub" ]] && grubpkg=(grub)
 	hardwareacceleration=(); [[ "${OSsel,,}" == "void" ]] && hardwareacceleration=(mesa-dri mesa-vaapi mesa-vulkan-radeon) || hardwareacceleration=(intel-media-driver vkd3d)
 	kernel=("${KSel}" "${KSel}-headers"); [[ "${OSsel,,}" == "void" ]] && kernel+=(linux-firmware-network) || kernel+=(linux-firmware); [[ "${OSsel,,}" != "void" ]] && { [[ "$IRFSetup" == "booster" ]] && kernel+=(booster); [[ "$IRFSetup" == "dracut" ]] && kernel+=(dracut); }
-	liminepkg=(); [[ "${BLsel,,}" == "limine" ]] && liminepkg=(limine)
+	limine=(); [[ "${BLsel,,}" == "limine" ]] && limine=(limine)
 	logind=(); [[ "${OSsel,,}" == "artix" ]] && logind=(elogind elogind-"${init_sys,,}" "${init_sys,,}"-settingsd); [[ "${OSsel,,}" == "void" ]] && logind=(seatd)
-	microcode=(); [[ -n "$microcodepkg" ]] && microcode=("$microcodepkg")
+	microcode=(); [[ -n "$UCODEsel" ]] && microcode=("$UCODEsel")
 	net=(iwd chrony); [[ "${OSsel,,}" == "void" ]] && net+=(NetworkManager) || net+=(networkmanager); [[ "${OSsel,,}" == "artix" ]] && net+=("chrony-${init_sys,,}" "networkmanager-${init_sys,,}")
 	print=(cups cups-pdf avahi); [[ "${OSsel,,}" == "void" ]] && print+=(cups-filters) || print+=(system-config-printer); [[ "${OSsel,,}" == "artix" ]] && print+=("avahi-${init_sys,,}" "cups-${init_sys,,}")
-	refindpkg=(); [[ "${BLsel,,}" == "refind" ]] && refindpkg=(refind)
-	ukipkg=(); [[ "${BLsel,,}" == "uki" ]] && ukipkg=(systemd-ukify)
-	utility=(imv featherpad libqalculate fd btop fwupd fastfetch grim slurp wl-clipboard swappy awww xorg-xwayland); [[ "${OSsel,,}" != "void" ]] && utility+=(lact cowfortune pacman-contrib); [[ "${OSsel,,}" == "artix" && "$LUKS_ENC" -eq 1 ]] && utility+=("cryptsetup-${init_sys,,}"); if ls /sys/class/power_supply/BAT* &>/dev/null; then [[ "${OSsel,,}" == "arch" ]] && utility+=(power-profiles-daemon) || utility+=(tlp); [[ "$microcodepkg" == "intel-ucode" ]] && utility+=(thermald); fi; [[ "$VBTsel" -eq 1 ]] && { [[ "${OSsel,,}" == "void" ]] && utility+=(virtualbox-os-guest) || utility+=(virtualbox-guest-utils); }; [[ "${GPUMANAGERsel,,}" == "envycontrol" ]] && utility+=(envycontrol); [[ "${GPUMANAGERsel,,}" == "cardwire" ]] && utility+=(cardwire)
+	refind=(); [[ "${BLsel,,}" == "refind" ]] && refind=(refind)
+	uki=(); [[ "${BLsel,,}" == "uki" ]] && uki=(systemd-ukify)
+	utility=(imv featherpad libqalculate fd btop fwupd fastfetch grim slurp wl-clipboard swappy awww xorg-xwayland); [[ "${OSsel,,}" != "void" ]] && utility+=(lact cowfortune pacman-contrib); [[ "${OSsel,,}" == "artix" && "$LUKS_ENC" -eq 1 ]] && utility+=("cryptsetup-${init_sys,,}"); if ls /sys/class/power_supply/BAT* &>/dev/null; then [[ "${OSsel,,}" == "arch" ]] && utility+=(power-profiles-daemon) || utility+=(tlp); [[ "$UCODEsel" == "intel-ucode" ]] && utility+=(thermald); fi; [[ "$VBTsel" -eq 1 ]] && { [[ "${OSsel,,}" == "void" ]] && utility+=(virtualbox-os-guest) || utility+=(virtualbox-guest-utils); }; [[ "${GPUMANAGERsel,,}" == "envycontrol" ]] && utility+=(envycontrol); [[ "${GPUMANAGERsel,,}" == "cardwire" ]] && utility+=(cardwire)
 	vulkan=(); [[ "${OSsel,,}" == "void" ]] && vulkan=(vulkan-loader) || vulkan=(vulkan-icd-loader vulkan-intel vulkan-mesa-layers)
 	[[ "${OSsel,,}" == "void" ]] && { local v_live_repos=(void-repo-nonfree); [[ "$LIBsel" == "GLIBC" ]] && v_live_repos+=(void-repo-multilib void-repo-multilib-nonfree); $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${v_live_repos[@]}" || true; }
 	echo "Downloading remote package indexes..."; local remote_repo_list="/tmp/remote_pkgs.list"
 	[[ "${OSsel,,}" == "void" ]] && $PKGmanager$PKGchk -R -s "" | awk '{print $2}' | sed 's/-[0-9].*//' | sort -u > "$remote_repo_list" || $PKGmanager$PKGinst$PKGupd"lq" | sort -u > "$remote_repo_list"
-	local y="amddrivers apps archive audio baselinux baseutils bluetooth bootloaderutility booster btrfsutility desktoppkg displaymanagerpkg filemanager fonts fs grubbtrfs grubpkg hardwareacceleration kernel liminepkg logind microcode net nvidiadrivers print refindpkg ukipkg utility vulkan" miss=()
+	local y="amddrivers apps archive audio baselinux baseutils bluetooth bootloaderutility booster btrfsutility desktop displaymanager filemanager fonts fs grub grubbtrfs hardwareacceleration kernel limine logind microcode net nvidiadrivers print refind uki utility vulkan" miss=()
 	for group in $y; do
 		local -n current_group="$group"; local valid_pkgs=()
 		for pkg in "${current_group[@]}"; do grep -qx "$pkg" "$remote_repo_list" && valid_pkgs+=("$pkg") || miss+=("$pkg"); done
@@ -201,7 +201,7 @@ PKGcheck () {
 	fi
 }
 KernelSetup () {
-	[[ "$microcodepkg" == "intel-ucode" ]] && { mkdir -p /mnt/etc/modprobe.d && echo 'options i915 enable_fbc=1 fastboot=0 enable_dc=4' > /mnt/etc/modprobe.d/i915.conf || SHOWerror "KernelSetup: write i915.conf"; }
+	[[ "$UCODEsel" == "intel-ucode" ]] && { mkdir -p /mnt/etc/modprobe.d && echo 'options i915 enable_fbc=1 fastboot=0 enable_dc=4' > /mnt/etc/modprobe.d/i915.conf || SHOWerror "KernelSetup: write i915.conf"; }
 	if [[ ${#nvidiadrivers[@]} -gt 0 ]]; then
 		[[ "${OSsel,,}" == "artix" ]] && { "$chroot" /mnt $PKGmanager$PKGinst$PKGupd"u" "${PKGskp[@]}" "nvidia-utils-${init_sys}" || SHOWerror "KernelSetup: install nvidia-utils"; }
 		ln -s /dev/null /mnt/etc/udev/rules.d/61-gdm.rules || SHOWerror "KernelSetup: ln 61-gdm.rules"
@@ -324,10 +324,10 @@ BootloaderSetup () {
 	[[ "$FSsel" == "btrfs" ]] && rootflags='rootflags=subvol=@'
 	[[ ${#nvidiadrivers[@]} -gt 0 ]] && { nvdrm="nvidia-drm.modeset=1 nvidia-drm.fbdev=1"; nvosi="acpi_osi=\"$osi_version\""; }
 	[[ "${GPUMANAGERsel,,}" == "cardwire" ]] && nvosi="$nvosi lsm=lockdown,capability,landlock,bpf"
-	[[ -n "$microcodepkg" && -f "/mnt/boot/${microcodepkg}.img" ]] && initrd_flags="initrd=\\${microcodepkg}.img initrd=\\${irfs}" || initrd_flags="initrd=\\${irfs}"
+	[[ -n "$UCODEsel" && -f "/mnt/boot/${UCODEsel}.img" ]] && initrd_flags="initrd=\\${UCODEsel}.img initrd=\\${irfs}" || initrd_flags="initrd=\\${irfs}"
 	[[ "$LUKS_ENC" -eq 1 ]] && luks_flags="cryptdevice=UUID=${CRYPT_ROOT_UUID}:cryptroot rd.luks.uuid=${CRYPT_ROOT_UUID} rd.luks.name=${CRYPT_ROOT_UUID}=cryptroot root=/dev/mapper/cryptroot" || luks_flags="root=${PIDsel}=$ROOTID"
 	case "${BLsel,,}" in
-		refind)			"$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${refindpkg[@]}" || SHOWerror "BootloaderSetup: install refind"
+		refind)			"$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${refind[@]}" || SHOWerror "BootloaderSetup: install refind"
 						"$chroot" /mnt refind-install || SHOWerror "BootloaderSetup: refind-install"
 						[[ "$UEFImode" -eq 1 ]] && efifolder='refind' || efifolder='BOOT'
 						mkdir -p /mnt/boot/EFI/"$efifolder"/themes || SHOWerror "BootloaderSetup: mkdir refind themes"
@@ -337,8 +337,8 @@ BootloaderSetup () {
 						local rl_flags="rw $luks_flags resume=${PIDsel}=$SWAPID rootfstype=$FSsel $rootflags $nvdrm $nvosi"
 						echo -e "\"Boot Standard\"\t\"$rl_flags $initrd_flags\"\n\"Boot Terminal\"\t\"$rl_flags $initrd_flags systemd.unit=multi-user.target\"" > /mnt/boot/refind_linux.conf || SHOWerror "BootloaderSetup: write refind_linux.conf"
 						echo '!!!Refind config and theme changed!!!' ;;
-		grub)			[[ "$FSsel" == "btrfs" ]] && grubpkg+=("${grubbtrfs[@]}")
-						"$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${grubpkg[@]}" || SHOWerror "BootloaderSetup: install grub"
+		grub)			[[ "$FSsel" == "btrfs" ]] && grub+=("${grubbtrfs[@]}")
+						"$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${grub[@]}" || SHOWerror "BootloaderSetup: install grub"
 						[[ "$UEFImode" -eq 0 ]] && "$chroot" /mnt grub-install --target=i386-pc --recheck --debug "$DRIVE" || "$chroot" /mnt grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB || SHOWerror "BootloaderSetup: grub-install"
 						local g_theme="Grub-Sekiro"
 						mkdir -p /mnt/boot/grub/themes /mnt/usr/share/grub/themes/ || SHOWerror "BootloaderSetup: mkdir grub themes"
@@ -351,24 +351,24 @@ BootloaderSetup () {
 						local BLflags="$initrd_flags ro $luks_flags resume=${PIDsel}=$SWAPID rootfstype=$FSsel $rootflags $nvdrm $nvosi"
 						local efi_dev="$DRIVE"; local efi_num="$(echo "$BOOT_PART" | grep -o '[0-9]*$')"
 						"$chroot" /mnt efibootmgr -d "$efi_dev" -p "${efi_num:-1}" -c -L "$boot_label" -l "\\$kname" -u "$BLflags" --verbose || SHOWerror "BootloaderSetup: efibootmgr efistub" ;;
-		limine)			"$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${liminepkg[@]}" || SHOWerror "BootloaderSetup: install limine"
+		limine)			"$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${limine[@]}" || SHOWerror "BootloaderSetup: install limine"
 						local efi_dev="$DRIVE"; local efi_num="$(echo "$BOOT_PART" | grep -o '[0-9]*$')"
 						mkdir -p /mnt/boot/EFI/BOOT || SHOWerror "BootloaderSetup: mkdir limine BOOT"
 						cp /mnt/usr/share/limine/BOOTX64.EFI /mnt/boot/EFI/BOOT/ || SHOWerror "BootloaderSetup: cp limine EFI"
-						local lim_ucode=""; [[ -n "$microcodepkg" ]] && lim_ucode="module_path: boot():/${microcodepkg}.img\n	"
+						local lim_ucode=""; [[ -n "$UCODEsel" ]] && lim_ucode="module_path: boot():/${UCODEsel}.img\n	"
 						local lim_flags="rw $luks_flags resume=${PIDsel}=$SWAPID rootfstype=$FSsel $rootflags $nvdrm $nvosi"
 						echo -e "timeout: 3\n\n/Linux (${OSsel^})\n	protocol: linux\n	kernel_path: boot():/${kname}\n	${lim_ucode}module_path: boot():/${irfs}\n	cmdline: ${lim_flags}" > /mnt/boot/limine.conf || SHOWerror "BootloaderSetup: write limine.conf"
 						"$chroot" /mnt efibootmgr -c -d "$efi_dev" -p "${efi_num:-1}" -L "Limine Bootloader" -l '\EFI\BOOT\BOOTX64.EFI' || SHOWerror "BootloaderSetup: efibootmgr limine" ;;
 		systemd-boot)	"$chroot" /mnt bootctl --path=/boot install || SHOWerror "BootloaderSetup: bootctl install"
 						echo -e "default arch.conf\ntimeout 3\nconsole-mode max\neditor no" > /mnt/boot/loader/loader.conf || SHOWerror "BootloaderSetup: write loader.conf"
-						local sd_ucode=""; [[ -n "$microcodepkg" ]] && sd_ucode="initrd /${microcodepkg}.img\n"
+						local sd_ucode=""; [[ -n "$UCODEsel" ]] && sd_ucode="initrd /${UCODEsel}.img\n"
 						local sd_flags="rw $luks_flags resume=${PIDsel}=$SWAPID rootfstype=$FSsel $rootflags $nvdrm $nvosi"
 						echo -e "title Arch Linux\nlinux /${kname}\n${sd_ucode}initrd /${irfs}\noptions ${sd_flags}" > /mnt/boot/loader/entries/arch.conf || SHOWerror "BootloaderSetup: write arch.conf" ;;
-		uki)			"$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${ukipkg[@]}" || SHOWerror "BootloaderSetup: install ukify"
+		uki)			"$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${uki[@]}" || SHOWerror "BootloaderSetup: install ukify"
 						local efi_dev="$DRIVE"; local efi_num="$(echo "$BOOT_PART" | grep -o '[0-9]*$')"
 						mkdir -p /mnt/boot/EFI/BOOT || SHOWerror "BootloaderSetup: mkdir uki BOOT"
 						echo "rw $luks_flags resume=${PIDsel}=$SWAPID rootfstype=$FSsel $rootflags $nvdrm $nvosi" > /mnt/boot/cmdline.txt || SHOWerror "BootloaderSetup: write uki cmdline"
-						local uki_ucode=""; [[ -n "$microcodepkg" ]] && uki_ucode="--microcode=/boot/${microcodepkg}.img"
+						local uki_ucode=""; [[ -n "$UCODEsel" ]] && uki_ucode="--microcode=/boot/${UCODEsel}.img"
 						"$chroot" /mnt ukify build --linux=/boot/${kname} --initrd=/boot/${irfs} ${uki_ucode} --cmdline=@/boot/cmdline.txt --output=/boot/EFI/BOOT/BOOTX64.EFI || SHOWerror "BootloaderSetup: ukify build"
 						rm -f /mnt/boot/cmdline.txt
 						"$chroot" /mnt efibootmgr -c -d "$efi_dev" -p "${efi_num:-1}" -L "Arch Linux (UKI)" -l '\EFI\BOOT\BOOTX64.EFI' || SHOWerror "BootloaderSetup: efibootmgr uki" ;;
@@ -394,7 +394,7 @@ InstallationSetup () {
 	fi
 	while true; do
 		local sum="\n=== CONFIGURATION SUMMARY ===\nOS: $OSsel | Init: $INITsel | Kernel: $KSel | Initramfs: $IRFSetup ($IRFSMode) | Bootloader: $BLsel\nOS Drive: $DRIVE | Sec. Drive: ${ADDITIONAL_DRIVE:-None}\nUser: $UNsel | Hostname: $HNsel | Locale: $LOCsel | Language: $LANGsel | Timezone: $TZsel\nFilesystem: $FSsel | Partition ID: $PIDsel | LUKS: $LUKS_ENC\nDesktop: $DEsel | DM: $DMsel\n"
-		[[ -n "$microcodepkg" ]] && sum+="Microcode: $microcodepkg\n"
+		[[ -n "$UCODEsel" ]] && sum+="Microcode: $UCODEsel\n"
 		[[ ${#nvidiadrivers[@]} -gt 0 ]] && sum+="NVIDIA Driver: $NVsel | Manager: $GPUMANAGERsel\n"
 		[[ ${#amddrivers[@]} -gt 0 ]] && sum+="AMD Drivers included\n"
 		[[ "$VBTsel" -eq 1 ]] && sum+="Virtual Machine Mode: ON\n"
