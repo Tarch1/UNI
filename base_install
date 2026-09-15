@@ -156,50 +156,38 @@ PackageInstall () {
 }
 PKGcheck () {
 	echo "Initializing package groups..."
-	microcode=(); [[ -n "$microcodepkg" ]] && microcode=("$microcodepkg")
-	grubpkg=(); [[ "${BLsel,,}" == "grub" ]] && grubpkg=(grub)
-	refindpkg=(); [[ "${BLsel,,}" == "refind" ]] && refindpkg=(refind)
-	liminepkg=(); [[ "${BLsel,,}" == "limine" ]] && liminepkg=(limine)
-	ukipkg=(); [[ "${BLsel,,}" == "uki" ]] && ukipkg=(systemd-ukify)
-	btrfsutility=(); grubbtrfs=(); [[ "$FSsel" == "btrfs" ]] && { btrfsutility=(snapper btrfs-progs); [[ "${OSsel,,}" != "void" ]] && grubbtrfs=(grub-btrfs); }
-	booster=(); [[ "${OSsel,,}" != "void" ]] && booster=(booster)
-	[[ ! -v nvidiadrivers ]] && nvidiadrivers=(); [[ ! -v amddrivers ]] && amddrivers=()
-	[[ "${OSsel,,}" == "void" ]] && { local v_live_repos=(void-repo-nonfree); [[ "$LIBsel" == "GLIBC" ]] && v_live_repos+=(void-repo-multilib void-repo-multilib-nonfree); $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${v_live_repos[@]}" || true; }
-	desktoppkg=(); [[ "$DEsel" == "KDE" ]] && desktoppkg=(plasma-meta dolphin konsole xdg-desktop-portal-kde)
-	[[ "$DEsel" == "GNOME" ]] && desktoppkg=(gnome gnome-tweaks xdg-desktop-portal-gnome)
-	[[ "$DEsel" == "LXQt" ]] && desktoppkg=(lxqt xdg-desktop-portal-lxqt)
-	[[ "$DEsel" == "COSMIC" ]] && desktoppkg=(cosmic xdg-desktop-portal-cosmic)
-	[[ "$DEsel" == "Hyprland" ]] && desktoppkg=(hyprland fuzzel waybar swaync hyprlock hypridle polkit-kde-agent xdg-desktop-portal-hyprland xdg-desktop-portal-gtk)
-	[[ "$DEsel" == "Niri" ]] && desktoppkg=(niri fuzzel waybar swaync hyprlock hypridle polkit-kde-agent xdg-desktop-portal-gnome xdg-desktop-portal-gtk xwayland-satellite)
-	displaymanagerpkg=(); [[ "${DMsel,,}" == "ly" ]] && displaymanagerpkg=(ly); [[ "${DMsel,,}" == "greetd" ]] && displaymanagerpkg=(greetd greetd-tuigreet); [[ "${DMsel,,}" == "sddm" ]] && displaymanagerpkg=(sddm); [[ "${DMsel,,}" == "gdm" ]] && displaymanagerpkg=(gdm)
-	[[ "${OSsel,,}" == "artix" && "${DMsel,,}" != "none" ]] && displaymanagerpkg+=("${DMsel,,}-${init_sys}")
-	kernel=("${KSel}" "${KSel}-headers"); [[ "${OSsel,,}" == "void" ]] && kernel+=(linux-firmware-network) || kernel+=(linux-firmware)
-	[[ "${OSsel,,}" != "void" ]] && { [[ "$IRFSetup" == "booster" ]] && kernel+=(booster); [[ "$IRFSetup" == "dracut" ]] && kernel+=(dracut); }
+	[[ ! -v amddrivers ]] && amddrivers=(); [[ ! -v nvidiadrivers ]] && nvidiadrivers=()
+	apps=(kitty telegram-desktop firefox); [[ "${OSsel,,}" != "void" ]] && apps+=(profile-sync-daemon)
+	archive=(bzip2 cpio gzip xz 7zip tar unrar zip unzip zstd)
+	audio=(pipewire wireplumber); [[ "${OSsel,,}" != "void" ]] && audio+=(pipewire-pulse pipewire-alsa pipewire-jack sof-firmware)
 	baselinux=(base-devel); [[ "${OSsel,,}" == "void" ]] && baselinux+=(base-system) || baselinux+=(base); [[ "${OSsel,,}" == "artix" ]] && baselinux+=("${init_sys,,}")
 	baseutils=(bash-completion vim nano wget git binutils cryptsetup rsync); [[ "${OSsel,,}" == "void" ]] && baseutils+=(man-pages) || baseutils+=(man-db)
-	net=(iwd chrony); [[ "${OSsel,,}" == "void" ]] && net+=(NetworkManager) || net+=(networkmanager)
-	bluetooth=(bluez); [[ "${OSsel,,}" != "void" ]] && bluetooth+=(bluez-utils bluetui blueman)
-	print=(cups cups-pdf avahi); [[ "${OSsel,,}" == "void" ]] && print+=(cups-filters) || print+=(system-config-printer)
-	audio=(pipewire wireplumber); [[ "${OSsel,,}" != "void" ]] && audio+=(pipewire-pulse pipewire-alsa pipewire-jack sof-firmware)
-	fs=(dialog mtools parted gptfdisk dosfstools ntfsprogs)
-	archive=(bzip2 cpio gzip xz 7zip tar unrar zip unzip zstd)
-	utility=(imv featherpad libqalculate fd btop fwupd fastfetch grim slurp wl-clipboard swappy awww xorg-xwayland); [[ "${OSsel,,}" != "void" ]] && utility+=(lact cowfortune pacman-contrib)
-	[[ "${OSsel,,}" == "artix" && "$LUKS_ENC" -eq 1 ]] && utility+=("cryptsetup-${init_sys,,}")
-	if ls /sys/class/power_supply/BAT* &>/dev/null; then [[ "${OSsel,,}" == "arch" ]] && utility+=(power-profiles-daemon) || utility+=(tlp); [[ "$microcodepkg" == "intel-ucode" ]] && utility+=(thermald); fi
-	[[ "$VBTsel" -eq 1 ]] && { [[ "${OSsel,,}" == "void" ]] && utility+=(virtualbox-os-guest) || utility+=(virtualbox-guest-utils); }
-	[[ "${GPUMANAGERsel,,}" == "envycontrol" ]] && utility+=(envycontrol)
-	[[ "${GPUMANAGERsel,,}" == "cardwire" ]] && utility+=(cardwire)
-	apps=(kitty telegram-desktop firefox); [[ "${OSsel,,}" != "void" ]] && apps+=(profile-sync-daemon)
-	[[ "${OSsel,,}" == "void" ]] && fonts=(nerd-fonts) || fonts=(ttf-jetbrains-mono-nerd)
+	bluetooth=(bluez); [[ "${OSsel,,}" != "void" ]] && bluetooth+=(bluez-utils bluetui blueman); [[ "${OSsel,,}" == "artix" ]] && bluetooth+=("bluez-${init_sys,,}" bluez-cups)
 	bootloaderutility=(efibootmgr os-prober); [[ "${OSsel,,}" != "void" ]] && bootloaderutility+=(sbsigntools)
-	[[ "${OSsel,,}" == "void" ]] && hardwareacceleration=(mesa-dri mesa-vaapi mesa-vulkan-radeon) || hardwareacceleration=(intel-media-driver vkd3d)
-	[[ "${OSsel,,}" == "void" ]] && vulkan=(vulkan-loader) || vulkan=(vulkan-icd-loader vulkan-intel vulkan-mesa-layers)
+	booster=(); [[ "${OSsel,,}" != "void" ]] && booster=(booster)
+	btrfsutility=(); [[ "$FSsel" == "btrfs" ]] && btrfsutility=(snapper btrfs-progs)
+	desktoppkg=(); [[ "$DEsel" == "KDE" ]] && desktoppkg=(plasma-meta dolphin konsole xdg-desktop-portal-kde); [[ "$DEsel" == "GNOME" ]] && desktoppkg=(gnome gnome-tweaks xdg-desktop-portal-gnome); [[ "$DEsel" == "LXQt" ]] && desktoppkg=(lxqt xdg-desktop-portal-lxqt); [[ "$DEsel" == "COSMIC" ]] && desktoppkg=(cosmic xdg-desktop-portal-cosmic); [[ "$DEsel" == "Hyprland" ]] && desktoppkg=(hyprland fuzzel waybar swaync hyprlock hypridle polkit-kde-agent xdg-desktop-portal-hyprland xdg-desktop-portal-gtk); [[ "$DEsel" == "Niri" ]] && desktoppkg=(niri fuzzel waybar swaync hyprlock hypridle polkit-kde-agent xdg-desktop-portal-gnome xdg-desktop-portal-gtk xwayland-satellite)
+	displaymanagerpkg=(); [[ "${DMsel,,}" == "ly" ]] && displaymanagerpkg=(ly); [[ "${DMsel,,}" == "greetd" ]] && displaymanagerpkg=(greetd greetd-tuigreet); [[ "${DMsel,,}" == "sddm" ]] && displaymanagerpkg=(sddm); [[ "${DMsel,,}" == "gdm" ]] && displaymanagerpkg=(gdm); [[ "${OSsel,,}" == "artix" && "${DMsel,,}" != "none" ]] && displaymanagerpkg+=("${DMsel,,}-${init_sys,,}")
 	filemanager=(yazi pcmanfm-qt tumbler file-roller android-tools); [[ "${OSsel,,}" != "void" ]] && filemanager+=(gvfs-mtp)
-	logind=(); [[ "${OSsel,,}" == "artix" ]] && { local init_s="${init_sys,,}"; logind=(elogind elogind-"$init_s" "${init_s}"-settingsd); net+=("chrony-${init_s}" "networkmanager-${init_s}"); bluetooth+=("bluez-${init_s}" bluez-cups); print+=("avahi-${init_s}" "cups-${init_s}"); }
-	[[ "${OSsel,,}" == "void" ]] && logind=(seatd)
+	fonts=(); [[ "${OSsel,,}" == "void" ]] && fonts=(nerd-fonts) || fonts=(ttf-jetbrains-mono-nerd)
+	fs=(dialog mtools parted gptfdisk dosfstools ntfs-3g)
+	grubbtrfs=(); [[ "$FSsel" == "btrfs" && "${OSsel,,}" != "void" ]] && grubbtrfs=(grub-btrfs)
+	grubpkg=(); [[ "${BLsel,,}" == "grub" ]] && grubpkg=(grub)
+	hardwareacceleration=(); [[ "${OSsel,,}" == "void" ]] && hardwareacceleration=(mesa-dri mesa-vaapi mesa-vulkan-radeon) || hardwareacceleration=(intel-media-driver vkd3d)
+	kernel=("${KSel}" "${KSel}-headers"); [[ "${OSsel,,}" == "void" ]] && kernel+=(linux-firmware-network) || kernel+=(linux-firmware); [[ "${OSsel,,}" != "void" ]] && { [[ "$IRFSetup" == "booster" ]] && kernel+=(booster); [[ "$IRFSetup" == "dracut" ]] && kernel+=(dracut); }
+	liminepkg=(); [[ "${BLsel,,}" == "limine" ]] && liminepkg=(limine)
+	logind=(); [[ "${OSsel,,}" == "artix" ]] && logind=(elogind elogind-"${init_sys,,}" "${init_sys,,}"-settingsd); [[ "${OSsel,,}" == "void" ]] && logind=(seatd)
+	microcode=(); [[ -n "$microcodepkg" ]] && microcode=("$microcodepkg")
+	net=(iwd chrony); [[ "${OSsel,,}" == "void" ]] && net+=(NetworkManager) || net+=(networkmanager); [[ "${OSsel,,}" == "artix" ]] && net+=("chrony-${init_sys,,}" "networkmanager-${init_sys,,}")
+	print=(cups cups-pdf avahi); [[ "${OSsel,,}" == "void" ]] && print+=(cups-filters) || print+=(system-config-printer); [[ "${OSsel,,}" == "artix" ]] && print+=("avahi-${init_sys,,}" "cups-${init_sys,,}")
+	refindpkg=(); [[ "${BLsel,,}" == "refind" ]] && refindpkg=(refind)
+	ukipkg=(); [[ "${BLsel,,}" == "uki" ]] && ukipkg=(systemd-ukify)
+	utility=(imv featherpad libqalculate fd btop fwupd fastfetch grim slurp wl-clipboard swappy awww xorg-xwayland); [[ "${OSsel,,}" != "void" ]] && utility+=(lact cowfortune pacman-contrib); [[ "${OSsel,,}" == "artix" && "$LUKS_ENC" -eq 1 ]] && utility+=("cryptsetup-${init_sys,,}"); if ls /sys/class/power_supply/BAT* &>/dev/null; then [[ "${OSsel,,}" == "arch" ]] && utility+=(power-profiles-daemon) || utility+=(tlp); [[ "$microcodepkg" == "intel-ucode" ]] && utility+=(thermald); fi; [[ "$VBTsel" -eq 1 ]] && { [[ "${OSsel,,}" == "void" ]] && utility+=(virtualbox-os-guest) || utility+=(virtualbox-guest-utils); }; [[ "${GPUMANAGERsel,,}" == "envycontrol" ]] && utility+=(envycontrol); [[ "${GPUMANAGERsel,,}" == "cardwire" ]] && utility+=(cardwire)
+	vulkan=(); [[ "${OSsel,,}" == "void" ]] && vulkan=(vulkan-loader) || vulkan=(vulkan-icd-loader vulkan-intel vulkan-mesa-layers)
+	[[ "${OSsel,,}" == "void" ]] && { local v_live_repos=(void-repo-nonfree); [[ "$LIBsel" == "GLIBC" ]] && v_live_repos+=(void-repo-multilib void-repo-multilib-nonfree); $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${v_live_repos[@]}" || true; }
 	echo "Downloading remote package indexes..."; local remote_repo_list="/tmp/remote_pkgs.list"
 	[[ "${OSsel,,}" == "void" ]] && $PKGmanager$PKGchk -R -s "" | awk '{print $2}' | sed 's/-[0-9].*//' | sort -u > "$remote_repo_list" || $PKGmanager$PKGinst$PKGupd"lq" | sort -u > "$remote_repo_list"
-	local y="microcode amddrivers nvidiadrivers kernel baselinux baseutils fs bootloaderutility btrfsutility logind grubpkg grubbtrfs refindpkg liminepkg ukipkg net audio bluetooth print apps utility hardwareacceleration vulkan filemanager archive booster desktoppkg displaymanagerpkg fonts" miss=()
+	local y="amddrivers apps archive audio baselinux baseutils bluetooth bootloaderutility booster btrfsutility desktoppkg displaymanagerpkg filemanager fonts fs grubbtrfs grubpkg hardwareacceleration kernel liminepkg logind microcode net nvidiadrivers print refindpkg ukipkg utility vulkan" miss=()
 	for group in $y; do
 		local -n current_group="$group"; local valid_pkgs=()
 		for pkg in "${current_group[@]}"; do grep -qx "$pkg" "$remote_repo_list" && valid_pkgs+=("$pkg") || miss+=("$pkg"); done
