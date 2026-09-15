@@ -126,7 +126,7 @@ UEFIsel () {
 ArchRepoSel()			{ YesNoSel "Do you want Arch repositories as well as Artix repositories?"; [[ "$CC" -eq 1 ]] && { ARCHrepo=1; echo "OK, adding Arch repositories!"; } || { ARCHrepo=''; echo "Proceeding without them..."; }; }
 BootloaderSel()			{ [[ "$UEFImode" -eq 0 ]] && { BLsel="grub"; echo "BIOS mode: GRUB selected automatically"; return 0; }; local bl_options=( "refind" "grub" "efistub" "limine" ); [[ "${OSsel,,}" == "arch" ]] && bl_options+=( "systemd-boot" "uki" ); MenuSel "BLsel" "Select Bootloader" "${bl_options[@]}"; }
 DesktopEnvSel()			{ MenuSel "DEsel" "Select Desktop Environment / Window Manager" "KDE" "GNOME" "LXQt" "COSMIC" "Hyprland" "Niri" "None"; }
-DisplayManagerSel()		{ MenuSel "DMsel" "Select Display Manager" "Ly" "Greetd" "LightDM" "None"; }
+DisplayManagerSel()		{ if [[ "$DEsel" == "GNOME" ]]; then DMsel="GDM" ; elif [[ "$DEsel" == "KDE" ]]; then DMsel="SDDM" ; else MenuSel "DMsel" "Select Display Manager" "Ly" "Greetd" "LightDM" "None" ; fi }
 FilesystemSel()			{ MenuSel "FSsel" "Select filesystem for ROOT" "ext4" "btrfs"; }
 HostnameSel()			{ TextPromptSel "HNsel" "Enter preferred hostname"; }
 InitSystemSel()			{ [[ "${OSsel,,}" == "artix" ]] && MenuSel "INITsel" "Select preferred Init System for Artix" "OpenRC" "Runit" "s6" "dinit" || INITsel="systemd"; }
