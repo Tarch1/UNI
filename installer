@@ -307,15 +307,16 @@ UserSetup () {
 		[[ "$DEsel" == "Hyprland" && -d "${SCRIPT_DIR}/Conf_files/Hyprland" ]] && cp -a "${SCRIPT_DIR}/Conf_files/Hyprland/." /mnt/home/"$UNsel"/.config/hypr/ && touch /mnt/home/"$UNsel"/.config/hypr/hyprpaper.conf
 		[[ "$DEsel" == "Niri" && -d "${SCRIPT_DIR}/Conf_files/Niri" ]] && cp -r "${SCRIPT_DIR}/Conf_files/Niri" /mnt/home/"$UNsel"/.config/niri
 		"$chroot" /mnt chmod +x /home/"$UNsel"/.config/wallpapers/theme-switcher.sh
-		local h_conf="/mnt/home/$UNsel/.config/hypr/hyprland.conf" n_conf="/mnt/home/$UNsel/.config/niri/config.kdl"
-		if [[ "$VBTsel" -eq 1 ]]; then
-			[[ "$DEsel" == "Niri" && -f "$n_conf" ]] && { echo -e '\nenvironment {\n\tLIBGL_ALWAYS_SOFTWARE "1"\n}' >> "$n_conf"; sed -i -e '/spawn-at-startup/{i\spawn-at-startup "VBoxClient" "--clipboard"' -e ':a;n;ba}' "$n_conf"; }
-			[[ "$DEsel" == "Hyprland" && -f "$h_conf" ]] && sed -i -e '/exec-once/{i\exec-once = VBoxClient --clipboard' -e ':a;n;ba}' "$h_conf"
-		fi
-		if [[ "${OSsel,,}" != "arch" && "$init_sys" != "systemd" ]]; then
-			[[ "$DEsel" == "Hyprland" && -f "$h_conf" ]] && sed -i -e '/exec-once/{i\exec-once = bash -c "pipewire & sleep 1; wireplumber & pipewire-pulse &"' -e ':a;n;ba}' "$h_conf"
-			[[ "$DEsel" == "Niri" && -f "$n_conf" ]] && sed -i -e '/spawn-at-startup/{i\spawn-at-startup "bash" "-c" "pipewire & sleep 1; wireplumber & pipewire-pulse &"' -e ':a;n;ba}' "$n_conf"
-		fi
+		local t_files=()
+		[[ "$DEsel" == "Niri" ]] && t_files=( "/mnt/home/$UNsel/.config/niri/config.kdl" "/mnt/home/$UNsel/.config/wallust/templates/colors-niri.conf" )
+		[[ "$DEsel" == "Hyprland" ]] && t_files=( "/mnt/home/$UNsel/.config/hypr/hyprland.conf" "/mnt/home/$UNsel/.config/wallust/templates/colors-hyprland.conf" )
+		for f in "${t_files[@]}"; do
+			[[ -f "$f" ]] || continue
+			[[ "$VBTsel" -eq 1 && "$DEsel" == "Niri" ]] && { echo -e '\nenvironment {\n\tLIBGL_ALWAYS_SOFTWARE "1"\n}' >> "$f"; sed -i -e '/spawn-at-startup/{i\spawn-at-startup "VBoxClient" "--clipboard"' -e ':a;n;ba}' "$f"; }
+			[[ "$VBTsel" -eq 1 && "$DEsel" == "Hyprland" ]] && sed -i -e '/exec-once/{i\exec-once = VBoxClient --clipboard' -e ':a;n;ba}' "$f"
+			[[ "${OSsel,,}" != "arch" && "$init_sys" != "systemd" && "$DEsel" == "Niri" ]] && sed -i -e '/spawn-at-startup/{i\spawn-at-startup "bash" "-c" "pipewire & sleep 1; wireplumber & pipewire-pulse &"' -e ':a;n;ba}' "$f"
+			[[ "${OSsel,,}" != "arch" && "$init_sys" != "systemd" && "$DEsel" == "Hyprland" ]] && sed -i -e '/exec-once/{i\exec-once = bash -c "pipewire & sleep 1; wireplumber & pipewire-pulse &"' -e ':a;n;ba}' "$f"
+		done
 	fi
 }
 AudioSetup () {
