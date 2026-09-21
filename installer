@@ -284,7 +284,7 @@ UserSetup () {
 	if [[ "${OSsel,,}" == "void" ]]; then mkdir -p /mnt/etc/bash && [[ -f "${SCRIPT_DIR}/Conf_files/bashrc" ]] && cp "${SCRIPT_DIR}/Conf_files/bashrc" /mnt/home/"$UNsel"/.bashrc
 	else 
 		mkdir -p /mnt/etc/bash/bashrc.d && [[ -f "${SCRIPT_DIR}/Conf_files/bashrc" ]] && cp "${SCRIPT_DIR}/Conf_files/bashrc" /mnt/etc/bash/bashrc.d/"$UNsel".bashrc
-		if [[ -f "${SCRIPT_DIR}/Conf_files/50-bootbackup.hook" ]]; then mkdir -p /mnt/etc/pacman.d/hooks; cp "${SCRIPT_DIR}/Conf_files/50-bootbackup.hook" /mnt/etc/pacman.d/hooks/ ; fi
+		[[ -f "${SCRIPT_DIR}/Conf_files/50-bootbackup.hook" ]] && { mkdir -p /mnt/etc/pacman.d/hooks; cp "${SCRIPT_DIR}/Conf_files/50-bootbackup.hook" /mnt/etc/pacman.d/hooks/ ; }
 	fi
 	[[ -f "${SCRIPT_DIR}/Conf_files/kitty.conf" ]] && { mkdir -p /mnt/home/"$UNsel"/.config/kitty && cp "${SCRIPT_DIR}/Conf_files/kitty.conf" /mnt/home/"$UNsel"/.config/kitty/; }
 	echo -e 'include "/usr/share/nano/*.nanorc"\nset linenumbers' > /mnt/etc/nanorc
@@ -293,18 +293,18 @@ UserSetup () {
 		echo "Installing Wallust..."
 		API_URL=$(curl -s https://codeberg.org/api/v1/repos/explosion-mental/wallust/releases/latest | grep -o '"browser_download_url": *"[^"]*"' | grep 'x86_64-unknown-linux-musl.tar.gz' | cut -d '"' -f 4)
 		if [[ -n "$API_URL" ]] && curl -sA "Mozilla/5.0" -L -o /tmp/wallust_dl.tar.gz "$API_URL" && tar -tf /tmp/wallust_dl.tar.gz &>/dev/null; then
-			tar -xzf /tmp/wallust_dl.tar.gz -C /tmp/
-			mv /tmp/wallust /mnt/usr/bin/wallust
-			chmod +x /mnt/usr/bin/wallust || SHOWerror "UserSetup: chmod wallust"
+			tar -xzf /tmp/wallust_dl.tar.gz -C /tmp/ && mv /tmp/wallust /mnt/usr/bin/wallust && chmod +x /mnt/usr/bin/wallust || SHOWerror "UserSetup: chmod wallust"
 		else
 			echo "Binary download failed. Compiling from source..."
 			"$chroot" /mnt bash -c 'git clone https://codeberg.org/explosion-mental/wallust /tmp/wallust-src && cd /tmp/wallust-src && make && make install' || SHOWerror "UserSetup: make wallust"
 			rm -rf /mnt/tmp/wallust-src
 		fi
 		echo "Copying configuration files..."
+		"$chroot" /mnt sudo -u "$UNsel" bash -c "mkdir -p ~/.config/hypr"
 		for conf in Fuzzel Waybar Swaync Hyprlock Wallust Wallpapers; do [[ -d "${SCRIPT_DIR}/Conf_files/$conf" ]] && cp -r "${SCRIPT_DIR}/Conf_files/$conf" /mnt/home/"$UNsel"/.config/"${conf,,}"; done
+		[[ -f /mnt/home/"$UNsel"/.config/hyprlock/hypridle.conf ]] && mv /mnt/home/"$UNsel"/.config/hyprlock/hypridle.conf /mnt/home/"$UNsel"/.config/hypr/hypridle.conf
 		touch /mnt/home/"$UNsel"/.config/wallust/colors-waybar.css
-		[[ "$DEsel" == "Hyprland" && -d "${SCRIPT_DIR}/Conf_files/Hyprland" ]] && cp -r "${SCRIPT_DIR}/Conf_files/Hyprland" /mnt/home/"$UNsel"/.config/hypr && touch /mnt/home/"$UNsel"/.config/hypr/hyprpaper.conf
+		[[ "$DEsel" == "Hyprland" && -d "${SCRIPT_DIR}/Conf_files/Hyprland" ]] && cp -a "${SCRIPT_DIR}/Conf_files/Hyprland/." /mnt/home/"$UNsel"/.config/hypr/ && touch /mnt/home/"$UNsel"/.config/hypr/hyprpaper.conf
 		[[ "$DEsel" == "Niri" && -d "${SCRIPT_DIR}/Conf_files/Niri" ]] && cp -r "${SCRIPT_DIR}/Conf_files/Niri" /mnt/home/"$UNsel"/.config/niri
 		"$chroot" /mnt chmod +x /home/"$UNsel"/.config/wallpapers/theme-switcher.sh
 		local h_conf="/mnt/home/$UNsel/.config/hypr/hyprland.conf" n_conf="/mnt/home/$UNsel/.config/niri/config.kdl"
