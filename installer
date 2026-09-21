@@ -100,28 +100,23 @@ ArchTixSystemInstall () {
 	[[ -f /mnt/etc/pacman.conf ]] && sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 5/' /mnt/etc/pacman.conf || true
 }
 VoidSystemInstall () {
-	local void_repo="https://voidlinux.org"
-	[[ "${LIBsel}" == "MUSL" ]] && void_repo="${void_repo}/musl"
-	[[ "${VImethod}" == "XBPS" ]] && { mkdir -p /mnt/var/db/xbps/keys && cp -r /var/db/xbps/keys/* /mnt/var/db/xbps/keys/ || true; $PKGstrap base-system || SHOWerror "VoidSystemInstall: xbps base-system" ; }
-	[[ "${VImethod}" == "ROOTFS" ]] && { local tarball="void-x86_64-ROOTFS.tar.xz"; [[ "${LIBsel}" == "MUSL" ]] && tarball="void-x86_64-musl-ROOTFS.tar.xz";
-				if [ -f "${SCRIPT_DIR}/Conf_files/${tarball}" ]; then tar -xJf "${SCRIPT_DIR}/Conf_files/${tarball}" -C /mnt || SHOWerror "VoidSystemInstall: tar extract"
-				else curl -Lo "/tmp/${tarball}" "${void_repo}/static/${tarball}" || SHOWerror "VoidSystemInstall: curl download"; tar -xJf "/tmp/${tarball}" -C /mnt && rm -f "/tmp/${tarball}" || SHOWerror "VoidSystemInstall: tar downloaded extract"; fi ; }
-	for d in dev proc sys run; do mkdir -p /mnt/$d && mount --bind /$d /mnt/$d || SHOWerror "VoidSystemInstall: mount bind"; done
+	local v_repo="https://voidlinux.org$([[ "${LIBsel}" == "MUSL" ]] && echo "/musl")"
+	if [[ "${VImethod}" == "XBPS" ]]; then mkdir -p /mnt/var/db/xbps/keys && cp -r /var/db/xbps/keys/* /mnt/var/db/xbps/keys/ 2>/dev/null || true ; $PKGstrap base-system || SHOWerror "VoidSystemInstall: xbps base-system"
+	elif [[ "${VImethod}" == "ROOTFS" ]]; then local tb="void-x86_64$([[ "${LIBsel}" == "MUSL" ]] && echo "-musl")-ROOTFS.tar.xz" ; [[ -f "${SCRIPT_DIR}/Conf_files/${tb}" ]] && tar -xJf "${SCRIPT_DIR}/Conf_files/${tb}" -C /mnt || { curl -Lo "/tmp/${tb}" "${v_repo}/static/${tb}" && tar -xJf "/tmp/${tb}" -C /mnt && rm -f "/tmp/${tb}"; } || SHOWerror "VoidSystemInstall: rootfs extract"
+	fi
+	for d in dev proc sys run; do mkdir -p /mnt/$d && mount --bind /$d /mnt/$d || SHOWerror "VoidSystemInstall: mount bind $d"; done
 	mount --make-rslave /mnt/sys || SHOWerror "VoidSystemInstall: mount rslave"
-	[[ "$UEFImode" -eq 1 ]] && { mkdir -p /mnt/sys/firmware/efi/efivars; mount --bind /sys/firmware/efi/efivars /mnt/sys/firmware/efi/efivars || SHOWerror "VoidSystemInstall: mount efivars"; } || true
+	[[ "$UEFImode" -eq 1 ]] && { mkdir -p /mnt/sys/firmware/efi/efivars; mount --bind /sys/firmware/efi/efivars /mnt/sys/firmware/efi/efivars || SHOWerror "VoidSystemInstall: mount efivars"; }
 	cp /etc/resolv.conf /mnt/etc/resolv.conf || true
 }
 CrypttabGen () {
 	[[ "$LUKS_ENC" -ne 1 ]] && return 0
-	echo -n "$LUKS_PASS" > /mnt/etc/crypt_key.bin || SHOWerror "CrypttabGen: create crypt_key.bin"
-	chmod 600 /mnt/etc/crypt_key.bin || SHOWerror "CrypttabGen: chmod crypt_key.bin"
+	echo -n "$LUKS_PASS" > /mnt/etc/crypt_key.bin && chmod 600 /mnt/etc/crypt_key.bin || SHOWerror "CrypttabGen: create crypt_key.bin"
 	echo -n "$LUKS_PASS" | cryptsetup luksAddKey -q "$SWAP_PART" /mnt/etc/crypt_key.bin -d - || SHOWerror "CrypttabGen: luksAddKey swap"
-	[[ "${OSsel,,}" == "artix" && "$init_sys" == "openrc" ]] && { echo -e "target='cryptswap'\nsource='/dev/disk/by-uuid/$CRYPT_SWAP_UUID'\nkey='/etc/crypt_key.bin'" > /mnt/etc/conf.d/dmcrypt || SHOWerror "CrypttabGen: write conf.d/dmcrypt swap"; }
-	[[ "${OSsel,,}" != "artix" || "$init_sys" != "openrc" ]] && { echo "cryptswap UUID=$CRYPT_SWAP_UUID /etc/crypt_key.bin luks" > /mnt/etc/crypttab || SHOWerror "CrypttabGen: write crypttab swap"; }
+	[[ "${OSsel,,}" == "artix" && "$init_sys" == "openrc" ]] && echo -e "target='cryptswap'\nsource='/dev/disk/by-uuid/$CRYPT_SWAP_UUID'\nkey='/etc/crypt_key.bin'" > /mnt/etc/conf.d/dmcrypt || echo "cryptswap UUID=$CRYPT_SWAP_UUID /etc/crypt_key.bin luks" > /mnt/etc/crypttab
 	[[ -n "$CRYPT_ADD_UUID" ]] && {
 		echo -n "$LUKS_PASS" | cryptsetup luksAddKey -q "$ADDITIONAL_DRIVE" /mnt/etc/crypt_key.bin -d - || SHOWerror "CrypttabGen: luksAddKey add"
-		[[ "${OSsel,,}" == "artix" && "$init_sys" == "openrc" ]] && { echo -e "\ntarget='cryptdata'\nsource='/dev/disk/by-uuid/$CRYPT_ADD_UUID'\nkey='/etc/crypt_key.bin'" >> /mnt/etc/conf.d/dmcrypt || SHOWerror "CrypttabGen: write conf.d/dmcrypt add"; }
-		[[ "${OSsel,,}" != "artix" || "$init_sys" != "openrc" ]] && { echo "cryptdata UUID=$CRYPT_ADD_UUID /etc/crypt_key.bin luks,nofail" >> /mnt/etc/crypttab || SHOWerror "CrypttabGen: write crypttab add"; }
+		[[ "${OSsel,,}" == "artix" && "$init_sys" == "openrc" ]] && echo -e "\ntarget='cryptdata'\nsource='/dev/disk/by-uuid/$CRYPT_ADD_UUID'\nkey='/etc/crypt_key.bin'" >> /mnt/etc/conf.d/dmcrypt || echo "cryptdata UUID=$CRYPT_ADD_UUID /etc/crypt_key.bin luks,nofail" >> /mnt/etc/crypttab
 	} || true
 }
 FStabGen () {
@@ -132,13 +127,20 @@ FStabGen () {
 	cat /mnt/etc/fstab
 }
 SetupEnvironment () {
-	local keymap_val="${keylayout:-KEYMAP=it}"
-	[[ "$keymap_val" != KEYMAP=* ]] && keymap_val="KEYMAP=$keymap_val"
-	[[ "${OSsel,,}" == "void" ]] && { echo "LANG=$LOCsel" > /mnt/etc/locale.conf; echo "$keymap_val" > /mnt/etc/vconsole.conf; echo 'HARDWARECLOCK="UTC"' >> /mnt/etc/rc.conf; "$chroot" /mnt ln -sf /usr/share/zoneinfo/"$TZsel" /etc/localtime ; }
-	[[ "${OSsel,,}" != "void" ]] && { sed -i "/\($LOCsel\|$LANGsel\)/ s/#//g" /mnt/etc/locale.gen; echo -e "LANG=$LOCsel\nLANGUAGE=$LANGsel\nLC_TIME=$LOCsel\nLC_ADDRESS=$LOCsel\nLC_MESSAGES=$LOCsel\nLC_CTYPE=C" >> /mnt/etc/locale.conf;
-		echo "$keymap_val" > /mnt/etc/vconsole.conf; [[ -n "$keypath" ]] && echo "$keymap_val" > /mnt/"$keypath"; "$chroot" /mnt bash -c "ln -sf /usr/share/zoneinfo/$TZsel /etc/localtime; hwclock --systohc --utc || true; locale-gen" ; }
+	local k_map="${keylayout:-KEYMAP=it}"; [[ "$k_map" != KEYMAP=* ]] && k_map="KEYMAP=$k_map"
 	echo "$HNsel" > /mnt/etc/hostname
 	echo -e "127.0.0.1\tlocalhost\n::1\t\tlocalhost\n127.0.1.1\t$HNsel.localdomain\t$HNsel" >> /mnt/etc/hosts
+	echo "$k_map" > /mnt/etc/vconsole.conf
+	if [[ "${OSsel,,}" == "void" ]]; then
+		echo "LANG=$LOCsel" > /mnt/etc/locale.conf
+		echo 'HARDWARECLOCK="UTC"' >> /mnt/etc/rc.conf
+		"$chroot" /mnt ln -sf /usr/share/zoneinfo/"$TZsel" /etc/localtime
+	else
+		sed -i "/\($LOCsel\|$LANGsel\)/ s/#//g" /mnt/etc/locale.gen
+		echo -e "LANG=$LOCsel\nLANGUAGE=$LANGsel\nLC_TIME=$LOCsel\nLC_ADDRESS=$LOCsel\nLC_MESSAGES=$LOCsel\nLC_CTYPE=C" >> /mnt/etc/locale.conf
+		[[ -n "$keypath" ]] && echo "$k_map" > /mnt/"$keypath"
+		"$chroot" /mnt bash -c "ln -sf /usr/share/zoneinfo/$TZsel /etc/localtime; hwclock --systohc --utc || true; locale-gen"
+	fi
 }
 PackageConfig () {
 	[[ "${OSsel,,}" == "void" ]] && { local v_repos=(void-repo-nonfree); [[ "$LIBsel" == "GLIBC" ]] && v_repos+=(void-repo-multilib void-repo-multilib-nonfree); "$chroot" /mnt $PKGmanager$PKGinst "${PKGskp[@]}" xbps-allow-references "${v_repos[@]}"; }
@@ -209,40 +211,34 @@ PKGcheck () {
 KernelSetup () {
 	[[ "$UCODEsel" == "intel-ucode" ]] && { mkdir -p /mnt/etc/modprobe.d && echo 'options i915 enable_fbc=1 fastboot=0 enable_dc=4' > /mnt/etc/modprobe.d/i915.conf || SHOWerror "KernelSetup: write i915.conf"; }
 	if [[ ${#nvidiadrivers[@]} -gt 0 ]]; then
-		[[ "${OSsel,,}" == "artix" ]] && { "$chroot" /mnt $PKGmanager$PKGinst$PKGupd"u" "${PKGskp[@]}" "nvidia-utils-${init_sys}" || SHOWerror "KernelSetup: install nvidia-utils"; }
+		[[ "${OSsel,,}" == "artix" ]] && "$chroot" /mnt $PKGmanager$PKGinst$PKGupd"u" "${PKGskp[@]}" "nvidia-utils-${init_sys}" || SHOWerror "KernelSetup: install nvidia-utils"
 		modules+=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)
 		echo -e "options nvidia-drm modeset=1 fbdev=1\noptions nvidia NVreg_DynamicPowerManagement=0x02 NVreg_UsePageAttributeTable=1 NVreg_EnablePCIeGen3=1" > /mnt/etc/modprobe.d/nvidia.conf || SHOWerror "KernelSetup: write nvidia.conf"
 	fi
 	case "$IRFSetup" in
-		dracut)		mkdir -p /mnt/etc/dracut.conf.d || SHOWerror "KernelSetup: mkdir dracut.conf.d"
+		dracut)		mkdir -p /mnt/etc/dracut.conf.d
 					[[ "$LUKS_ENC" -eq 1 ]] && echo -e 'add_dracutmodules+=" crypt "\ninstall_items+=" /etc/crypttab /etc/crypt_key.bin "' > /mnt/etc/dracut.conf.d/crypt.conf
 					[[ "$FSsel" == "btrfs" ]] && echo 'add_dracutmodules+=" btrfs "' > /mnt/etc/dracut.conf.d/btrfs.conf
 					[[ ${#nvidiadrivers[@]} -gt 0 ]] && echo 'force_drivers+=" nvidia nvidia_modeset nvidia_uvm nvidia_drm "' > /mnt/etc/dracut.conf.d/nvidia.conf
-					local dracut_flag="--hostonly"
-					[[ "$IRFSMode" == "Universal" ]] && dracut_flag="--no-hostonly"
-					if [[ "${OSsel,,}" == "void" ]]; then 
-						"$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" dracut || SHOWerror "KernelSetup: dracut install"
-						echo "hostonly=\"$( [[ "$IRFSMode" == "Universal" ]] && echo "no" || echo "yes" )\"" > /mnt/etc/dracut.conf.d/hostonly.conf
-						"$chroot" /mnt xbps-reconfigure -f "$KSel" || SHOWerror "KernelSetup: xbps-reconfigure"
-					else 
-						local r_kver; r_kver="$(basename "$(find /mnt/usr/lib/modules/ -maxdepth 1 -mindepth 1 -type d | head -n 1)")"
-						"$chroot" /mnt dracut $dracut_flag --kver "$r_kver" --force /boot/initramfs-"$KSel".img || SHOWerror "KernelSetup: dracut build"
+					local d_flag="--hostonly"; [[ "$IRFSMode" == "Universal" ]] && d_flag="--no-hostonly"
+					if [[ "${OSsel,,}" == "void" ]]; then
+						"$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" dracut && echo "hostonly=\"$( [[ "$IRFSMode" == "Universal" ]] && echo "no" || echo "yes" )\"" > /mnt/etc/dracut.conf.d/hostonly.conf && "$chroot" /mnt xbps-reconfigure -f "$KSel" || SHOWerror "KernelSetup: dracut void"
+					else
+						"$chroot" /mnt dracut $d_flag --kver "$(basename "$(find /mnt/usr/lib/modules/ -maxdepth 1 -mindepth 1 -type d | head -n 1)")" --force /boot/initramfs-"$KSel".img || SHOWerror "KernelSetup: dracut build"
 					fi ;;
-		booster)	local b_opts="mount_timeout: 3m\nvconsole: true\nresume: /dev/disk/by-uuid/${SWAPID}\nmodules: ahci,ata_piix,sd_mod,nvme"
-					local b_flag=""
+		booster)	local b_opts="mount_timeout: 3m\nvconsole: true\nresume: /dev/disk/by-uuid/${SWAPID}\nmodules: ahci,ata_piix,sd_mod,nvme" b_flag=""
 					[[ "$IRFSMode" == "Universal" ]] && { b_opts="universal: true\n$b_opts"; b_flag="--universal"; }
-					[[ "$FSsel" == "btrfs" ]] && b_opts="${b_opts},btrfs"
-					[[ ${#nvidiadrivers[@]} -gt 0 ]] && b_opts="${b_opts},nvidia,nvidia_modeset,nvidia_uvm,nvidia_drm"
+					[[ "$FSsel" == "btrfs" ]] && b_opts+=",btrfs"
+					[[ ${#nvidiadrivers[@]} -gt 0 ]] && b_opts+=",nvidia,nvidia_modeset,nvidia_uvm,nvidia_drm"
 					echo -e "$b_opts" > /mnt/etc/booster.yaml || SHOWerror "KernelSetup: write booster.yaml"
-					if [[ "${OSsel,,}" != "void" ]]; then mkdir -p /mnt/etc/pacman.d/hooks || SHOWerror "KernelSetup: mkdir hooks" ; printf "[Trigger]\nOperation = Install\nOperation = Upgrade\nType = Package\nTarget = linux\nTarget = linux-*\n\n[Action]\nDescription = Forcing Booster initramfs update...\nWhen = PostTransaction\nDepends = booster\nNeedsTargets\nExec = /bin/bash -c 'while read -r pkg; do for d in /usr/lib/modules/*; do if [[ -f \"\$d/pkgbase\" && \"\$(<\"\$d/pkgbase\")\" == \"\$pkg\" ]]; then kver=\"\${d##*/}\"; /usr/bin/booster build --force $b_flag --kernel-version=\"\$kver\" \"/boot/initramfs-\${pkg}.img\"; break; fi; done; done'\n" > /mnt/etc/pacman.d/hooks/95-booster-force.hook || SHOWerror "KernelSetup: write booster hook" ; fi
-					local real_kver; real_kver=$(basename "$(find /mnt/usr/lib/modules/ -maxdepth 1 -mindepth 1 -type d ! -name 'extramodules*' | head -n 1)") || SHOWerror "KernelSetup: find real_kver"
-					"$chroot" /mnt /bin/bash -c "booster build --force $b_flag --kernel-version=${real_kver} /boot/initramfs-${KSel}.img" || SHOWerror "KernelSetup: booster build" ;;
+					[[ "${OSsel,,}" != "void" ]] && { mkdir -p /mnt/etc/pacman.d/hooks; printf "[Trigger]\nOperation = Install\nOperation = Upgrade\nType = Package\nTarget = linux\nTarget = linux-*\n\n[Action]\nDescription = Forcing Booster initramfs update...\nWhen = PostTransaction\nDepends = booster\nNeedsTargets\nExec = /bin/bash -c 'while read -r pkg; do for d in /usr/lib/modules/*; do if [[ -f \"\$d/pkgbase\" && \"\$(<\"\$d/pkgbase\")\" == \"\$pkg\" ]]; then kver=\"\${d##*/}\"; /usr/bin/booster build --force $b_flag --kernel-version=\"\$kver\" \"/boot/initramfs-\${pkg}.img\"; break; fi; done; done'\n" > /mnt/etc/pacman.d/hooks/95-booster-force.hook; }
+					"$chroot" /mnt /bin/bash -c "booster build --force $b_flag --kernel-version=$(basename "$(find /mnt/usr/lib/modules/ -maxdepth 1 -mindepth 1 -type d ! -name 'extramodules*' | head -n 1)") /boot/initramfs-${KSel}.img" || SHOWerror "KernelSetup: booster build" ;;
 		*)			local HOOKS=(base udev autodetect keyboard keymap modconf block)
 					[[ "$IRFSMode" == "Universal" ]] && HOOKS=( ${HOOKS[@]/autodetect/} )
 					[[ "$LUKS_ENC" -eq 1 ]] && HOOKS+=(encrypt)
 					HOOKS+=(resume filesystems fsck)
 					[[ ${#nvidiadrivers[@]} -gt 0 ]] && HOOKS+=(kms)
-					sed -i -e "/MODULES/ s/()/(${modules[*]})/" -e "/BINARIES/ s/()/($binaries)/" -e "s/^HOOKS.*/HOOKS=(${HOOKS[*]})/" /mnt/etc/mkinitcpio.conf || SHOWerror "KernelSetup: sed mkinitcpio.conf"
+					sed -i -e "/MODULES/ s/()/(${modules[*]})/" -e "/BINARIES/ s/()/($binaries)/" -e "s/^HOOKS.*/HOOKS=(${HOOKS[*]})/" /mnt/etc/mkinitcpio.conf
 					"$chroot" /mnt mkinitcpio -p "$KSel" || SHOWerror "KernelSetup: mkinitcpio build" ;;
 	esac
 }
@@ -335,52 +331,41 @@ BootloaderSetup () {
 	[[ "${GPUMANAGERsel,,}" == "cardwire" ]] && nvosi="$nvosi lsm=lockdown,capability,landlock,bpf"
 	[[ -n "$UCODEsel" && -f "/mnt/boot/${UCODEsel}.img" ]] && initrd_flags="initrd=\\${UCODEsel}.img initrd=\\${irfs}" || initrd_flags="initrd=\\${irfs}"
 	[[ "$LUKS_ENC" -eq 1 ]] && luks_flags="cryptdevice=UUID=${CRYPT_ROOT_UUID}:cryptroot rd.luks.uuid=${CRYPT_ROOT_UUID} rd.luks.name=${CRYPT_ROOT_UUID}=cryptroot root=/dev/mapper/cryptroot" || luks_flags="root=${PIDsel}=$ROOTID"
+	local c_flags="rw $luks_flags resume=${PIDsel}=$SWAPID rootfstype=$FSsel $rootflags $nvdrm $nvosi"
+	local e_dev="$DRIVE" e_num="${BOOT_PART##*[a-z]}"
 	case "${BLsel,,}" in
 		refind)			"$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${refind[@]}" || SHOWerror "BootloaderSetup: install refind"
 						"$chroot" /mnt refind-install || SHOWerror "BootloaderSetup: refind-install"
-						[[ "$UEFImode" -eq 1 ]] && efifolder='refind' || efifolder='BOOT'
-						mkdir -p /mnt/boot/EFI/"$efifolder"/themes || SHOWerror "BootloaderSetup: mkdir refind themes"
-						cp -r "${SCRIPT_DIR}/Bootloader/Refind/themes/"* /mnt/boot/EFI/"$efifolder"/themes/ || SHOWerror "BootloaderSetup: cp refind themes"
-						local ref_res="max"; [[ "$VBTsel" -eq 1 ]] && ref_res="1024 768"
-						echo -e "timeout 3\nshowtools shell, gdisk, apple_recovery, windows_recovery, mok_tool, bootorder, firmware, shutdown\nenable_mouse\nalso_scan_dirs +,@/boot\nscanfor internal,external,optical,manual,firmware\nextra_kernel_version_strings linux-hardened,linux-rt-lts,linux-zen,linux-lts,linux-rt,linux\ninclude themes/Blur-theme/theme.conf\nresolution $ref_res" >> /mnt/boot/EFI/"$efifolder"/refind.conf
-						local rl_flags="rw $luks_flags resume=${PIDsel}=$SWAPID rootfstype=$FSsel $rootflags $nvdrm $nvosi"
-						echo -e "\"Boot Standard\"\t\"$rl_flags $initrd_flags\"\n\"Boot Terminal\"\t\"$rl_flags $initrd_flags systemd.unit=multi-user.target\"" > /mnt/boot/refind_linux.conf || SHOWerror "BootloaderSetup: write refind_linux.conf"
-						echo '!!!Refind config and theme changed!!!' ;;
+						local e_fld='BOOT'; [[ "$UEFImode" -eq 1 ]] && e_fld='refind'
+						mkdir -p /mnt/boot/EFI/"$e_fld"/themes && cp -r "${SCRIPT_DIR}/Bootloader/Refind/themes/"* /mnt/boot/EFI/"$e_fld"/themes/ || SHOWerror "BootloaderSetup: refind themes"
+						local r_res="max"; [[ "$VBTsel" -eq 1 ]] && r_res="1024 768"
+						echo -e "timeout 3\nshowtools shell, gdisk, apple_recovery, windows_recovery, mok_tool, bootorder, firmware, shutdown\nenable_mouse\nalso_scan_dirs +,@/boot\nscanfor internal,external,optical,manual,firmware\nextra_kernel_version_strings linux-hardened,linux-rt-lts,linux-zen,linux-lts,linux-rt,linux\ninclude themes/Blur-theme/theme.conf\nresolution $r_res" >> /mnt/boot/EFI/"$e_fld"/refind.conf
+						echo -e "\"Boot Standard\"\t\"$c_flags $initrd_flags\"\n\"Boot Terminal\"\t\"$c_flags $initrd_flags systemd.unit=multi-user.target\"" > /mnt/boot/refind_linux.conf || SHOWerror "BootloaderSetup: write refind_linux.conf" ;;
 		grub)			[[ "$FSsel" == "btrfs" ]] && grub+=("${grubbtrfs[@]}")
 						"$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${grub[@]}" || SHOWerror "BootloaderSetup: install grub"
 						[[ "$UEFImode" -eq 0 ]] && "$chroot" /mnt grub-install --target=i386-pc --recheck --debug "$DRIVE" || "$chroot" /mnt grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB || SHOWerror "BootloaderSetup: grub-install"
-						local g_theme="Grub-Sekiro"
-						mkdir -p /mnt/boot/grub/themes /mnt/usr/share/grub/themes/ || SHOWerror "BootloaderSetup: mkdir grub themes"
-						cp -r "${SCRIPT_DIR}/Bootloader/$g_theme" /mnt/boot/grub/themes/ && cp -r "${SCRIPT_DIR}/Bootloader/$g_theme" /mnt/usr/share/grub/themes/ || SHOWerror "BootloaderSetup: cp grub themes"
+						local g_thm="Grub-Sekiro"; mkdir -p /mnt/boot/grub/themes /mnt/usr/share/grub/themes/ && cp -r "${SCRIPT_DIR}/Bootloader/$g_thm" /mnt/boot/grub/themes/ && cp -r "${SCRIPT_DIR}/Bootloader/$g_thm" /mnt/usr/share/grub/themes/ || SHOWerror "BootloaderSetup: grub themes"
 						local g_res="1920x1080,1024x768,auto"; [[ "$VBTsel" -eq 1 ]] && g_res="1024x768,auto"
-						sed -i -e "/GRUB_DISABLE_OS_PROBER=/ s/#//g" -e "s/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=3/" -e "s/^#GRUB_GFXMODE=.*/GRUB_GFXMODE=$g_res/" -e '/GRUB_THEME=/c GRUB_THEME="/boot/grub/themes/'"$g_theme"'/theme.txt"' -e "s|^GRUB_CMDLINE_LINUX=.*|GRUB_CMDLINE_LINUX=\"$nvosi $luks_flags\"|" /mnt/etc/default/grub
+						sed -i -e "/GRUB_DISABLE_OS_PROBER=/ s/#//g" -e "s/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=3/" -e "s/^#GRUB_GFXMODE=.*/GRUB_GFXMODE=$g_res/" -e '/GRUB_THEME=/c GRUB_THEME="/boot/grub/themes/'"$g_thm"'/theme.txt"' -e "s|^GRUB_CMDLINE_LINUX=.*|GRUB_CMDLINE_LINUX=\"$nvosi $luks_flags\"|" /mnt/etc/default/grub
 						[[ ${#nvidiadrivers[@]} -gt 0 ]] && sed -i "s/^GRUB_CMDLINE_LINUX_DEFAULT=\"\(.*\)\"/GRUB_CMDLINE_LINUX_DEFAULT=\"\1 quiet splash $nvdrm\"/" /mnt/etc/default/grub
 						"$chroot" /mnt grub-mkconfig -o /boot/grub/grub.cfg || SHOWerror "BootloaderSetup: grub-mkconfig" ;;
-		efistub)		local boot_label="${OSsel^} Linux ($FSsel)"
-						local BLflags="$initrd_flags ro $luks_flags resume=${PIDsel}=$SWAPID rootfstype=$FSsel $rootflags $nvdrm $nvosi"
-						local efi_dev="$DRIVE"; local efi_num="$(echo "$BOOT_PART" | grep -o '[0-9]*$')"
-						"$chroot" /mnt efibootmgr -d "$efi_dev" -p "${efi_num:-1}" -c -L "$boot_label" -l "\\$kname" -u "$BLflags" --verbose || SHOWerror "BootloaderSetup: efibootmgr efistub" ;;
+		efistub)		"$chroot" /mnt efibootmgr -d "$e_dev" -p "${e_num:-1}" -c -L "${OSsel^} Linux ($FSsel)" -l "\\$kname" -u "$initrd_flags ro $c_flags" --verbose || SHOWerror "BootloaderSetup: efibootmgr efistub" ;;
 		limine)			"$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${limine[@]}" || SHOWerror "BootloaderSetup: install limine"
-						local efi_dev="$DRIVE"; local efi_num="$(echo "$BOOT_PART" | grep -o '[0-9]*$')"
-						mkdir -p /mnt/boot/EFI/BOOT || SHOWerror "BootloaderSetup: mkdir limine BOOT"
-						cp /mnt/usr/share/limine/BOOTX64.EFI /mnt/boot/EFI/BOOT/ || SHOWerror "BootloaderSetup: cp limine EFI"
-						local lim_ucode=""; [[ -n "$UCODEsel" ]] && lim_ucode="module_path: boot():/${UCODEsel}.img\n    "
-						local lim_flags="rw $luks_flags resume=${PIDsel}=$SWAPID rootfstype=$FSsel $rootflags $nvdrm $nvosi"
-						echo -e "timeout: 3\n\n/Linux (${OSsel^})\n    protocol: linux\n    kernel_path: boot():/${kname}\n    ${lim_ucode}module_path: boot():/${irfs}\n    cmdline: ${lim_flags}" > /mnt/boot/limine.conf || SHOWerror "BootloaderSetup: write limine.conf"
-						"$chroot" /mnt efibootmgr -c -d "$efi_dev" -p "${efi_num:-1}" -L "Limine Bootloader" -l '\EFI\BOOT\BOOTX64.EFI' || SHOWerror "BootloaderSetup: efibootmgr limine" ;;
+						mkdir -p /mnt/boot/EFI/BOOT && cp /mnt/usr/share/limine/BOOTX64.EFI /mnt/boot/EFI/BOOT/ || SHOWerror "BootloaderSetup: limine EFI"
+						local l_ucode=""; [[ -n "$UCODEsel" ]] && l_ucode="module_path: boot():/${UCODEsel}.img\n    "
+						echo -e "timeout: 3\n\n/Linux (${OSsel^})\n    protocol: linux\n    kernel_path: boot():/${kname}\n    ${l_ucode}module_path: boot():/${irfs}\n    cmdline: ${c_flags}" > /mnt/boot/limine.conf || SHOWerror "BootloaderSetup: write limine.conf"
+						"$chroot" /mnt efibootmgr -c -d "$e_dev" -p "${e_num:-1}" -L "Limine Bootloader" -l '\EFI\BOOT\BOOTX64.EFI' || SHOWerror "BootloaderSetup: efibootmgr limine" ;;
 		systemd-boot)	"$chroot" /mnt bootctl --path=/boot install || SHOWerror "BootloaderSetup: bootctl install"
 						echo -e "default arch.conf\ntimeout 3\nconsole-mode max\neditor no" > /mnt/boot/loader/loader.conf || SHOWerror "BootloaderSetup: write loader.conf"
-						local sd_ucode=""; [[ -n "$UCODEsel" ]] && sd_ucode="initrd /${UCODEsel}.img\n"
-						local sd_flags="rw $luks_flags resume=${PIDsel}=$SWAPID rootfstype=$FSsel $rootflags $nvdrm $nvosi"
-						echo -e "title Arch Linux\nlinux /${kname}\n${sd_ucode}initrd /${irfs}\noptions ${sd_flags}" > /mnt/boot/loader/entries/arch.conf || SHOWerror "BootloaderSetup: write arch.conf" ;;
+						local s_ucode=""; [[ -n "$UCODEsel" ]] && s_ucode="initrd /${UCODEsel}.img\n"
+						echo -e "title Arch Linux\nlinux /${kname}\n${s_ucode}initrd /${irfs}\noptions ${c_flags}" > /mnt/boot/loader/entries/arch.conf || SHOWerror "BootloaderSetup: write arch.conf" ;;
 		uki)			"$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${uki[@]}" || SHOWerror "BootloaderSetup: install ukify"
-						local efi_dev="$DRIVE"; local efi_num="$(echo "$BOOT_PART" | grep -o '[0-9]*$')"
 						mkdir -p /mnt/boot/EFI/BOOT || SHOWerror "BootloaderSetup: mkdir uki BOOT"
-						echo "rw $luks_flags resume=${PIDsel}=$SWAPID rootfstype=$FSsel $rootflags $nvdrm $nvosi" > /mnt/boot/cmdline.txt || SHOWerror "BootloaderSetup: write uki cmdline"
-						local uki_ucode=""; [[ -n "$UCODEsel" ]] && uki_ucode="--microcode=/boot/${UCODEsel}.img"
-						"$chroot" /mnt ukify build --linux=/boot/${kname} --initrd=/boot/${irfs} ${uki_ucode} --cmdline=@/boot/cmdline.txt --output=/boot/EFI/BOOT/BOOTX64.EFI || SHOWerror "BootloaderSetup: ukify build"
+						echo "$c_flags" > /mnt/boot/cmdline.txt || SHOWerror "BootloaderSetup: write uki cmdline"
+						local u_ucode=""; [[ -n "$UCODEsel" ]] && u_ucode="--microcode=/boot/${UCODEsel}.img"
+						"$chroot" /mnt ukify build --linux=/boot/${kname} --initrd=/boot/${irfs} ${u_ucode} --cmdline=@/boot/cmdline.txt --output=/boot/EFI/BOOT/BOOTX64.EFI || SHOWerror "BootloaderSetup: ukify build"
 						rm -f /mnt/boot/cmdline.txt
-						"$chroot" /mnt efibootmgr -c -d "$efi_dev" -p "${efi_num:-1}" -L "Arch Linux (UKI)" -l '\EFI\BOOT\BOOTX64.EFI' || SHOWerror "BootloaderSetup: efibootmgr uki" ;;
+						"$chroot" /mnt efibootmgr -c -d "$e_dev" -p "${e_num:-1}" -L "Arch Linux (UKI)" -l '\EFI\BOOT\BOOTX64.EFI' || SHOWerror "BootloaderSetup: efibootmgr uki" ;;
 	esac
 }
 InstallationSetup () {
