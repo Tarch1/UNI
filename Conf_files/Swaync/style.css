@@ -1,132 +1,140 @@
 @import "../wallust/colors-waybar.css";
 
 * {
-  font-family: "JetBrainsMono Nerd Font", monospace;
-  font-weight: bold;
+	font-family: "JetBrainsMono Nerd Font", monospace;
+	font-weight: bold;
 }
 
-/* Sfondo generale del pannello (trasparente per far vedere il blur di Niri/Hyprland) */
 .control-center {
-  background: rgba(0, 0, 0, 0.4);
-  border: 2px solid @color4;
-  border-radius: 20px;
+	background: rgba(0, 0, 0, 0.4);
+	border: 2px solid @color4;
+	border-radius: 20px;
 }
 
-/* Titolo e Pulsante Pulisci */
 .widget-title {
-  color: @foreground;
-  margin: 15px 15px 10px 15px;
-  font-size: 1.5rem;
+	color: @foreground;
+	margin: 15px 15px 10px 15px;
+	font-size: 1.5rem;
 }
+
 .widget-title > button {
-  background: transparent;
-  color: @color4;
-  border-radius: 10px;
-  padding: 5px 10px;
-  border: 1px solid @color4;
+	background: transparent;
+	color: @color4;
+	border-radius: 10px;
+	padding: 5px 10px;
+	border: 1px solid @color4;
 }
+
 .widget-title > button:hover {
-  background: @color4;
-  color: @background;
+	background: @color4;
+	color: @background;
 }
 
-/* Sezione Notifiche */
 .notification {
-  background: @color0;
-  border-radius: 15px;
-  margin: 0 15px 10px 15px;
-  padding: 15px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+	background: @color0;
+	border-radius: 15px;
+	margin: 0 15px 10px 15px;
+	padding: 15px;
+	border: 1px solid rgba(255, 255, 255, 0.05);
 }
+
 .notification-content {
-  background: transparent;
+	background: transparent;
 }
+
 .close-button {
-  background: @color1;
-  color: @foreground;
-  border-radius: 50%;
-  min-width: 24px;
-  min-height: 24px;
+	background: @color1;
+	color: @foreground;
+	border-radius: 50%;
+	min-width: 24px;
+	min-height: 24px;
 }
+
 .close-button:hover {
-  background: @color1;
+	background: @color1;
 }
 
-/* Griglia dei 5 Pulsanti */
 .widget-buttons-grid {
-  background: @color0;
-  border-radius: 15px;
-  margin: 10px 15px;
-  padding: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+	background: @color0;
+	border-radius: 15px;
+	margin: 10px 15px;
+	padding: 10px;
+	border: 1px solid rgba(255, 255, 255, 0.05);
 }
+
 .widget-buttons-grid > flowbox > flowboxchild > button {
-  background: transparent;
-  color: @foreground;
-  border-radius: 12px;
-  min-width: 60px;
-  min-height: 50px;
-  margin: 2px 4px;
-  font-size: 1.6rem;
-  transition: all 0.2s ease;
+	background: transparent;
+	color: @foreground;
+	border-radius: 12px;
+	min-width: 60px;
+	min-height: 50px;
+	margin: 2px 4px;
+	font-size: 1.6rem;
+	transition: all 0.2s ease;
 }
+
 .widget-buttons-grid > flowbox > flowboxchild > button:hover {
-  background: @color4;
-  color: @background;
+	background: @color4;
+	color: @background;
 }
 
-/* Controller Musicale (MPRIS) */
 .widget-mpris {
-  background: @color0;
-  border-radius: 15px;
-  margin: 10px 15px;
-  padding: 15px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-}
-.widget-mpris-title {
-  color: @foreground;
-  font-size: 1.1rem;
-}
-.widget-mpris-subtitle {
-  color: @color4;
-  font-size: 0.9rem;
-}
-.widget-mpris-player > box > button {
-  color: @foreground;
-  background: transparent;
-  border-radius: 10px;
-}
-.widget-mpris-player > box > button:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: @color4;
+	background: @color0;
+	border-radius: 15px;
+	margin: 10px 15px;
+	padding: 15px;
+	border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-/* Slider Volume e Luminosità */
+.widget-mpris-title {
+	color: @foreground;
+	font-size: 1.1rem;
+}
+
+.widget-mpris-subtitle {
+	color: @color4;
+	font-size: 0.9rem;
+}
+
+.widget-mpris-player > box > button {
+	color: @foreground;
+	background: transparent;
+	border-radius: 10px;
+}
+
+.widget-mpris-player > box > button:hover {
+	background: rgba(255, 255, 255, 0.1);
+	color: @color4;
+}
+
 .widget-volume, .widget-backlight {
-  background: @color0;
-  border-radius: 15px;
-  margin: 5px 15px;
-  padding: 10px 20px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+	background: @color0;
+	border-radius: 15px;
+	margin: 5px 15px;
+	padding: 10px 20px;
+	border: 1px solid rgba(255, 255, 255, 0.05);
 }
+
 .widget-volume > label, .widget-backlight > label {
-  color: @color4;
-  font-size: 1.5rem;
-  margin-right: 15px;
+	color: @color4;
+	font-size: 1.5rem;
+	margin-right: 15px;
 }
-/* Stile della barra scorrevole */
+
 scale trough {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
-  min-height: 8px;
+	background: rgba(255, 255, 255, 0.1);
+	border-radius: 10px;
+	min-height: 8px;
 }
+
 scale highlight {
-  background: @color4;
-  border-radius: 10px;
+	background: @color4;
+	border-radius: 10px;
 }
+
 scale slider {
-  background: @foreground;
-  border-radius: 50%;
-  min-width: 16px;
-  min-height: 16px;
+	background: @foreground;
+	border-radius: 50%;
+	min-width: 16px;
+	min-height: 16px;
 }
