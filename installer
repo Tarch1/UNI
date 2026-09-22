@@ -272,9 +272,7 @@ KernelSetup () {
 						"$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" dracut
 						if [[ "$IRFSMode" == "Universal" ]]; then echo "hostonly=\"no\"" > /mnt/etc/dracut.conf.d/hostonly.conf ; else echo "hostonly=\"yes\"" > /mnt/etc/dracut.conf.d/hostonly.conf ; fi
 						"$chroot" /mnt xbps-reconfigure -f "$KSel"
-					else
-						"$chroot" /mnt dracut $d_flag --kver "$(basename "$(find /mnt/usr/lib/modules/ -maxdepth 1 -mindepth 1 -type d | head -n 1)")" --force /boot/initramfs-"$KSel".img
-					fi
+					else "$chroot" /mnt dracut $d_flag --kver "$(basename "$(find /mnt/usr/lib/modules/ -maxdepth 1 -mindepth 1 -type d | head -n 1)")" --force /boot/initramfs-"$KSel".img ; fi
 					;;
 		booster)	local b_opts="mount_timeout: 3m\nvconsole: true\nresume: /dev/disk/by-uuid/${SWAPID}\nmodules: ahci,ata_piix,sd_mod,nvme" ; local b_flag=""
 					if [[ "$IRFSMode" == "Universal" ]]; then b_opts="universal: true\n$b_opts" ; b_flag="--universal" ; fi
@@ -298,37 +296,32 @@ KernelSetup () {
 	esac
 }
 ServiceSetup () {
-	if [[ "${OSsel,,}" == "artix" ]]; then
-		Services+=( NetworkManager chrony dbus elogind cupsd avahi-daemon bluetoothd )
-		if [[ "$LUKS_ENC" -eq 1 ]]; then Services+=( dmcrypt ); fi
-		if [[ "$init_sys" == "openrc" ]]; then Services+=( openrc-settingsd ); fi
-		if [[ -f /mnt/usr/bin/tlp ]]; then Services+=( tlp ); fi
-		if [[ -f /mnt/usr/bin/thermald || -f /mnt/usr/sbin/thermald ]]; then Services+=( thermald ); fi
-		if [[ -v nvidiadrivers && -f /mnt/usr/bin/nvidia-persistenced ]]; then Services+=( nvidia-persistenced ); fi
-	fi
-	if [[ "${OSsel,,}" == "arch" ]]; then
-		Services+=( NetworkManager chronyd cups avahi-daemon bluetooth paccache.timer )
-		if [[ -f /mnt/usr/lib/systemd/system/power-profiles-daemon.service ]]; then Services+=( power-profiles-daemon ); fi
-		if [[ -f /mnt/usr/lib/systemd/system/thermald.service ]]; then Services+=( thermald ); fi
-	fi
-	if [[ "${OSsel,,}" == "void" ]]; then
-		Services+=( NetworkManager chronyd cupsd dbus avahi-daemon bluetoothd seatd )
-		if [[ -f /mnt/usr/bin/tlp ]]; then Services+=( tlp ); fi
-		if [[ -f /mnt/usr/bin/thermald || -f /mnt/usr/sbin/thermald ]]; then Services+=( thermald ); fi
-	fi
+	case "${OSsel,,}" in
+		artix)	Services+=( NetworkManager chrony dbus elogind cupsd avahi-daemon bluetoothd )
+				if [[ "$LUKS_ENC" -eq 1 ]]; then Services+=( dmcrypt ); fi
+				if [[ "$init_sys" == "openrc" ]]; then Services+=( openrc-settingsd ); fi
+				if [[ -f /mnt/usr/bin/tlp ]]; then Services+=( tlp ); fi
+				if [[ -f /mnt/usr/bin/thermald || -f /mnt/usr/sbin/thermald ]]; then Services+=( thermald ); fi
+				if [[ -v nvidiadrivers && -f /mnt/usr/bin/nvidia-persistenced ]]; then Services+=( nvidia-persistenced ); fi
+				;;
+		arch)	Services+=( NetworkManager chronyd cups avahi-daemon bluetooth paccache.timer )
+				if [[ -f /mnt/usr/lib/systemd/system/power-profiles-daemon.service ]]; then Services+=( power-profiles-daemon ); fi
+				if [[ -f /mnt/usr/lib/systemd/system/thermald.service ]]; then Services+=( thermald ); fi
+				;;
+		void)	Services+=( NetworkManager chronyd cupsd dbus avahi-daemon bluetoothd seatd )
+				if [[ -f /mnt/usr/bin/tlp ]]; then Services+=( tlp ); fi
+				if [[ -f /mnt/usr/bin/thermald || -f /mnt/usr/sbin/thermald ]]; then Services+=( thermald ); fi
+				;;
+	esac
 	if [[ "$VBTsel" -eq 1 && "${OSsel,,}" != "artix" ]]; then Services+=( vboxservice ) ; fi
 	if [[ "${DMsel,,}" =~ ^(ly|greetd|lightdm|sddm|gdm)$ ]]; then Services+=("${DMsel,,}") ; fi
 	if [[ "${GPUMANAGERsel,,}" == "cardwire" ]]; then
-		if [[ "${OSsel,,}" == "artix" && "$init_sys" == "openrc" ]]; then
-			echo -e '#!/sbin/openrc-run\nname="Cardwire GPU Manager"\ncommand="/usr/bin/cardwire"\ncommand_background="yes"\npidfile="/run/${RC_SVCNAME}.pid"\ndepend() {\n\tneed localmount devfs\n\tafter bootmisc\n}' > /mnt/etc/init.d/cardwire ; chmod +x /mnt/etc/init.d/cardwire
-		fi
-		if [[ "${OSsel,,}" == "artix" && "$init_sys" != "openrc" ]]; then
-			mkdir -p /mnt/etc/runit/sv/cardwire ; echo -e '#!/bin/sh\nexec /usr/bin/cardwire' > /mnt/etc/runit/sv/cardwire/run ; chmod +x /mnt/etc/runit/sv/cardwire/run
-		fi
-		if [[ "${OSsel,,}" == "void" ]]; then
-			mkdir -p /mnt/etc/sv/cardwire ; echo -e '#!/bin/sh\nexec /usr/bin/cardwire' > /mnt/etc/sv/cardwire/run ; chmod +x /mnt/etc/sv/cardwire/run
-		fi
 		Services+=( cardwire )
+		case "${OSsel,,}:$init_sys" in
+			artix:openrc)	echo -e '#!/sbin/openrc-run\nname="Cardwire GPU Manager"\ncommand="/usr/bin/cardwire"\ncommand_background="yes"\npidfile="/run/${RC_SVCNAME}.pid"\ndepend() {\n\tneed localmount devfs\n\tafter bootmisc\n}' > /mnt/etc/init.d/cardwire ; chmod +x /mnt/etc/init.d/cardwire ;;
+			artix:*)		mkdir -p /mnt/etc/runit/sv/cardwire ; echo -e '#!/bin/sh\nexec /usr/bin/cardwire' > /mnt/etc/runit/sv/cardwire/run ; chmod +x /mnt/etc/runit/sv/cardwire/run ;;
+			void:*)			mkdir -p /mnt/etc/sv/cardwire ; echo -e '#!/bin/sh\nexec /usr/bin/cardwire' > /mnt/etc/sv/cardwire/run ; chmod +x /mnt/etc/sv/cardwire/run ;;
+		esac
 	fi
 	for s in "${Services[@]}"; do
 		case "${OSsel,,}:$init_sys" in
@@ -364,20 +357,20 @@ UserSetup () {
 	while true; do if "$chroot" /mnt passwd "$UNsel"; then break ; else echo "Error: Try again..." ; fi ; done
 	echo "Choose password for root"
 	while true; do if "$chroot" /mnt passwd; then break ; else echo "Error: Try again..." ; fi ; done
-	if [[ "${OSsel,,}" != "void" ]]; then
-		echo "%wheel ALL=(ALL:ALL) NOPASSWD: ALL" > /mnt/etc/sudoers.d/99-installer-temp
-		"$chroot" /mnt sudo -u "$UNsel" bash -c "git clone https://aur.archlinux.org/trizen.git /tmp/trizen && cd /tmp/trizen && makepkg -si --noconfirm"
-		rm -f /mnt/etc/sudoers.d/99-installer-temp
-	fi
-	echo "Copying configuration files..."
-	if [[ "${OSsel,,}" == "void" ]]; then
-		mkdir -p /mnt/etc/bash
-		if [[ -f "${SCRIPT_DIR}/Conf_files/bashrc" ]]; then cp "${SCRIPT_DIR}/Conf_files/bashrc" /mnt/home/"$UNsel"/.bashrc ; fi
-	else
-		mkdir -p /mnt/etc/bash/bashrc.d
-		if [[ -f "${SCRIPT_DIR}/Conf_files/bashrc" ]]; then cp "${SCRIPT_DIR}/Conf_files/bashrc" /mnt/etc/bash/bashrc.d/"$UNsel".bashrc ; fi
-		if [[ -f "${SCRIPT_DIR}/Conf_files/50-bootbackup.hook" ]]; then mkdir -p /mnt/etc/pacman.d/hooks ; cp "${SCRIPT_DIR}/Conf_files/50-bootbackup.hook" /mnt/etc/pacman.d/hooks/ ; fi
-	fi
+	case "${OSsel,,}" in
+		void)		echo "Copying configuration files..."
+					mkdir -p /mnt/etc/bash
+					if [[ -f "${SCRIPT_DIR}/Conf_files/bashrc" ]]; then cp "${SCRIPT_DIR}/Conf_files/bashrc" /mnt/home/"$UNsel"/.bashrc ; fi
+					;;
+		arch|artix)	echo "%wheel ALL=(ALL:ALL) NOPASSWD: ALL" > /mnt/etc/sudoers.d/99-installer-temp
+					"$chroot" /mnt sudo -u "$UNsel" bash -c "git clone https://aur.archlinux.org/trizen.git /tmp/trizen && cd /tmp/trizen && makepkg -si --noconfirm"
+					rm -f /mnt/etc/sudoers.d/99-installer-temp
+					echo "Copying configuration files..."
+					mkdir -p /mnt/etc/bash/bashrc.d
+					if [[ -f "${SCRIPT_DIR}/Conf_files/bashrc" ]]; then cp "${SCRIPT_DIR}/Conf_files/bashrc" /mnt/etc/bash/bashrc.d/"$UNsel".bashrc ; fi
+					if [[ -f "${SCRIPT_DIR}/Conf_files/50-bootbackup.hook" ]]; then mkdir -p /mnt/etc/pacman.d/hooks ; cp "${SCRIPT_DIR}/Conf_files/50-bootbackup.hook" /mnt/etc/pacman.d/hooks/ ; fi
+					;;
+	esac
 	if [[ -f "${SCRIPT_DIR}/Conf_files/kitty.conf" ]]; then mkdir -p /mnt/home/"$UNsel"/.config/kitty ; cp "${SCRIPT_DIR}/Conf_files/kitty.conf" /mnt/home/"$UNsel"/.config/kitty/ ; fi
 	echo -e 'include "/usr/share/nano/*.nanorc"\nset linenumbers' > /mnt/etc/nanorc
 	echo 'export MOZ_ENABLE_WAYLAND=1' >> /mnt/home/"$UNsel"/.profile
@@ -435,49 +428,43 @@ BootloaderSetup () {
 	local c_flags="rw $luks_flags resume=${PIDsel}=$SWAPID rootfstype=$FSsel $rootflags $nvdrm $nvosi"
 	local e_dev="$DRIVE" ; local e_num="${BOOT_PART##*[a-z]}"
 	case "${BLsel,,}" in
-		refind)
-			"$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${refind[@]}"
-			"$chroot" /mnt refind-install
-			local e_fld='BOOT' ; if [[ "$UEFImode" -eq 1 ]]; then e_fld='refind' ; fi
-			mkdir -p /mnt/boot/EFI/"$e_fld"/themes ; cp -r "${SCRIPT_DIR}/Bootloader/Refind/themes/"* /mnt/boot/EFI/"$e_fld"/themes/
-			local r_res="max" ; if [[ "$VBTsel" -eq 1 ]]; then r_res="1024 768" ; fi
-			echo -e "timeout 3\nshowtools shell, gdisk, apple_recovery, windows_recovery, mok_tool, bootorder, firmware, shutdown\nenable_mouse\nalso_scan_dirs +,@/boot\nscanfor internal,external,optical,manual,firmware\nextra_kernel_version_strings linux-hardened,linux-rt-lts,linux-zen,linux-lts,linux-rt,linux\ninclude themes/Blur-theme/theme.conf\nresolution $r_res" >> /mnt/boot/EFI/"$e_fld"/refind.conf
-			echo -e "\"Boot Standard\"\t\"$c_flags $initrd_flags\"\n\"Boot Terminal\"\t\"$c_flags $initrd_flags systemd.unit=multi-user.target\"" > /mnt/boot/refind_linux.conf
-			;;
-		grub)
-			if [[ "$FSsel" == "btrfs" ]]; then grub+=("${grubbtrfs[@]}") ; fi
-			"$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${grub[@]}"
-			if [[ "$UEFImode" -eq 0 ]]; then "$chroot" /mnt grub-install --target=i386-pc --recheck --debug "$DRIVE" ; else "$chroot" /mnt grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB ; fi
-			local g_thm="Grub-Sekiro" ; mkdir -p /mnt/boot/grub/themes /mnt/usr/share/grub/themes/ ; cp -r "${SCRIPT_DIR}/Bootloader/$g_thm" /mnt/boot/grub/themes/ ; cp -r "${SCRIPT_DIR}/Bootloader/$g_thm" /mnt/usr/share/grub/themes/
-			local g_res="1920x1080,1024x768,auto" ; if [[ "$VBTsel" -eq 1 ]]; then g_res="1024x768,auto" ; fi
-			sed -i -e "/GRUB_DISABLE_OS_PROBER=/ s/#//g" -e "s/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=3/" -e "s/^#GRUB_GFXMODE=.*/GRUB_GFXMODE=$g_res/" -e '/GRUB_THEME=/c GRUB_THEME="/boot/grub/themes/'"$g_thm"'/theme.txt"' -e "s|^GRUB_CMDLINE_LINUX=.*|GRUB_CMDLINE_LINUX=\"$nvosi $luks_flags\"|" /mnt/etc/default/grub
-			if [[ ${#nvidiadrivers[@]} -gt 0 ]]; then sed -i "s/^GRUB_CMDLINE_LINUX_DEFAULT=\"\(.*\)\"/GRUB_CMDLINE_LINUX_DEFAULT=\"\1 quiet splash $nvdrm\"/" /mnt/etc/default/grub ; fi
-			"$chroot" /mnt grub-mkconfig -o /boot/grub/grub.cfg
-			;;
-		efistub)
-			"$chroot" /mnt efibootmgr -d "$e_dev" -p "${e_num:-1}" -c -L "${OSsel^} Linux ($FSsel)" -l "\\$kname" -u "$initrd_flags ro $c_flags" --verbose
-			;;
-		limine)
-			"$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${limine[@]}"
-			mkdir -p /mnt/boot/EFI/BOOT ; cp /mnt/usr/share/limine/BOOTX64.EFI /mnt/boot/EFI/BOOT/
-			local l_ucode="" ; if [[ -n "$UCODEsel" ]]; then l_ucode="module_path: boot():/${UCODEsel}.img\n    " ; fi
-			echo -e "timeout: 3\n\n/Linux (${OSsel^})\n    protocol: linux\n    kernel_path: boot():/${kname}\n    ${l_ucode}module_path: boot():/${irfs}\n    cmdline: ${c_flags}" > /mnt/boot/limine.conf
-			"$chroot" /mnt efibootmgr -c -d "$e_dev" -p "${e_num:-1}" -L "Limine Bootloader" -l '\EFI\BOOT\BOOTX64.EFI'
-			;;
-		systemd-boot)
-			"$chroot" /mnt bootctl --path=/boot install
-			echo -e "default arch.conf\ntimeout 3\nconsole-mode max\neditor no" > /mnt/boot/loader/loader.conf
-			local s_ucode="" ; if [[ -n "$UCODEsel" ]]; then s_ucode="initrd /${UCODEsel}.img\n" ; fi
-			echo -e "title Arch Linux\nlinux /${kname}\n${s_ucode}initrd /${irfs}\noptions ${c_flags}" > /mnt/boot/loader/entries/arch.conf
-			;;
-		uki)
-			"$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${uki[@]}"
-			mkdir -p /mnt/boot/EFI/BOOT ; echo "$c_flags" > /mnt/boot/cmdline.txt
-			local u_ucode="" ; if [[ -n "$UCODEsel" ]]; then u_ucode="--microcode=/boot/${UCODEsel}.img" ; fi
-			"$chroot" /mnt ukify build --linux=/boot/${kname} --initrd=/boot/${irfs} ${u_ucode} --cmdline=@/boot/cmdline.txt --output=/boot/EFI/BOOT/BOOTX64.EFI
-			rm -f /mnt/boot/cmdline.txt
-			"$chroot" /mnt efibootmgr -c -d "$e_dev" -p "${e_num:-1}" -L "Arch Linux (UKI)" -l '\EFI\BOOT\BOOTX64.EFI'
-			;;
+		refind)			"$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${refind[@]}"
+						"$chroot" /mnt refind-install
+						local e_fld='BOOT' ; if [[ "$UEFImode" -eq 1 ]]; then e_fld='refind' ; fi
+						mkdir -p /mnt/boot/EFI/"$e_fld"/themes ; cp -r "${SCRIPT_DIR}/Bootloader/Refind/themes/"* /mnt/boot/EFI/"$e_fld"/themes/
+						local r_res="max" ; if [[ "$VBTsel" -eq 1 ]]; then r_res="1024 768" ; fi
+						echo -e "timeout 3\nshowtools shell, gdisk, apple_recovery, windows_recovery, mok_tool, bootorder, firmware, shutdown\nenable_mouse\nalso_scan_dirs +,@/boot\nscanfor internal,external,optical,manual,firmware\nextra_kernel_version_strings linux-hardened,linux-rt-lts,linux-zen,linux-lts,linux-rt,linux\ninclude themes/Blur-theme/theme.conf\nresolution $r_res" >> /mnt/boot/EFI/"$e_fld"/refind.conf
+						echo -e "\"Boot Standard\"\t\"$c_flags $initrd_flags\"\n\"Boot Terminal\"\t\"$c_flags $initrd_flags systemd.unit=multi-user.target\"" > /mnt/boot/refind_linux.conf
+						;;
+		grub)			if [[ "$FSsel" == "btrfs" ]]; then grub+=("${grubbtrfs[@]}") ; fi
+						"$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${grub[@]}"
+						if [[ "$UEFImode" -eq 0 ]]; then "$chroot" /mnt grub-install --target=i386-pc --recheck --debug "$DRIVE" ; else "$chroot" /mnt grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB ; fi
+						local g_thm="Grub-Sekiro" ; mkdir -p /mnt/boot/grub/themes /mnt/usr/share/grub/themes/ ; cp -r "${SCRIPT_DIR}/Bootloader/$g_thm" /mnt/boot/grub/themes/ ; cp -r "${SCRIPT_DIR}/Bootloader/$g_thm" /mnt/usr/share/grub/themes/
+						local g_res="1920x1080,1024x768,auto" ; if [[ "$VBTsel" -eq 1 ]]; then g_res="1024x768,auto" ; fi
+						sed -i -e "/GRUB_DISABLE_OS_PROBER=/ s/#//g" -e "s/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=3/" -e "s/^#GRUB_GFXMODE=.*/GRUB_GFXMODE=$g_res/" -e '/GRUB_THEME=/c GRUB_THEME="/boot/grub/themes/'"$g_thm"'/theme.txt"' -e "s|^GRUB_CMDLINE_LINUX=.*|GRUB_CMDLINE_LINUX=\"$nvosi $luks_flags\"|" /mnt/etc/default/grub
+						if [[ ${#nvidiadrivers[@]} -gt 0 ]]; then sed -i "s/^GRUB_CMDLINE_LINUX_DEFAULT=\"\(.*\)\"/GRUB_CMDLINE_LINUX_DEFAULT=\"\1 quiet splash $nvdrm\"/" /mnt/etc/default/grub ; fi
+						"$chroot" /mnt grub-mkconfig -o /boot/grub/grub.cfg
+						;;
+		efistub)		"$chroot" /mnt efibootmgr -d "$e_dev" -p "${e_num:-1}" -c -L "${OSsel^} Linux ($FSsel)" -l "\\$kname" -u "$initrd_flags ro $c_flags" --verbose
+						;;
+		limine)			"$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${limine[@]}"
+						mkdir -p /mnt/boot/EFI/BOOT ; cp /mnt/usr/share/limine/BOOTX64.EFI /mnt/boot/EFI/BOOT/
+						local l_ucode="" ; if [[ -n "$UCODEsel" ]]; then l_ucode="module_path: boot():/${UCODEsel}.img\n    " ; fi
+						echo -e "timeout: 3\n\n/Linux (${OSsel^})\n    protocol: linux\n    kernel_path: boot():/${kname}\n    ${l_ucode}module_path: boot():/${irfs}\n    cmdline: ${c_flags}" > /mnt/boot/limine.conf
+						"$chroot" /mnt efibootmgr -c -d "$e_dev" -p "${e_num:-1}" -L "Limine Bootloader" -l '\EFI\BOOT\BOOTX64.EFI'
+						;;
+		systemd-boot)	"$chroot" /mnt bootctl --path=/boot install
+						echo -e "default arch.conf\ntimeout 3\nconsole-mode max\neditor no" > /mnt/boot/loader/loader.conf
+						local s_ucode="" ; if [[ -n "$UCODEsel" ]]; then s_ucode="initrd /${UCODEsel}.img\n" ; fi
+						echo -e "title Arch Linux\nlinux /${kname}\n${s_ucode}initrd /${irfs}\noptions ${c_flags}" > /mnt/boot/loader/entries/arch.conf
+						;;
+		uki)			"$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${uki[@]}"
+						mkdir -p /mnt/boot/EFI/BOOT ; echo "$c_flags" > /mnt/boot/cmdline.txt
+						local u_ucode="" ; if [[ -n "$UCODEsel" ]]; then u_ucode="--microcode=/boot/${UCODEsel}.img" ; fi
+						"$chroot" /mnt ukify build --linux=/boot/${kname} --initrd=/boot/${irfs} ${u_ucode} --cmdline=@/boot/cmdline.txt --output=/boot/EFI/BOOT/BOOTX64.EFI
+						rm -f /mnt/boot/cmdline.txt
+						"$chroot" /mnt efibootmgr -c -d "$e_dev" -p "${e_num:-1}" -L "Arch Linux (UKI)" -l '\EFI\BOOT\BOOTX64.EFI'
+						;;
 	esac
 }
 InstallationSetup () {
