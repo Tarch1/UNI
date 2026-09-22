@@ -16,7 +16,7 @@ Check_required_files () {
 	local files=( menu Bootloader/Refind/themes/Blur-theme/theme.conf Bootloader/Grub-Sekiro/{theme.txt,sekiro_1920x1080.png,select_c.png} Bootloader/Grub-Eiffel/{theme.txt,eiffel_tower_under_construction.png,select_c.png} )
 	local miss=()
 	for a in "${files[@]}"; do if [[ ! -f "${SCRIPT_DIR}/$a" ]]; then miss+=("$a") ; fi ; done
-	if [[ ${#miss[@]} -gt 0 ]]; then echo 'Required file(s) missing:' "${miss[@]}" ; exit 1 ; else source menu ; fi
+	if [[ ${#miss[@]} -gt 0 ]]; then echo 'Required file(s) missing:' "${miss[@]}" ; exit 1 ; else source "${SCRIPT_DIR}/menu" ; fi
 }
 DiskPartition() {
 	if grep -qs '/mnt' /proc/mounts; then echo "[i] Found active mount point in /mnt. Unmounting..." ; umount -R /mnt ; fi
@@ -560,5 +560,4 @@ InstallationSetup () {
 	YesNoSel "Reboot system"
 	if [[ "$CC" -eq 1 ]]; then umount -R -l /mnt || true ; reboot ; else echo "OK" ; exit 0 ; fi
 }
-
 InstallationSetup
