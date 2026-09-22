@@ -208,23 +208,19 @@ PKGcheck () {
 	bootloaderutility=(efibootmgr os-prober) ; if [[ "${OSsel,,}" != "void" ]]; then bootloaderutility+=(sbsigntools) ; fi
 	if [[ "${OSsel,,}" != "void" ]]; then booster=(booster) ; else booster=() ; fi
 	if [[ "$FSsel" == "btrfs" ]]; then btrfsutility=(snapper btrfs-progs) ; else btrfsutility=() ; fi
-	desktop=()
-	case "$DEsel" in
-		KDE) desktop=(plasma-meta dolphin konsole xdg-desktop-portal-kde) ;;
-		GNOME) desktop=(gnome gnome-tweaks xdg-desktop-portal-gnome) ;;
-		LXQt) desktop=(lxqt xdg-desktop-portal-lxqt) ;;
-		COSMIC) desktop=(cosmic xdg-desktop-portal-cosmic) ;;
-		Hyprland) desktop=(hyprland fuzzel waybar swaync hyprlock hypridle polkit-kde-agent xdg-desktop-portal-hyprland xdg-desktop-portal-gtk) ;;
-		Niri) desktop=(niri fuzzel waybar swaync hyprlock hypridle polkit-kde-agent xdg-desktop-portal-gnome xdg-desktop-portal-gtk xwayland-satellite) ;;
-	esac
-	displaymanager=()
-	case "${DMsel,,}" in
-		ly) displaymanager=(ly) ;;
-		greetd) displaymanager=(greetd greetd-tuigreet) ;;
-		lightdm) displaymanager=(lightdm lightdm-gtk-greeter lightdm-gtk-greeter-settings) ;;
-		sddm) displaymanager=(sddm) ;;
-		gdm) displaymanager=(gdm) ;;
-	esac
+	if [[ "$DEsel" == "COSMIC" ]]; then desktop=(cosmic xdg-desktop-portal-cosmic)
+	elif [[ "$DEsel" == "GNOME" ]]; then desktop=(gnome gnome-tweaks xdg-desktop-portal-gnome)
+	elif [[ "$DEsel" == "Hyprland" ]]; then desktop=(hyprland fuzzel waybar swaync hyprlock hypridle polkit-kde-agent xdg-desktop-portal-hyprland xdg-desktop-portal-gtk)
+	elif [[ "$DEsel" == "KDE" ]]; then desktop=(plasma-meta dolphin konsole xdg-desktop-portal-kde)
+	elif [[ "$DEsel" == "LXQt" ]]; then desktop=(lxqt xdg-desktop-portal-lxqt)
+	elif [[ "$DEsel" == "Niri" ]]; then desktop=(niri fuzzel waybar swaync hyprlock hypridle polkit-kde-agent xdg-desktop-portal-gnome xdg-desktop-portal-gtk xwayland-satellite)
+	else desktop=() ; fi
+	if [[ "${DMsel,,}" == "gdm" ]]; then displaymanager=(gdm)
+	elif [[ "${DMsel,,}" == "greetd" ]]; then displaymanager=(greetd greetd-tuigreet)
+	elif [[ "${DMsel,,}" == "lightdm" ]]; then displaymanager=(lightdm lightdm-gtk-greeter lightdm-gtk-greeter-settings)
+	elif [[ "${DMsel,,}" == "ly" ]]; then displaymanager=(ly)
+	elif [[ "${DMsel,,}" == "sddm" ]]; then displaymanager=(sddm)
+	else displaymanager=() ; fi
 	if [[ "${OSsel,,}" == "artix" && "${DMsel,,}" != "none" ]]; then displaymanager+=("${DMsel,,}-${init_sys,,}") ; fi
 	filemanager=(yazi pcmanfm-qt tumbler file-roller android-tools) ; if [[ "${OSsel,,}" != "void" ]]; then filemanager+=(gvfs-mtp) ; fi
 	if [[ "${OSsel,,}" == "void" ]]; then fonts=(nerd-fonts) ; else fonts=(ttf-jetbrains-mono-nerd) ; fi
