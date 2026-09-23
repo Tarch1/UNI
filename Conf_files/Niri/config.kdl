@@ -5,7 +5,6 @@ spawn-at-startup "awww-daemon"
 spawn-at-startup "bash" "-c" "~/.config/wallpapers/theme-switcher.sh"
 spawn-at-startup "hypridle"
 spawn-at-startup "/usr/lib/polkit-kde-authentication-agent-1"
-spawn-at-startup "bash" "-c" "if [ -f ~/.config/niri/colors ]; then bash ~/.config/niri/colors; fi"
 
 // --- INPUT ---
 input {
@@ -20,7 +19,7 @@ input {
     }
 }
 
-// --- LAYOUT & ESTETICA ---
+// --- LAYOUT & AESTHETICS ---
 layout {
     gaps 16
     center-focused-column "never"
@@ -38,7 +37,7 @@ layout {
     }
 }
 
-// --- ANIMAZIONI ---
+// --- ANIMATIONS ---
 animations {
     workspace-switch {
         spring damping-ratio=0.15 stiffness=1000 epsilon=0.0001
@@ -49,13 +48,13 @@ animations {
     }
 }
 
-// --- REGOLE FINESTRE ---
+// --- WINDOW RULES ---
 window-rule {
     geometry-corner-radius 10
     clip-to-geometry true
 }
 
-// --- SCORCIATOIE DA TASTIERA ---
+// --- KEYBINDS ---
 binds {
     Mod+Return { spawn "kitty"; }
     Mod+Space  { spawn "fuzzel"; }
@@ -105,7 +104,7 @@ binds {
     XF86AudioPrev allow-when-locked=true { spawn "playerctl" "previous"; }
 }
 
-// --- REGOLE LIVELLI (BLUR) ---
+// --- LAYER RULES (BLUR) ---
 layer-rule {
     match namespace="^waybar$"
     background-effect {
