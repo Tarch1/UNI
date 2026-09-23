@@ -1,3 +1,0 @@
-#!/bin/bash
-niri msg action set-window-rule -i 'geometry-corner-radius 10'
-niri msg action set-focus-ring -a '{{color4}}' -i '{{color8}}'
