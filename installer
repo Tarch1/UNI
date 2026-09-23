@@ -240,7 +240,10 @@ PKGcheck () {
 	utility=(imv featherpad libqalculate fd btop fwupd fastfetch grim slurp wl-clipboard swappy awww xorg-xwayland)
 	if [[ "${OSsel,,}" != "void" ]]; then utility+=(lact cowfortune pacman-contrib) ; fi
 	if [[ "${OSsel,,}" == "artix" && "$LUKS_ENC" -eq 1 ]]; then utility+=("cryptsetup-${init_sys,,}") ; fi
-	if ls /sys/class/power_supply/BAT* &>/dev/null; then if [[ "${OSsel,,}" == "arch" ]]; then utility+=(power-profiles-daemon) ; else utility+=(tlp) ; fi ; if [[ "$UCODEsel" == "intel-ucode" ]]; then utility+=(thermald) ; fi ; fi
+	if ls /sys/class/power_supply/BAT* &>/dev/null; then
+		if [[ "${OSsel,,}" == "arch" ]]; then utility+=(power-profiles-daemon) ; else utility+=(tlp) ; if [[ "${OSsel,,}" == "artix" ]]; then utility+=("tlp-${init_sys,,}") ; fi ; fi
+		if [[ "$UCODEsel" == "intel-ucode" ]]; then utility+=(thermald) ; if [[ "${OSsel,,}" == "artix" ]]; then utility+=("thermald-${init_sys,,}") ; fi ; fi
+	fi
 	if [[ "$VBTsel" -eq 1 ]]; then if [[ "${OSsel,,}" == "void" ]]; then utility+=(virtualbox-os-guest) ; else utility+=(virtualbox-guest-utils) ; fi ; fi
 	if [[ "${GPUMANAGERsel,,}" == "envycontrol" ]]; then utility+=(envycontrol) ; elif [[ "${GPUMANAGERsel,,}" == "cardwire" ]]; then utility+=(cardwire) ; fi
 	if [[ "${OSsel,,}" == "void" ]]; then vulkan=(vulkan-loader) ; else vulkan=(vulkan-icd-loader vulkan-intel vulkan-mesa-layers) ; fi
