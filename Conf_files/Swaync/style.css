@@ -1,12 +1,21 @@
 @import "../wallust/colors-waybar.css";
 
 * {
+	all: unset;
 	font-family: "JetBrainsMono Nerd Font", monospace;
 	font-weight: bold;
 }
 
+window {
+	background: transparent;
+}
+
+.blank-window {
+	background: transparent;
+}
+
 .control-center {
-	background: rgba(0, 0, 0, 0.4);
+	background: rgba(30, 30, 46, 0.6);
 	border: 2px solid @color4;
 	border-radius: 20px;
 }
