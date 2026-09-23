@@ -16,7 +16,7 @@
 	"timeout": 10,
 	"timeout-low": 5,
 	"timeout-critical": 0,
-	"fit-to-screen": true,
+	"fit-to-screen": false,
 	"control-center-width": 400,
 	"control-center-height": 850,
 	"notification-window-width": 400,
