@@ -56,11 +56,11 @@
 				},
 				{
 					"label": "󰌾",
-					"command": "hyprlock"
+					"command": "bash -c 'sleep 0.2; hyprlock'"
 				},
 				{
 					"label": "󰐥",
-					"command": "bash -c 'res=$(echo -e \"󰐥 Poweroff\\n󰑐 Reboot\\n󰤄 Suspend\\n󰒲 Hibernate\\n󰌾 Lock\" | fuzzel -d -p \"Power: \" -l 5); case \"$res\" in *Poweroff) loginctl poweroff;; *Reboot) loginctl reboot;; *Suspend) loginctl suspend;; *Hibernate) loginctl hibernate;; *Lock) hyprlock;; esac'"
+					"command": "bash -c 'sleep 0.2; res=$(echo -e \"󰐥 Poweroff\\n󰑐 Reboot\\n󰤄 Suspend\\n󰒲 Hibernate\\n󰌾 Lock\" | fuzzel -d -p \"Power: \" -l 5); case \"$res\" in *Poweroff) loginctl poweroff;; *Reboot) loginctl reboot;; *Suspend) loginctl suspend;; *Hibernate) loginctl hibernate;; *Lock) hyprlock;; esac'"
 				}
 			]
 		},
