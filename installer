@@ -305,19 +305,17 @@ ServiceSetup () {
 		artix)	Services+=( NetworkManager chrony dbus elogind cupsd avahi-daemon bluetoothd )
 				if [[ "$LUKS_ENC" -eq 1 ]]; then Services+=( dmcrypt ); fi
 				if [[ "$init_sys" == "openrc" ]]; then Services+=( openrc-settingsd ); fi
-				if [[ -f /mnt/usr/bin/tlp ]]; then Services+=( tlp ); fi
-				if [[ -f /mnt/usr/bin/thermald || -f /mnt/usr/sbin/thermald ]]; then Services+=( thermald ); fi
-				if [[ -v nvidiadrivers && -f /mnt/usr/bin/nvidia-persistenced ]]; then Services+=( nvidia-persistenced ); fi
+				if [[ -v nvidiadrivers && ${#nvidiadrivers[@]} -gt 0 ]]; then Services+=( nvidia-persistenced ); fi
 				;;
 		arch)	Services+=( NetworkManager chronyd cups avahi-daemon bluetooth paccache.timer )
-				if [[ -f /mnt/usr/lib/systemd/system/power-profiles-daemon.service ]]; then Services+=( power-profiles-daemon ); fi
-				if [[ -f /mnt/usr/lib/systemd/system/thermald.service ]]; then Services+=( thermald ); fi
 				;;
 		void)	Services+=( NetworkManager chronyd cupsd dbus avahi-daemon bluetoothd seatd )
-				if [[ -f /mnt/usr/bin/tlp ]]; then Services+=( tlp ); fi
-				if [[ -f /mnt/usr/bin/thermald || -f /mnt/usr/sbin/thermald ]]; then Services+=( thermald ); fi
 				;;
 	esac
+	if ls /sys/class/power_supply/BAT* &>/dev/null; then
+		if [[ "${OSsel,,}" == "arch" ]]; then Services+=( power-profiles-daemon ) ; else Services+=( tlp ) ; fi
+		if [[ "$UCODEsel" == "intel-ucode" ]]; then Services+=( thermald ) ; fi
+	fi
 	if [[ "$VBTsel" -eq 1 && "${OSsel,,}" != "artix" ]]; then Services+=( vboxservice ) ; fi
 	if [[ "${DMsel,,}" =~ ^(ly|greetd|lightdm|sddm|gdm)$ ]]; then Services+=("${DMsel,,}") ; fi
 	if [[ "${GPUMANAGERsel,,}" == "cardwire" ]]; then
