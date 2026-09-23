@@ -11,7 +11,8 @@
         "niri/workspaces"
     ],
     "modules-center": [
-        "clock"
+        "clock",
+        "custom/weather"
     ],
     "modules-right": [
         "temperature",
@@ -40,6 +41,12 @@
         "tooltip-format": "<tt><small>{calendar}</small></tt>",
         "on-click": "swaync-client -t -sw"
     },
+    "custom/weather": {
+		"exec": "curl -s 'wttr.in/?format=1'",
+		"interval": 1800,
+		"format": "{}",
+		"tooltip": false
+	},
 
     /* HARDWARE & STATUS */
     "temperature": {
