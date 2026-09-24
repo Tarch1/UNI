@@ -21,7 +21,8 @@
         "pulseaudio#microphone",
         "bluetooth",
         "network",
-        "battery"
+        "battery",
+		"group/power"
     ],
 
     /* WORKSPACES */
