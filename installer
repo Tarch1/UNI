@@ -361,18 +361,18 @@ UserSetup () {
 	echo "Choose password for root"
 	while true; do if "$chroot" /mnt passwd; then break ; else echo "Error: Try again..." ; fi ; done
 	case "${OSsel,,}" in
-		void)			echo "Copying configuration files..."
-						mkdir -p /mnt/etc/bash
-						if [[ -f "${SCRIPT_DIR}/Conf_files/bashrc" ]]; then cp "${SCRIPT_DIR}/Conf_files/bashrc" /mnt/home/"$UNsel"/.bashrc ; fi
-						;;
-		arch|artix)		echo "%wheel ALL=(ALL:ALL) NOPASSWD: ALL" > /mnt/etc/sudoers.d/99-installer-temp
-						"$chroot" /mnt sudo -u "$UNsel" bash -c "git clone https://aur.archlinux.org/trizen.git /tmp/trizen && cd /tmp/trizen && makepkg -si --noconfirm"
-						rm -f /mnt/etc/sudoers.d/99-installer-temp
-						echo "Copying configuration files..."
-						mkdir -p /mnt/etc/bash/bashrc.d
-						if [[ -f "${SCRIPT_DIR}/Conf_files/bashrc" ]]; then cp "${SCRIPT_DIR}/Conf_files/bashrc" /mnt/etc/bash/bashrc.d/"$UNsel".bashrc ; fi
-						if [[ -f "${SCRIPT_DIR}/Conf_files/50-bootbackup.hook" ]]; then mkdir -p /mnt/etc/pacman.d/hooks ; cp "${SCRIPT_DIR}/Conf_files/50-bootbackup.hook" /mnt/etc/pacman.d/hooks/ ; fi
-						;;
+		void)		echo "Copying configuration files..."
+					mkdir -p /mnt/etc/bash
+					if [[ -f "${SCRIPT_DIR}/Conf_files/bashrc" ]]; then cp "${SCRIPT_DIR}/Conf_files/bashrc" /mnt/home/"$UNsel"/.bashrc ; fi
+					;;
+		arch|artix)	echo "%wheel ALL=(ALL:ALL) NOPASSWD: ALL" > /mnt/etc/sudoers.d/99-installer-temp
+					"$chroot" /mnt sudo -u "$UNsel" bash -c "git clone https://aur.archlinux.org/trizen.git /tmp/trizen && cd /tmp/trizen && makepkg -si --noconfirm"
+					rm -f /mnt/etc/sudoers.d/99-installer-temp
+					echo "Copying configuration files..."
+					mkdir -p /mnt/etc/bash/bashrc.d
+					if [[ -f "${SCRIPT_DIR}/Conf_files/bashrc" ]]; then cp "${SCRIPT_DIR}/Conf_files/bashrc" /mnt/etc/bash/bashrc.d/"$UNsel".bashrc ; fi
+					if [[ -f "${SCRIPT_DIR}/Conf_files/50-bootbackup.hook" ]]; then mkdir -p /mnt/etc/pacman.d/hooks ; cp "${SCRIPT_DIR}/Conf_files/50-bootbackup.hook" /mnt/etc/pacman.d/hooks/ ; fi
+					;;
 	esac
 	if [[ -f "${SCRIPT_DIR}/Conf_files/kitty.conf" ]]; then mkdir -p /mnt/home/"$UNsel"/.config/kitty ; cp "${SCRIPT_DIR}/Conf_files/kitty.conf" /mnt/home/"$UNsel"/.config/kitty/ ; fi
 	echo -e 'include "/usr/share/nano/*.nanorc"\nset linenumbers' > /mnt/etc/nanorc
@@ -392,6 +392,7 @@ UserSetup () {
 		"$chroot" /mnt sudo -u "$UNsel" bash -c "mkdir -p ~/.config/hypr"
 		for conf in Fuzzel Waybar Swaync Hyprlock Wallust Wallpapers; do if [[ -d "${SCRIPT_DIR}/Conf_files/$conf" ]]; then cp -r "${SCRIPT_DIR}/Conf_files/$conf" /mnt/home/"$UNsel"/.config/"${conf,,}" ; fi ; done
 		if [[ -f /mnt/home/"$UNsel"/.config/hyprlock/hypridle.conf ]]; then mv /mnt/home/"$UNsel"/.config/hyprlock/hypridle.conf /mnt/home/"$UNsel"/.config/hypr/hypridle.conf ; fi
+		if [[ -f /mnt/home/"$UNsel"/.config/hyprlock/hyprlock.conf ]]; then mv /mnt/home/"$UNsel"/.config/hyprlock/hyprlock.conf /mnt/home/"$UNsel"/.config/hypr/hyprlock.conf ; fi
 		touch /mnt/home/"$UNsel"/.config/wallust/colors-waybar.css
 		if [[ "$DEsel" == "Hyprland" && -d "${SCRIPT_DIR}/Conf_files/Hyprland" ]]; then cp -a "${SCRIPT_DIR}/Conf_files/Hyprland/." /mnt/home/"$UNsel"/.config/hypr/ ; touch /mnt/home/"$UNsel"/.config/hypr/hyprpaper.conf ; fi
 		if [[ "$DEsel" == "Niri" && -d "${SCRIPT_DIR}/Conf_files/Niri" ]]; then cp -r "${SCRIPT_DIR}/Conf_files/Niri" /mnt/home/"$UNsel"/.config/niri ; fi
@@ -404,13 +405,12 @@ UserSetup () {
 			if [[ "$VBTsel" -eq 1 ]]; then
 				if [[ "$DEsel" == "Niri" ]]; then
 					for target in "$f" "$(dirname "$f")/../wallust/templates/colors-niri.conf"; do
-						if grep -q "environment *{" "$target"; then	grep -q 'LIBGL_ALWAYS_SOFTWARE' "$target" || sed -i '/environment *{/a\    LIBGL_ALWAYS_SOFTWARE "1"' "$target"
-						else echo -e '\nenvironment {\n    LIBGL_ALWAYS_SOFTWARE "1"\n}' >> "$target" ; fi
+						if grep -q "environment *{" "$target"; then	grep -q 'LIBGL_ALWAYS_SOFTWARE' "$target" || sed -i '/environment *{/a\	LIBGL_ALWAYS_SOFTWARE "1"' "$target"
+						else echo -e '\nenvironment {\n	LIBGL_ALWAYS_SOFTWARE "1"\n}' >> "$target" ; fi
 						grep -q 'VBoxClient' "$target" || sed -i -e '/spawn-at-startup/{i\spawn-at-startup "VBoxClient" "--clipboard"' -e ':a;n;ba}' "$target"
 						sed -i 's/blur true/blur false/g' "$target"
 					done
 				fi
-				if [[ "$DEsel" == "Niri" && "${DMsel,,}" == "ly" ]]; then echo -e '\nenvironment {\n\tLIBGL_ALWAYS_SOFTWARE "1"\n}' >> "$f" ; sed -i -e '/spawn-at-startup/{i\spawn-at-startup "VBoxClient" "--clipboard"' -e ':a;n;ba}' -e 's/blur true/blur false/g' "$f" ; fi
 				if [[ "$DEsel" == "Hyprland" ]]; then sed -i -e '/exec-once/{i\exec-once = VBoxClient --clipboard' -e ':a;n;ba}' "$f" ; fi
 			fi
 			if [[ "${OSsel,,}" != "arch" && "$init_sys" != "systemd" ]]; then
