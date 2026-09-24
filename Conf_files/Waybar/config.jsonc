@@ -92,5 +92,39 @@
         "format-charging": "󰂄 {capacity}%",
         "format-plugged": " {capacity}%",
         "format-icons": ["󰂎", "󰁺", "󰁻", "󰁼", "󰁽", "󰁾", "󰁿", "󰂀", "󰂁", "󰂂", "󰁹"]
+    },
+	"group/power": {
+        "orientation": "inherit",
+        "drawer": {
+            "transition-duration": 500,
+            "children-class": "not-power",
+            "transition-left-to-right": true
+        },
+        "modules": [ "custom/power", "custom/lock", "custom/suspend", "custom/hibernate", "custom/reboot" ]
+    },
+    "custom/power": {
+        "format": "󰐥",
+        "tooltip": false,
+        "on-click": "loginctl poweroff"
+    },
+    "custom/lock": {
+        "format": "󰌾",
+        "tooltip": false,
+        "on-click": "hyprlock"
+    },
+    "custom/suspend": {
+        "format": "󰤄",
+        "tooltip": false,
+        "on-click": "loginctl suspend"
+    },
+    "custom/hibernate": {
+        "format": "󰒲",
+        "tooltip": false,
+        "on-click": "loginctl hibernate"
+    },
+    "custom/reboot": {
+        "format": "󰑐",
+        "tooltip": false,
+        "on-click": "loginctl reboot"
     }
 }
