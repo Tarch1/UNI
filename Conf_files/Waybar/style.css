@@ -48,5 +48,30 @@ window#waybar {
 
 #battery.warning { color: #ff9e64; }
 #battery.critical { color: @color1; animation: blink 1s steps(5, start) infinite; }
+#custom-power,
+#custom-lock,
+#custom-suspend,
+#custom-hibernate,
+#custom-reboot {
+    font-size: 15px;
+    padding: 0 10px;
+    margin: 4px 2px;
+    color: @foreground;
+    border-radius: 20px;
+    transition: all 0.2s ease;
+}
+
+#custom-power {
+    color: @color1;
+}
+
+#custom-power:hover,
+#custom-lock:hover,
+#custom-suspend:hover,
+#custom-hibernate:hover,
+#custom-reboot:hover {
+    background-color: @color4;
+    color: @background;
+}
 
 @keyframes blink { to { color: transparent; } }
