@@ -403,9 +403,12 @@ UserSetup () {
 			if [[ ! -f "$f" ]]; then continue ; fi
 			if [[ "$VBTsel" -eq 1 ]]; then
 				if [[ "$DEsel" == "Niri" ]]; then
-					if grep -q "environment *{" "$f"; then grep -q 'LIBGL_ALWAYS_SOFTWARE' "$f" || sed -i '/environment *{/a\    LIBGL_ALWAYS_SOFTWARE "1"' "$f" ; else echo -e '\nenvironment {\n    LIBGL_ALWAYS_SOFTWARE "1"\n}' >> "$f" ; fi
-					grep -q 'VBoxClient' "$f" || sed -i -e '/spawn-at-startup/{i\spawn-at-startup "VBoxClient" "--clipboard"' -e ':a;n;ba}' "$f"
-					sed -i 's/blur true/blur false/g' "$f"
+					for target in "$f" "$(dirname "$f")/../wallust/templates/colors-niri.conf"; do
+						if grep -q "environment *{" "$target"; then	grep -q 'LIBGL_ALWAYS_SOFTWARE' "$target" || sed -i '/environment *{/a\    LIBGL_ALWAYS_SOFTWARE "1"' "$target"
+						else echo -e '\nenvironment {\n    LIBGL_ALWAYS_SOFTWARE "1"\n}' >> "$target" ; fi
+						grep -q 'VBoxClient' "$target" || sed -i -e '/spawn-at-startup/{i\spawn-at-startup "VBoxClient" "--clipboard"' -e ':a;n;ba}' "$target"
+						sed -i 's/blur true/blur false/g' "$target"
+					done
 				fi
 				if [[ "$DEsel" == "Niri" && "${DMsel,,}" == "ly" ]]; then echo -e '\nenvironment {\n\tLIBGL_ALWAYS_SOFTWARE "1"\n}' >> "$f" ; sed -i -e '/spawn-at-startup/{i\spawn-at-startup "VBoxClient" "--clipboard"' -e ':a;n;ba}' -e 's/blur true/blur false/g' "$f" ; fi
 				if [[ "$DEsel" == "Hyprland" ]]; then sed -i -e '/exec-once/{i\exec-once = VBoxClient --clipboard' -e ':a;n;ba}' "$f" ; fi
