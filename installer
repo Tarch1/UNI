@@ -389,11 +389,11 @@ UserSetup () {
 			rm -rf /mnt/tmp/wallust-src
 		fi
 		echo "Copying configuration files..."
-		"$chroot" /mnt sudo -u "$UNsel" bash -c "mkdir -p ~/.config/hypr"
+		"\(chroot" /mnt sudo -u "\)UNsel" bash -c "mkdir -p ~/.config/hypr ~/.cache"
 		for conf in Fuzzel Waybar Swaync Hyprlock Wallust Wallpapers; do if [[ -d "${SCRIPT_DIR}/Conf_files/$conf" ]]; then cp -r "${SCRIPT_DIR}/Conf_files/$conf" /mnt/home/"$UNsel"/.config/"${conf,,}" ; fi ; done
 		if [[ -f /mnt/home/"$UNsel"/.config/hyprlock/hypridle.conf ]]; then mv /mnt/home/"$UNsel"/.config/hyprlock/hypridle.conf /mnt/home/"$UNsel"/.config/hypr/hypridle.conf ; fi
 		if [[ -f /mnt/home/"$UNsel"/.config/hyprlock/hyprlock.conf ]]; then mv /mnt/home/"$UNsel"/.config/hyprlock/hyprlock.conf /mnt/home/"$UNsel"/.config/hypr/hyprlock.conf ; fi
-		touch /mnt/home/"$UNsel"/.config/wallust/colors-waybar.css
+		touch /mnt/home/"$UNsel"/.config/wallust/colors-waybar.css ; touch /mnt/home/"$UNsel"/.config/hypr/colors.conf
 		if [[ "$DEsel" == "Hyprland" && -d "${SCRIPT_DIR}/Conf_files/Hyprland" ]]; then cp -a "${SCRIPT_DIR}/Conf_files/Hyprland/." /mnt/home/"$UNsel"/.config/hypr/ ; touch /mnt/home/"$UNsel"/.config/hypr/hyprpaper.conf ; fi
 		if [[ "$DEsel" == "Niri" && -d "${SCRIPT_DIR}/Conf_files/Niri" ]]; then cp -r "${SCRIPT_DIR}/Conf_files/Niri" /mnt/home/"$UNsel"/.config/niri ; fi
 		"$chroot" /mnt chmod +x /home/"$UNsel"/.config/wallpapers/theme-switcher.sh
