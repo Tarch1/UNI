@@ -244,7 +244,7 @@ PKGcheck () {
 		if [[ "${OSsel,,}" == "arch" ]]; then utility+=(power-profiles-daemon) ; else utility+=(tlp) ; if [[ "${OSsel,,}" == "artix" ]]; then utility+=("tlp-${init_sys,,}") ; fi ; fi
 		if [[ "$UCODEsel" == "intel-ucode" ]]; then utility+=(thermald) ; if [[ "${OSsel,,}" == "artix" ]]; then utility+=("thermald-${init_sys,,}") ; fi ; fi
 	fi
-	if [[ "$VBTsel" -eq 1 ]]; then if [[ "${OSsel,,}" == "void" ]]; then utility+=(virtualbox-os-guest) ; else utility+=(virtualbox-guest-utils) ; fi ; fi
+	if [[ "$VBTsel" -eq 1 ]]; then if [[ "$VM_TYPE" == "qemu" ]]; then utility+=(spice-vdagent) ; elif [[ "$VM_TYPE" == "vbox" ]]; then if [[ "${OSsel,,}" == "void" ]]; then utility+=(virtualbox-os-guest) ; else utility+=(virtualbox-guest-utils) ; fi ; fi ; fi
 	if [[ "${GPUMANAGERsel,,}" == "envycontrol" ]]; then utility+=(envycontrol) ; elif [[ "${GPUMANAGERsel,,}" == "cardwire" ]]; then utility+=(cardwire) ; fi
 	if [[ "${OSsel,,}" == "void" ]]; then vulkan=(vulkan-loader) ; else vulkan=(vulkan-icd-loader vulkan-intel vulkan-mesa-layers) ; fi
 	if [[ "${OSsel,,}" == "void" ]]; then local v_live_repos=(void-repo-nonfree) ; if [[ "$LIBsel" == "GLIBC" ]]; then v_live_repos+=(void-repo-multilib void-repo-multilib-nonfree) ; fi ; $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${v_live_repos[@]}" || true ; fi
@@ -477,8 +477,9 @@ BootloaderSetup () {
 	esac
 }
 InstallationSetup () {
-	VBTsel=0
-	if [[ "$(lspci | grep -Ei 'VGA|3D')" =~ (VMware|VirtualBox|Virtio|QXL) ]]; then VBTsel=1 ; fi
+	VBTsel=0 ; VM_TYPE="none"
+	if [[ "$(lspci | grep -Ei 'VGA|3D')" =~ (VirtualBox) ]]; then VM_TYPE="vbox" ; VBTsel=1 ; fi
+	if [[ "$(lspci | grep -Ei 'VGA|3D')" =~ (VMware|Virtio|QXL) ]]; then VM_TYPE="qemu" ; VBTsel=1 ; fi
 	if command -v timedatectl &>/dev/null; then timedatectl set-ntp true &>/dev/null ; elif command -v chronyc &>/dev/null; then chronyc makestep &>/dev/null ; elif command -v chronyd &>/dev/null; then chronyd -q "pool pool.ntp.org iburst" &>/dev/null ; elif command -v ntpdate &>/dev/null; then ntpdate pool.ntp.org &>/dev/null ; fi
 	echo 'List of all errors occurred during the installation process:' > Errors
 	CheckandSetup=( Check_required_files AutoOSsel UEFIsel KernelSel IRFsel IRFSModeSel BootloaderSel Pacman_Locked )
