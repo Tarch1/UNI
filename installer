@@ -4,12 +4,21 @@ if ! ping -c 1 -W 3 8.8.8.8 &>/dev/null; then echo "Network connection required.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 exec &> >(stdbuf -oL -eL tee -a /tmp/install_$(date +%Y%m%d_%H%M%S).log)
 set -E
-trap 'SHOWerror $LINENO ${FUNCNAME[0]:-main}' ERR
+trap 'SHOWerror' ERR
 
 SHOWerror () {
-	local err_line="$1" ; local err_func="$2" ; local err_msg="$err_func : line $err_line"
-	echo "$err_msg" >> Errors
-	YesNoSel "Error in $err_msg. Fix: 'nano +$err_line installer'. Continue?"
+	local err_code=$?
+	local call_stack=""
+	for (( i=1; i<${#FUNCNAME[@]}-1; i++ )); do
+		local func="${FUNCNAME[$i]}"
+		local line="${BASH_LINENO[$i-1]}"
+		call_stack="${func}(line:${line}) -> $call_stack"
+	done
+	local err_line="${BASH_LINENO[0]}"
+	local err_func="${FUNCNAME[1]:-main}"
+	local err_msg="Error in ${call_stack% -> *} \nActual failure at line: $err_line (Exit code: $err_code)"
+	echo -e "$err_msg" >> Errors
+	YesNoSel "Error occurred:\n$err_msg\n\nFix: 'nano +$err_line installer'. Continue?"
 	if [[ "$CC" -eq 1 ]]; then echo "OK, still going..." ; else echo "OK, exit." ; exit 1 ; fi
 }
 Check_required_files () {
@@ -378,13 +387,13 @@ UserSetup () {
 	"$chroot" /mnt sudo -u "$UNsel" bash -c "mkdir -p /home/$UNsel/Pictures/Screenshots /home/$UNsel/.config/swappy && echo -e '[Default]\nsave_dir=/home/$UNsel/Pictures/Screenshots\nsave_filename_format=swappy-%Y%m%d-%H%M%S.png\nshow_panel=false\nline_size=5\ntext_size=20\ntext_font=sans-serif\npaint_mode=brush\nearly_exit=false\nfill_shape=false' > /home/$UNsel/.config/swappy/config"
 	if [[ "$DEsel" =~ ^(Hyprland|Niri)$ ]]; then
 		echo "Installing Wallust..."
+		set +e ; set +E
 		API_URL=$(curl -s https://codeberg.org/api/v1/repos/explosion-mental/wallust/releases/latest | grep -o '"browser_download_url": *"[^"]*"' | grep 'x86_64-unknown-linux-musl.tar.gz' | cut -d '"' -f 4)
-		if [[ -n "$API_URL" ]] && curl -sA "Mozilla/5.0" -L -o /tmp/wallust_dl.tar.gz "$API_URL" && tar -tf /tmp/wallust_dl.tar.gz &>/dev/null; then
-			tar -xzf /tmp/wallust_dl.tar.gz -C /tmp/ ; mv /tmp/wallust /mnt/usr/bin/wallust ; chmod +x /mnt/usr/bin/wallust
-		else
-			echo "Binary download failed. Compiling from source..."
-			"$chroot" /mnt bash -c 'git clone https://codeberg.org/explosion-mental/wallust /tmp/wallust-src && cd /tmp/wallust-src && make && make install'
-			rm -rf /mnt/tmp/wallust-src
+		local dl_success=0
+		if [[ -n "$API_URL" ]]; then curl -sA "Mozilla/5.0" -L -o /tmp/wallust_dl.tar.gz "$API_URL" ; if tar -tf /tmp/wallust_dl.tar.gz &>/dev/null; then dl_success=1 ; fi ; fi
+		set -e ; set -E
+		if [[ "$dl_success" -eq 1 ]]; then tar -xzf /tmp/wallust_dl.tar.gz -C /tmp/ ; mv /tmp/wallust /mnt/usr/bin/wallust ; chmod +x /mnt/usr/bin/wallust
+		else echo "Compiling from source..." ; "$chroot" /mnt bash -c 'git clone https://codeberg.org/explosion-mental/wallust /tmp/wallust-src && cd /tmp/wallust-src && make && make install' ; rm -rf /mnt/tmp/wallust-src
 		fi
 		"$chroot" /mnt sudo -u "$UNsel" bash -c "mkdir -p ~/.config/hypr ~/.cache"
 		for conf in Fuzzel Waybar Swaync Wallust Wallpapers; do [[ -d "${SCRIPT_DIR}/Conf_files/$conf" ]] && cp -r "${SCRIPT_DIR}/Conf_files/$conf" /mnt/home/"$UNsel"/.config/"${conf,,}" ; done
@@ -394,17 +403,16 @@ UserSetup () {
 		[[ "$DEsel" == "Niri" && -d "${SCRIPT_DIR}/Conf_files/Niri" ]] && cp -r "${SCRIPT_DIR}/Conf_files/Niri" /mnt/home/"$UNsel"/.config/niri
 		"$chroot" /mnt chmod +x /home/"$UNsel"/.config/wallpapers/theme-switcher.sh
 		echo -e "auth required pam_unix.so nullok_secure\naccount required pam_unix.so\npassword required pam_unix.so\nsession required pam_unix.so" > /mnt/etc/pam.d/hyprlock
-		#"$chroot" /mnt chmod u+s /usr/bin/unix_chkpwd 2>/dev/null || "$chroot" /mnt chmod u+s /sbin/unix_chkpwd 2>/dev/null
 		local t_files=()
 		[[ "$DEsel" == "Niri" ]] && t_files=( "/mnt/home/$UNsel/.config/niri/config.kdl" "/mnt/home/$UNsel/.config/wallust/templates/colors-niri.conf" )
 		[[ "$DEsel" == "Hyprland" ]] && t_files=( "/mnt/home/$UNsel/.config/hypr/hyprland.conf" "/mnt/home/$UNsel/.config/wallust/templates/colors-hyprland.conf" )
-				for f in "${t_files[@]}"; do
+		for f in "${t_files[@]}"; do
 			[[ ! -f "$f" ]] && continue
 			if [[ "$VBTsel" -eq 1 ]]; then
 				local is_qemu=0 ; lspci | grep -Eqi "(VMware|Virtio|QXL)" && is_qemu=1
 				if [[ "$DEsel" == "Niri" ]]; then
-					grep -q "environment *{" "$f" && { grep -q 'LIBGL_ALWAYS_SOFTWARE' "$f" || sed -i '/environment *{/a\    LIBGL_ALWAYS_SOFTWARE "1"' "$f"; } || echo -e '\nenvironment {\n    LIBGL_ALWAYS_SOFTWARE "1"\n}' >> "$f"
-					grep -q 'output "Virtual-1"' "$f" || echo -e '\noutput "Virtual-1" {\n    mode "1440x900"\n}' >> "$f"
+					grep -q "environment *{" "$f" && { grep -q 'LIBGL_ALWAYS_SOFTWARE' "$f" || sed -i '/environment *{/a\	LIBGL_ALWAYS_SOFTWARE "1"' "$f"; } || echo -e '\nenvironment {\n	LIBGL_ALWAYS_SOFTWARE "1"\n}' >> "$f"
+					grep -q 'output "Virtual-1"' "$f" || echo -e '\noutput "Virtual-1" {\n	mode "1440x900"\n}' >> "$f"
 					sed -i 's/blur true/blur false/g' "$f"
 					if [[ "$f" == *config.kdl ]]; then
 						[[ "$is_qemu" -eq 1 ]] && { grep -q 'spice-vdagent' "$f" || sed -i -e '/spawn-at-startup/{i\spawn-at-startup "spice-vdagent"' -e ':a;n;ba}' "$f"; } || { grep -q 'VBoxClient' "$f" || sed -i -e '/spawn-at-startup/{i\spawn-at-startup "VBoxClient" "--clipboard"' -e ':a;n;ba}' "$f"; }
@@ -421,6 +429,7 @@ UserSetup () {
 		done
 	fi
 }
+
 AudioSetup () {
 	"$chroot" /mnt mkdir -p /etc/pipewire/pipewire.conf.d /etc/wireplumber/wireplumber.conf.d
 	printf 'monitor.bluez.properties = { bluez5.enable-sbc-xq = true, bluez5.enable-msbc = true, bluez5.enable-hw-volume = true, bluez5.codecs = [ sbc_xq aac aptx aptx_hd ldac ] }\n' > /mnt/etc/wireplumber/wireplumber.conf.d/10-bluetooth-policy.conf
