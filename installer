@@ -406,18 +406,18 @@ UserSetup () {
 		for f in "${t_files[@]}"; do
 			if [[ ! -f "$f" ]]; then continue ; fi
 			if [[ "$VBTsel" -eq 1 ]]; then
-				local is_qemu=0 ; if lspci | grep -Eqi "(VMware|Virtio|QXL)"; then is_qemu=1 ; fi
-				if [[ "$DEsel" == "Niri" && "$f" == *config.kdl ]]; then
+				local QEMU=0 ; if lspci | grep -Eqi "(VMware|Virtio|QXL)"; then QEMU=1 ; fi
+				if [[ "$DEsel" == "Niri" ]]; then
 					if grep -q "environment *{" "$f"; then    grep -q 'LIBGL_ALWAYS_SOFTWARE' "$f" || sed -i '/environment *{/a\    LIBGL_ALWAYS_SOFTWARE "1"' "$f"
 					else echo -e '\nenvironment {\n    LIBGL_ALWAYS_SOFTWARE "1"\n}' >> "$f" ; fi
 					grep -q 'output "Virtual-1"' "$f" || echo -e '\noutput "Virtual-1" {\n    mode "1920x1080"\n}' >> "$f"
-					if [[ "$is_qemu" -eq 1 ]]; then grep -q 'spice-vdagent' "$f" || sed -i -e '/spawn-at-startup/{i\spawn-at-startup "spice-vdagent"' -e ':a;n;ba}' "$f"
+					if [[ "$QEMU" -eq 1 ]]; then grep -q 'spice-vdagent' "$f" || sed -i -e '/spawn-at-startup/{i\spawn-at-startup "spice-vdagent"' -e ':a;n;ba}' "$f"
 					else grep -q 'VBoxClient' "$f" || sed -i -e '/spawn-at-startup/{i\spawn-at-startup "VBoxClient" "--clipboard"' -e ':a;n;ba}' "$f" ; fi
 					sed -i 's/blur true/blur false/g' "$f"
 				fi
 				if [[ "$DEsel" == "Hyprland" && "$f" == *hyprland.conf ]]; then
 					grep -q 'monitor=,1920x1080' "$f" || sed -i '1i monitor=,1920x1080@60,auto,1' "$f"
-					if [[ "$is_qemu" -eq 1 ]]; then sed -i -e '/exec-once/{i\exec-once = spice-vdagent' -e ':a;n;ba}' "$f"
+					if [[ "$QEMU" -eq 1 ]]; then sed -i -e '/exec-once/{i\exec-once = spice-vdagent' -e ':a;n;ba}' "$f"
 					else sed -i -e '/exec-once/{i\exec-once = VBoxClient --clipboard' -e ':a;n;ba}' "$f" ; fi
 				fi
 			fi
