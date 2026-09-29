@@ -15,7 +15,6 @@ SHOWerror () {
 		call_stack="${func}(line:${line}) -> $call_stack"
 	done
 	local err_line="${BASH_LINENO[0]}"
-	local err_func="${FUNCNAME[1]:-main}"
 	local err_msg="Error in ${call_stack% -> *} \nActual failure at line: $err_line (Exit code: $err_code)"
 	echo -e "$err_msg" >> Errors
 	YesNoSel "Error occurred:\n$err_msg\n\nFix: 'nano +$err_line installer'. Continue?"
@@ -32,8 +31,8 @@ DiskPartition() {
 	if [[ $(wc -l < /proc/swaps) -gt 1 ]]; then echo "[i] Found active Swap. Disabling..." ; swapoff -a ; fi
 	local mapper_devs=( 'cryptroot' 'cryptswap' 'cryptdata' )
 	for dev in "${mapper_devs[@]}"; do if [[ -b "/dev/mapper/$dev" ]]; then echo "[i] Found active LUKS volume (/dev/mapper/$dev). Closing..." ; cryptsetup close "$dev" ; fi ; done
-	if $PKGmanager$PKGchk ntfs-3g &>/dev/null; then $PKGmanager$PKGrmv$PKGfrc "${PKGrsk[@]}" ntfs-3g || true ; fi
-	$PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${fs[@]}"
+	if "${PKGmanager[@]}" "${PKGchk[@]}" ntfs-3g &>/dev/null; then "${PKGmanager[@]}" "${PKGrmv[@]}" "${PKGfrc[@]}" "${PKGrsk[@]}" ntfs-3g || true ; fi
+	"${PKGmanager[@]}" "${PKGinst[@]}" "${PKGupd[@]}" "${PKGskp[@]}" "${fs[@]}"
 	for p in "$DRIVE"?*; do if grep -qs "^$p " /proc/mounts; then echo "[i] Unmounting active partition $p..." ; umount "$p" ; fi ; done
 	sgdisk -ozZ "$DRIVE"
 	local total_ram_gb=$(( ($(free -m | awk '/^Mem:/{print $2}') + 1023) / 1024 ))
@@ -71,7 +70,7 @@ FileSystemFormat() {
 	else
 		TARGET_ROOT="$ROOT_PART"; TARGET_SWAP="$SWAP_PART"
 	fi
-	mkswap "$TARGET_SWAP"
+	mkswap "$TARGET_SWAP" ; udevadm settle || true
 	SWAPID="$(blkid -s "$PIDsel" -o value "$TARGET_SWAP")"
 	UNIfstab="$PIDsel=$BOOTID /boot vfat defaults 0 2\n$PIDsel=$SWAPID none swap defaults 0 0\n"
 	case "$FSsel" in
@@ -125,21 +124,21 @@ ArchTixSystemInstall () {
 	local BasePKG=( "${kernel[@]}" "${baselinux[@]}" "${logind[@]}" )
 	if [[ -n "$UCODEsel" ]]; then BasePKG+=( "$UCODEsel" ) ; fi
 	if [[ "$FSsel" == "btrfs" ]]; then BasePKG+=( "${btrfsutility[@]}" ) ; fi
-	"$PKGstrap" /mnt "${BasePKG[@]}"
+	"${PKGstrap[@]}" /mnt "${BasePKG[@]}"
 	if [[ -f /mnt/etc/pacman.conf ]]; then sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 5/' /mnt/etc/pacman.conf ; fi
 }
 VoidSystemInstall () {
-	local v_repo="https://voidlinux.org"
+	local v_repo="https://repo-default.voidlinux.org/current"
 	if [[ "${LIBsel}" == "MUSL" ]]; then v_repo+="/musl" ; fi
 	if [[ "${VImethod}" == "XBPS" ]]; then
 		mkdir -p /mnt/var/db/xbps/keys ; cp -r /var/db/xbps/keys/* /mnt/var/db/xbps/keys/ 2>/dev/null || true
-		$PKGstrap base-system
+		"${PKGstrap[@]}" base-system
 	elif [[ "${VImethod}" == "ROOTFS" ]]; then
 		local tb="void-x86_64"
 		if [[ "${LIBsel}" == "MUSL" ]]; then tb+="-musl" ; fi
 		tb+="-ROOTFS.tar.xz"
 		if [[ -f "${SCRIPT_DIR}/Conf_files/${tb}" ]]; then tar -xJf "${SCRIPT_DIR}/Conf_files/${tb}" -C /mnt
-		else curl -Lo "/tmp/${tb}" "${v_repo}/static/${tb}" ; tar -xJf "/tmp/${tb}" -C /mnt ; rm -f "/tmp/${tb}" ; fi
+		else curl -Lo "/tmp/${tb}" "https://voidlinux.org/static/${tb}" ; tar -xJf "/tmp/${tb}" -C /mnt ; rm -f "/tmp/${tb}" ; fi
 	fi
 	for d in dev proc sys run; do mkdir -p /mnt/$d ; mount --bind /$d /mnt/$d ; done
 	mount --make-rslave /mnt/sys
@@ -161,7 +160,7 @@ CrypttabGen () {
 FStabGen () {
 	if [[ -f /mnt/etc/fstab ]]; then mv -f /mnt/etc/fstab /mnt/etc/old-fstab ; fi
 	if [[ "${OSsel,,}" == "void" ]]; then echo -e "$UNIfstab" > /mnt/etc/fstab
-	else "$FSTABgen" -t "$PIDsel" /mnt >> /mnt/etc/fstab ; fi
+	else "${FSTABgen[@]}" -t "$PIDsel" /mnt >> /mnt/etc/fstab ; fi
 	cat /mnt/etc/fstab
 }
 SetupEnvironment () {
@@ -172,24 +171,24 @@ SetupEnvironment () {
 	echo "$k_map" > /mnt/etc/vconsole.conf
 	if [[ "${OSsel,,}" == "void" ]]; then
 		echo "LANG=$LOCsel" > /mnt/etc/locale.conf ; echo 'HARDWARECLOCK="UTC"' >> /mnt/etc/rc.conf
-		"$chroot" /mnt ln -sf /usr/share/zoneinfo/"$TZsel" /etc/localtime
+		"${chroot[@]}" /mnt ln -sf /usr/share/zoneinfo/"$TZsel" /etc/localtime
 	else
 		sed -i "/\($LOCsel\|$LANGsel\)/ s/#//g" /mnt/etc/locale.gen
 		echo -e "LANG=$LOCsel\nLANGUAGE=$LANGsel\nLC_TIME=$LOCsel\nLC_ADDRESS=$LOCsel\nLC_MESSAGES=$LOCsel\nLC_CTYPE=C" >> /mnt/etc/locale.conf
 		if [[ -n "$keypath" ]]; then echo "$k_map" > /mnt/"$keypath" ; fi
-		"$chroot" /mnt bash -c "ln -sf /usr/share/zoneinfo/$TZsel /etc/localtime; hwclock --systohc --utc || true; locale-gen"
+		"${chroot[@]}" /mnt bash -c "ln -sf /usr/share/zoneinfo/$TZsel /etc/localtime; hwclock --systohc --utc || true; locale-gen"
 	fi
 }
 PackageConfig () {
 	if [[ "${OSsel,,}" == "void" ]]; then
 		local v_repos=(void-repo-nonfree)
 		if [[ "$LIBsel" == "GLIBC" ]]; then v_repos+=(void-repo-multilib void-repo-multilib-nonfree) ; fi
-		"$chroot" /mnt $PKGmanager$PKGinst "${PKGskp[@]}" xbps-allow-references "${v_repos[@]}"
+		"${chroot[@]}" /mnt "${PKGmanager[@]}" "${PKGinst[@]}" "${PKGskp[@]}" xbps-allow-references "${v_repos[@]}"
 	fi
 	if [[ "${OSsel,,}" == "arch" ]]; then sed -i '/\[multilib]/,/mirrorlist/ s/#//' /mnt/etc/pacman.conf ; fi
 	if [[ "${OSsel,,}" == "artix" ]]; then sed -i '/\[lib32]/,/mirrorlist/ s/#//' /mnt/etc/pacman.conf ; if [[ "$ARCHrepo" == "1" ]]; then ArchRepoSetup /mnt/etc/pacman.conf ; fi ; fi
 	if [[ -f /mnt/etc/pacman.conf ]]; then sed -i -e '/\(Color\|ParallelDownloads\)/ s/#//' -e '/ParallelDownloads/a ILoveCandy' /mnt/etc/pacman.conf ; fi
-	"$chroot" /mnt $PKGmanager$PKGinst$PKGupd
+	"${chroot[@]}" /mnt "${PKGmanager[@]}" "${PKGinst[@]}" "${PKGupd[@]}"
 }
 PackageInstall () {
 	local FinalPKGs=( "${baseutils[@]}" "${fs[@]}" "${bootloaderutility[@]}" "${btrfsutility[@]}" "${grub[@]}" "${refind[@]}" "${limine[@]}" "${uki[@]}" "${net[@]}" "${audio[@]}" "${bluetooth[@]}" "${print[@]}" "${apps[@]}" "${utility[@]}" "${filemanager[@]}" "${archive[@]}" "${desktop[@]}" "${displaymanager[@]}" "${logind[@]}" "${fonts[@]}" )
@@ -201,8 +200,8 @@ PackageInstall () {
 		if [[ -v amddrivers && ${#amddrivers[@]} -gt 0 ]]; then FinalPKGs+=( "${amddrivers[@]}" ) ; fi
 		if [[ "${OSsel,,}" != "void" ]]; then FinalPKGs+=( "${baselinux[@]}" "${grubbtrfs[@]}" ) ; fi
 	fi
-	if [[ "${OSsel,,}" == "void" ]]; then "$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${FinalPKGs[@]}"
-	else "$chroot" /mnt $PKGmanager$PKGinst$PKGupd"u" "${PKGskp[@]}" "${FinalPKGs[@]}" ; fi
+	if [[ "${OSsel,,}" == "void" ]]; then "${chroot[@]}" /mnt "${PKGmanager[@]}" "${PKGinst[@]}" "${PKGupd[@]}" "${PKGskp[@]}" "${FinalPKGs[@]}"
+	else "${chroot[@]}" /mnt "${PKGmanager[@]}" "${PKGinst[@]}" "${PKGupd[@]}u" "${PKGskp[@]}" "${FinalPKGs[@]}" ; fi
 }
 PKGcheck () {
 	echo "Initializing package groups..."
@@ -256,13 +255,13 @@ PKGcheck () {
 	if [[ "$VBTsel" -eq 1 ]]; then if [[ "$VM_TYPE" == "qemu" ]]; then utility+=(spice-vdagent) ; elif [[ "$VM_TYPE" == "vbox" ]]; then if [[ "${OSsel,,}" == "void" ]]; then utility+=(virtualbox-os-guest) ; else utility+=(virtualbox-guest-utils) ; fi ; fi ; fi
 	if [[ "${GPUMANAGERsel,,}" == "envycontrol" ]]; then utility+=(envycontrol) ; elif [[ "${GPUMANAGERsel,,}" == "cardwire" ]]; then utility+=(cardwire) ; fi
 	if [[ "${OSsel,,}" == "void" ]]; then vulkan=(vulkan-loader) ; else vulkan=(vulkan-icd-loader vulkan-intel vulkan-mesa-layers) ; fi
-	if [[ "${OSsel,,}" == "void" ]]; then local v_live_repos=(void-repo-nonfree) ; if [[ "$LIBsel" == "GLIBC" ]]; then v_live_repos+=(void-repo-multilib void-repo-multilib-nonfree) ; fi ; $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${v_live_repos[@]}" || true ; fi
+	if [[ "${OSsel,,}" == "void" ]]; then local v_live_repos=(void-repo-nonfree) ; if [[ "$LIBsel" == "GLIBC" ]]; then v_live_repos+=(void-repo-multilib void-repo-multilib-nonfree) ; fi ; "${PKGmanager[@]}" "${PKGinst[@]}" "${PKGupd[@]}" "${PKGskp[@]}" "${v_live_repos[@]}" || true ; fi
 	echo "Downloading remote package indexes..."
 	local remote_repo_list="/tmp/remote_pkgs.list"
-	if [[ "${OSsel,,}" == "void" ]]; then $PKGmanager$PKGchk -R -s "" | awk '{print $2}' | sed 's/-[0-9].*//' | sort -u > "$remote_repo_list" ; else $PKGmanager$PKGinst$PKGupd"lq" | sort -u > "$remote_repo_list" ; fi
+	if [[ "${OSsel,,}" == "void" ]]; then "${PKGmanager[@]}" "${PKGchk[@]}" -R -s "" | awk '{print $2}' | sed 's/-[0-9].*//' | sort -u > "$remote_repo_list" ; else "${PKGmanager[@]}" "${PKGinst[@]}" "${PKGupd[@]}lq" | sort -u > "$remote_repo_list" ; fi
 	local y="amddrivers apps archive audio baselinux baseutils bluetooth bootloaderutility booster btrfsutility desktop displaymanager filemanager fonts fs grub grubbtrfs hardwareacceleration kernel limine logind microcode net nvidiadrivers print refind uki utility vulkan"
 	local miss=()
-	for group in $y; do local -n current_group="$group" ; local valid_pkgs=() ; for pkg in "${current_group[@]}"; do if grep -qx "$pkg" "$remote_repo_list"; then valid_pkgs+=("$pkg") ; else miss+=("$pkg") ; fi ; done ; current_group=("${valid_pkgs[@]}") ; done
+	for group in $y; do local -n current_group="$group" ; local valid_pkgs=() ; mapfile -t valid_pkgs < <(printf '%s\n' "${current_group[@]}" | grep -F -x -f "$remote_repo_list") ; mapfile -t group_miss < <(printf '%s\n' "${current_group[@]}" | grep -F -x -v -f "$remote_repo_list" || true) ; miss+=("${group_miss[@]}") ; current_group=("${valid_pkgs[@]}") ; done
 	rm -f "$remote_repo_list"
 	if [[ ${#miss[@]} -gt 0 ]]; then
 		echo -e "\n[!] WARNING: Unavailable packages:\n$(printf ' - %s\n' "${miss[@]}" | sort -u)\n" ; printf '%s\n' "${miss[@]}" | sort -u > pkg_missed
@@ -273,7 +272,7 @@ PKGcheck () {
 KernelSetup () {
 	if [[ "$UCODEsel" == "intel-ucode" ]]; then mkdir -p /mnt/etc/modprobe.d ; echo 'options i915 enable_fbc=1 fastboot=0 enable_dc=4' > /mnt/etc/modprobe.d/i915.conf ; fi
 	if [[ ${#nvidiadrivers[@]} -gt 0 ]]; then
-		if [[ "${OSsel,,}" == "artix" ]]; then "$chroot" /mnt $PKGmanager$PKGinst$PKGupd"u" "${PKGskp[@]}" "nvidia-utils-${init_sys}" ; fi
+		if [[ "${OSsel,,}" == "artix" ]]; then "${chroot[@]}" /mnt "${PKGmanager[@]}" "${PKGinst[@]}" "${PKGupd[@]}u" "${PKGskp[@]}" "nvidia-utils-${init_sys}" ; fi
 		modules+=(nvidia nvidia_modeset nvidia_uvm nvidia_drm) ; echo -e "options nvidia-drm modeset=1 fbdev=1\noptions nvidia NVreg_DynamicPowerManagement=0x02 NVreg_UsePageAttributeTable=1 NVreg_EnablePCIeGen3=1" > /mnt/etc/modprobe.d/nvidia.conf
 	fi
 	case "$IRFSetup" in
@@ -283,10 +282,10 @@ KernelSetup () {
 						if [[ ${#nvidiadrivers[@]} -gt 0 ]]; then echo 'force_drivers+=" nvidia nvidia_modeset nvidia_uvm nvidia_drm "' > /mnt/etc/dracut.conf.d/nvidia.conf ; fi
 						local d_flag="--hostonly" ; if [[ "$IRFSMode" == "Universal" ]]; then d_flag="--no-hostonly" ; fi
 						if [[ "${OSsel,,}" == "void" ]]; then
-							"$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" dracut
+							"${chroot[@]}" /mnt "${PKGmanager[@]}" "${PKGinst[@]}" "${PKGupd[@]}" "${PKGskp[@]}" dracut
 							if [[ "$IRFSMode" == "Universal" ]]; then echo "hostonly=\"no\"" > /mnt/etc/dracut.conf.d/hostonly.conf ; else echo "hostonly=\"yes\"" > /mnt/etc/dracut.conf.d/hostonly.conf ; fi
-							"$chroot" /mnt xbps-reconfigure -f "$KSel"
-						else "$chroot" /mnt dracut $d_flag --kver "$(basename "$(find /mnt/usr/lib/modules/ -maxdepth 1 -mindepth 1 -type d | head -n 1)")" --force /boot/initramfs-"$KSel".img ; fi
+							"${chroot[@]}" /mnt xbps-reconfigure -f "$KSel"
+						else "${chroot[@]}" /mnt dracut "$d_flag" --kver "$(basename "$(find /mnt/usr/lib/modules/ -maxdepth 1 -mindepth 1 -type d -print -quit)")" --force /boot/initramfs-"$KSel".img ; fi
 						;;
 		booster)		local b_opts="mount_timeout: 3m\nvconsole: true\nresume: /dev/disk/by-uuid/${SWAPID}\nmodules: ahci,ata_piix,sd_mod,nvme" ; local b_flag=""
 						if [[ "$IRFSMode" == "Universal" ]]; then b_opts="universal: true\n$b_opts" ; b_flag="--universal" ; fi
@@ -297,15 +296,15 @@ KernelSetup () {
 							mkdir -p /mnt/etc/pacman.d/hooks
 							printf "[Trigger]\nOperation = Install\nOperation = Upgrade\nType = Package\nTarget = linux\nTarget = linux-*\n\n[Action]\nDescription = Forcing Booster initramfs update...\nWhen = PostTransaction\nDepends = booster\nNeedsTargets\nExec = /bin/bash -c 'while read -r pkg; do for d in /usr/lib/modules/*; do if [[ -f \"\$d/pkgbase\" && \"\$(<\"\$d/pkgbase\")\" == \"\$pkg\" ]]; then kver=\"\${d##*/}\"; /usr/bin/booster build --force $b_flag --kernel-version=\"\$kver\" \"/boot/initramfs-\${pkg}.img\"; break; fi; done; done'\n" > /mnt/etc/pacman.d/hooks/95-booster-force.hook
 						fi
-						"$chroot" /mnt /bin/bash -c "booster build --force $b_flag --kernel-version=$(basename "$(find /mnt/usr/lib/modules/ -maxdepth 1 -mindepth 1 -type d ! -name 'extramodules*' | head -n 1)") /boot/initramfs-${KSel}.img"
+						"${chroot[@]}" /mnt /bin/bash -c "booster build --force $b_flag --kernel-version=$(basename "$(find /mnt/usr/lib/modules/ -maxdepth 1 -mindepth 1 -type d ! -name 'extramodules*' -print -quit)") /boot/initramfs-${KSel}.img"
 						;;
 		*)				local HOOKS=(base udev autodetect keyboard keymap modconf block)
-						if [[ "$IRFSMode" == "Universal" ]]; then HOOKS=( ${HOOKS[@]/autodetect/} ) ; fi
+						if [[ "$IRFSMode" == "Universal" ]]; then HOOKS=( "${HOOKS[@]/autodetect/}" ) ; fi
 						if [[ "$LUKS_ENC" -eq 1 ]]; then HOOKS+=(encrypt) ; fi
 						HOOKS+=(resume filesystems fsck)
 						if [[ ${#nvidiadrivers[@]} -gt 0 ]]; then HOOKS+=(kms) ; fi
 						sed -i -e "/MODULES/ s/()/(${modules[*]})/" -e "/BINARIES/ s/()/($binaries)/" -e "s/^HOOKS.*/HOOKS=(${HOOKS[*]})/" /mnt/etc/mkinitcpio.conf
-						"$chroot" /mnt mkinitcpio -p "$KSel"
+						"${chroot[@]}" /mnt mkinitcpio -p "$KSel"
 						;;
 	esac
 }
@@ -337,12 +336,12 @@ ServiceSetup () {
 	fi
 	for s in "${Services[@]}"; do
 		case "${OSsel,,}:$init_sys" in
-			void:*)			"$chroot" /mnt ln -sf /etc/sv/"$s" /etc/runit/runsvdir/default/ ;;
-			arch:*)			"$chroot" /mnt systemctl enable "$s" ;;
-			artix:runit)	"$chroot" /mnt ln -sf /etc/runit/sv/"$s" /etc/runit/runsvdir/default/ ;;
-			artix:s6)		"$chroot" /mnt touch /etc/s6/adminsv/default/contents.d/"$s" ;;
-			artix:dinit)	"$chroot" /mnt ln -sf ../"$s" /etc/dinit.d/boot.d/ ;;
-			artix:*)		if [[ "$s" == "dmcrypt" ]]; then "$chroot" /mnt rc-update add "$s" boot ; else "$chroot" /mnt rc-update add "$s" default ; fi ;;
+			void:*)			"${chroot[@]}" /mnt ln -sf /etc/sv/"$s" /etc/runit/runsvdir/default/ ;;
+			arch:*)			"${chroot[@]}" /mnt systemctl enable "$s" ;;
+			artix:runit)	"${chroot[@]}" /mnt ln -sf /etc/runit/sv/"$s" /etc/runit/runsvdir/default/ ;;
+			artix:s6)		"${chroot[@]}" /mnt touch /etc/s6/adminsv/default/contents.d/"$s" ;;
+			artix:dinit)	"${chroot[@]}" /mnt ln -sf ../"$s" /etc/dinit.d/boot.d/ ;;
+			artix:*)		if [[ "$s" == "dmcrypt" ]]; then "${chroot[@]}" /mnt rc-update add "$s" boot ; else "${chroot[@]}" /mnt rc-update add "$s" default ; fi ;;
 		esac
 	done
 	mkdir -p /mnt/etc/udev/rules.d/
@@ -351,31 +350,31 @@ ServiceSetup () {
 		local t_cmd="tuigreet --time --cmd "
 		if [[ "$DEsel" == "Hyprland" ]]; then t_cmd+="Hyprland" ; fi
 		if [[ "$DEsel" == "Niri" ]]; then if [[ "$init_sys" =~ ^(systemd|dinit)$ ]]; then t_cmd+="niri-session" ; else t_cmd+="'niri --session'" ; fi ; fi
-		"$chroot" /mnt sed -i -e "s|^command = .*|command = \"$t_cmd\"|" -e 's/^vt = .*/vt = 7/' /etc/greetd/config.toml
+		"${chroot[@]}" /mnt sed -i -e "s|^command = .*|command = \"$t_cmd\"|" -e 's/^vt = .*/vt = 7/' /etc/greetd/config.toml
 	fi
 	if [[ "$init_sys" != "systemd" && "$init_sys" != "dinit" ]]; then
 		if [[ "$DEsel" =~ ^(Niri|Hyprland)$ ]]; then
 			local x_cmd="Hyprland"
 			if [[ "$DEsel" == "Niri" ]]; then x_cmd="niri --session" ; fi
-			if [[ -f /mnt/usr/share/wayland-sessions/${DEsel,,}.desktop ]]; then "$chroot" /mnt sed -i "s/^Exec=.*/Exec=dbus-run-session $x_cmd/" /usr/share/wayland-sessions/${DEsel,,}.desktop ; fi
+			if [[ -f /mnt/usr/share/wayland-sessions/${DEsel,,}.desktop ]]; then "${chroot[@]}" /mnt sed -i "s/^Exec=.*/Exec=dbus-run-session $x_cmd/" /usr/share/wayland-sessions/${DEsel,,}.desktop ; fi
 		fi
 	fi
 }
 UserSetup () {
-	"$chroot" /mnt bash -c "useradd -m -g users -G wheel,video,audio,storage,input,lp,scanner,power,kvm $UNsel && su $UNsel -c 'mkdir -p ~/.config'"
-	[[ "${OSsel,,}" == "void" ]] && "$chroot" /mnt usermod -aG _seatd "$UNsel"
+	"${chroot[@]}" /mnt bash -c "useradd -m -g users -G wheel,video,audio,storage,input,lp,scanner,power,kvm $UNsel && su $UNsel -c 'mkdir -p ~/.config'"
+	[[ "${OSsel,,}" == "void" ]] && "${chroot[@]}" /mnt usermod -aG _seatd "$UNsel"
 	sed -i 's/^#\s*\(%wheel ALL=(ALL:ALL) ALL\)/\1/' /mnt/etc/sudoers
 	echo "Choose password for user: $UNsel"
-	while ! "$chroot" /mnt passwd "$UNsel"; do echo "Error: Try again..." ; done
+	while ! "${chroot[@]}" /mnt passwd "$UNsel"; do echo "Error: Try again..." ; done
 	echo "Choose password for root"
-	while ! "$chroot" /mnt passwd; do echo "Error: Try again..." ; done
+	while ! "${chroot[@]}" /mnt passwd; do echo "Error: Try again..." ; done
 	echo "Copying configuration files..."
 	if [[ "${OSsel,,}" == "void" ]]; then
 		mkdir -p /mnt/etc/bash
 		[[ -f "${SCRIPT_DIR}/Conf_files/bashrc" ]] && cp "${SCRIPT_DIR}/Conf_files/bashrc" /mnt/home/"$UNsel"/.bashrc
 	else
 		echo "%wheel ALL=(ALL:ALL) NOPASSWD: ALL" > /mnt/etc/sudoers.d/99-installer-temp
-		"$chroot" /mnt sudo -u "$UNsel" bash -c "git clone https://aur.archlinux.org/trizen.git /tmp/trizen && cd /tmp/trizen && makepkg -si --noconfirm"
+		"${chroot[@]}" /mnt sudo -u "$UNsel" bash -c "git clone https://aur.archlinux.org/trizen.git /tmp/trizen && cd /tmp/trizen && makepkg -si --noconfirm"
 		rm -f /mnt/etc/sudoers.d/99-installer-temp
 		mkdir -p /mnt/etc/bash/bashrc.d
 		[[ -f "${SCRIPT_DIR}/Conf_files/bashrc" ]] && cp "${SCRIPT_DIR}/Conf_files/bashrc" /mnt/etc/bash/bashrc.d/"$UNsel".bashrc
@@ -384,24 +383,26 @@ UserSetup () {
 	[[ -f "${SCRIPT_DIR}/Conf_files/kitty.conf" ]] && { mkdir -p /mnt/home/"$UNsel"/.config/kitty; cp "${SCRIPT_DIR}/Conf_files/kitty.conf" /mnt/home/"$UNsel"/.config/kitty/; }
 	echo -e 'include "/usr/share/nano/*.nanorc"\nset linenumbers' > /mnt/etc/nanorc
 	echo 'export MOZ_ENABLE_WAYLAND=1' >> /mnt/home/"$UNsel"/.profile
-	"$chroot" /mnt sudo -u "$UNsel" bash -c "mkdir -p /home/$UNsel/Pictures/Screenshots /home/$UNsel/.config/swappy && echo -e '[Default]\nsave_dir=/home/$UNsel/Pictures/Screenshots\nsave_filename_format=swappy-%Y%m%d-%H%M%S.png\nshow_panel=false\nline_size=5\ntext_size=20\ntext_font=sans-serif\npaint_mode=brush\nearly_exit=false\nfill_shape=false' > /home/$UNsel/.config/swappy/config"
+	"${chroot[@]}" /mnt sudo -u "$UNsel" bash -c "mkdir -p /home/$UNsel/Pictures/Screenshots /home/$UNsel/.config/swappy && echo -e '[Default]\nsave_dir=/home/$UNsel/Pictures/Screenshots\nsave_filename_format=swappy-%Y%m%d-%H%M%S.png\nshow_panel=false\nline_size=5\ntext_size=20\ntext_font=sans-serif\npaint_mode=brush\nearly_exit=false\nfill_shape=false' > /home/$UNsel/.config/swappy/config"
 	if [[ "$DEsel" =~ ^(Hyprland|Niri)$ ]]; then
 		echo "Installing Wallust..."
-		set +e ; set +E
-		API_URL=$(curl -s https://codeberg.org/api/v1/repos/explosion-mental/wallust/releases/latest | grep -o '"browser_download_url": *"[^"]*"' | grep 'x86_64-unknown-linux-musl.tar.gz' | cut -d '"' -f 4)
-		local dl_success=0
-		if [[ -n "$API_URL" ]]; then curl -sA "Mozilla/5.0" -L -o /tmp/wallust_dl.tar.gz "$API_URL" ; if tar -tf /tmp/wallust_dl.tar.gz &>/dev/null; then dl_success=1 ; fi ; fi
-		set -e ; set -E
-		if [[ "$dl_success" -eq 1 ]]; then tar -xzf /tmp/wallust_dl.tar.gz -C /tmp/ ; mv /tmp/wallust /mnt/usr/bin/wallust ; chmod +x /mnt/usr/bin/wallust
-		else echo "Compiling from source..." ; "$chroot" /mnt bash -c 'git clone https://codeberg.org/explosion-mental/wallust /tmp/wallust-src && cd /tmp/wallust-src && make && make install' ; rm -rf /mnt/tmp/wallust-src
+		API_URL=$(curl -s "https://codeberg.org/api/v1/repos/explosion-mental/wallust/releases/latest" | grep -o '"browser_download_url": *"[^"]*"' | grep 'x86_64-unknown-linux-musl.tar.gz' | cut -d '"' -f 4 || true)
+		if [[ -n "$API_URL" ]] && curl -sA "Mozilla/5.0" -L -o /tmp/wallust_dl.tar.gz "$API_URL" && tar -tf /tmp/wallust_dl.tar.gz &>/dev/null; then
+			tar -xzf /tmp/wallust_dl.tar.gz -C /tmp/
+			mv /tmp/wallust /mnt/usr/bin/wallust
+			chmod +x /mnt/usr/bin/wallust
+		else
+			echo "Compiling from source..."
+			"${chroot[@]}" /mnt bash -c 'git clone https://codeberg.org/explosion-mental/wallust /tmp/wallust-src && cd /tmp/wallust-src && make && make install' || true
+			rm -rf /mnt/tmp/wallust-src
 		fi
-		"$chroot" /mnt sudo -u "$UNsel" bash -c "mkdir -p ~/.config/hypr ~/.cache"
+		"${chroot[@]}" /mnt sudo -u "$UNsel" bash -c "mkdir -p ~/.config/hypr ~/.cache"
 		for conf in Fuzzel Waybar Swaync Wallust Wallpapers; do [[ -d "${SCRIPT_DIR}/Conf_files/$conf" ]] && cp -r "${SCRIPT_DIR}/Conf_files/$conf" /mnt/home/"$UNsel"/.config/"${conf,,}" ; done
 		for f in hypridle.conf hyprlock.conf; do [[ -f "${SCRIPT_DIR}/Conf_files/Hyprlock/$f" ]] && cp "${SCRIPT_DIR}/Conf_files/Hyprlock/$f" /mnt/home/"$UNsel"/.config/hypr/ ; done
 		touch /mnt/home/"$UNsel"/.config/wallust/colors-waybar.css /mnt/home/"$UNsel"/.config/hypr/colors.conf
 		[[ "$DEsel" == "Hyprland" && -d "${SCRIPT_DIR}/Conf_files/Hyprland" ]] && { cp -a "${SCRIPT_DIR}/Conf_files/Hyprland/." /mnt/home/"$UNsel"/.config/hypr/; touch /mnt/home/"$UNsel"/.config/hypr/hyprpaper.conf; }
 		[[ "$DEsel" == "Niri" && -d "${SCRIPT_DIR}/Conf_files/Niri" ]] && cp -r "${SCRIPT_DIR}/Conf_files/Niri" /mnt/home/"$UNsel"/.config/niri
-		"$chroot" /mnt chmod +x /home/"$UNsel"/.config/wallpapers/theme-switcher.sh
+		"${chroot[@]}" /mnt chmod +x /home/"$UNsel"/.config/wallpapers/theme-switcher.sh
 		echo -e "auth required pam_unix.so nullok_secure\naccount required pam_unix.so\npassword required pam_unix.so\nsession required pam_unix.so" > /mnt/etc/pam.d/hyprlock
 		local t_files=()
 		[[ "$DEsel" == "Niri" ]] && t_files=( "/mnt/home/$UNsel/.config/niri/config.kdl" "/mnt/home/$UNsel/.config/wallust/templates/colors-niri.conf" )
@@ -429,17 +430,16 @@ UserSetup () {
 		done
 	fi
 }
-
 AudioSetup () {
-	"$chroot" /mnt mkdir -p /etc/pipewire/pipewire.conf.d /etc/wireplumber/wireplumber.conf.d
+	"${chroot[@]}" /mnt mkdir -p /etc/pipewire/pipewire.conf.d /etc/wireplumber/wireplumber.conf.d
 	printf 'monitor.bluez.properties = { bluez5.enable-sbc-xq = true, bluez5.enable-msbc = true, bluez5.enable-hw-volume = true, bluez5.codecs = [ sbc_xq aac aptx aptx_hd ldac ] }\n' > /mnt/etc/wireplumber/wireplumber.conf.d/10-bluetooth-policy.conf
 	printf 'context.properties = { default.clock.rate = 48000, default.clock.quantum = 1024, default.clock.min-quantum = 32, default.clock.max-quantum = 2048 }\n' > /mnt/etc/pipewire/pipewire.conf.d/99-input-denoise.conf
 	if [[ -f /mnt/etc/bluetooth/main.conf ]]; then sed -i 's/#AutoEnable=false/AutoEnable=true/g' /mnt/etc/bluetooth/main.conf ; fi
-	if [[ "$init_sys" == "systemd" || "${OSsel,,}" == "arch" ]]; then "$chroot" /mnt systemctl --global enable pipewire.socket pipewire-pulse.socket wireplumber.service ; fi
+	if [[ "$init_sys" == "systemd" || "${OSsel,,}" == "arch" ]]; then "${chroot[@]}" /mnt systemctl --global enable pipewire.socket pipewire-pulse.socket wireplumber.service ; fi
 }
 BootloaderSetup () {
 	local osi_version="${AcpiOS:-Windows 2020}" ; local kname
-	if ! kname=$(basename "$(find /mnt/boot/ -type f -name 'vmlinuz-*' | head -n 1)"); then kname="vmlinuz-$KSel" ; fi
+	kname=$(basename "$(find /mnt/boot/ -type f -name 'vmlinuz-*' -print -quit)") || kname="vmlinuz-$KSel"
 	local irfs initrd_flags rootflags="" nvdrm="" nvosi="" luks_flags=""
 	if [[ "${OSsel,,}" == "void" ]]; then irfs="initramfs-${kname#vmlinuz-}.img" ; else irfs="initramfs-$KSel.img" ; fi
 	if [[ "$FSsel" == "btrfs" ]]; then rootflags='rootflags=subvol=@' ; fi
@@ -450,8 +450,8 @@ BootloaderSetup () {
 	local c_flags="rw $luks_flags resume=${PIDsel}=$SWAPID rootfstype=$FSsel $rootflags $nvdrm $nvosi"
 	local e_dev="$DRIVE" ; local e_num="${BOOT_PART##*[a-z]}"
 	case "${BLsel,,}" in
-		refind)			"$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${refind[@]}"
-						"$chroot" /mnt refind-install
+		refind)			"${chroot[@]}" /mnt "${PKGmanager[@]}" "${PKGinst[@]}" "${PKGupd[@]}" "${PKGskp[@]}" "${refind[@]}"
+						"${chroot[@]}" /mnt refind-install
 						local e_fld='BOOT' ; if [[ "$UEFImode" -eq 1 ]]; then e_fld='refind' ; fi
 						mkdir -p /mnt/boot/EFI/"$e_fld"/themes ; cp -r "${SCRIPT_DIR}/Bootloader/Refind/themes/"* /mnt/boot/EFI/"$e_fld"/themes/
 						local r_res="max" ; if [[ "$VBTsel" -eq 1 ]]; then r_res="1024 768" ; fi
@@ -459,33 +459,33 @@ BootloaderSetup () {
 						echo -e "\"Boot Standard\"\t\"$c_flags $initrd_flags\"\n\"Boot Terminal\"\t\"$c_flags $initrd_flags 3\"" > /mnt/boot/refind_linux.conf
 						;;
 		grub)			if [[ "$FSsel" == "btrfs" ]]; then grub+=("${grubbtrfs[@]}") ; fi
-						"$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${grub[@]}"
-						if [[ "$UEFImode" -eq 0 ]]; then "$chroot" /mnt grub-install --target=i386-pc --recheck --debug "$DRIVE" ; else "$chroot" /mnt grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB ; fi
+						"${chroot[@]}" /mnt "${PKGmanager[@]}" "${PKGinst[@]}" "${PKGupd[@]}" "${PKGskp[@]}" "${grub[@]}"
+						if [[ "$UEFImode" -eq 0 ]]; then "${chroot[@]}" /mnt grub-install --target=i386-pc --recheck --debug "$DRIVE" ; else "${chroot[@]}" /mnt grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB ; fi
 						local g_thm="Grub-Sekiro" ; mkdir -p /mnt/boot/grub/themes /mnt/usr/share/grub/themes/ ; cp -r "${SCRIPT_DIR}/Bootloader/$g_thm" /mnt/boot/grub/themes/ ; cp -r "${SCRIPT_DIR}/Bootloader/$g_thm" /mnt/usr/share/grub/themes/
 						local g_res="1920x1080,1024x768,auto" ; if [[ "$VBTsel" -eq 1 ]]; then g_res="1024x768,auto" ; fi
 						sed -i -e "/GRUB_DISABLE_OS_PROBER=/ s/#//g" -e "s/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=3/" -e "s/^#GRUB_GFXMODE=.*/GRUB_GFXMODE=$g_res/" -e '/GRUB_THEME=/c GRUB_THEME="/boot/grub/themes/'"$g_thm"'/theme.txt"' -e "s|^GRUB_CMDLINE_LINUX=.*|GRUB_CMDLINE_LINUX=\"$nvosi $luks_flags\"|" /mnt/etc/default/grub
 						if [[ ${#nvidiadrivers[@]} -gt 0 ]]; then sed -i "s/^GRUB_CMDLINE_LINUX_DEFAULT=\"\(.*\)\"/GRUB_CMDLINE_LINUX_DEFAULT=\"\1 quiet splash $nvdrm\"/" /mnt/etc/default/grub ; fi
-						"$chroot" /mnt grub-mkconfig -o /boot/grub/grub.cfg
+						"${chroot[@]}" /mnt grub-mkconfig -o /boot/grub/grub.cfg
 						;;
-		efistub)		"$chroot" /mnt efibootmgr -d "$e_dev" -p "${e_num:-1}" -c -L "${OSsel^} Linux ($FSsel)" -l "\\$kname" -u "$initrd_flags ro $c_flags" --verbose
+		efistub)		"${chroot[@]}" /mnt efibootmgr -d "$e_dev" -p "${e_num:-1}" -c -L "${OSsel^} Linux ($FSsel)" -l "\\$kname" -u "$initrd_flags ro $c_flags" --verbose
 						;;
-		limine)			"$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${limine[@]}"
+		limine)			"${chroot[@]}" /mnt "${PKGmanager[@]}" "${PKGinst[@]}" "${PKGupd[@]}" "${PKGskp[@]}" "${limine[@]}"
 						mkdir -p /mnt/boot/EFI/BOOT ; cp /mnt/usr/share/limine/BOOTX64.EFI /mnt/boot/EFI/BOOT/
 						local l_ucode="" ; if [[ -n "$UCODEsel" ]]; then l_ucode="module_path: boot():/${UCODEsel}.img\n    " ; fi
 						echo -e "timeout: 3\n\n/Linux (${OSsel^})\n    protocol: linux\n    kernel_path: boot():/${kname}\n    ${l_ucode}module_path: boot():/${irfs}\n    cmdline: ${c_flags}" > /mnt/boot/limine.conf
-						"$chroot" /mnt efibootmgr -c -d "$e_dev" -p "${e_num:-1}" -L "Limine Bootloader" -l '\EFI\BOOT\BOOTX64.EFI'
+						"${chroot[@]}" /mnt efibootmgr -c -d "$e_dev" -p "${e_num:-1}" -L "Limine Bootloader" -l '\EFI\BOOT\BOOTX64.EFI'
 						;;
-		systemd-boot)	"$chroot" /mnt bootctl --path=/boot install
+		systemd-boot)	"${chroot[@]}" /mnt bootctl --path=/boot install
 						echo -e "default arch.conf\ntimeout 3\nconsole-mode max\neditor no" > /mnt/boot/loader/loader.conf
 						local s_ucode="" ; if [[ -n "$UCODEsel" ]]; then s_ucode="initrd /${UCODEsel}.img\n" ; fi
 						echo -e "title Arch Linux\nlinux /${kname}\n${s_ucode}initrd /${irfs}\noptions ${c_flags}" > /mnt/boot/loader/entries/arch.conf
 						;;
-		uki)			"$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${uki[@]}"
+		uki)			"${chroot[@]}" /mnt "${PKGmanager[@]}" "${PKGinst[@]}" "${PKGupd[@]}" "${PKGskp[@]}" "${uki[@]}"
 						mkdir -p /mnt/boot/EFI/BOOT ; echo "$c_flags" > /mnt/boot/cmdline.txt
 						local u_ucode="" ; if [[ -n "$UCODEsel" ]]; then u_ucode="--microcode=/boot/${UCODEsel}.img" ; fi
-						"$chroot" /mnt ukify build --linux=/boot/${kname} --initrd=/boot/${irfs} ${u_ucode} --cmdline=@/boot/cmdline.txt --output=/boot/EFI/BOOT/BOOTX64.EFI
+						"${chroot[@]}" /mnt ukify build --linux=/boot/${kname} --initrd=/boot/${irfs} ${u_ucode} --cmdline=@/boot/cmdline.txt --output=/boot/EFI/BOOT/BOOTX64.EFI
 						rm -f /mnt/boot/cmdline.txt
-						"$chroot" /mnt efibootmgr -c -d "$e_dev" -p "${e_num:-1}" -L "Arch Linux (UKI)" -l '\EFI\BOOT\BOOTX64.EFI'
+						"${chroot[@]}" /mnt efibootmgr -c -d "$e_dev" -p "${e_num:-1}" -L "Arch Linux (UKI)" -l '\EFI\BOOT\BOOTX64.EFI'
 						;;
 	esac
 }
@@ -551,24 +551,24 @@ InstallationSetup () {
 	local s_step
 	if [[ "${OSsel,,}" == "void" ]]; then s_step='VoidSystemInstall' ; else s_step='ArchTixSystemInstall' ; fi
 	if [[ "${OSsel,,}" != "void" ]]; then
-		PKGmanager="pacman" ; PKGinst=" -S" ; PKGupd="y" ; PKGchk=" -Q" ; PKGrmv=" -R" ; PKGdpn="s" ; PKGfrc="dd" ; PKGskp=( --needed --noconfirm ) ; PKGrsk=( --noconfirm ) ; keylayout='KEYMAP=it' ; chroot="${OSsel,,}-chroot"
+		PKGmanager=(pacman) ; PKGinst=(-S) ; PKGupd=(y) ; PKGchk=(-Q) ; PKGrmv=(-R) ; PKGdpn=(s) ; PKGfrc=(dd) ; PKGskp=(--needed --noconfirm) ; PKGrsk=(--noconfirm) ; keylayout='KEYMAP=it' ; chroot=("${OSsel,,}-chroot")
 		if [[ "${OSsel,,}" == "arch" ]]; then
-			keypath='etc/vconsole.conf' ; PKGstrap=pacstrap ; FSTABgen=genfstab ; init_sys="systemd"
+			keypath='etc/vconsole.conf' ; PKGstrap=(pacstrap) ; FSTABgen=(genfstab) ; init_sys="systemd"
 			sed -i -e 's/^#ParallelDownloads = 5/ParallelDownloads = 5/' -e '/\[multilib]/,/mirrorlist/ s/#//' /etc/pacman.conf
-			$PKGmanager$PKGinst$PKGupd"lq" core extra multilib | sort > pacman_db || true
+			"${PKGmanager[@]}" "${PKGinst[@]}" "${PKGupd[@]}lq" core extra multilib | sort > pacman_db || true
 		elif [[ "${OSsel,,}" == "artix" ]]; then
-			keypath='etc/conf.d/keymaps' ; PKGstrap=basestrap ; FSTABgen=fstabgen ; init_sys="${INITsel,,}"
+			keypath='etc/conf.d/keymaps' ; PKGstrap=(basestrap) ; FSTABgen=(fstabgen) ; init_sys="${INITsel,,}"
 			sed -i -e 's/^#ParallelDownloads = 5/ParallelDownloads = 5/' -e '/\[lib32]/,/mirrorlist/ s/#//' /etc/pacman.conf
 			if [[ "$ARCHrepo" == "1" ]]; then ArchRepoSetup /etc/pacman.conf ; fi
 			local artix_pkgs="system world galaxy lib32"
 			if [[ "$ARCHrepo" == "1" ]]; then artix_pkgs+=" universe extra multilib" ; fi
-			$PKGmanager$PKGinst$PKGupd"lq" $artix_pkgs | sort > pacman_db || true
+			"${PKGmanager[@]}" "${PKGinst[@]}" "${PKGupd[@]}lq" $artix_pkgs | sort > pacman_db || true
 		fi
 	else
-		PKGmanager="xbps" ; PKGinst="-install" ; PKGupd=" -S" ; PKGchk="-query" ; PKGrmv="-remove" ; PKGdpn=" -R" ; PKGfrc=" -F" ; PKGskp=( -y -y ) ; PKGrsk=( -y ) ; keylayout='KEYMAP=it' ; keypath='etc/rc.conf'
+		PKGmanager=(xbps) ; PKGinst=(-install) ; PKGupd=(-S) ; PKGchk=(-query) ; PKGrmv=(-remove) ; PKGdpn=(-R) ; PKGfrc=(-F) ; PKGskp=(-y -y) ; PKGrsk=(-y) ; keylayout='KEYMAP=it' ; keypath='etc/rc.conf'
 		if [[ "$LIBsel" == "GLIBC" ]]; then VoidArch="x86_64" ; else VoidArch="x86_64-musl" ; fi
-		VoidRepo="https://voidlinux.org" ; if [[ "$LIBsel" == "MUSL" ]]; then VoidRepo+="/musl" ; fi
-		PKGstrap="$PKGmanager$PKGinst$PKGupd -R $VoidRepo -r /mnt ${PKGskp[*]}" ; chroot="chroot"
+		VoidRepo="https://repo-default.voidlinux.org/current" ; if [[ "$LIBsel" == "MUSL" ]]; then VoidRepo+="/musl" ; fi
+		PKGstrap=("${PKGmanager[@]}" "${PKGinst[@]}" "${PKGupd[@]}" -R "$VoidRepo" -r /mnt "${PKGskp[@]}") ; chroot=(chroot)
 	fi
 	echo 'Running check for missing packages' ; PKGcheck
 	local ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' "$s_step" 'CrypttabGen' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'KernelSetup' 'ServiceSetup' 'UserSetup' )
@@ -576,7 +576,7 @@ InstallationSetup () {
 	ArchTixSteps+=( 'BootloaderSetup' )
 	for a in "${ArchTixSteps[@]}"; do "$a" ; done
 	echo -e "\n=== INSTALLATION COMPLETED ==="
-	"$chroot" /mnt chown -hR "$UNsel":users /home/"$UNsel"
+	"${chroot[@]}" /mnt chown -hR "$UNsel":users /home/"$UNsel"
 	if [[ "$(wc -l < Errors)" -gt 1 ]]; then echo -e "\n[!] Some errors logged during installation:" ; cat Errors ; cp Errors /mnt/var/log/installer_errors.log ; else echo "[+] Clean installation: zero errors detected." ; fi
 	YesNoSel "Reboot system"
 	if [[ "$CC" -eq 1 ]]; then umount -R -l /mnt || true ; reboot ; else echo "OK" ; exit 0 ; fi
