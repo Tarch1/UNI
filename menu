@@ -35,7 +35,7 @@ YesNoSel () {
 
 ArchRepoSetup () {
 	local target_conf="$1" ; local cmd=() ; local mirror_file="/etc/pacman.d/mirrorlist-arch"
-	if [[ "$target_conf" == "/mnt/etc/pacman.conf" ]]; then cmd=( "$chroot" /mnt ) ; mirror_file="/mnt/etc/pacman.d/mirrorlist-arch" ; fi
+	if [[ "$target_conf" == "/mnt/etc/pacman.conf" ]]; then cmd=( "${chroot[@]}" /mnt ) ; mirror_file="/mnt/etc/pacman.d/mirrorlist-arch" ; fi
 	if [[ ${#cmd[@]} -eq 0 ]]; then rm -rf /etc/pacman.d/gnupg/* 2>/dev/null || true ; mkdir -p /etc/pacman.d/gnupg ; chmod 700 /etc/pacman.d/gnupg ; pacman-key --init ; pacman-key --populate artix
 	else "${cmd[@]}" pacman-key --init ; "${cmd[@]}" pacman-key --populate artix ; fi
 	sed -i '/\[universe\]/,/^[[:space:]]*$/d' "$target_conf"
@@ -47,14 +47,14 @@ ArchRepoSetup () {
 
 AutoOSsel () {
 	local os_id
-	if [[ -f /etc/os-release ]]; then if ! os_id=$(grep -i '^ID=' /etc/os-release | cut -d= -f2 | tr -d '"'); then os_id="" ; fi ; fi
+	if [[ -f /etc/os-release ]]; then os_id=$(grep -i '^ID=' /etc/os-release | cut -d= -f2 | tr -d '"') || os_id="" ; fi
 	if [[ "${os_id,,}" =~ ^(arch|artix|void)$ ]]; then OSsel="${os_id^}" ; else echo "Automated OS detection failed or unsupported Live OS." ; OperatingSystemSel ; fi
 	echo "Detected Live OS: $OSsel"
 }
 
 CPUsel () {
 	local cpu_info
-	if ! cpu_info=$(grep -m1 -Ei 'GenuineIntel|AuthenticAMD' /proc/cpuinfo); then cpu_info="" ; fi
+	cpu_info=$(grep -m1 -Ei 'GenuineIntel|AuthenticAMD' /proc/cpuinfo) || cpu_info=""
 	if [[ "$cpu_info" =~ Intel ]]; then echo 'Installing Intel microcode' ; UCODEsel='intel-ucode'
 	elif [[ "$cpu_info" =~ AMD ]]; then echo 'Installing AMD microcode' ; if [[ "${OSsel,,}" == "void" ]]; then UCODEsel='amd-ucode-firmware' ; else UCODEsel='amd-ucode' ; fi
 	else echo 'No microcode needed or unknown CPU' ; UCODEsel="" ; fi
@@ -104,7 +104,7 @@ DriveSelection() {
 GPUsel () {
 	echo "Detecting video chipset..."
 	local gpu_info
-	if ! gpu_info=$(lspci | grep -Ei 'VGA|3D'); then gpu_info="" ; fi
+	gpu_info=$(lspci | grep -Ei 'VGA|3D') || gpu_info=""
 	if [[ "$gpu_info" =~ (AMD|Radeon) ]]; then if [[ "${OSsel,,}" == "void" ]]; then amddrivers=(mesa-dri vulkan-loader mesa-vulkan-radeon) ; else amddrivers=(amdgpu mesa vulkan-radeon libva-mesa-driver) ; fi ; fi
 	if [[ "$gpu_info" =~ (VMware|VirtualBox|Virtio|QXL) ]]; then echo "VM detected: The default Mesa driver will be installed" ; fi
 	if [[ "$gpu_info" =~ NVIDIA ]]; then
@@ -121,7 +121,7 @@ GPUsel () {
 				echo "Setting up NVIDIA $NVsel Drivers" ; MenuSel "GPUMANAGERsel" "Select NVIDIA Optimus Manager" "Native" "Envycontrol" "Cardwire"
 			fi
 		fi
-		if command -v strings >/dev/null && [[ -f /sys/firmware/acpi/tables/DSDT ]]; then if ! AcpiOS="$(strings /sys/firmware/acpi/tables/DSDT | grep -i 'windows ' | sort | tail -1)"; then AcpiOS="" ; fi ; fi
+		if command -v strings >/dev/null && [[ -f /sys/firmware/acpi/tables/DSDT ]]; then AcpiOS="$(strings /sys/firmware/acpi/tables/DSDT | grep -i 'windows ' | sort | tail -1)" || AcpiOS="" ; fi
 	fi
 	if [[ ! "$gpu_info" =~ (AMD|Radeon|VMware|VirtualBox|Virtio|QXL|NVIDIA) ]]; then echo "Generic/Intel GPU: Mesa will be installed" ; fi
 }
