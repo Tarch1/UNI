@@ -259,10 +259,10 @@ PKGcheck () {
 	if [[ "${OSsel,,}" == "void" ]]; then local v_live_repos=(void-repo-nonfree) ; if [[ "$LIBsel" == "GLIBC" ]]; then v_live_repos+=(void-repo-multilib void-repo-multilib-nonfree) ; fi ; $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${v_live_repos[@]}" || true ; fi
 	echo "Downloading remote package indexes..."
 	local remote_repo_list="/tmp/remote_pkgs.list"
-	if [[ "${OSsel,,}" == "void" ]]; then $PKGmanager$PKGchk -R -s "" | awk '{print $2}' | sed 's/-[0-9].*//' | sort -u > "$remote_repo_list" ; else $PKGmanager$PKGinst$PKGupd"lq" | sort -u > "$remote_repo_list" ; fi
+	if [[ "${OSsel,,}" == "void" ]]; then $PKGmanager$PKGchk -R -s "" | awk '{print $2}' | sed 's/-[0-9].*//' | sort -u > "$remote_repo_list" || true ; else $PKGmanager$PKGinst"lq" | sort -u > "$remote_repo_list" || true ; fi
 	local y="amddrivers apps archive audio baselinux baseutils bluetooth bootloaderutility booster btrfsutility desktop displaymanager filemanager fonts fs grub grubbtrfs hardwareacceleration kernel limine logind microcode net nvidiadrivers print refind uki utility vulkan"
 	local miss=()
-	for group in $y; do local -n current_group="$group" ; local valid_pkgs=() ; mapfile -t valid_pkgs < <(printf '%s\n' "${current_group[@]}" | grep -F -x -f "$remote_repo_list") ; mapfile -t group_miss < <(printf '%s\n' "${current_group[@]}" | grep -F -x -v -f "$remote_repo_list" || true) ; miss+=("${group_miss[@]}") ; current_group=("${valid_pkgs[@]}") ; done
+	for group in $y; do	local -n current_group="$group" ; local valid_pkgs=() ; mapfile -t valid_pkgs < <(printf '%s\n' "${current_group[@]}" | grep -F -x -f "$remote_repo_list" || true) ; mapfile -t group_miss < <(printf '%s\n' "${current_group[@]}" | grep -F -x -v -f "$remote_repo_list" || true) ; miss+=("${group_miss[@]}") ; current_group=("${valid_pkgs[@]}") ; done
 	rm -f "$remote_repo_list"
 	if [[ ${#miss[@]} -gt 0 ]]; then
 		echo -e "\n[!] WARNING: Unavailable packages:\n$(printf ' - %s\n' "${miss[@]}" | sort -u)\n" ; printf '%s\n' "${miss[@]}" | sort -u > pkg_missed
