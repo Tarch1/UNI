@@ -356,17 +356,12 @@ UserSetup () {
 	echo 'export MOZ_ENABLE_WAYLAND=1' >> /mnt/home/"$UNsel"/.profile
 	"$chroot" /mnt sudo -u "$UNsel" bash -c "mkdir -p /home/$UNsel/Pictures/Screenshots /home/$UNsel/.config/swappy && echo -e '[Default]\nsave_dir=/home/$UNsel/Pictures/Screenshots\nsave_filename_format=swappy-%Y%m%d-%H%M%S.png\nshow_panel=false\nline_size=5\ntext_size=20\ntext_font=sans-serif\npaint_mode=brush\early_exit=false\nfill_shape=false' > /home/$UNsel/.config/swappy/config"
 	if [[ "$DEsel" =~ ^(Hyprland|Niri)$ ]]; then
-		echo "Installing Wallust..."
-		API_URL=$(curl -s "https://codeberg.org/api/v1/repos/explosion-mental/wallust/releases/latest" | grep -o '"browser_download_url": *"[^"]*"' | grep 'x86_64-unknown-linux-musl.tar.gz' | cut -d '"' -f 4 || true)
-		if [[ -n "$API_URL" ]] && curl -sA "Mozilla/5.0" -L -o /tmp/wallust_dl.tar.gz "$API_URL" && tar -tf /tmp/wallust_dl.tar.gz &>/dev/null; then
-			tar -xzf /tmp/wallust_dl.tar.gz -C /tmp/
-			mv /tmp/wallust /mnt/usr/bin/wallust
-			chmod +x /mnt/usr/bin/wallust
-		else
-			echo "Compiling from source..."
-			"$chroot" /mnt bash -c 'git clone https://codeberg.org/explosion-mental/wallust /tmp/wallust-src && cd /tmp/wallust-src && make && make install' || true
-			rm -rf /mnt/tmp/wallust-src
-		fi
+		echo "Installing Wallust..." ; local w_ok=0
+		local API_URL=$(curl -s "https://codeberg.org/api/v1/repos/explosion-mental/wallust/releases/latest" | grep -o '"browser_download_url": *"[^"]*"' | grep 'x86_64-unknown-linux-musl.tar.gz' | cut -d '"' -f 4 || true)
+		if [[ -n "$API_URL" ]] && curl -sA "Mozilla/5.0" -L -o /tmp/wallust_dl.tar.gz "$API_URL" && tar -tf /tmp/wallust_dl.tar.gz &>/dev/null; then tar -xzf /tmp/wallust_dl.tar.gz -C /tmp/ ; mv /tmp/wallust /mnt/usr/bin/wallust ; chmod +x /mnt/usr/bin/wallust ; w_ok=1 ; fi
+		if [[ "$w_ok" -eq 0 && -f "${SCRIPT_DIR}/Conf_files/Wallust/wallust" ]]; then echo "Codeberg failed. Using local fallback..." ; cp "${SCRIPT_DIR}/Conf_files/Wallust/wallust" /mnt/usr/bin/wallust ; chmod +x /mnt/usr/bin/wallust ; w_ok=1 ; fi
+		if [[ "$w_ok" -eq 0 && "${OSsel,,}" != "void" ]]; then echo "Fallback failed. Trying AUR..." ; "$chroot" /mnt sudo -u "$UNsel" bash -c "trizen -S --noconfirm wallust-bin" || echo "Wallust installation failed." ; fi
+		echo "Refining user..."
 		"$chroot" /mnt sudo -u "$UNsel" bash -c "mkdir -p ~/.config/hypr ~/.cache"
 		for conf in Fuzzel Waybar Swaync Wallust Wallpapers; do [[ -d "${SCRIPT_DIR}/Conf_files/$conf" ]] && cp -r "${SCRIPT_DIR}/Conf_files/$conf" /mnt/home/"$UNsel"/.config/"${conf,,}" ; done
 		for f in hypridle.conf hyprlock.conf; do [[ -f "${SCRIPT_DIR}/Conf_files/Hyprlock/$f" ]] && cp "${SCRIPT_DIR}/Conf_files/Hyprlock/$f" /mnt/home/"$UNsel"/.config/hypr/ ; done
