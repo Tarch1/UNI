@@ -360,7 +360,7 @@ UserSetup () {
 		local API_URL=$(curl -s "https://codeberg.org/api/v1/repos/explosion-mental/wallust/releases/latest" | grep -o '"browser_download_url": *"[^"]*"' | grep 'x86_64-unknown-linux-musl.tar.gz' | cut -d '"' -f 4 || true)
 		if [[ -n "$API_URL" ]] && curl -sA "Mozilla/5.0" -L -o /tmp/wallust_dl.tar.gz "$API_URL" && tar -tf /tmp/wallust_dl.tar.gz &>/dev/null; then tar -xzf /tmp/wallust_dl.tar.gz -C /tmp/ ; mv /tmp/wallust /mnt/usr/bin/wallust ; chmod +x /mnt/usr/bin/wallust ; w_ok=1 ; fi
 		if [[ "$w_ok" -eq 0 && -f "${SCRIPT_DIR}/Conf_files/Wallust/wallust" ]]; then echo "Codeberg failed. Using local fallback..." ; cp "${SCRIPT_DIR}/Conf_files/Wallust/wallust" /mnt/usr/bin/wallust ; chmod +x /mnt/usr/bin/wallust ; w_ok=1 ; fi
-		if [[ "$w_ok" -eq 0 && "${OSsel,,}" != "void" ]]; then echo "Fallback failed. Trying AUR..." ; "$chroot" /mnt sudo -u "$UNsel" bash -c "trizen -S --noconfirm wallust-bin" || echo "Wallust installation failed." ; fi
+		if [[ "$w_ok" -eq 0 ]]; then echo "Fallback failed. Trying package managers..." ; if [[ "${OSsel,,}" == "void" ]]; then "$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" wallust || echo "Wallust installation failed." ; else "$chroot" /mnt sudo -u "$UNsel" bash -c "trizen -S --noconfirm wallust-bin" || echo "Wallust installation failed." ; fi ; fi
 		echo "Refining user..."
 		"$chroot" /mnt sudo -u "$UNsel" bash -c "mkdir -p ~/.config/hypr ~/.cache"
 		for conf in Fuzzel Waybar Swaync Wallust Wallpapers; do [[ -d "${SCRIPT_DIR}/Conf_files/$conf" ]] && cp -r "${SCRIPT_DIR}/Conf_files/$conf" /mnt/home/"$UNsel"/.config/"${conf,,}" ; done
