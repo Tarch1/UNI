@@ -207,7 +207,7 @@ PKGcheck () {
 	echo "Initializing package groups..."
 	if [[ ! -v amddrivers ]]; then amddrivers=() ; fi
 	if [[ ! -v nvidiadrivers ]]; then nvidiadrivers=() ; fi
-	if [[ "${OSsel,,}" == "artix" && ${#nvidiadrivers[@]} -gt 0 ]]; then nvidiadrivers+=("nvidia-utils-${init_sys,,}") ; fi
+	if [[ "${OSsel,,}" == "artix" ]]; then if [[ ${#nvidiadrivers[@]} -gt 0 ]]; then nvidiadrivers+=("nvidia-utils-${init_sys,,}") ; fi ; fi
 	apps=(kitty telegram-desktop firefox) ; if [[ "${OSsel,,}" != "void" ]]; then apps+=(profile-sync-daemon) ; fi
 	archive=(bzip2 cpio gzip xz 7zip tar unrar zip unzip zstd)
 	audio=(pipewire wireplumber) ; if [[ "${OSsel,,}" != "void" ]]; then audio+=(pipewire-pulse pipewire-alsa pipewire-jack sof-firmware) ; fi
@@ -230,25 +230,25 @@ PKGcheck () {
 	elif [[ "${DMsel,,}" == "ly" ]]; then displaymanager=(ly)
 	elif [[ "${DMsel,,}" == "sddm" ]]; then displaymanager=(sddm)
 	else displaymanager=() ; fi
-	if [[ "${OSsel,,}" == "artix" && "${DMsel,,}" != "none" ]]; then displaymanager+=("${DMsel,,}-${init_sys,,}") ; fi
+	if [[ "${OSsel,,}" == "artix" ]]; then if [[ "${DMsel,,}" != "none" ]]; then displaymanager+=("${DMsel,,}-${init_sys,,}") ; fi ; fi
 	filemanager=(yazi pcmanfm-qt tumbler file-roller android-tools) ; if [[ "${OSsel,,}" != "void" ]]; then filemanager+=(gvfs-mtp) ; fi
 	if [[ "${OSsel,,}" == "void" ]]; then fonts=(nerd-fonts) ; else fonts=(ttf-jetbrains-mono-nerd) ; fi
 	fs=(dialog mtools parted gptfdisk dosfstools ntfs-3g)
 	if [[ "${BLsel,,}" == "grub" ]]; then grub=(grub) ; else grub=() ; fi
-	if [[ "$FSsel" == "btrfs" && "${OSsel,,}" != "void" ]]; then grubbtrfs=(grub-btrfs) ; else grubbtrfs=() ; fi
+	if [[ "$FSsel" == "btrfs" ]]; then if [[ "${OSsel,,}" != "void" ]]; then grubbtrfs=(grub-btrfs) ; else grubbtrfs=() ; fi ; else grubbtrfs=() ; fi
+	if [[ "${BLsel,,}" == "limine" ]]; then limine=(limine) ; else limine=() ; fi
+	if [[ "${BLsel,,}" == "refind" ]]; then refind=(refind) ; else refind=() ; fi
+	if [[ "${BLsel,,}" == "uki" ]]; then uki=(systemd-ukify) ; else uki=() ; fi
 	if [[ "${OSsel,,}" == "void" ]]; then hardwareacceleration=(mesa-dri mesa-vaapi mesa-vulkan-radeon) ; else hardwareacceleration=(intel-media-driver vkd3d) ; fi
 	kernel=("${KSel}" "${KSel}-headers") ; if [[ "${OSsel,,}" == "void" ]]; then kernel+=(linux-firmware-network) ; else kernel+=(linux-firmware) ; fi
 	if [[ "$IRFSetup" == "booster" ]]; then kernel+=(booster) ; elif [[ "$IRFSetup" == "dracut" ]]; then kernel+=(dracut) ; elif [[ "$IRFSetup" == "mkinitcpio" ]]; then kernel+=(mkinitcpio) ; fi
-	if [[ "${BLsel,,}" == "limine" ]]; then limine=(limine) ; else limine=() ; fi
 	if [[ "${OSsel,,}" == "artix" ]]; then logind=(elogind elogind-"${init_sys,,}" "${init_sys,,}"-settingsd) ; elif [[ "${OSsel,,}" == "void" ]]; then logind=(seatd) ; else logind=() ; fi
 	if [[ -n "$UCODEsel" ]]; then microcode=("$UCODEsel") ; else microcode=() ; fi
 	net=(iwd chrony) ; if [[ "${OSsel,,}" == "void" ]]; then net+=(NetworkManager) ; else net+=(networkmanager) ; fi ; if [[ "${OSsel,,}" == "artix" ]]; then net+=("chrony-${init_sys,,}" "networkmanager-${init_sys,,}") ; fi
 	print=(cups cups-pdf avahi) ; if [[ "${OSsel,,}" == "void" ]]; then print+=(cups-filters) ; else print+=(system-config-printer) ; fi ; if [[ "${OSsel,,}" == "artix" ]]; then print+=("avahi-${init_sys,,}" "cups-${init_sys,,}") ; fi
-	if [[ "${BLsel,,}" == "refind" ]]; then refind=(refind) ; else refind=() ; fi
-	if [[ "${BLsel,,}" == "uki" ]]; then uki=(systemd-ukify) ; else uki=() ; fi
 	utility=(imv featherpad libqalculate fd btop fwupd fastfetch grim slurp wl-clipboard swappy awww xorg-xwayland)
 	if [[ "${OSsel,,}" != "void" ]]; then utility+=(lact cowfortune pacman-contrib) ; fi
-	if [[ "${OSsel,,}" == "artix" && "$LUKS_ENC" -eq 1 ]]; then utility+=("cryptsetup-${init_sys,,}") ; fi
+	if [[ "${OSsel,,}" == "artix" ]]; then if [[ "$LUKS_ENC" -eq 1 ]]; then utility+=("cryptsetup-${init_sys,,}") ; fi ; fi
 	if ls /sys/class/power_supply/BAT* &>/dev/null; then
 		if [[ "${OSsel,,}" == "arch" ]]; then utility+=(power-profiles-daemon) ; else utility+=(tlp) ; if [[ "${OSsel,,}" == "artix" ]]; then utility+=("tlp-${init_sys,,}") ; fi ; fi
 		if [[ "$UCODEsel" == "intel-ucode" ]]; then utility+=(thermald) ; if [[ "${OSsel,,}" == "artix" ]]; then utility+=("thermald-${init_sys,,}") ; fi ; fi
@@ -256,13 +256,13 @@ PKGcheck () {
 	if [[ "$VBTsel" -eq 1 ]]; then if [[ "$VM_TYPE" == "qemu" ]]; then utility+=(spice-vdagent) ; elif [[ "$VM_TYPE" == "vbox" ]]; then if [[ "${OSsel,,}" == "void" ]]; then utility+=(virtualbox-os-guest) ; else utility+=(virtualbox-guest-utils) ; fi ; fi ; fi
 	if [[ "${GPUMANAGERsel,,}" == "envycontrol" ]]; then utility+=(envycontrol) ; elif [[ "${GPUMANAGERsel,,}" == "cardwire" ]]; then utility+=(cardwire) ; fi
 	if [[ "${OSsel,,}" == "void" ]]; then vulkan=(vulkan-loader) ; else vulkan=(vulkan-icd-loader vulkan-intel vulkan-mesa-layers) ; fi
-	if [[ "${OSsel,,}" == "void" ]]; then local v_live_repos=(void-repo-nonfree) ; if [[ "$LIBsel" == "GLIBC" ]]; then v_live_repos+=(void-repo-multilib void-repo-multilib-nonfree) ; fi ; $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${v_live_repos[@]}" || true ; fi
+	if [[ "${OSsel,,}" == "void" ]]; then local v_live_repos=(void-repo-nonfree); if [[ "$LIBsel" == "GLIBC" ]]; then v_live_repos+=(void-repo-multilib void-repo-multilib-nonfree) ; fi ; "${PKG_INSTALL[@]}" "${PKG_UPDATE[@]}" "${PKG_SKIP[@]}" "${v_live_repos[@]}" || true ; fi
 	echo "Downloading remote package indexes..."
 	local remote_repo_list="/tmp/remote_pkgs.list"
-	if [[ "${OSsel,,}" == "void" ]]; then $PKGmanager$PKGchk -R -s "" | awk '{print $2}' | sed 's/-[0-9].*//' | sort -u > "$remote_repo_list" || true ; else $PKGmanager$PKGinst"lq" | sort -u > "$remote_repo_list" || true ; fi
+	if [[ "${OSsel,,}" == "void" ]]; then "${PKG_QUERY[@]}" -R -s "" | awk '{print $2}' | sed 's/-[0-9].*//' | sort -u > "$remote_repo_list" || true ; else "${PKG_INSTALL[@]}" -l -q | sort -u > "$remote_repo_list" || true ; fi
 	local y="amddrivers apps archive audio baselinux baseutils bluetooth bootloaderutility booster btrfsutility desktop displaymanager filemanager fonts fs grub grubbtrfs hardwareacceleration kernel limine logind microcode net nvidiadrivers print refind uki utility vulkan"
 	local miss=()
-	for group in $y; do	local -n current_group="$group" ; local valid_pkgs=() ; mapfile -t valid_pkgs < <(printf '%s\n' "${current_group[@]}" | grep -F -x -f "$remote_repo_list" || true) ; mapfile -t group_miss < <(printf '%s\n' "${current_group[@]}" | grep -F -x -v -f "$remote_repo_list" || true) ; miss+=("${group_miss[@]}") ; current_group=("${valid_pkgs[@]}") ; done
+	for group in $y; do local -n current_group="$group" ; if [[ ${#current_group[@]} -eq 0 ]]; then continue ; fi ; local valid_pkgs=() ; for pkg in "${current_group[@]}"; do if grep -q -x -F "$pkg" "$remote_repo_list"; then valid_pkgs+=("$pkg") ; else miss+=("$pkg") ; fi ; done ; current_group=("${valid_pkgs[@]}") ; done
 	rm -f "$remote_repo_list"
 	if [[ ${#miss[@]} -gt 0 ]]; then
 		echo -e "\n[!] WARNING: Unavailable packages:\n$(printf ' - %s\n' "${miss[@]}" | sort -u)\n" ; printf '%s\n' "${miss[@]}" | sort -u > pkg_missed
