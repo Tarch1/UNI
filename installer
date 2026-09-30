@@ -197,11 +197,11 @@ PackageInstall () {
 	else
 		FinalPKGs+=( "${microcode[@]}" "${kernel[@]}" "${hardwareacceleration[@]}" "${vulkan[@]}" )
 		if [[ ${#nvidiadrivers[@]} -gt 0 ]]; then FinalPKGs+=( "${nvidiadrivers[@]}" ) ; fi
-		if [[ -v amddrivers && ${#amddrivers[@]} -gt 0 ]]; then FinalPKGs+=( "${amddrivers[@]}" ) ; fi
+		if [[ -v amddrivers ]]; then if [[ ${#amddrivers[@]} -gt 0 ]]; then FinalPKGs+=( "${amddrivers[@]}" ) ; fi ; fi
 		if [[ "${OSsel,,}" != "void" ]]; then FinalPKGs+=( "${baselinux[@]}" "${grubbtrfs[@]}" ) ; fi
 	fi
-	if [[ "${OSsel,,}" == "void" ]]; then "$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${FinalPKGs[@]}"
-	else "$chroot" /mnt $PKGmanager$PKGinst$PKGupd"u" "${PKGskp[@]}" "${FinalPKGs[@]}" ; fi
+	if [[ "${OSsel,,}" == "void" ]]; then "${chroot[@]}" /mnt "${PKG_INSTALL[@]}" "${PKG_UPDATE[@]}" "${PKG_SKIP[@]}" "${FinalPKGs[@]}"
+	else "${chroot[@]}" /mnt "${PKG_INSTALL[@]}" "${PKG_UPDATE[@]}" -u "${PKG_SKIP[@]}" "${FinalPKGs[@]}" ; fi
 }
 PKGcheck () {
 	echo "Initializing package groups..."
