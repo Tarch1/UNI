@@ -536,7 +536,7 @@ InstallationSetup () {
 	local ArchTixSteps=( 'DiskPartition' 'FileSystemFormat' "$s_step" 'CrypttabGen' 'FStabGen' 'SetupEnvironment' 'PackageConfig' 'PackageInstall' 'KernelSetup' 'ServiceSetup' 'UserSetup' )
 	if [[ "$VBTsel" -eq 0 ]]; then ArchTixSteps+=( 'AudioSetup' ) ; fi
 	ArchTixSteps+=( 'BootloaderSetup' )
-	for a in "${ArchTixSteps[@]}"; do "$a" ; done
+	for a in "${ArchTixSteps[@]}"; do eval "$a" ; done
 	echo -e "\n=== INSTALLATION COMPLETED ==="
 	"$chroot" /mnt chown -hR "$UNsel":users /home/"$UNsel"
 	if [[ "$(wc -l < Errors)" -gt 1 ]]; then echo -e "\n[!] Some errors logged during installation:" ; cat Errors ; cp Errors /mnt/var/log/installer_errors.log ; else echo "[+] Clean installation: zero errors detected." ; fi
