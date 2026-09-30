@@ -333,7 +333,7 @@ ServiceSetup () {
 }
 UserSetup () {
 	"$chroot" /mnt bash -c "useradd -m -g users -G wheel,video,audio,storage,input,lp,scanner,power,kvm $UNsel && su $UNsel -c 'mkdir -p ~/.config'"
-	[[ "${OSsel,,}" == "void" ]] && "$chroot" /mnt usermod -aG _seatd "$UNsel"
+	if [[ "${OSsel,,}" == "void" ]]; then "$chroot" /mnt usermod -aG _seatd "$UNsel" ; fi
 	sed -i 's/^#\s*\(%wheel ALL=(ALL:ALL) ALL\)/\1/' /mnt/etc/sudoers
 	echo "Choose password for user: $UNsel"
 	while ! "$chroot" /mnt passwd "$UNsel"; do echo "Error: Try again..." ; done
@@ -342,16 +342,16 @@ UserSetup () {
 	echo "Copying configuration files..."
 	if [[ "${OSsel,,}" == "void" ]]; then
 		mkdir -p /mnt/etc/bash
-		[[ -f "${SCRIPT_DIR}/Conf_files/bashrc" ]] && cp "${SCRIPT_DIR}/Conf_files/bashrc" /mnt/home/"$UNsel"/.bashrc
+		if [[ -f "${SCRIPT_DIR}/Conf_files/bashrc" ]]; then cp "${SCRIPT_DIR}/Conf_files/bashrc" /mnt/home/"$UNsel"/.bashrc ; fi
 	else
 		echo "%wheel ALL=(ALL:ALL) NOPASSWD: ALL" > /mnt/etc/sudoers.d/99-installer-temp
 		"$chroot" /mnt sudo -u "$UNsel" bash -c "git clone https://aur.archlinux.org/trizen.git /tmp/trizen && cd /tmp/trizen && makepkg -si --noconfirm"
 		rm -f /mnt/etc/sudoers.d/99-installer-temp
 		mkdir -p /mnt/etc/bash/bashrc.d
-		[[ -f "${SCRIPT_DIR}/Conf_files/bashrc" ]] && cp "${SCRIPT_DIR}/Conf_files/bashrc" /mnt/etc/bash/bashrc.d/"$UNsel".bashrc
-		[[ -f "${SCRIPT_DIR}/Conf_files/50-bootbackup.hook" ]] && { mkdir -p /mnt/etc/pacman.d/hooks; cp "${SCRIPT_DIR}/Conf_files/50-bootbackup.hook" /mnt/etc/pacman.d/hooks/; }
+		if [[ -f "${SCRIPT_DIR}/Conf_files/bashrc" ]]; then cp "${SCRIPT_DIR}/Conf_files/bashrc" /mnt/etc/bash/bashrc.d/"$UNsel".bashrc ; fi
+		if [[ -f "${SCRIPT_DIR}/Conf_files/50-bootbackup.hook" ]]; then mkdir -p /mnt/etc/pacman.d/hooks; cp "${SCRIPT_DIR}/Conf_files/50-bootbackup.hook" /mnt/etc/pacman.d/hooks/ ; fi
 	fi
-	[[ -f "${SCRIPT_DIR}/Conf_files/kitty.conf" ]] && { mkdir -p /mnt/home/"$UNsel"/.config/kitty; cp "${SCRIPT_DIR}/Conf_files/kitty.conf" /mnt/home/"$UNsel"/.config/kitty/; }
+	if [[ -f "${SCRIPT_DIR}/Conf_files/kitty.conf" ]]; then mkdir -p /mnt/home/"$UNsel"/.config/kitty; cp "${SCRIPT_DIR}/Conf_files/kitty.conf" /mnt/home/"$UNsel"/.config/kitty/ ; fi
 	echo -e 'include "/usr/share/nano/*.nanorc"\nset linenumbers' > /mnt/etc/nanorc
 	echo 'export MOZ_ENABLE_WAYLAND=1' >> /mnt/home/"$UNsel"/.profile
 	"$chroot" /mnt sudo -u "$UNsel" bash -c "mkdir -p /home/$UNsel/Pictures/Screenshots /home/$UNsel/.config/swappy && echo -e '[Default]\nsave_dir=/home/$UNsel/Pictures/Screenshots\nsave_filename_format=swappy-%Y%m%d-%H%M%S.png\nshow_panel=false\nline_size=5\ntext_size=20\ntext_font=sans-serif\npaint_mode=brush\early_exit=false\nfill_shape=false' > /home/$UNsel/.config/swappy/config"
@@ -363,38 +363,39 @@ UserSetup () {
 		if [[ "$w_ok" -eq 0 ]]; then echo "Fallback failed. Trying package managers..." ; if [[ "${OSsel,,}" == "void" ]]; then "$chroot" /mnt $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" wallust || echo "Wallust installation failed." ; else "$chroot" /mnt sudo -u "$UNsel" bash -c "trizen -S --noconfirm wallust-bin" || echo "Wallust installation failed." ; fi ; fi
 		echo "Refining user..."
 		"$chroot" /mnt sudo -u "$UNsel" bash -c "mkdir -p ~/.config/hypr ~/.cache"
-		for conf in Fuzzel Waybar Swaync Wallust Wallpapers; do [[ -d "${SCRIPT_DIR}/Conf_files/$conf" ]] && cp -r "${SCRIPT_DIR}/Conf_files/$conf" /mnt/home/"$UNsel"/.config/"${conf,,}" ; done
-		for f in hypridle.conf hyprlock.conf; do [[ -f "${SCRIPT_DIR}/Conf_files/Hyprlock/$f" ]] && cp "${SCRIPT_DIR}/Conf_files/Hyprlock/$f" /mnt/home/"$UNsel"/.config/hypr/ ; done
+		for conf in Fuzzel Waybar Swaync Wallust Wallpapers; do if [[ -d "${SCRIPT_DIR}/Conf_files/$conf" ]]; then cp -r "${SCRIPT_DIR}/Conf_files/$conf" /mnt/home/"$UNsel"/.config/"${conf,,}" ; fi ; done
+		for f in hypridle.conf hyprlock.conf; do if [[ -f "${SCRIPT_DIR}/Conf_files/Hyprlock/$f" ]]; then cp "${SCRIPT_DIR}/Conf_files/Hyprlock/$f" /mnt/home/"$UNsel"/.config/hypr/ ; fi ; done
 		touch /mnt/home/"$UNsel"/.config/wallust/colors-waybar.css /mnt/home/"$UNsel"/.config/hypr/colors.conf
-		[[ "$DEsel" == "Hyprland" && -d "${SCRIPT_DIR}/Conf_files/Hyprland" ]] && { cp -a "${SCRIPT_DIR}/Conf_files/Hyprland/." /mnt/home/"$UNsel"/.config/hypr/; touch /mnt/home/"$UNsel"/.config/hypr/hyprpaper.conf; }
-		[[ "$DEsel" == "Niri" && -d "${SCRIPT_DIR}/Conf_files/Niri" ]] && cp -r "${SCRIPT_DIR}/Conf_files/Niri" /mnt/home/"$UNsel"/.config/niri
+		if [[ "$DEsel" == "Hyprland" && -d "${SCRIPT_DIR}/Conf_files/Hyprland" ]]; then cp -a "${SCRIPT_DIR}/Conf_files/Hyprland/." /mnt/home/"$UNsel"/.config/hypr/; touch /mnt/home/"$UNsel"/.config/hypr/hyprpaper.conf ; fi
+		if [[ "$DEsel" == "Niri" && -d "${SCRIPT_DIR}/Conf_files/Niri" ]]; then cp -r "${SCRIPT_DIR}/Conf_files/Niri" /mnt/home/"$UNsel"/.config/niri ; fi
 		"$chroot" /mnt chmod +x /home/"$UNsel"/.config/wallpapers/theme-switcher.sh
 		echo -e "auth required pam_unix.so nullok_secure\naccount required pam_unix.so\npassword required pam_unix.so\nsession required pam_unix.so" > /mnt/etc/pam.d/hyprlock
 		local t_files=()
-		[[ "$DEsel" == "Niri" ]] && t_files=( "/mnt/home/$UNsel/.config/niri/config.kdl" "/mnt/home/$UNsel/.config/wallust/templates/colors-niri.conf" )
-		[[ "$DEsel" == "Hyprland" ]] && t_files=( "/mnt/home/$UNsel/.config/hypr/hyprland.conf" "/mnt/home/$UNsel/.config/wallust/templates/colors-hyprland.conf" )
+		if [[ "$DEsel" == "Niri" ]]; then t_files=( "/mnt/home/$UNsel/.config/niri/config.kdl" "/mnt/home/$UNsel/.config/wallust/templates/colors-niri.conf" ) ; fi
+		if [[ "$DEsel" == "Hyprland" ]]; then t_files=( "/mnt/home/$UNsel/.config/hypr/hyprland.conf" "/mnt/home/$UNsel/.config/wallust/templates/colors-hyprland.conf" ) ; fi
 		for f in "${t_files[@]}"; do
-			[[ ! -f "$f" ]] && continue
+			if [[ ! -f "$f" ]]; then continue ; fi
 			if [[ "$VBTsel" -eq 1 ]]; then
-				local is_qemu=0 ; lspci | grep -Eqi "(VMware|Virtio|QXL)" && is_qemu=1
+				local is_qemu=0 ; if lspci | grep -Eqi "(VMware|Virtio|QXL)"; then is_qemu=1 ; fi
 				if [[ "$DEsel" == "Niri" ]]; then
-					grep -q "environment *{" "$f" && { grep -q 'LIBGL_ALWAYS_SOFTWARE' "$f" || sed -i '/environment *{/a\	LIBGL_ALWAYS_SOFTWARE "1"' "$f"; } || echo -e '\nenvironment {\n	LIBGL_ALWAYS_SOFTWARE "1"\n}' >> "$f"
-					grep -q 'output "Virtual-1"' "$f" || echo -e '\noutput "Virtual-1" {\n	mode "1440x900"\n}' >> "$f"
+					if grep -q "environment *{" "$f"; then if ! grep -q 'LIBGL_ALWAYS_SOFTWARE' "$f"; then sed -i '/environment *{/a\	LIBGL_ALWAYS_SOFTWARE "1"' "$f" ; fi ; else echo -e '\nenvironment {\n	LIBGL_ALWAYS_SOFTWARE "1"\n}' >> "$f" ; fi
+					if ! grep -q 'output "Virtual-1"' "$f"; then echo -e '\noutput "Virtual-1" {\n	mode "1440x900"\n}' >> "$f" ; fi
 					sed -i 's/blur true/blur false/g' "$f"
 					if [[ "$f" == *config.kdl ]]; then
-						[[ "$is_qemu" -eq 1 ]] && { grep -q 'spice-vdagent' "$f" || sed -i -e '/spawn-at-startup/{i\spawn-at-startup "spice-vdagent"' -e ':a;n;ba}' "$f"; } || { grep -q 'VBoxClient' "$f" || sed -i -e '/spawn-at-startup/{i\spawn-at-startup "VBoxClient" "--clipboard"' -e ':a;n;ba}' "$f"; }
+						if [[ "$is_qemu" -eq 1 ]]; then if ! grep -q 'spice-vdagent' "$f"; then sed -i -e '/spawn-at-startup/{i\spawn-at-startup "spice-vdagent"' -e ':a;n;ba}' "$f" ; fi ; else if ! grep -q 'VBoxClient' "$f"; then sed -i -e '/spawn-at-startup/{i\spawn-at-startup "VBoxClient" "--clipboard"' -e ':a;n;ba}' "$f" ; fi ; fi
 					fi
 				elif [[ "$DEsel" == "Hyprland" && "$f" == *hyprland.conf ]]; then
-					grep -q 'monitor=,1440x900' "$f" || sed -i '1i monitor=,1440x900@60,auto,1' "$f"
-					[[ "$is_qemu" -eq 1 ]] && sed -i -e '/exec-once/{i\exec-once = spice-vdagent' -e ':a;n;ba}' "$f" || sed -i -e '/exec-once/{i\exec-once = VBoxClient --clipboard' -e ':a;n;ba}' "$f"
+					if ! grep -q 'monitor=,1440x900' "$f"; then sed -i '1i monitor=,1440x900@60,auto,1' "$f" ; fi
+					if [[ "$is_qemu" -eq 1 ]]; then sed -i -e '/exec-once/{i\exec-once = spice-vdagent' -e ':a;n;ba}' "$f" ; else sed -i -e '/exec-once/{i\exec-once = VBoxClient --clipboard' -e ':a;n;ba}' "$f" ; fi
 				fi
 			fi
 			if [[ "${OSsel,,}" != "arch" && "$init_sys" != "systemd" ]]; then
-				[[ "$DEsel" == "Niri" && "$f" == *config.kdl ]] && sed -i -e '/spawn-at-startup/{i\spawn-at-startup "bash" "-c" "pipewire & sleep 1; wireplumber & pipewire-pulse &"' -e ':a;n;ba}' "$f"
-				[[ "$DEsel" == "Hyprland" && "$f" == *hyprland.conf ]] && sed -i -e '/exec-once/{i\exec-once = bash -c "pipewire & sleep 1; wireplumber & pipewire-pulse &"' -e ':a;n;ba}' "$f"
+				if [[ "$DEsel" == "Niri" && "$f" == *config.kdl ]]; then sed -i -e '/spawn-at-startup/{i\spawn-at-startup "bash" "-c" "pipewire & sleep 1; wireplumber & pipewire-pulse &"' -e ':a;n;ba}' "$f" ; fi
+				if [[ "$DEsel" == "Hyprland" && "$f" == *hyprland.conf ]]; then sed -i -e '/exec-once/{i\exec-once = bash -c "pipewire & sleep 1; wireplumber & pipewire-pulse &"' -e ':a;n;ba}' "$f" ; fi
 			fi
 		done
 	fi
+	return 0
 }
 AudioSetup () {
 	"$chroot" /mnt mkdir -p /etc/pipewire/pipewire.conf.d /etc/wireplumber/wireplumber.conf.d
