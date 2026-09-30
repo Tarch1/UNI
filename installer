@@ -395,7 +395,6 @@ UserSetup () {
 			fi
 		done
 	fi
-	return 0
 }
 AudioSetup () {
 	"$chroot" /mnt mkdir -p /etc/pipewire/pipewire.conf.d /etc/wireplumber/wireplumber.conf.d
