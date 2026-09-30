@@ -17,7 +17,8 @@ SHOWerror () {
 	local err_line="${BASH_LINENO[0]}"
 	local err_msg="Error in ${call_stack% -> *} \nActual failure at line: $err_line (Exit code: $err_code)"
 	echo -e "$err_msg" >> Errors
-	YesNoSel "Error occurred:\n$err_msg\n\nFix: 'nano +$err_line installer'. Continue?"
+	echo -e "\n[CRITICAL ERROR DETECTED]\n$err_msg"
+	YesNoSel "Do you want to continue the installation anyway? (Fix: 'nano +$err_line installer')"
 	if [[ "$CC" -eq 1 ]]; then echo "OK, still going..." ; else echo "OK, exit." ; exit 1 ; fi
 }
 Check_required_files () {
