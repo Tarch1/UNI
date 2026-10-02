@@ -5,11 +5,7 @@ MenuSel () {
 		echo -e "\n=== $question ==="
 		for i in "${!options[@]}"; do echo "$((i+1))) ${options[$i]}" ; done
 		read -rp "Choice: " user_choice
-		if [[ "$user_choice" =~ ^[0-9]+$ ]] && [[ "$user_choice" -le "${#options[@]}" ]] && [[ "$user_choice" -gt 0 ]]; then
-			var_name="${options[$((user_choice-1))]}" ; echo "Selected: $var_name" ; break
-		else
-			echo "Invalid choice, please try again."
-		fi
+		if [[ "$user_choice" =~ ^[0-9]+$ ]] && [[ "$user_choice" -le "${#options[@]}" ]] && [[ "$user_choice" -gt 0 ]]; then var_name="${options[$((user_choice-1))]}" ; echo "Selected: $var_name" ; break ; else echo "Invalid choice, please try again." ; fi
 	done
 }
 TextPromptSel () {
@@ -20,6 +16,7 @@ TextPromptSel () {
 		if [[ "$CC" -eq 1 ]]; then var_name="$input_val" ; break ; else echo "Let's try again..." ; fi
 	done
 }
+
 YesNoSel () {
 	local choice
 	while true; do
@@ -39,12 +36,12 @@ ArchRepoSetup () {
 }
 AutoOSsel () {
 	local os_id
-	if [[ -f /etc/os-release ]]; then os_id=$(grep -i '^ID=' /etc/os-release | cut -d= -f2 | tr -d '"' || true) ; else os_id="" ; fi
+	if [[ -f /etc/os-release ]]; then if ! os_id=$(grep -i '^ID=' /etc/os-release | cut -d= -f2 | tr -d '"'); then os_id="" ; fi ; else os_id="" ; fi
 	if [[ "${os_id,,}" =~ ^(arch|artix|void)$ ]]; then OSsel="${os_id^}" ; else echo "Automated OS detection failed or unsupported Live OS." ; OperatingSystemSel ; fi
 	echo "Detected Live OS: $OSsel"
 }
 CPUsel () {
-	local cpu_info ; if echo "$SYS_CPU" | grep -qEi 'GenuineIntel|AuthenticAMD'; then cpu_info=$(echo "$SYS_CPU" | grep -m1 -Ei 'GenuineIntel|AuthenticAMD') ; else cpu_info="" ; fi
+	local cpu_info ; if ! cpu_info=$(echo "$SYS_CPU" | grep -m1 -Ei 'GenuineIntel|AuthenticAMD'); then cpu_info="" ; fi
 	if [[ "$cpu_info" =~ Intel ]]; then echo 'Installing Intel microcode' ; UCODEsel='intel-ucode' ; elif [[ "$cpu_info" =~ AMD ]]; then echo 'Installing AMD microcode' ; if [[ "${OSsel,,}" == "void" ]]; then UCODEsel='amd-ucode-firmware' ; else UCODEsel='amd-ucode' ; fi ; else echo 'No microcode needed or unknown CPU' ; UCODEsel="" ; fi
 }
 DriveSelection() {
@@ -85,7 +82,7 @@ DriveSelection() {
 }
 GPUsel () {
 	echo "Detecting video chipset..."
-	local gpu_info ; if echo "$SYS_LSPCI" | grep -qEi 'VGA|3D'; then gpu_info=$(echo "$SYS_LSPCI" | grep -Ei 'VGA|3D') ; else gpu_info="" ; fi
+	local gpu_info ; if ! gpu_info=$(echo "$SYS_LSPCI" | grep -Ei 'VGA|3D'); then gpu_info="" ; fi
 	if [[ "$gpu_info" =~ (AMD|Radeon) ]]; then if [[ "${OSsel,,}" == "void" ]]; then amddrivers=(mesa-dri vulkan-loader mesa-vulkan-radeon) ; else amddrivers=(amdgpu mesa vulkan-radeon libva-mesa-driver) ; fi ; fi
 	if [[ "$gpu_info" =~ (VMware|VirtualBox|Virtio|QXL) ]]; then echo "VM detected: The default Mesa driver will be installed" ; fi
 	if [[ "$gpu_info" =~ NVIDIA ]]; then
@@ -101,7 +98,7 @@ GPUsel () {
 				echo "Setting up NVIDIA $NVsel Drivers" ; MenuSel "GPUMANAGERsel" "Select NVIDIA Optimus Manager" "Native" "Envycontrol" "Cardwire"
 			fi
 		fi
-		if command -v strings >/dev/null; then if [[ -f /sys/firmware/acpi/tables/DSDT ]]; then AcpiOS="$(strings /sys/firmware/acpi/tables/DSDT | grep -i 'windows ' | sort | tail -1 || true)" ; else AcpiOS="" ; fi ; fi
+		if command -v strings >/dev/null; then if [[ -f /sys/firmware/acpi/tables/DSDT ]]; then if ! AcpiOS="$(strings /sys/firmware/acpi/tables/DSDT | grep -i 'windows ' | sort | tail -1)"; then AcpiOS="" ; fi ; else AcpiOS="" ; fi ; fi
 	fi
 	if [[ ! "$gpu_info" =~ (AMD|Radeon|VMware|VirtualBox|Virtio|QXL|NVIDIA) ]]; then echo "Generic/Intel GPU: Mesa will be installed" ; fi
 }
