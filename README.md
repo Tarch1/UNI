@@ -122,3 +122,27 @@ EXTRA
 Steam launch script for dlss and RT
 	
 	PROTON_ENABLE_NVAPI=1 VKD3D_CONFIG=dxr11 VKD3D_FEATURE_LEVEL=12_1 %command%	
+
+MAPPA COMPLETA DEL REPOSITORY
+
+{
+	find uni -not -path '*/\.git/*' | sort
+	find uni -type f -not -path '*/\.git/*' -not -name "dump_repository.txt" \
+    -not \( \
+      -iname "*.ttf" -o -iname "*.otf" -o -iname "*.pf2" -o -iname "*.woff*" -o -iname "*.psf*" \
+      -o -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.gif" -o -iname "*.bmp" \
+      -o -iname "*.webp" -o -iname "*.ico" -o -iname "*.svg" -o -iname "*.xcf" \
+      -o -iname "*.zip" -o -iname "*.tar*" -o -iname "*.gz" -o -iname "*.xz" -o -iname "*.zst" \
+      -o -iname "*.7z" -o -iname "*.iso" -o -iname "*.img" -o -iname "*.bin" -o -iname "*.pdf" \
+      -o -iname "*.mp3" -o -iname "*.mp4" -o -iname "*.wav" -o -iname "*.ogg" \
+    \) -exec sh -c '
+      for f do
+        if [ ! -s "$f" ]; then
+          printf "\n=========================================\nFILE: %s (Empty file)\n=========================================\n" "$f"
+        elif grep -Iq . "$f"; then
+          printf "\n=========================================\nFILE: %s\n=========================================\n" "$f"
+          cat "$f"
+        fi
+      done
+    ' sh {} +
+} > dump_repository.txt
