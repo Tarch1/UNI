@@ -16,7 +16,6 @@ TextPromptSel () {
 		if [[ "$CC" -eq 1 ]]; then var_name="$input_val" ; break ; else echo "Let's try again..." ; fi
 	done
 }
-
 YesNoSel () {
 	local choice
 	while true; do
@@ -26,7 +25,7 @@ YesNoSel () {
 }
 ArchRepoSetup () {
 	local target_conf="$1" ; local cmd=() ; local mirror_file="/etc/pacman.d/mirrorlist-arch"
-	if [[ "$target_conf" == "/mnt/etc/pacman.conf" ]]; then cmd=( "${chroot[@]}" /mnt ) ; mirror_file="/mnt/etc/pacman.d/mirrorlist-arch" ; fi
+	if [[ "$target_conf" == "/mnt/etc/pacman.conf" ]]; then cmd=( "$chroot" /mnt ) ; mirror_file="/mnt/etc/pacman.d/mirrorlist-arch" ; fi
 	if [[ ${#cmd[@]} -eq 0 ]]; then rm -rf /etc/pacman.d/gnupg/* 2>/dev/null || true ; mkdir -p /etc/pacman.d/gnupg ; chmod 700 /etc/pacman.d/gnupg ; pacman-key --init ; pacman-key --populate artix ; else "${cmd[@]}" pacman-key --init ; "${cmd[@]}" pacman-key --populate artix ; fi
 	sed -i '/\[universe\]/,/^[[:space:]]*$/d' "$target_conf"
 	printf '\n[universe]\nServer = https://universe.artixlinux.org/$arch\nServer = https://mirror1.artixlinux.org/universe/$arch\nServer = https://mirror.pascalpuffke.de/artix-universe/$arch\nServer = https://artixlinux.qontinuum.space/artixlinux/universe/os/$arch\nServer = https://mirror1.cl.netactuate.com/artix/universe/$arch\nServer = https://ftp.crifo.org/artix-universe/$arch\n' >> "$target_conf"
@@ -42,7 +41,7 @@ AutoOSsel () {
 }
 CPUsel () {
 	local cpu_info ; if ! cpu_info=$(echo "$SYS_CPU" | grep -m1 -Ei 'GenuineIntel|AuthenticAMD'); then cpu_info="" ; fi
-	if [[ "$cpu_info" =~ Intel ]]; then echo 'Installing Intel microcode' ; UCODEsel='intel-ucode' ; elif [[ "$cpu_info" =~ AMD ]]; then echo 'Installing AMD microcode' ; if [[ "${OSsel,,}" == "void" ]]; then UCODEsel='amd-ucode-firmware' ; else UCODEsel='amd-ucode' ; fi ; else echo 'No microcode needed or unknown CPU' ; UCODEsel="" ; fi
+	if [[ "$cpu_info" =~ Intel ]]; then echo 'Installing Intel microcode' ; UCODEsel='intel-ucode' ; elif [[ "$cpu_info" =~ AMD ]]; then echo 'Installing AMD microcode' ; if [[ "${OSsel,,}" == "void" ]]; then UCODEsel='linux-firmware-amd' ; else UCODEsel='amd-ucode' ; fi ; else echo 'No microcode needed or unknown CPU' ; UCODEsel="" ; fi
 }
 DriveSelection() {
 	local avail_disks=() display_options=()
@@ -80,23 +79,33 @@ DriveSelection() {
 		fi
 	fi
 }
+NVDriverUpdate () {
+	if [[ "${OSsel,,}" == "void" ]]; then
+		if [[ "$LIBsel" == "MUSL" ]]; then nvidiadrivers=() ; echo 'MUSL selection detected, forcing Mesa/Nouveau.' ; else nvidiadrivers=(nvidia nvidia-libs-32bit) ; fi
+	else
+		if [[ "$NVsel" =~ ^(MESA|NOUVEAU)$ ]]; then nvidiadrivers=() ; echo "Using default Mesa/Nouveau"
+		elif [[ "$NVsel" =~ ^(OPEN|PROPRIETARY)$ ]]; then
+			local nv_main="nvidia-dkms"
+			if [[ "$NVsel" == "OPEN" ]]; then if [[ "$KSel" == "linux" ]]; then nv_main="nvidia-open" ; else nv_main="nvidia-open-dkms" ; fi
+			elif [[ "$NVsel" == "PROPRIETARY" ]]; then if [[ "$KSel" == "linux" ]]; then nv_main="nvidia" ; elif [[ "$KSel" == "linux-lts" ]]; then nv_main="nvidia-lts" ; fi ; fi
+			nvidiadrivers=("${nv_main}" nvidia-prime nvidia-settings nvidia-utils lib32-nvidia-utils opencl-nvidia lib32-opencl-nvidia libxnvctrl libvdpau)
+		fi
+	fi
+}
 GPUsel () {
 	echo "Detecting video chipset..."
 	local gpu_info ; if ! gpu_info=$(echo "$SYS_LSPCI" | grep -Ei 'VGA|3D'); then gpu_info="" ; fi
 	if [[ "$gpu_info" =~ (AMD|Radeon) ]]; then if [[ "${OSsel,,}" == "void" ]]; then amddrivers=(mesa-dri vulkan-loader mesa-vulkan-radeon) ; else amddrivers=(amdgpu mesa vulkan-radeon libva-mesa-driver) ; fi ; fi
 	if [[ "$gpu_info" =~ (VMware|VirtualBox|Virtio|QXL) ]]; then echo "VM detected: The default Mesa driver will be installed" ; fi
 	if [[ "$gpu_info" =~ NVIDIA ]]; then
+		HAS_NVIDIA=1
 		if [[ "${OSsel,,}" == "void" ]]; then
-			if [[ "$LIBsel" == "MUSL" ]]; then nvidiadrivers=() ; echo 'MUSL selection detected, forcing Mesa/Nouveau.' ; else nvidiadrivers=(nvidia nvidia-libs-32bit) ; MenuSel "GPUMANAGERsel" "Select NVIDIA Optimus Manager" "Native" "Envycontrol" "Cardwire" ; echo 'NVIDIA selected' ; fi
+			NVDriverUpdate
+			if [[ ${#nvidiadrivers[@]} -gt 0 ]]; then MenuSel "GPUMANAGERsel" "Select NVIDIA Optimus Manager" "Native" "Envycontrol" "Cardwire" ; echo 'NVIDIA selected' ; fi
 		else
 			MenuSel "NVsel" "NVIDIA gpu found, choose driver" "OPEN" "NOUVEAU" "PROPRIETARY" "MESA"
-			if [[ "$NVsel" =~ (MESA|NOUVEAU) ]]; then echo "Using default Mesa/Nouveau" ; fi
-			if [[ "$NVsel" =~ (OPEN|PROPRIETARY) ]]; then
-				local nv_main="nvidia-dkms" ; if [[ "$NVsel" == "OPEN" ]]; then if [[ "$KSel" == "linux" ]]; then nv_main="nvidia-open" ; else nv_main="nvidia-open-dkms" ; fi ; fi
-				if [[ "$NVsel" == "PROPRIETARY" ]]; then if [[ "$KSel" == "linux" ]]; then nv_main="nvidia" ; elif [[ "$KSel" == "linux-lts" ]]; then nv_main="nvidia-lts" ; fi ; fi
-				nvidiadrivers=("${nv_main}" nvidia-prime nvidia-settings nvidia-utils lib32-nvidia-utils opencl-nvidia lib32-opencl-nvidia libxnvctrl libvdpau)
-				echo "Setting up NVIDIA $NVsel Drivers" ; MenuSel "GPUMANAGERsel" "Select NVIDIA Optimus Manager" "Native" "Envycontrol" "Cardwire"
-			fi
+			NVDriverUpdate
+			if [[ "$NVsel" =~ ^(OPEN|PROPRIETARY)$ ]]; then echo "Setting up NVIDIA $NVsel Drivers" ; MenuSel "GPUMANAGERsel" "Select NVIDIA Optimus Manager" "Native" "Envycontrol" "Cardwire" ; fi
 		fi
 		if command -v strings >/dev/null; then if [[ -f /sys/firmware/acpi/tables/DSDT ]]; then if ! AcpiOS="$(strings /sys/firmware/acpi/tables/DSDT | grep -i 'windows ' | sort | tail -1)"; then AcpiOS="" ; fi ; else AcpiOS="" ; fi ; fi
 	fi
