@@ -127,7 +127,6 @@ FileSystemFormat() {
 }
 BaseSystemInstall () {
 	if [[ "${OSsel,,}" == "void" ]]; then
-		local v_repo="https://repo-default.voidlinux.org/current" ; if [[ "${LIBsel}" == "MUSL" ]]; then v_repo+="/musl" ; fi
 		if [[ "${VImethod}" == "XBPS" ]]; then mkdir -p /mnt/var/db/xbps/keys ; cp -r /var/db/xbps/keys/* /mnt/var/db/xbps/keys/ 2>/dev/null || true ; $PKGstrap base-system
 		elif [[ "${VImethod}" == "ROOTFS" ]]; then
 			local tb="void-x86_64" ; if [[ "${LIBsel}" == "MUSL" ]]; then tb+="-musl" ; fi ; tb+="-ROOTFS.tar.xz"
@@ -146,7 +145,7 @@ BaseSystemInstall () {
 		local BasePKG=( "${kernel[@]}" "${baselinux[@]}" "${logind[@]}" )
 		if [[ -n "$UCODEsel" ]]; then BasePKG+=( "$UCODEsel" ) ; fi
 		if [[ "$FSsel" == "btrfs" ]]; then BasePKG+=( "${btrfsutility[@]}" ) ; fi
-		$PKGstrap /mnt "${BasePKG[@]}"
+		$PKGstrap "${BasePKG[@]}"
 		if [[ -f /mnt/etc/pacman.conf ]]; then sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 5/' /mnt/etc/pacman.conf ; fi
 	fi
 }
@@ -250,7 +249,7 @@ PackageInstall () {
 		if [[ ${#nvidiadrivers[@]} -gt 0 ]]; then FinalPKGs+=( "${nvidiadrivers[@]}" ) ; fi
 		if [[ -v amddrivers && ${#amddrivers[@]} -gt 0 ]]; then FinalPKGs+=( "${amddrivers[@]}" ) ; fi
 	fi
-	if [[ "${OSsel,,}" == "void" ]]; then CR $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${FinalPKGs[@]}" ; else CR $PKGmanager$PKGinst$PKGupd"u" "${PKGskp[@]}" "${FinalPKGs[@]}" ; fi
+	CR $PKGmanager$PKGinst$PKGupd$PKGupg "${PKGskp[@]}" "${FinalPKGs[@]}"
 }
 KernelSetup () {
 	if [[ "$UCODEsel" == "intel-ucode" ]]; then mkdir -p /mnt/etc/modprobe.d ; echo 'options i915 enable_fbc=1 fastboot=0 enable_dc=4' > /mnt/etc/modprobe.d/i915.conf ; fi
@@ -323,7 +322,7 @@ ServiceSetup () {
 }
 UserSetup () {
 	CR bash -c "useradd -m -g users -G wheel,video,audio,storage,input,lp,scanner,power,kvm $UNsel && su $UNsel -c 'mkdir -p ~/.config'"
-	if [[ "${OSsel,,}" == "void" ]]; then CR usermod -aG _seatd "$UNsel" || true ; fi
+	if [[ "${OSsel,,}" == "void" ]]; then CR usermod -aG _seatd "$UNsel" ; fi
 	sed -i 's/^#\s*\(%wheel ALL=(ALL:ALL) ALL\)/\1/' /mnt/etc/sudoers
 	echo "Choose password for user: $UNsel"
 	while ! CR passwd "$UNsel"; do echo "Error: Try again..." ; done
@@ -335,7 +334,6 @@ UserSetup () {
 	else
 		echo "%wheel ALL=(ALL:ALL) NOPASSWD: ALL" > /mnt/etc/sudoers.d/99-installer-temp
 		CR_USER "git clone https://aur.archlinux.org/trizen.git /tmp/trizen && cd /tmp/trizen && makepkg -si --noconfirm"
-		rm -f /mnt/etc/sudoers.d/99-installer-temp
 		mkdir -p /mnt/etc/bash/bashrc.d ; if [[ -f "${SCRIPT_DIR}/Conf_files/bashrc" ]]; then cp "${SCRIPT_DIR}/Conf_files/bashrc" /mnt/etc/bash/bashrc.d/"$UNsel".bashrc ; fi
 		if [[ -f "${SCRIPT_DIR}/Conf_files/50-bootbackup.hook" ]]; then mkdir -p /mnt/etc/pacman.d/hooks; cp "${SCRIPT_DIR}/Conf_files/50-bootbackup.hook" /mnt/etc/pacman.d/hooks/ ; fi
 	fi
@@ -345,19 +343,19 @@ UserSetup () {
 	CR_USER "mkdir -p /home/$UNsel/Pictures/Screenshots /home/$UNsel/.config/swappy && echo -e '[Default]\nsave_dir=/home/$UNsel/Pictures/Screenshots\nsave_filename_format=swappy-%Y%m%d-%H%M%S.png\nshow_panel=false\nline_size=5\ntext_size=20\ntext_font=sans-serif\npaint_mode=brush\nearly_exit=false\nfill_shape=false' > /home/$UNsel/.config/swappy/config"
 	if [[ "$DEsel" =~ ^(Hyprland|Niri)$ ]]; then
 		echo "Installing Wallust..." ; local w_ok=0
-		local API_URL=$(curl -s "https://codeberg.org/api/v1/repos/explosion-mental/wallust/releases/latest" | grep -o '"browser_download_url": *"[^"]*"' | grep 'x86_64-unknown-linux-musl.tar.gz' | cut -d '"' -f 4 || true)
+		local API_URL=$(curl -sA "Mozilla/5.0" "https://codeberg.org/api/v1/repos/explosion-mental/wallust/releases" | grep -o '"browser_download_url": *"[^"]*x86_64-unknown-linux-musl\.tar\.gz"' | head -n1 | cut -d '"' -f 4 || true)
 		if [[ -n "$API_URL" ]] && curl -sA "Mozilla/5.0" -L -o /tmp/wallust_dl.tar.gz "$API_URL" && tar -tf /tmp/wallust_dl.tar.gz &>/dev/null; then tar -xzf /tmp/wallust_dl.tar.gz -C /tmp/ ; mv /tmp/wallust /mnt/usr/bin/wallust ; chmod +x /mnt/usr/bin/wallust ; w_ok=1 ; fi
 		if [[ "$w_ok" -eq 0 ]]; then if [[ -f "${SCRIPT_DIR}/Conf_files/wallust" ]]; then echo "Codeberg failed. Using local fallback..." ; cp "${SCRIPT_DIR}/Conf_files/wallust" /mnt/usr/bin/wallust ; chmod +x /mnt/usr/bin/wallust ; w_ok=1 ; fi ; fi
-		if [[ "$w_ok" -eq 0 ]]; then echo "Fallback failed. Trying package managers..." ; if [[ "${OSsel,,}" == "void" ]]; then CR $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" wallust || echo "Wallust installation failed." ; else CR_USER "trizen -S --noconfirm wallust-bin" || echo "Wallust installation failed." ; fi ; fi
-		echo "Refining user..." ; CR_USER "mkdir -p ~/.config/hypr ~/.config/fuzzel ~/.config/wallust ~/.cache"
+		if [[ "$w_ok" -eq 0 ]]; then echo "Fallback failed. Trying package managers..." ; if [[ "${OSsel,,}" == "void" ]]; then CR $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" wallust || echo "Wallust installation failed." ; else CR_USER "trizen -S --noconfirm wallust" || echo "Wallust installation failed." ; fi ; fi
+		echo "Refining user..." ; CR_USER "mkdir -p ~/.config/hypr ~/.cache"
 		for conf in "${SCRIPT_DIR}/Conf_files/"*; do
-			if [[ -d "$conf" && ! "$conf" =~ (Hyprland|Niri|Hyprlock)$ ]]; then local bname ; bname=$(basename "$conf") ; cp -r "$conf" /mnt/home/"$UNsel"/.config/"${bname,,}" ; fi
+			if [[ -d "$conf" && ! "$conf" =~ (Hyprland|Niri|Hyprlock)$ ]]; then local bname ; bname=$(basename "$conf") ; cp -rT "$conf" /mnt/home/"$UNsel"/.config/"${bname,,}" ; fi
 		done
 		touch /mnt/home/"$UNsel"/.config/fuzzel/colors.ini /mnt/home/"$UNsel"/.config/wallust/colors-waybar.css
 		echo -e '$background = rgb(1e1e2e)\n$foreground = rgb(cdd6f4)\n$color4 = rgb(89b4fa)\n$color6 = rgb(94e2d5)' > /mnt/home/"$UNsel"/.config/hypr/colors.conf
 		for f in hypridle.conf hyprlock.conf; do if [[ -f "${SCRIPT_DIR}/Conf_files/Hyprlock/$f" ]]; then cp "${SCRIPT_DIR}/Conf_files/Hyprlock/$f" /mnt/home/"$UNsel"/.config/hypr/ ; fi ; done
-		if [[ "$DEsel" == "Hyprland" && -d "${SCRIPT_DIR}/Conf_files/Hyprland" ]]; then cp -a "${SCRIPT_DIR}/Conf_files/Hyprland/." /mnt/home/"$UNsel"/.config/hypr/; touch /mnt/home/"$UNsel"/.config/hypr/hyprpaper.conf ; fi
-		if [[ "$DEsel" == "Niri" && -d "${SCRIPT_DIR}/Conf_files/Niri" ]]; then cp -r "${SCRIPT_DIR}/Conf_files/Niri" /mnt/home/"$UNsel"/.config/niri ; fi
+		if [[ "$DEsel" == "Hyprland" && -d "${SCRIPT_DIR}/Conf_files/Hyprland" ]]; then cp -rT "${SCRIPT_DIR}/Conf_files/Hyprland" /mnt/home/"$UNsel"/.config/hypr ; touch /mnt/home/"$UNsel"/.config/hypr/hyprpaper.conf ; fi
+		if [[ "$DEsel" == "Niri" && -d "${SCRIPT_DIR}/Conf_files/Niri" ]]; then cp -rT "${SCRIPT_DIR}/Conf_files/Niri" /mnt/home/"$UNsel"/.config/niri ; fi
 		CR chmod +x /home/"$UNsel"/.config/wallpapers/theme-switcher.sh
 		echo -e "auth required pam_unix.so nullok_secure\naccount required pam_unix.so\npassword required pam_unix.so\nsession required pam_unix.so" > /mnt/etc/pam.d/hyprlock
 		local t_files=()
@@ -383,6 +381,7 @@ UserSetup () {
 			fi
 		done
 	fi
+	rm -f /mnt/etc/sudoers.d/99-installer-temp
 	if [[ "$VBTsel" -eq 1 ]]; then echo -e "WLR_NO_HARDWARE_CURSORS=1\nWLR_RENDERER_ALLOW_SOFTWARE=1\nLIBGL_ALWAYS_SOFTWARE=1\nKITTY_DISABLE_WAYLAND=1" >> /mnt/etc/environment ; fi
 }
 AudioSetup () {
@@ -508,11 +507,11 @@ InstallationSetup () {
 		esac
 	done
 	if [[ "${OSsel,,}" != "void" ]]; then
-		PKGmanager="pacman" ; PKGinst=" -S" ; PKGupd="y" ; PKGchk=" -Q" ; PKGrmv=" -R" ; PKGdpn="s" ; PKGfrc="dd" ; PKGskp=( --needed --noconfirm ) ; PKGrsk=( --noconfirm ) ; keylayout='KEYMAP=it' ; chroot="${OSsel,,}-chroot"
-		if [[ "${OSsel,,}" == "arch" ]]; then keypath='etc/vconsole.conf' ; PKGstrap=pacstrap ; FSTABgen=genfstab ; init_sys="systemd" ; sed -i -e 's/^#ParallelDownloads = 5/ParallelDownloads = 5/' -e '/\[multilib]/,/mirrorlist/ s/#//' /etc/pacman.conf ; $PKGmanager$PKGinst$PKGupd"lq" core extra multilib | sort > pacman_db || true
-		elif [[ "${OSsel,,}" == "artix" ]]; then keypath='etc/conf.d/keymaps' ; PKGstrap=basestrap ; FSTABgen=fstabgen ; init_sys="${INITsel,,}" ; sed -i -e 's/^#ParallelDownloads = 5/ParallelDownloads = 5/' -e '/\[lib32]/,/mirrorlist/ s/#//' /etc/pacman.conf ; if [[ "$ARCHrepo" == "1" ]]; then ArchRepoSetup /etc/pacman.conf ; fi ; local artix_pkgs="system world galaxy lib32" ; if [[ "$ARCHrepo" == "1" ]]; then artix_pkgs+=" universe extra multilib" ; fi ; $PKGmanager$PKGinst$PKGupd"lq" $artix_pkgs | sort > pacman_db || true ; fi
+		PKGmanager="pacman" ; PKGinst=" -S" ; PKGupd="y" ; PKGupg="u" ; PKGchk=" -Q" ; PKGrmv=" -R" ; PKGdpn="s" ; PKGfrc="dd" ; PKGskp=( --needed --noconfirm ) ; PKGrsk=( --noconfirm ) ; keylayout='KEYMAP=it' ; chroot="${OSsel,,}-chroot"
+		if [[ "${OSsel,,}" == "arch" ]]; then keypath='etc/vconsole.conf' ; PKGstrap="pacstrap /mnt" ; FSTABgen=genfstab ; init_sys="systemd" ; sed -i -e 's/^#ParallelDownloads = 5/ParallelDownloads = 5/' -e '/\[multilib]/,/mirrorlist/ s/#//' /etc/pacman.conf ; $PKGmanager$PKGinst$PKGupd"lq" core extra multilib | sort > pacman_db || true
+		elif [[ "${OSsel,,}" == "artix" ]]; then keypath='etc/conf.d/keymaps' ; PKGstrap="basestrap /mnt" ; FSTABgen=fstabgen ; init_sys="${INITsel,,}" ; sed -i -e 's/^#ParallelDownloads = 5/ParallelDownloads = 5/' -e '/\[lib32]/,/mirrorlist/ s/#//' /etc/pacman.conf ; if [[ "$ARCHrepo" == "1" ]]; then ArchRepoSetup /etc/pacman.conf ; fi ; local artix_pkgs="system world galaxy lib32" ; if [[ "$ARCHrepo" == "1" ]]; then artix_pkgs+=" universe extra multilib" ; fi ; $PKGmanager$PKGinst$PKGupd"lq" $artix_pkgs | sort > pacman_db || true ; fi
 	else
-		PKGmanager="xbps" ; PKGinst="-install" ; PKGupd=" -S" ; PKGchk="-query" ; PKGrmv="-remove" ; PKGdpn=" -R" ; PKGfrc=" -F" ; PKGskp=( -y -y ) ; PKGrsk=( -y ) ; keylayout='KEYMAP=it' ; keypath='etc/rc.conf' ; init_sys="runit"
+		PKGmanager="xbps" ; PKGinst="-install" ; PKGupd=" -S" ; PKGupg="u" ; PKGchk="-query" ; PKGrmv="-remove" ; PKGdpn=" -R" ; PKGfrc=" -F" ; PKGskp=( -y -y ) ; PKGrsk=( -y ) ; keylayout='KEYMAP=it' ; keypath='etc/rc.conf' ; init_sys="runit"
 		if [[ "$LIBsel" == "GLIBC" ]]; then VoidArch="x86_64" ; else VoidArch="x86_64-musl" ; fi
 		VoidRepo="https://repo-default.voidlinux.org/current" ; if [[ "$LIBsel" == "MUSL" ]]; then VoidRepo+="/musl" ; fi
 		PKGstrap="$PKGmanager$PKGinst$PKGupd -R $VoidRepo -r /mnt ${PKGskp[*]}" ; chroot="chroot"
