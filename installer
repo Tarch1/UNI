@@ -368,15 +368,14 @@ UserSetup () {
 		for f in "${t_files[@]}"; do
 			if [[ ! -f "$f" ]]; then continue ; fi
 			if [[ "$VBTsel" -eq 1 ]]; then
-				local is_qemu=0 ; if echo "$SYS_LSPCI" | grep -Eqi "(VMware|Virtio|QXL)"; then is_qemu=1 ; fi
 				if [[ "$DEsel" == "Niri" ]]; then
 					if grep -q "environment *{" "$f"; then if ! grep -q 'LIBGL_ALWAYS_SOFTWARE' "$f"; then sed -i '/environment *{/a\	LIBGL_ALWAYS_SOFTWARE "1"' "$f" ; fi ; else echo -e '\nenvironment {\n	LIBGL_ALWAYS_SOFTWARE "1"\n}' >> "$f" ; fi
 					if ! grep -q 'output "Virtual-1"' "$f"; then echo -e '\noutput "Virtual-1" {\n	mode "1440x900"\n}' >> "$f" ; fi
 					sed -i 's/blur true/blur false/g' "$f"
-					if [[ "$is_qemu" -eq 1 ]]; then if ! grep -q 'spice-vdagent' "$f"; then sed -i -e '/spawn-at-startup/{i\spawn-at-startup "spice-vdagent"' -e ':a;n;ba}' "$f" ; fi ; else if ! grep -q 'VBoxClient' "$f"; then sed -i -e '/spawn-at-startup/{i\spawn-at-startup "VBoxClient" "--clipboard"' -e ':a;n;ba}' "$f" ; fi ; fi
+					if [[ "$VM_TYPE" == "qemu" ]]; then if ! grep -q 'spice-vdagent' "$f"; then sed -i -e '/spawn-at-startup/{i\spawn-at-startup "spice-vdagent"' -e ':a;n;ba}' "$f" ; fi ; else if ! grep -q 'VBoxClient' "$f"; then sed -i -e '/spawn-at-startup/{i\spawn-at-startup "VBoxClient" "--clipboard"' -e ':a;n;ba}' "$f" ; fi ; fi
 				elif [[ "$DEsel" == "Hyprland" && "$f" == *hyprland.conf ]]; then
 					if ! grep -q 'monitor=,1440x900' "$f"; then sed -i '1i monitor=,1440x900@60,auto,1' "$f" ; fi
-					if [[ "$is_qemu" -eq 1 ]]; then sed -i -e '/exec-once/{i\exec-once = spice-vdagent' -e ':a;n;ba}' "$f" ; else sed -i -e '/exec-once/{i\exec-once = VBoxClient --clipboard' -e ':a;n;ba}' "$f" ; fi
+					if [[ "$VM_TYPE" == "qemu" ]]; then sed -i -e '/exec-once/{i\exec-once = spice-vdagent' -e ':a;n;ba}' "$f" ; else sed -i -e '/exec-once/{i\exec-once = VBoxClient --clipboard' -e ':a;n;ba}' "$f" ; fi
 				fi
 			fi
 			if [[ "${OSsel,,}" != "arch" && "$init_sys" != "systemd" ]]; then
@@ -445,8 +444,8 @@ BootloaderSetup () {
 }
 InstallationSetup () {
 	SYS_LSPCI=$(lspci || true) ; SYS_CPU=$(cat /proc/cpuinfo || true) ; VBTsel=0 ; VM_TYPE="none" ; HAS_NVIDIA=0
-	if echo "$SYS_LSPCI" | grep -qEi "(VirtualBox)"; then VM_TYPE="vbox" ; VBTsel=1 ; fi
-	if echo "$SYS_LSPCI" | grep -qEi "(VMware|Virtio|QXL)"; then VM_TYPE="qemu" ; VBTsel=1 ; fi
+	if echo "$SYS_LSPCI" | grep -qEi "(VirtualBox)"; then VM_TYPE="vbox" ; VBTsel=1
+	elif echo "$SYS_LSPCI" | grep -qEi "(VMware|Virtio|QXL)"; then VM_TYPE="qemu" ; VBTsel=1 ; fi
 	echo "Synchronizing system clock..." ; local t_ok=0
 	if command -v timedatectl &>/dev/null && timedatectl status &>/dev/null && timedatectl set-ntp true &>/dev/null; then t_ok=1
 	elif command -v chronyc &>/dev/null && chronyc makestep &>/dev/null; then t_ok=1
