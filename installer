@@ -343,9 +343,13 @@ UserSetup () {
 	CR_USER "mkdir -p /home/$UNsel/Pictures/Screenshots /home/$UNsel/.config/swappy && echo -e '[Default]\nsave_dir=/home/$UNsel/Pictures/Screenshots\nsave_filename_format=swappy-%Y%m%d-%H%M%S.png\nshow_panel=false\nline_size=5\ntext_size=20\ntext_font=sans-serif\npaint_mode=brush\nearly_exit=false\nfill_shape=false' > /home/$UNsel/.config/swappy/config"
 	if [[ "$DEsel" =~ ^(Hyprland|Niri)$ ]]; then
 		echo "Installing Wallust..." ; local w_ok=0
-		local API_URL=$(curl -sA "Mozilla/5.0" "https://codeberg.org/api/v1/repos/explosion-mental/wallust/releases" | grep -o '"browser_download_url": *"[^"]*x86_64-unknown-linux-musl\.tar\.gz"' | head -n1 | cut -d '"' -f 4 || true)
-		if [[ -n "$API_URL" ]] && curl -sA "Mozilla/5.0" -L -o /tmp/wallust_dl.tar.gz "$API_URL" && tar -tf /tmp/wallust_dl.tar.gz &>/dev/null; then tar -xzf /tmp/wallust_dl.tar.gz -C /tmp/ ; mv /tmp/wallust /mnt/usr/bin/wallust ; chmod +x /mnt/usr/bin/wallust ; w_ok=1 ; fi
-		if [[ "$w_ok" -eq 0 ]]; then if [[ -f "${SCRIPT_DIR}/Conf_files/wallust" ]]; then echo "Codeberg failed. Using local fallback..." ; cp "${SCRIPT_DIR}/Conf_files/wallust" /mnt/usr/bin/wallust ; chmod +x /mnt/usr/bin/wallust ; w_ok=1 ; fi ; fi
+		local API_URL=$(curl -sA "Mozilla/5.0" "https://codeberg.org/api/v1/repos/explosion-mental/wallust/releases/latest" | grep -o '"browser_download_url": *"[^"]*"' | grep 'x86_64-unknown-linux-musl.tar.gz' | cut -d '"' -f 4 || true)
+		if [[ -n "$API_URL" ]] && curl -sA "Mozilla/5.0" -L -o /tmp/wallust_dl.tar.gz "$API_URL" && tar -tf /tmp/wallust_dl.tar.gz &>/dev/null; then
+			tar -xzf /tmp/wallust_dl.tar.gz -C /tmp/ ; local w_bin ; w_bin=$(find /tmp -maxdepth 3 -type f -name "wallust" -print -quit || true)
+			if [[ -n "$w_bin" ]]; then mv -f "$w_bin" /mnt/usr/bin/wallust && chmod +x /mnt/usr/bin/wallust && w_ok=1 ; fi
+			rm -rf /tmp/wallust*
+		fi
+		if [[ "$w_ok" -eq 0 && -f "${SCRIPT_DIR}/Conf_files/wallust" ]]; then echo "Codeberg failed. Using local fallback..." ; cp "${SCRIPT_DIR}/Conf_files/wallust" /mnt/usr/bin/wallust ; chmod +x /mnt/usr/bin/wallust ; w_ok=1 ; fi
 		if [[ "$w_ok" -eq 0 ]]; then echo "Fallback failed. Trying package managers..." ; if [[ "${OSsel,,}" == "void" ]]; then CR $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" wallust || echo "Wallust installation failed." ; else CR_USER "trizen -S --noconfirm wallust" || echo "Wallust installation failed." ; fi ; fi
 		echo "Refining user..." ; CR_USER "mkdir -p ~/.config/hypr ~/.cache"
 		for conf in "${SCRIPT_DIR}/Conf_files/"*; do
