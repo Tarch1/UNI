@@ -1,6 +1,10 @@
 # Universal-Installation-Script
 
+pkill -f vm-clipboard ; pkill -x VBoxClient ; VBoxClient --clipboard
+
+
 old_x=""; old_w=""; while sleep 0.5; do x=$(xclip -o -selection clipboard -t UTF8_STRING 2>/dev/null || true); w=$(wl-paste -n 2>/dev/null || true); if [[ -n "$x" && "$x" != "$old_x" ]]; then old_x="$x"; old_w="$x"; printf '%s' "$x" | wl-copy; elif [[ -n "$w" && "$w" != "$old_w" ]]; then old_w="$w"; old_x="$w"; printf '%s' "$w" | xclip -selection clipboard -t UTF8_STRING; fi; done &
+
 
 sudo -E hw-probe -all -upload
 
