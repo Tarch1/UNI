@@ -334,6 +334,7 @@ UserSetup () {
 	else
 		echo "%wheel ALL=(ALL:ALL) NOPASSWD: ALL" > /mnt/etc/sudoers.d/99-installer-temp
 		CR_USER "git clone https://aur.archlinux.org/trizen.git /tmp/trizen && cd /tmp/trizen && makepkg -si --noconfirm"
+		rm -rf /mnt/tmp/trizen
 		mkdir -p /mnt/etc/bash/bashrc.d ; if [[ -f "${SCRIPT_DIR}/Conf_files/bashrc" ]]; then cp "${SCRIPT_DIR}/Conf_files/bashrc" /mnt/etc/bash/bashrc.d/"$UNsel".bashrc ; fi
 		if [[ -f "${SCRIPT_DIR}/Conf_files/50-bootbackup.hook" ]]; then mkdir -p /mnt/etc/pacman.d/hooks; cp "${SCRIPT_DIR}/Conf_files/50-bootbackup.hook" /mnt/etc/pacman.d/hooks/ ; fi
 	fi
@@ -361,14 +362,13 @@ UserSetup () {
 		touch /mnt/home/"$UNsel"/.config/fuzzel/colors.ini /mnt/home/"$UNsel"/.config/wallust/colors-waybar.css
 		echo -e '$background = rgb(1e1e2e)\n$foreground = rgb(cdd6f4)\n$color4 = rgb(89b4fa)\n$color6 = rgb(94e2d5)' > /mnt/home/"$UNsel"/.config/hypr/colors.conf
 		for f in hypridle.conf hyprlock.conf; do if [[ -f "${SCRIPT_DIR}/Conf_files/Hyprlock/$f" ]]; then cp "${SCRIPT_DIR}/Conf_files/Hyprlock/$f" /mnt/home/"$UNsel"/.config/hypr/ ; fi ; done
-		if [[ "$VBTsel" -eq 1 ]]; then
-			sed -i 's/blur_passes = 3/blur_passes = 0/' /mnt/home/"$UNsel"/.config/hypr/hyprlock.conf
-			mkdir -p /mnt/usr/local/bin
-			printf '#!/bin/sh\nexec env -u LIBGL_ALWAYS_SOFTWARE /usr/bin/hyprlock "$@"\n' > /mnt/usr/local/bin/hyprlock
-			chmod +x /mnt/usr/local/bin/hyprlock
-		fi
 		if [[ "$DEsel" == "Hyprland" && -d "${SCRIPT_DIR}/Conf_files/Hyprland" ]]; then cp -rT "${SCRIPT_DIR}/Conf_files/Hyprland" /mnt/home/"$UNsel"/.config/hypr ; touch /mnt/home/"$UNsel"/.config/hypr/hyprpaper.conf ; fi
 		if [[ "$DEsel" == "Niri" && -d "${SCRIPT_DIR}/Conf_files/Niri" ]]; then cp -rT "${SCRIPT_DIR}/Conf_files/Niri" /mnt/home/"$UNsel"/.config/niri ; fi
+		if [[ "$VBTsel" -eq 1 ]]; then
+			sed -i 's/blur_passes = 3/blur_passes = 0/' /mnt/home/"$UNsel"/.config/hypr/hyprlock.conf
+			sed -i 's/&& hyprlock/\&\& env -u LIBGL_ALWAYS_SOFTWARE hyprlock/g; s/; hyprlock/; env -u LIBGL_ALWAYS_SOFTWARE hyprlock/g; s/) hyprlock/) env -u LIBGL_ALWAYS_SOFTWARE hyprlock/g' /mnt/home/"$UNsel"/.config/waybar/config.jsonc /mnt/home/"$UNsel"/.config/swaync/config.json /mnt/home/"$UNsel"/.config/hypr/hypridle.conf
+			sed -i 's/spawn "hyprlock"/spawn "env" "-u" "LIBGL_ALWAYS_SOFTWARE" "hyprlock"/g; s/exec, hyprlock/exec, env -u LIBGL_ALWAYS_SOFTWARE hyprlock/g' /mnt/home/"$UNsel"/.config/niri/config.kdl /mnt/home/"$UNsel"/.config/wallust/templates/colors-niri.conf /mnt/home/"$UNsel"/.config/hypr/hyprland.conf 2>/dev/null || true
+		fi
 		CR chmod +x /home/"$UNsel"/.config/wallpapers/theme-switcher.sh
 		echo -e "auth required pam_unix.so nullok\naccount required pam_unix.so\npassword required pam_unix.so\nsession required pam_unix.so" > /mnt/etc/pam.d/hyprlock
 		local t_files=()
@@ -381,23 +381,20 @@ UserSetup () {
 					if grep -q "environment *{" "$f"; then if ! grep -q 'LIBGL_ALWAYS_SOFTWARE' "$f"; then sed -i '/environment *{/a\	LIBGL_ALWAYS_SOFTWARE "1"' "$f" ; fi ; else echo -e '\nenvironment {\n	LIBGL_ALWAYS_SOFTWARE "1"\n}' >> "$f" ; fi
 					if ! grep -q 'output "Virtual-1"' "$f"; then echo -e '\noutput "Virtual-1" {\n	mode "1440x900"\n}' >> "$f" ; fi
 					sed -i 's/blur true/blur false/g' "$f"
-					if [[ "$VM_TYPE" == "qemu" ]]; then if ! grep -q 'spice-vdagent' "$f"; then sed -i -e '/spawn-at-startup/{i\spawn-at-startup "bash" "-c" "pkill -x spice-vdagent; spice-vdagent"' -e ':a;n;ba}' "$f" ; fi ; else if ! grep -q 'VBoxClient' "$f"; then sed -i -e '/spawn-at-startup/{i\spawn-at-startup "bash" "-c" "pkill -f VBoxClient; VBoxClient --clipboard"' -e ':a;n;ba}' "$f" ; fi ; fi
+					if [[ "$VM_TYPE" == "qemu" ]]; then if ! grep -q 'spice-vdagent' "$f"; then sed -i -e '/spawn-at-startup/{i\spawn-at-startup "bash" "-c" "pkill -x spice-vdagent; spice-vdagent"' -e ':a;n;ba}' "$f" ; fi ; else if ! grep -q 'VBoxClient' "$f"; then sed -i -e '/spawn-at-startup/{i\spawn-at-startup "bash" "-c" "pkill -x VBoxClient; VBoxClient --clipboard"' -e ':a;n;ba}' "$f" ; fi ; fi
 				elif [[ "$DEsel" == "Hyprland" && "$f" == *hyprland.conf ]]; then
 					if ! grep -q 'monitor=,1440x900' "$f"; then sed -i '1i monitor=,1440x900@60,auto,1' "$f" ; fi
-					if [[ "$VM_TYPE" == "qemu" ]]; then sed -i -e '/exec-once/{i\exec-once = pkill -x spice-vdagent; spice-vdagent' -e ':a;n;ba}' "$f" ; else sed -i -e '/exec-once/{i\exec-once = pkill -f VBoxClient; VBoxClient --clipboard' -e ':a;n;ba}' "$f" ; fi
+					if [[ "$VM_TYPE" == "qemu" ]]; then sed -i -e '/exec-once/{i\exec-once = pkill -x spice-vdagent; spice-vdagent' -e ':a;n;ba}' "$f" ; else sed -i -e '/exec-once/{i\exec-once = pkill -x VBoxClient; VBoxClient --clipboard' -e ':a;n;ba}' "$f" ; fi
 				fi
 			fi
 			if [[ "${OSsel,,}" != "arch" && "$init_sys" != "systemd" ]]; then
-				if [[ "$DEsel" == "Niri" ]]; then if ! grep -q 'pipewire' "$f"; then sed -i -e '/spawn-at-startup/{i\spawn-at-startup "bash" "-c" "pgrep -x pipewire >/dev/null || { pipewire & sleep 1; wireplumber & pipewire-pulse & }"' -e ':a;n;ba}' "$f" ; fi ; fi
-				if [[ "$DEsel" == "Hyprland" && "$f" == *hyprland.conf ]]; then if ! grep -q 'pipewire' "$f"; then sed -i -e '/exec-once/{i\exec-once = bash -c "pgrep -x pipewire >/dev/null || { pipewire & sleep 1; wireplumber & pipewire-pulse & }"' -e ':a;n;ba}' "$f" ; fi ; fi
+				if [[ "$DEsel" == "Niri" ]]; then if ! grep -q 'pipewire' "$f"; then sed -i -e '/spawn-at-startup/{i\spawn-at-startup "bash" "-c" "pgrep -x pipewire >/dev/null || (pipewire & sleep 1; wireplumber & pipewire-pulse &)"' -e ':a;n;ba}' "$f" ; fi ; fi
+				if [[ "$DEsel" == "Hyprland" && "$f" == *hyprland.conf ]]; then if ! grep -q 'pipewire' "$f"; then sed -i -e '/exec-once/{i\exec-once = bash -c "pgrep -x pipewire >/dev/null || (pipewire & sleep 1; wireplumber & pipewire-pulse &)"' -e ':a;n;ba}' "$f" ; fi ; fi
 			fi
 		done
 	fi
 	rm -f /mnt/etc/sudoers.d/99-installer-temp
-	if [[ "$VBTsel" -eq 1 ]]; then
-		echo -e "WLR_NO_HARDWARE_CURSORS=1\nWLR_RENDERER_ALLOW_SOFTWARE=1\nLIBGL_ALWAYS_SOFTWARE=1\nKITTY_DISABLE_WAYLAND=1" >> /mnt/etc/environment
-		if [[ "$VM_TYPE" == "vbox" ]]; then echo -e "QT_QPA_PLATFORM=xcb\nGDK_BACKEND=x11" >> /mnt/etc/environment ; fi
-	fi
+	if [[ "$VBTsel" -eq 1 ]]; then echo -e "WLR_NO_HARDWARE_CURSORS=1\nWLR_RENDERER_ALLOW_SOFTWARE=1\nLIBGL_ALWAYS_SOFTWARE=1\nKITTY_DISABLE_WAYLAND=1" >> /mnt/etc/environment ; fi
 }
 AudioSetup () {
 	CR mkdir -p /etc/pipewire/pipewire.conf.d /etc/wireplumber/wireplumber.conf.d
