@@ -1,4 +1,6 @@
 #!/bin/bash
+LOC_LIST=( "en_US.UTF-8" "en_GB.UTF-8" "it_IT.UTF-8" )
+
 MenuSel () {
 	local -n var_name="$1" ; local question="$2" ; local user_choice ; shift 2 ; local options=("$@")
 	while true; do
@@ -24,14 +26,14 @@ YesNoSel () {
 	done
 }
 ArchRepoSetup () {
-	local target_conf="$1" ; local cmd=() ; local mirror_file="/etc/pacman.d/mirrorlist-arch"
-	if [[ "$target_conf" == "/mnt/etc/pacman.conf" ]]; then cmd=( "$chroot" /mnt ) ; mirror_file="/mnt/etc/pacman.d/mirrorlist-arch" ; fi
-	if [[ ${#cmd[@]} -eq 0 ]]; then rm -rf /etc/pacman.d/gnupg/* 2>/dev/null || true ; mkdir -p /etc/pacman.d/gnupg ; chmod 700 /etc/pacman.d/gnupg ; pacman-key --init ; pacman-key --populate artix ; else "${cmd[@]}" pacman-key --init ; "${cmd[@]}" pacman-key --populate artix ; fi
+	local target_conf="${1:-/etc/pacman.conf}"
+	rm -rf /etc/pacman.d/gnupg/* 2>/dev/null || true ; mkdir -p /etc/pacman.d/gnupg ; chmod 700 /etc/pacman.d/gnupg
+	pacman-key --init ; pacman-key --populate artix
 	sed -i '/\[universe\]/,/^[[:space:]]*$/d' "$target_conf"
 	printf '\n[universe]\nServer = https://universe.artixlinux.org/$arch\nServer = https://mirror1.artixlinux.org/universe/$arch\nServer = https://mirror.pascalpuffke.de/artix-universe/$arch\nServer = https://artixlinux.qontinuum.space/artixlinux/universe/os/$arch\nServer = https://mirror1.cl.netactuate.com/artix/universe/$arch\nServer = https://ftp.crifo.org/artix-universe/$arch\n' >> "$target_conf"
-	if [[ ! -f "$mirror_file" ]]; then "${cmd[@]}" pacman -Sy --noconfirm artix-keyring archlinux-keyring artix-archlinux-support ; fi
+	if [[ ! -f /etc/pacman.d/mirrorlist-arch ]]; then pacman -Sy --noconfirm artix-keyring archlinux-keyring artix-archlinux-support ; fi
 	if ! grep -q 'mirrorlist-arch' "$target_conf"; then printf '\n# Arch\n[extra]\nInclude = /etc/pacman.d/mirrorlist-arch\n\n[multilib]\nInclude = /etc/pacman.d/mirrorlist-arch\n' >> "$target_conf" ; fi
-	"${cmd[@]}" pacman-key --populate artix archlinux
+	pacman-key --populate artix archlinux
 }
 AutoOSsel () {
 	local os_id
@@ -44,39 +46,48 @@ CPUsel () {
 	if [[ "$cpu_info" =~ Intel ]]; then echo 'Installing Intel microcode' ; UCODEsel='intel-ucode' ; elif [[ "$cpu_info" =~ AMD ]]; then echo 'Installing AMD microcode' ; if [[ "${OSsel,,}" == "void" ]]; then UCODEsel='linux-firmware-amd' ; else UCODEsel='amd-ucode' ; fi ; else echo 'No microcode needed or unknown CPU' ; UCODEsel="" ; fi
 }
 DriveSelection() {
-	local avail_disks=() display_options=()
+	local avail_disks=() display_options=() choice_str
 	while read -r name size type; do
 		if [[ "$type" == "loop" || "$type" == "rom" ]]; then continue ; fi
 		avail_disks+=("$name") ; display_options+=("$name ($size)")
 	done < <(lsblk -dpno NAME,SIZE,TYPE)
 	if [[ ${#avail_disks[@]} -eq 0 ]]; then echo "No drives detected!" ; exit 1 ; fi
-	while true; do
-		echo -e "\n=== Select Target Drive for OS ==="
-		for i in "${!display_options[@]}"; do echo "$((i+1))) ${display_options[$i]}" ; done
-		read -rp "Choice: " choice
-		if [[ "$choice" =~ ^[0-9]+$ ]] && [[ "$choice" -le "${#display_options[@]}" ]] && [[ "$choice" -gt 0 ]]; then DRIVE="${avail_disks[$((choice-1))]}" ; echo "Selected: $DRIVE" ; break ; else echo "Invalid choice." ; fi
-	done
+	MenuSel "choice_str" "Select Target Drive for OS" "${display_options[@]}"
+	DRIVE="${choice_str%% *}"
 	local add_avail=() add_disp=()
 	for i in "${!avail_disks[@]}"; do
 		if [[ "${avail_disks[$i]}" == "$DRIVE" ]]; then continue ; fi
 		add_avail+=("${avail_disks[$i]}") ; add_disp+=("${display_options[$i]}")
 	done
-	ADD_SETUP=0 ; ADD_FORMAT=0 ; ADD_FS="" ; ADD_LABEL="" ; ADDITIONAL_DRIVE=""
+	ADD_SETUP=0 ; ADD_FORMAT=0 ; ADD_FS="" ; ADD_LABEL="" ; ADDITIONAL_DRIVE="" ; ADD_PARTS=()
 	if [[ ${#add_avail[@]} -gt 0 ]]; then
-		echo -e "\n=== Secondary drive(s) detected ==="
-		YesNoSel "Do you want to format and mount a secondary drive? (All data will be lost)"
-		if [[ "$CC" -eq 1 ]]; then
-			ADD_SETUP=1 ; ADD_FORMAT=1
-			while true; do
-				echo -e "\n=== Select Secondary Drive ==="
-				for i in "${!add_disp[@]}"; do echo "$((i+1))) ${add_disp[$i]}" ; done
-				read -rp "Choice: " choice
-				if [[ "$choice" =~ ^[0-9]+$ ]] && [[ "$choice" -le "${#add_disp[@]}" ]] && [[ "$choice" -gt 0 ]]; then ADDITIONAL_DRIVE="${add_avail[$((choice-1))]}" ; echo "Selected: $ADDITIONAL_DRIVE" ; break ; else echo "Invalid choice." ; fi
-			done
-			MenuSel "ADD_FS" "Select the filesystem for the secondary drive" "ext4" "btrfs" "exfat" "ntfs"
-			TextPromptSel "ADD_LABEL" "Enter label for the secondary drive (leave empty for 'DATA')"
-			if [[ -z "$ADD_LABEL" ]]; then ADD_LABEL="DATA" ; fi
-		fi
+		local sec_mode
+		MenuSel "sec_mode" "Secondary drive(s) detected: select action" "Format and mount a drive (Wipe data)" "Mount a single existing partition (Keep data)" "Mount ALL existing partitions (Keep data)" "Skip secondary drive(s)"
+		case "$sec_mode" in
+			"Format"*)
+				ADD_SETUP=1 ; ADD_FORMAT=1
+				MenuSel "choice_str" "Select Secondary Drive to Format" "${add_disp[@]}"
+				ADDITIONAL_DRIVE="${choice_str%% *}"
+				MenuSel "ADD_FS" "Select the filesystem for the secondary drive" "ext4" "btrfs" "exfat" "ntfs"
+				TextPromptSel "ADD_LABEL" "Enter label for the secondary drive (leave empty for 'DATA')"
+				if [[ -z "$ADD_LABEL" ]]; then ADD_LABEL="DATA" ; fi
+				;;
+			"Mount a single"*|"Mount ALL"*)
+				local part_opts=() part_devs=()
+				while read -r pname ptype psize pfstype plabel; do
+					if [[ "$ptype" != "part" || -z "$pfstype" || "$pfstype" == "swap" || "${plabel^^}" == "EFI" ]]; then continue ; fi
+					part_devs+=("$pname") ; part_opts+=("$pname ($psize - $pfstype${plabel:+ - $plabel})")
+				done < <(lsblk -lnpo NAME,TYPE,SIZE,FSTYPE,LABEL "${add_avail[@]}")
+				if [[ ${#part_devs[@]} -eq 0 ]]; then echo "No valid data partitions found on secondary drive(s). Skipping."
+				elif [[ "$sec_mode" == "Mount a single"* ]]; then
+					ADD_SETUP=1 ; ADD_FORMAT=0
+					MenuSel "choice_str" "Select Existing Partition to Mount" "${part_opts[@]}"
+					ADD_PARTS=("${choice_str%% *}") ; ADDITIONAL_DRIVE="${ADD_PARTS[0]}"
+				else
+					ADD_SETUP=1 ; ADD_FORMAT=0 ; ADD_PARTS=("${part_devs[@]}") ; ADDITIONAL_DRIVE="${ADD_PARTS[*]}"
+				fi
+				;;
+		esac
 	fi
 }
 NVDriverUpdate () {
@@ -149,8 +160,8 @@ IRFsel() { if [[ "${OSsel,,}" == "void" ]]; then IRFSetup="dracut" ; echo "Selec
 IRFSModeSel() { MenuSel "IRFSMode" "Select preferred Initramfs Mode, if universal for all PC or just for this one" "Host" "Universal" ; }
 KernelSel() { if [[ "${OSsel,,}" == "void" ]]; then MenuSel "KSel" "Select preferred Kernel" "linux" "linux-lts" ; else MenuSel "KSel" "Select preferred Kernel" "linux" "linux-lts" "linux-hardened" "linux-zen" ; fi ; }
 LibrarySel() { MenuSel "LIBsel" "Select base library" "GLIBC" "MUSL" ; }
-LanguageSel() { MenuSel "LANGsel" "Select preferred Language" "en_US.UTF-8" "en_GB.UTF-8" "it_IT.UTF-8" ; }
-LocalizationSel() { MenuSel "LOCsel" "Select localization" "en_US.UTF-8" "en_GB.UTF-8" "it_IT.UTF-8" ; }
+LanguageSel() { MenuSel "LANGsel" "Select preferred Language" "${LOC_LIST[@]}" ; }
+LocalizationSel() { MenuSel "LOCsel" "Select localization" "${LOC_LIST[@]}" ; }
 OperatingSystemSel() { MenuSel "OSsel" "Select the distro to setup" "Arch" "Artix" "Void" ; }
 PartIDSel() { MenuSel "PIDsel" "Select partition identifier" "UUID" "PARTUUID" "LABEL" ; }
 UsernameSel() { TextPromptSel "UNsel" "Enter preferred username" ; }
