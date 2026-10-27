@@ -5,6 +5,8 @@ NIGHT_DIR="$WALL_DIR/night"
 CURRENT_WALL=""
 CURRENT_THEME=""
 
+for pid in $(pgrep -u "$USER" -f "theme-switcher.sh"); do [[ "$pid" != "$$" && "$pid" != "$PPID" ]] && kill "$pid" 2>/dev/null; done
+
 apply_theme() {
 	local theme="$1" ; local target_dir="$2"
 	[[ ! -d "$target_dir" ]] && return 1
