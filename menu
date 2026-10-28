@@ -75,7 +75,7 @@ DriveSelection() {
 			"Mount a single"*|"Mount ALL"*)
 				local part_opts=() part_devs=()
 				while read -r pname ptype psize pfstype plabel; do
-					if [[ "$ptype" != "part" || -z "$pfstype" || "$pfstype" == "swap" || "${plabel^^}" == "EFI" ]]; then continue ; fi
+					if [[ "$ptype" != "part" || -z "$pfstype" || "$pfstype" =~ ^(swap|crypto_LUKS)$ || "${plabel^^}" == "EFI" ]]; then continue ; fi
 					part_devs+=("$pname") ; part_opts+=("$pname ($psize - $pfstype${plabel:+ - $plabel})")
 				done < <(lsblk -lnpo NAME,TYPE,SIZE,FSTYPE,LABEL "${add_avail[@]}")
 				if [[ ${#part_devs[@]} -eq 0 ]]; then echo "No valid data partitions found on secondary drive(s). Skipping."
