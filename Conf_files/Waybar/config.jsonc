@@ -110,7 +110,7 @@
     "custom/lock": {
         "format": "󰌾",
         "tooltip": false,
-        "on-click": "bash -c 'grim ~/.cache/screenlock.png && hyprlock'"
+        "on-click": "bash -c 'sleep 0.1; hyprlock'"
     },
     "custom/suspend": {
         "format": "󰤄",
