@@ -189,7 +189,7 @@ SetupEnvironment () {
 		fi
 	else
 		sed -i "/\($LOCsel\|$LANGsel\)/ s/#//g" /mnt/etc/locale.gen
-		echo -e "LANG=$LOCsel\nLANGUAGE=$LANGsel\nLC_TIME=$LOCsel\nLC_ADDRESS=$LOCsel\nLC_MESSAGES=$LOCsel\nLC_CTYPE=C" >> /mnt/etc/locale.conf
+		echo -e "LANG=$LOCsel\nLANGUAGE=$LANGsel\nLC_TIME=$LOCsel\nLC_ADDRESS=$LOCsel\nLC_MESSAGES=$LOCsel" >> /mnt/etc/locale.conf
 		if [[ -n "$keypath" ]]; then echo "$k_map" > /mnt/"$keypath" ; fi
 		CR bash -c "ln -sf /usr/share/zoneinfo/$TZsel /etc/localtime; hwclock --systohc --utc || true; locale-gen"
 	fi
@@ -223,10 +223,10 @@ PKGcheck () {
 	if [[ "$IRFSetup" == "booster" ]]; then kernel+=(booster) ; elif [[ "$IRFSetup" == "dracut" ]]; then kernel+=(dracut) ; elif [[ "$IRFSetup" == "mkinitcpio" ]]; then kernel+=(mkinitcpio) ; fi
 	if [[ "${OSsel,,}" == "artix" ]]; then logind=(elogind elogind-"${init_sys,,}" "${init_sys,,}"-settingsd) ; elif [[ "${OSsel,,}" == "void" ]]; then logind=(seatd elogind) ; else logind=() ; fi
 	if [[ -n "$UCODEsel" ]]; then microcode=("$UCODEsel") ; else microcode=() ; fi
-	net=(iwd chrony) ; if [[ "${OSsel,,}" == "void" ]]; then net+=(NetworkManager) ; else net+=(networkmanager) ; fi ; if [[ "${OSsel,,}" == "artix" ]]; then net+=("chrony-${init_sys,,}" "networkmanager-${init_sys,,}") ; fi
+	net=(iwd chrony) ; if [[ "${OSsel,,}" == "void" ]]; then net+=(NetworkManager) ; else net+=(networkmanager) ; fi ; if [[ "${OSsel,,}" == "artix" ]]; then net+=("iwd-${init_sys,,}" "chrony-${init_sys,,}" "networkmanager-${init_sys,,}") ; fi
 	print=(cups cups-pdf) ; if [[ "${OSsel,,}" == "void" ]]; then print+=(avahi-daemon cups-filters) ; else print+=(avahi system-config-printer) ; fi ; if [[ "${OSsel,,}" == "artix" ]]; then print+=("avahi-${init_sys,,}" "cups-${init_sys,,}") ; fi
 	utility=(imv featherpad libqalculate fd btop fwupd fastfetch grim slurp wl-clipboard xclip swappy awww brightnessctl playerctl pavucontrol xorg-xwayland) ; if [[ "${OSsel,,}" != "void" ]]; then utility+=(lact cowfortune pacman-contrib) ; fi ; if [[ "${OSsel,,}" == "artix" ]]; then if [[ "$LUKS_ENC" -eq 1 ]]; then utility+=("cryptsetup-${init_sys,,}") ; fi ; fi
-	if compgen -G "/sys/class/power_supply/BAT*" >/dev/null; then if [[ "${OSsel,,}" == "arch" ]]; then utility+=(power-profiles-daemon) ; else utility+=(tlp) ; if [[ "${OSsel,,}" == "artix" ]]; then utility+=("tlp-${init_sys,,}") ; fi ; fi ; if [[ "$UCODEsel" == "intel-ucode" ]]; then utility+=(thermald) ; if [[ "${OSsel,,}" == "artix" ]]; then utility+=("thermald-${init_sys,,}") ; fi ; fi ; fi
+	if compgen -G "/sys/class/power_supply/BAT*" >/dev/null; then if [[ "${OSsel,,}" == "arch" && "$DEsel" =~ ^(KDE|GNOME|COSMIC)$ ]]; then utility+=(power-profiles-daemon) ; else utility+=(tlp) ; if [[ "${OSsel,,}" == "artix" ]]; then utility+=("tlp-${init_sys,,}") ; fi ; fi ; if [[ "$UCODEsel" == "intel-ucode" ]]; then utility+=(thermald) ; if [[ "${OSsel,,}" == "artix" ]]; then utility+=("thermald-${init_sys,,}") ; fi ; fi ; fi
 	if [[ "$VBTsel" -eq 1 ]]; then if [[ "$VM_TYPE" == "qemu" ]]; then utility+=(spice-vdagent) ; elif [[ "$VM_TYPE" == "vbox" ]]; then if [[ "${OSsel,,}" == "void" ]]; then utility+=(virtualbox-ose-guest) ; else utility+=(virtualbox-guest-utils) ; fi ; fi ; fi
 	if [[ "${GPUMANAGERsel,,}" == "envycontrol" ]]; then utility+=(envycontrol) ; elif [[ "${GPUMANAGERsel,,}" == "cardwire" ]]; then utility+=(cardwire) ; fi
 	if [[ "${OSsel,,}" == "void" ]]; then vulkan=(vulkan-loader) ; else vulkan=(vulkan-icd-loader vulkan-intel vulkan-mesa-layers) ; fi
@@ -235,7 +235,7 @@ PKGcheck () {
 	declare -A repo_map=()
 	if [[ "${OSsel,,}" == "void" ]]; then while read -r pkg; do [[ -n "$pkg" ]] && repo_map["$pkg"]=1 ; done < <($PKGmanager$PKGchk -R -s "" | awk '{print $2}' | sed 's/-[0-9].*//') ; else while read -r pkg; do [[ -n "$pkg" ]] && repo_map["$pkg"]=1 ; done < <($PKGmanager$PKGinst"lq") ; fi
 	local y="amddrivers apps archive audio baselinux baseutils bluetooth bootloaderutility booster btrfsutility desktop displaymanager filemanager fonts fs grub grubbtrfs hardwareacceleration kernel limine logind microcode net nvidiadrivers print refind uki utility vulkan" ; local miss=()
-	for group in $y; do	local -n current_group="$group" ; if [[ ${#current_group[@]} -eq 0 ]]; then continue ; fi ; local valid_pkgs=() ; for pkg in "${current_group[@]}"; do if [[ -n "${repo_map[$pkg]:-}" ]]; then valid_pkgs+=("$pkg") ; else miss+=("$pkg") ; fi ; done current_group=("${valid_pkgs[@]}") ; done
+	for group in $y; do local -n current_group="$group" ; if [[ ${#current_group[@]} -eq 0 ]]; then continue ; fi ; local valid_pkgs=() ; for pkg in "${current_group[@]}"; do if [[ -n "${repo_map[$pkg]:-}" ]]; then valid_pkgs+=("$pkg") ; else miss+=("$pkg") ; fi ; done ; current_group=("${valid_pkgs[@]}") ; done
 	if [[ ${#miss[@]} -gt 0 ]]; then echo -e "\n[!] WARNING: Unavailable packages:\n$(printf ' - %s\n' "${miss[@]}" | sort -u)\n" ; printf '%s\n' "${miss[@]}" | sort -u > pkg_missed ; YesNoSel "Are these packages CRITICAL for installation? (Yes = Abort / No = Skip and continue)" ; if [[ "$CC" -eq 1 ]]; then echo "[-] Installation aborted by user." ; exit 0 ; else echo "[*] Missing packages removed." ; fi ; fi
 }
 PackageInstall () {
@@ -259,11 +259,12 @@ PackageInstall () {
 	CR $PKGmanager$PKGinst$PKGupd$PKGupg "${PKGskp[@]}" "${FinalPKGs[@]}"
 }
 KernelSetup () {
-	if [[ "$UCODEsel" == "intel-ucode" ]]; then mkdir -p /mnt/etc/modprobe.d ; echo 'options i915 enable_fbc=1 fastboot=0 enable_dc=4' > /mnt/etc/modprobe.d/i915.conf ; fi
-	if [[ ${#nvidiadrivers[@]} -gt 0 ]]; then modules+=(nvidia nvidia_modeset nvidia_uvm nvidia_drm) ; mkdir -p /mnt/etc/modprobe.d ; echo -e "options nvidia-drm modeset=1 fbdev=1\noptions nvidia NVreg_DynamicPowerManagement=0x02 NVreg_UsePageAttributeTable=1 NVreg_EnablePCIeGen3=1" > /mnt/etc/modprobe.d/nvidia.conf ; fi
+	if [[ "$UCODEsel" == "intel-ucode" ]]; then modules+=(vmd) ; fi
+	if [[ ${#nvidiadrivers[@]} -gt 0 ]]; then modules+=(nvidia nvidia_modeset nvidia_uvm nvidia_drm) ; mkdir -p /mnt/etc/modprobe.d ; echo -e "blacklist nouveau\noptions nouveau modeset=0\noptions nvidia-drm modeset=1 fbdev=1\noptions nvidia NVreg_DynamicPowerManagement=0x02 NVreg_UsePageAttributeTable=1" > /mnt/etc/modprobe.d/nvidia.conf ; fi
 	local kver ; kver="$(basename "$(find /mnt/usr/lib/modules/ -maxdepth 1 -mindepth 1 -type d ! -name 'extramodules*' -print -quit)")"
 	case "$IRFSetup" in
 		dracut)			mkdir -p /mnt/etc/dracut.conf.d
+						if [[ "$UCODEsel" == "intel-ucode" ]]; then echo 'add_drivers+=" vmd "' > /mnt/etc/dracut.conf.d/vmd.conf ; fi
 						if [[ "$LUKS_ENC" -eq 1 ]]; then echo -e 'add_dracutmodules+=" crypt "\ninstall_items+=" /etc/crypttab /etc/crypt_key.bin "' > /mnt/etc/dracut.conf.d/crypt.conf ; fi
 						if [[ "$FSsel" == "btrfs" ]]; then echo 'add_dracutmodules+=" btrfs "' > /mnt/etc/dracut.conf.d/btrfs.conf ; fi
 						if [[ ${#nvidiadrivers[@]} -gt 0 ]]; then echo 'force_drivers+=" nvidia nvidia_modeset nvidia_uvm nvidia_drm "' > /mnt/etc/dracut.conf.d/nvidia.conf ; fi
@@ -271,7 +272,7 @@ KernelSetup () {
 						if [[ "${OSsel,,}" == "void" ]]; then if [[ "$IRFSMode" == "Universal" ]]; then echo "hostonly=\"no\"" > /mnt/etc/dracut.conf.d/hostonly.conf ; else echo "hostonly=\"yes\"" > /mnt/etc/dracut.conf.d/hostonly.conf ; fi ; CR xbps-reconfigure -f "$KSel"
 						else CR dracut "$d_flag" --kver "$kver" --force /boot/initramfs-"$KSel".img ; fi
 						;;
-		booster)		local b_opts="mount_timeout: 3m\nvconsole: true\nresume: /dev/disk/by-uuid/${SWAP_UUID}\nmodules: ahci,ata_piix,sd_mod,nvme" ; local b_flag=""
+		booster)		local b_opts="mount_timeout: 3m\nvconsole: true\nresume: /dev/disk/by-uuid/${SWAP_UUID}\nmodules: ahci,ata_piix,sd_mod,nvme,vmd" ; local b_flag=""
 						if [[ "$IRFSMode" == "Universal" ]]; then b_opts="universal: true\n$b_opts" ; b_flag="--universal" ; fi
 						if [[ "$FSsel" == "btrfs" ]]; then b_opts+=",btrfs" ; fi
 						if [[ ${#nvidiadrivers[@]} -gt 0 ]]; then b_opts+=",nvidia,nvidia_modeset,nvidia_uvm,nvidia_drm" ; fi
@@ -291,11 +292,11 @@ KernelSetup () {
 ServiceSetup () {
 	Services=()
 	case "${OSsel,,}" in
-		artix)	Services+=( NetworkManager chrony dbus elogind cupsd avahi-daemon bluetoothd ) ; if [[ "$LUKS_ENC" -eq 1 ]]; then Services+=( dmcrypt ); fi ; if [[ "$init_sys" == "openrc" ]]; then Services+=( openrc-settingsd ); fi ; if [[ -v nvidiadrivers && ${#nvidiadrivers[@]} -gt 0 ]]; then Services+=( nvidia-persistenced ); fi ;;
-		arch)	Services+=( NetworkManager chronyd cups avahi-daemon bluetooth paccache.timer ) ;;
-		void)	Services+=( NetworkManager chronyd cupsd dbus elogind avahi-daemon bluetoothd seatd ) ;;
+		artix)	Services+=( iwd NetworkManager chrony dbus elogind cupsd avahi-daemon bluetoothd ) ; if [[ "$LUKS_ENC" -eq 1 ]]; then Services+=( dmcrypt ); fi ; if [[ "$init_sys" == "openrc" ]]; then Services+=( openrc-settingsd ); fi ;;
+		arch)	Services+=( iwd NetworkManager chronyd cups avahi-daemon bluetooth paccache.timer ) ; if [[ -v nvidiadrivers && ${#nvidiadrivers[@]} -gt 0 ]]; then Services+=( nvidia-suspend nvidia-hibernate nvidia-resume nvidia-powerd ); fi ;;
+		void)	Services+=( iwd NetworkManager chronyd cupsd dbus elogind avahi-daemon bluetoothd seatd ) ;;
 	esac
-	if compgen -G "/sys/class/power_supply/BAT*" >/dev/null; then if [[ "${OSsel,,}" == "arch" ]]; then Services+=( power-profiles-daemon ) ; else Services+=( tlp ) ; fi ; if [[ "$UCODEsel" == "intel-ucode" ]]; then Services+=( thermald ) ; fi ; fi
+	if compgen -G "/sys/class/power_supply/BAT*" >/dev/null; then if [[ "${OSsel,,}" == "arch" && "$DEsel" =~ ^(KDE|GNOME|COSMIC)$ ]]; then Services+=( power-profiles-daemon ) ; else Services+=( tlp ) ; fi ; if [[ "$UCODEsel" == "intel-ucode" ]]; then Services+=( thermald ) ; fi ; fi
 	if [[ "$VBTsel" -eq 1 && "$VM_TYPE" == "vbox" && "${OSsel,,}" != "artix" ]]; then Services+=( vboxservice ) ; fi
 	if [[ "${DMsel,,}" =~ ^(ly|greetd|lightdm|sddm|gdm)$ ]]; then Services+=("${DMsel,,}") ; fi
 	if [[ "${GPUMANAGERsel,,}" == "cardwire" ]]; then
@@ -316,7 +317,8 @@ ServiceSetup () {
 			artix:*)		if [[ "$s" == "dmcrypt" ]]; then CR rc-update add "$s" boot ; else CR rc-update add "$s" default ; fi ;;
 		esac
 	done
-	mkdir -p /mnt/etc/pipewire/pipewire.conf.d /mnt/etc/wireplumber/wireplumber.conf.d /mnt/etc/udev/rules.d/
+	mkdir -p /mnt/etc/NetworkManager/conf.d /mnt/etc/pipewire/pipewire.conf.d /mnt/etc/wireplumber/wireplumber.conf.d /mnt/etc/udev/rules.d/
+	printf '[device]\nwifi.backend=iwd\n' > /mnt/etc/NetworkManager/conf.d/wifi_backend.conf
 	printf 'monitor.bluez.properties = { bluez5.enable-sbc-xq = true, bluez5.enable-msbc = true, bluez5.enable-hw-volume = true, bluez5.codecs = [ sbc_xq aac aptx aptx_hd ldac ] }\n' > /mnt/etc/wireplumber/wireplumber.conf.d/10-bluetooth-policy.conf
 	printf 'context.properties = { default.clock.rate = 48000, default.clock.quantum = 1024, default.clock.min-quantum = 32, default.clock.max-quantum = 2048 }\n' > /mnt/etc/pipewire/pipewire.conf.d/99-input-denoise.conf
 	if [[ -f /mnt/etc/bluetooth/main.conf ]]; then sed -i 's/#AutoEnable=false/AutoEnable=true/g' /mnt/etc/bluetooth/main.conf ; fi
@@ -402,7 +404,7 @@ UserSetup () {
 			fi
 		fi
 		if [[ "${OSsel,,}" != "arch" && "$init_sys" != "systemd" ]]; then
-			local pw_cmd='pgrep -u $USER -x pipewire >/dev/null || pipewire & pgrep -u $USER -x pipewire-pulse >/dev/null || pipewire-pulse & pgrep -u $USER -x wireplumber >/dev/null || wireplumber &'
+			local pw_cmd='pgrep -u $USER -x pipewire >/dev/null || (pipewire & sleep 1; wireplumber & pipewire-pulse &)'
 			if [[ "$DEsel" == "Niri" ]]; then sed -i -e "/spawn-at-startup/{i\\spawn-at-startup \"bash\" \"-c\" \"$pw_cmd\"" -e ':a;n;ba}' "$cfg"
 			else sed -i -e "/exec-once/{i\\exec-once = bash -c '$pw_cmd'" -e ':a;n;ba}' "$cfg" ; fi
 		fi
@@ -413,14 +415,14 @@ UserSetup () {
 	CR chown -hR "$UNsel":users /home/"$UNsel"
 }
 BootloaderSetup () {
-	local osi_version="${AcpiOS:-Windows 2020}" ; local k_file ; local kname
+	local k_file ; local kname
 	k_file=$(find /mnt/boot/ -maxdepth 1 -type f -name 'vmlinuz-*' -print -quit || true)
 	if [[ -n "$k_file" ]]; then kname=$(basename "$k_file") ; else kname="vmlinuz-$KSel" ; fi
 	local irfs initrd_flags rootflags="" nvdrm="" nvosi="" luks_flags=""
 	if [[ "${OSsel,,}" == "void" ]]; then irfs="initramfs-${kname#vmlinuz-}.img" ; else irfs="initramfs-$KSel.img" ; fi
 	if [[ "$FSsel" == "btrfs" ]]; then rootflags='rootflags=subvol=@' ; fi
-	if [[ ${#nvidiadrivers[@]} -gt 0 ]]; then nvdrm="nvidia-drm.modeset=1 nvidia-drm.fbdev=1" ; nvosi="acpi_osi='$osi_version'" ; fi
-	if [[ "${GPUMANAGERsel,,}" == "cardwire" ]]; then nvosi="$nvosi lsm=lockdown,capability,landlock,bpf" ; fi
+	if [[ ${#nvidiadrivers[@]} -gt 0 ]]; then nvdrm="nvidia-drm.modeset=1 nvidia-drm.fbdev=1" ; fi
+	if [[ "${GPUMANAGERsel,,}" == "cardwire" ]]; then nvosi="lsm=lockdown,capability,landlock,bpf" ; fi
 	if [[ -n "$UCODEsel" && -f "/mnt/boot/${UCODEsel}.img" ]]; then initrd_flags="initrd=\\${UCODEsel}.img initrd=\\${irfs}" ; else initrd_flags="initrd=\\${irfs}" ; fi
 	if [[ "$LUKS_ENC" -eq 1 ]]; then luks_flags="cryptdevice=UUID=${CRYPT_ROOT_UUID}:cryptroot rd.luks.uuid=${CRYPT_ROOT_UUID} rd.luks.name=${CRYPT_ROOT_UUID}=cryptroot root=/dev/mapper/cryptroot" ; else luks_flags="root=${EFF_PID}=$ROOTID" ; fi
 	local c_flags="rw $luks_flags resume=${EFF_PID}=$SWAPID rootfstype=$FSsel $rootflags $nvdrm $nvosi"
@@ -436,7 +438,7 @@ BootloaderSetup () {
 		grub)			if [[ "$UEFImode" -eq 0 ]]; then CR grub-install --target=i386-pc --recheck --debug "$DRIVE" ; else CR grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB ; fi
 						local g_thm="Grub-Sekiro" ; mkdir -p /mnt/boot/grub/themes ; cp -r "${SCRIPT_DIR}/Bootloader/$g_thm" /mnt/boot/grub/themes/
 						local g_res="1920x1080,1024x768,auto" ; if [[ "$VBTsel" -eq 1 ]]; then g_res="1024x768,auto" ; fi
-						sed -i -e "/GRUB_DISABLE_OS_PROBER=/ s/#//g" -e "s/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=3/" -e "s/^#GRUB_GFXMODE=.*/GRUB_GFXMODE=$g_res/" -e '/GRUB_THEME=/c GRUB_THEME="/boot/grub/themes/'"$g_thm"'/theme.txt"' -e "s|^GRUB_CMDLINE_LINUX=.*|GRUB_CMDLINE_LINUX=\"$nvosi $luks_flags\"|" /mnt/etc/default/grub
+						sed -i -e "/GRUB_DISABLE_OS_PROBER=/ s/#//g" -e "s/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=3/" -e "s/^#GRUB_GFXMODE=.*/GRUB_GFXMODE=$g_res/" -e '/GRUB_THEME=/c GRUB_THEME="/boot/grub/themes/'"$g_thm"'/theme.txt"' -e "s|^GRUB_CMDLINE_LINUX=.*|GRUB_CMDLINE_LINUX=\"$luks_flags resume=${EFF_PID}=$SWAPID $nvosi\"|" /mnt/etc/default/grub
 						if [[ ${#nvidiadrivers[@]} -gt 0 ]]; then sed -i "s/^GRUB_CMDLINE_LINUX_DEFAULT=\"\(.*\)\"/GRUB_CMDLINE_LINUX_DEFAULT=\"\1 quiet splash $nvdrm\"/" /mnt/etc/default/grub ; fi
 						CR grub-mkconfig -o /boot/grub/grub.cfg
 						;;
@@ -546,3 +548,4 @@ InstallationSetup () {
 	YesNoSel "Reboot system"
 	if [[ "$CC" -eq 1 ]]; then umount -R -l /mnt || true ; reboot ; else echo "OK" ; exit 0 ; fi
 }
+InstallationSetup
