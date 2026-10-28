@@ -1,10 +1,5 @@
 # Universal-Installation-Script
 
-pkill -f vm-clipboard ; pkill -x VBoxClient ; VBoxClient --clipboard
-
-
-old_x=""; old_w=""; while sleep 0.5; do x=$(xclip -o -selection clipboard -t UTF8_STRING 2>/dev/null || true); w=$(wl-paste -n 2>/dev/null || true); if [[ -n "$x" && "$x" != "$old_x" ]]; then old_x="$x"; old_w="$x"; printf '%s' "$x" | wl-copy; elif [[ -n "$w" && "$w" != "$old_w" ]]; then old_w="$w"; old_x="$w"; printf '%s' "$w" | xclip -selection clipboard -t UTF8_STRING; fi; done &
-
 
 sudo -E hw-probe -all -upload
 
@@ -131,24 +126,26 @@ Steam launch script for dlss and RT
 
 MAPPA COMPLETA DEL REPOSITORY
 
+
+
 {
-	find uni -not -path '*/\.git/*' | sort
-	find uni -type f -not -path '*/\.git/*' -not -name "dump_repository.txt" \
-    -not \( \
-      -iname "*.ttf" -o -iname "*.otf" -o -iname "*.pf2" -o -iname "*.woff*" -o -iname "*.psf*" \
-      -o -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.gif" -o -iname "*.bmp" \
-      -o -iname "*.webp" -o -iname "*.ico" -o -iname "*.svg" -o -iname "*.xcf" \
-      -o -iname "*.zip" -o -iname "*.tar*" -o -iname "*.gz" -o -iname "*.xz" -o -iname "*.zst" \
-      -o -iname "*.7z" -o -iname "*.iso" -o -iname "*.img" -o -iname "*.bin" -o -iname "*.pdf" \
-      -o -iname "*.mp3" -o -iname "*.mp4" -o -iname "*.wav" -o -iname "*.ogg" \
-    \) -exec sh -c '
-      for f do
-        if [ ! -s "$f" ]; then
-          printf "\n=========================================\nFILE: %s (Empty file)\n=========================================\n" "$f"
-        elif grep -Iq . "$f"; then
-          printf "\n=========================================\nFILE: %s\n=========================================\n" "$f"
-          cat "$f"
-        fi
-      done
-    ' sh {} +
+	find uni -not -path '*/.git*' | sort
+	find uni -type f -not -path '*/.git*' -not -name "dump_repository.txt" \
+		-not \( \
+			-iname "*.ttf" -o -iname "*.otf" -o -iname "*.pf2" -o -iname "*.woff*" -o -iname "*.psf" \
+			-o -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.gif" -o -iname "*.bmp" \
+			-o -iname "*.webp" -o -iname "*.ico" -o -iname "*.svg" -o -iname "*.xcf" \
+			-o -iname "*.zip" -o -iname "*.tar" -o -iname "*.gz" -o -iname "*.xz" -o -iname "*.zst" \
+			-o -iname "*.7z" -o -iname "*.iso" -o -iname "*.img" -o -iname "*.bin" -o -iname "*.pdf" \
+			-o -iname "*.mp3" -o -iname "*.mp4" -o -iname "*.wav" -o -iname "*.ogg" \
+		\) -exec sh -c '
+		for f do
+			if [ ! -s "$f" ]; then
+				printf "\n=========================================\nFILE: %s (Empty file)\n=========================================\n" "$f"
+			elif grep -Iq . "$f"; then
+				printf "\n=========================================\nFILE: %s\n=========================================\n" "$f"
+				cat "$f"
+			fi
+		done
+	' sh {} +
 } > dump_repository.txt
