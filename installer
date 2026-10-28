@@ -387,7 +387,7 @@ UserSetup () {
 		fi
 		if [[ "$VBTsel" -eq 1 ]]; then
 			if [[ "$VM_TYPE" == "qemu" ]]; then printf '#!/bin/bash\npkill -x spice-vdagent 2>/dev/null\nexec spice-vdagent\n' > /mnt/usr/bin/vm-clipboard
-			else printf '#!/bin/bash\nfor pid in $(pgrep -u "$USER" -x vm-clipboard); do [[ "$pid" != "$$" && "$pid" != "$PPID" ]] && kill "$pid" 2>/dev/null; done\npkill -x VBoxClient 2>/dev/null\nVBoxClient --clipboard\nold_x="" ; old_w=""\nwhile sleep 0.3; do\n\tx=$(xclip -o -selection clipboard 2>/dev/null || true)\n\tw=$(wl-paste -n 2>/dev/null || true)\n\tif [[ "$x" != "$old_x" ]]; then old_x="$x"; old_w="$x"; printf "%%s" "$x" | wl-copy\n\telif [[ "$w" != "$old_w" ]]; then old_w="$w"; old_x="$w"; printf "%%s" "$w" | xclip -selection clipboard; fi\ndone\n' > /mnt/usr/bin/vm-clipboard ; fi
+			else printf '#!/bin/bash\nfor pid in $(pgrep -u "$USER" -x vm-clipboard); do [[ "$pid" != "$$" && "$pid" != "$PPID" ]] && kill "$pid" 2>/dev/null; done\npkill -x VBoxClient 2>/dev/null\nsleep 1\nVBoxClient --clipboard\nold_x="" ; old_w=""\nwhile sleep 0.5; do\n\tx=$(xclip -o -selection clipboard -t UTF8_STRING 2>/dev/null || true)\n\tw=$(wl-paste -n 2>/dev/null || true)\n\tif [[ -n "$x" && "$x" != "$old_x" ]]; then old_x="$x"; old_w="$x"; printf "%%s" "$x" | wl-copy\n\telif [[ -n "$w" && "$w" != "$old_w" ]]; then old_w="$w"; old_x="$w"; printf "%%s" "$w" | xclip -selection clipboard -t UTF8_STRING; fi\ndone\n' > /mnt/usr/bin/vm-clipboard ; fi
 			chmod +x /mnt/usr/bin/vm-clipboard
 			sed -i 's/blur_passes = 3/blur_passes = 0/' /mnt/home/"$UNsel"/.config/hypr/hyprlock.conf
 			sed -i 's/&& hyprlock/\&\& env -u LIBGL_ALWAYS_SOFTWARE hyprlock/g; s/; hyprlock/; env -u LIBGL_ALWAYS_SOFTWARE hyprlock/g; s/) hyprlock/) env -u LIBGL_ALWAYS_SOFTWARE hyprlock/g' /mnt/home/"$UNsel"/.config/waybar/config.jsonc /mnt/home/"$UNsel"/.config/swaync/config.json /mnt/home/"$UNsel"/.config/hypr/hypridle.conf
@@ -403,11 +403,11 @@ UserSetup () {
 			fi
 		fi
 		if [[ "${OSsel,,}" != "arch" && "$init_sys" != "systemd" ]]; then
-			local pw_cmd='pgrep -u "$USER" -x pipewire >/dev/null || pipewire & pgrep -u "$USER" -x pipewire-pulse >/dev/null || pipewire-pulse & pgrep -u "$USER" -x wireplumber >/dev/null || wireplumber &'
+			local pw_cmd='pgrep -u $USER -x pipewire >/dev/null || pipewire & pgrep -u $USER -x pipewire-pulse >/dev/null || pipewire-pulse & pgrep -u $USER -x wireplumber >/dev/null || wireplumber &'
 			if [[ "$DEsel" == "Niri" ]]; then sed -i -e "/spawn-at-startup/{i\\spawn-at-startup \"bash\" \"-c\" \"$pw_cmd\"" -e ':a;n;ba}' "$cfg"
 			else sed -i -e "/exec-once/{i\\exec-once = bash -c '$pw_cmd'" -e ':a;n;ba}' "$cfg" ; fi
 		fi
-		if [[ "$DEsel" == "Niri" ]]; then mkdir -p /mnt/home/"$UNsel"/.config/niri ; sed -e 's/{{color4}}/#8be9fd/g' -e 's/{{background}}/#282a36/g' "$cfg" > /mnt/home/"$UNsel"/.config/niri/config.kdl ; fi
+		if [[ "$DEsel" == "Niri" ]]; then mkdir -p /mnt/home/"$UNsel"/.config/niri ; sed -e 's/{{color4}}/#8be9fd/g' -e 's/{{[^}]*}}/#282a36/g' "$cfg" > /mnt/home/"$UNsel"/.config/niri/config.kdl ; fi
 	fi
 	rm -f /mnt/etc/sudoers.d/99-installer-temp
 	if [[ "$VBTsel" -eq 1 ]]; then echo -e "WLR_NO_HARDWARE_CURSORS=1\nWLR_RENDERER_ALLOW_SOFTWARE=1\nLIBGL_ALWAYS_SOFTWARE=1\nKITTY_DISABLE_WAYLAND=1" >> /mnt/etc/environment ; fi
