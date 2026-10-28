@@ -106,7 +106,7 @@ NVDriverUpdate () {
 GPUsel () {
 	echo "Detecting video chipset..."
 	local gpu_info ; if ! gpu_info=$(echo "$SYS_LSPCI" | grep -Ei 'VGA|3D'); then gpu_info="" ; fi
-	if [[ "$gpu_info" =~ (AMD|Radeon) ]]; then if [[ "${OSsel,,}" == "void" ]]; then amddrivers=(mesa-dri vulkan-loader mesa-vulkan-radeon) ; else amddrivers=(amdgpu mesa vulkan-radeon libva-mesa-driver) ; fi ; fi
+	if [[ "$gpu_info" =~ (AMD|Radeon) ]]; then if [[ "${OSsel,,}" == "void" ]]; then amddrivers=(mesa-dri vulkan-loader mesa-vulkan-radeon) ; else amddrivers=(mesa vulkan-radeon) ; fi ; fi
 	if [[ "$gpu_info" =~ (VMware|VirtualBox|Virtio|QXL) ]]; then echo "VM detected: The default Mesa driver will be installed" ; fi
 	if [[ "$gpu_info" =~ NVIDIA ]]; then
 		HAS_NVIDIA=1
@@ -118,7 +118,6 @@ GPUsel () {
 			NVDriverUpdate
 			if [[ "$NVsel" =~ ^(OPEN|PROPRIETARY)$ ]]; then echo "Setting up NVIDIA $NVsel Drivers" ; MenuSel "GPUMANAGERsel" "Select NVIDIA Optimus Manager" "Native" "Envycontrol" "Cardwire" ; fi
 		fi
-		if command -v strings >/dev/null; then if [[ -f /sys/firmware/acpi/tables/DSDT ]]; then if ! AcpiOS="$(strings /sys/firmware/acpi/tables/DSDT | grep -i 'windows ' | sort | tail -1)"; then AcpiOS="" ; fi ; else AcpiOS="" ; fi ; fi
 	fi
 	if [[ ! "$gpu_info" =~ (AMD|Radeon|VMware|VirtualBox|Virtio|QXL|NVIDIA) ]]; then echo "Generic/Intel GPU: Mesa will be installed" ; fi
 }
