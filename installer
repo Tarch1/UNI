@@ -38,7 +38,7 @@ DiskPartition() {
 	local total_ram_gb=$(( ($(free -m | awk '/^Mem:/{print $2}') + 1023) / 1024 )) ; local swap_gb
 	if [[ "$total_ram_gb" -le 8 ]]; then swap_gb=$(( total_ram_gb + 1 )) ; elif [[ "$total_ram_gb" -le 32 ]]; then swap_gb=$total_ram_gb ; else swap_gb=32 ; fi
 	if [[ "$UEFImode" -eq 0 ]]; then parted -s "$DRIVE" -- mktable gpt mkpart "ESP" fat32 2MiB 514MiB mkpart "LINUX-ROOT" 514MiB -"${swap_gb}GiB" mkpart "SWAP" -"${swap_gb}GiB" 100% mkpart "BIOS" 1MiB 2MiB set 1 boot on set 3 swap on set 4 bios_grub on
-	else parted -s "$DRIVE" -- mktable gpt mkpart "ESP" fat32 1MiB 513MiB mkpart "LINUX-ROOT" 513MiB -"${swap_gb}GiB" 100% set 1 esp on set 3 swap on ; fi
+	else parted -s "$DRIVE" -- mktable gpt mkpart "ESP" fat32 1MiB 513MiB mkpart "LINUX-ROOT" 513MiB -"${swap_gb}GiB" mkpart "SWAP" -"${swap_gb}GiB" 100% set 1 esp on set 3 swap on ; fi
 	udevadm settle || true
 	local p="" ; if [[ "$DRIVE" =~ [0-9]$ ]]; then p="p" ; fi
 	BOOT_PART="${DRIVE}${p}1" ; ROOT_PART="${DRIVE}${p}2" ; SWAP_PART="${DRIVE}${p}3" ; DEVICE="${DRIVE##*/}"
