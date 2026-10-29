@@ -14,28 +14,32 @@ apply_theme() {
 	[[ -z "$wall" ]] && return 1
 	[[ "$CURRENT_WALL" == "$wall" ]] && return 0
 	CURRENT_WALL="$wall"
-	if [[ "$XDG_CURRENT_DESKTOP" == "Hyprland" ]]; then
-		hyprctl hyprpaper preload "$wall"
-		hyprctl hyprpaper wallpaper ",$wall"
-	else
-		awww img "$wall" --transition-type grow --transition-pos 0.5,0.5
-	fi
 	if [[ "$theme" == "night" ]]; then wallust run -s "$wall" --palette dark16 ; else wallust run -s "$wall" ; fi
-	if pgrep -u "$USER" -x waybar > /dev/null; then killall -SIGUSR2 waybar ; else waybar & fi
 	killall -SIGUSR1 kitty 2>/dev/null || true
-	swaync-client -rs
+	if command -v quickshell >/dev/null 2>&1; then
+		if ! pgrep -u "$USER" -x quickshell >/dev/null; then env QSG_RHI_BACKEND=opengl quickshell & fi
+	else
+		if [[ "$XDG_CURRENT_DESKTOP" == "Hyprland" ]]; then
+			hyprctl hyprpaper preload "$wall"
+			hyprctl hyprpaper wallpaper ",$wall"
+		else
+			awww img "$wall" --transition-type grow --transition-pos 0.5,0.5
+		fi
+		if pgrep -u "$USER" -x waybar >/dev/null; then killall -SIGUSR2 waybar ; else waybar & fi
+		swaync-client -rs 2>/dev/null || true
+	fi
 	CURRENT_THEME="$theme"
 }
 
 sleep 3
 while true; do
-	pgrep -u "$USER" -x "niri|Hyprland" > /dev/null || exit 0
+	pgrep -u "$USER" -x "niri|Hyprland" >/dev/null || exit 0
 	printf -v HOUR '%(%k)T' -1
-	if (( HOUR >= 7 && HOUR < 19 )); then
-		[[ "$CURRENT_THEME" != "day" ]] && apply_theme "day" "$DAY_DIR"
-	else
-		[[ "$CURRENT_THEME" != "night" ]] && apply_theme "night" "$NIGHT_DIR"
+	if (( HOUR >= 7 && HOUR < 19 )); then [[ "$CURRENT_THEME" != "day" ]] && apply_theme "day" "$DAY_DIR"
+	else [[ "$CURRENT_THEME" != "night" ]] && apply_theme "night" "$NIGHT_DIR"
 	fi
-	if ! pgrep -u "$USER" -x waybar > /dev/null; then waybar & fi
+	if command -v quickshell >/dev/null 2>&1; then if ! pgrep -u "$USER" -x quickshell >/dev/null; then env QSG_RHI_BACKEND=opengl quickshell & fi
+	else if ! pgrep -u "$USER" -x waybar >/dev/null; then waybar & fi
+	fi
 	sleep 10
 done
