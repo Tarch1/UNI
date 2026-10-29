@@ -207,7 +207,17 @@ PKGcheck () {
 	bootloaderutility=(efibootmgr os-prober) ; if [[ "${OSsel,,}" != "void" ]]; then bootloaderutility+=(sbsigntools) ; fi
 	if [[ "${OSsel,,}" != "void" ]]; then booster=(booster) ; else booster=() ; fi
 	if [[ "$FSsel" == "btrfs" ]]; then btrfsutility=(snapper btrfs-progs) ; else btrfsutility=() ; fi
-	if [[ "$DEsel" == "COSMIC" ]]; then desktop=(cosmic xdg-desktop-portal-cosmic) ; elif [[ "$DEsel" == "GNOME" ]]; then desktop=(gnome gnome-tweaks xdg-desktop-portal-gnome) ; elif [[ "$DEsel" == "Hyprland" ]]; then desktop=(hyprland hyprpaper fuzzel waybar swaync hyprlock hypridle polkit-kde-agent xdg-desktop-portal-hyprland xdg-desktop-portal-gtk) ; elif [[ "$DEsel" == "KDE" ]]; then desktop=(plasma-meta dolphin konsole xdg-desktop-portal-kde) ; elif [[ "$DEsel" == "LXQt" ]]; then desktop=(lxqt xdg-desktop-portal-lxqt) ; elif [[ "$DEsel" == "Niri" ]]; then desktop=(niri fuzzel waybar swaync hyprlock hypridle polkit-kde-agent xdg-desktop-portal-gnome xdg-desktop-portal-gtk xwayland-satellite) ; else desktop=() ; fi
+	if [[ "$DEsel" == "COSMIC" ]]; then desktop=(cosmic xdg-desktop-portal-cosmic)
+	elif [[ "$DEsel" == "GNOME" ]]; then desktop=(gnome gnome-tweaks xdg-desktop-portal-gnome)
+	elif [[ "$DEsel" == "KDE" ]]; then desktop=(plasma-meta dolphin konsole xdg-desktop-portal-kde)
+	elif [[ "$DEsel" == "LXQt" ]]; then desktop=(lxqt xdg-desktop-portal-lxqt)
+	elif [[ "$DEsel" == "Hyprland" ]]; then
+		desktop=(hyprland hypridle polkit-kde-agent xdg-desktop-portal-hyprland xdg-desktop-portal-gtk)
+		if [[ "$SHELLsel" == "Quickshell" ]]; then desktop+=(quickshell qt6-svg qt6-5compat) ; else desktop+=(hyprpaper fuzzel waybar swaync hyprlock) ; fi
+	elif [[ "$DEsel" == "Niri" ]]; then
+		desktop=(niri hypridle polkit-kde-agent xdg-desktop-portal-gnome xdg-desktop-portal-gtk xwayland-satellite)
+		if [[ "$SHELLsel" == "Quickshell" ]]; then desktop+=(quickshell qt6-svg qt6-5compat) ; else desktop+=(fuzzel waybar swaync hyprlock) ; fi
+	else desktop=() ; fi
 	if [[ "${DMsel,,}" == "gdm" ]]; then displaymanager=(gdm) ; elif [[ "${DMsel,,}" == "greetd" ]]; then displaymanager=(greetd greetd-tuigreet) ; elif [[ "${DMsel,,}" == "lightdm" ]]; then displaymanager=(lightdm lightdm-gtk-greeter lightdm-gtk-greeter-settings) ; elif [[ "${DMsel,,}" == "ly" ]]; then displaymanager=(ly) ; elif [[ "${DMsel,,}" == "sddm" ]]; then displaymanager=(sddm) ; else displaymanager=() ; fi
 	if [[ "${OSsel,,}" == "artix" ]]; then if [[ "${DMsel,,}" != "none" ]]; then displaymanager+=("${DMsel,,}-${init_sys,,}") ; fi ; fi
 	filemanager=(yazi pcmanfm-qt tumbler file-roller android-tools) ; if [[ "${OSsel,,}" != "void" ]]; then filemanager+=(gvfs-mtp) ; fi
@@ -225,7 +235,9 @@ PKGcheck () {
 	if [[ -n "$UCODEsel" ]]; then microcode=("$UCODEsel") ; else microcode=() ; fi
 	net=(iwd chrony) ; if [[ "${OSsel,,}" == "void" ]]; then net+=(NetworkManager) ; else net+=(networkmanager) ; fi ; if [[ "${OSsel,,}" == "artix" ]]; then net+=("iwd-${init_sys,,}" "chrony-${init_sys,,}" "networkmanager-${init_sys,,}") ; fi
 	print=(cups cups-pdf) ; if [[ "${OSsel,,}" == "void" ]]; then print+=(avahi-daemon cups-filters) ; else print+=(avahi system-config-printer) ; fi ; if [[ "${OSsel,,}" == "artix" ]]; then print+=("avahi-${init_sys,,}" "cups-${init_sys,,}") ; fi
-	utility=(imv featherpad libqalculate fd btop fwupd fastfetch grim slurp wl-clipboard xclip swappy awww brightnessctl playerctl pavucontrol xorg-xwayland) ; if [[ "${OSsel,,}" != "void" ]]; then utility+=(lact cowfortune pacman-contrib) ; fi ; if [[ "${OSsel,,}" == "artix" ]]; then if [[ "$LUKS_ENC" -eq 1 ]]; then utility+=("cryptsetup-${init_sys,,}") ; fi ; fi
+	utility=(imv featherpad libqalculate fd btop fwupd fastfetch grim slurp wl-clipboard xclip swappy brightnessctl playerctl pavucontrol xorg-xwayland)
+	if [[ "$DEsel" == "Niri" && "$SHELLsel" != "Quickshell" ]]; then utility+=(awww) ; fi
+	if [[ "${OSsel,,}" != "void" ]]; then utility+=(lact cowfortune pacman-contrib) ; fi ; if [[ "${OSsel,,}" == "artix" ]]; then if [[ "$LUKS_ENC" -eq 1 ]]; then utility+=("cryptsetup-${init_sys,,}") ; fi ; fi
 	if compgen -G "/sys/class/power_supply/BAT*" >/dev/null; then if [[ "${OSsel,,}" == "arch" && "$DEsel" =~ ^(KDE|GNOME|COSMIC)$ ]]; then utility+=(power-profiles-daemon) ; else utility+=(tlp) ; if [[ "${OSsel,,}" == "artix" ]]; then utility+=("tlp-${init_sys,,}") ; fi ; fi ; if [[ "$UCODEsel" == "intel-ucode" ]]; then utility+=(thermald) ; if [[ "${OSsel,,}" == "artix" ]]; then utility+=("thermald-${init_sys,,}") ; fi ; fi ; fi
 	if [[ "$VBTsel" -eq 1 ]]; then if [[ "$VM_TYPE" == "qemu" ]]; then utility+=(spice-vdagent) ; elif [[ "$VM_TYPE" == "vbox" ]]; then if [[ "${OSsel,,}" == "void" ]]; then utility+=(virtualbox-ose-guest) ; else utility+=(virtualbox-guest-utils) ; fi ; fi ; fi
 	if [[ "${GPUMANAGERsel,,}" == "envycontrol" ]]; then utility+=(envycontrol) ; elif [[ "${GPUMANAGERsel,,}" == "cardwire" ]]; then utility+=(cardwire) ; fi
@@ -369,30 +381,70 @@ UserSetup () {
 		fi
 		if [[ "$w_ok" -eq 0 && -f "${SCRIPT_DIR}/Conf_files/wallust" ]]; then echo "Codeberg failed. Using local fallback..." ; cp "${SCRIPT_DIR}/Conf_files/wallust" /mnt/usr/bin/wallust ; chmod +x /mnt/usr/bin/wallust ; w_ok=1 ; fi
 		if [[ "$w_ok" -eq 0 ]]; then echo "Fallback failed. Trying package managers..." ; if [[ "${OSsel,,}" == "void" ]]; then CR $PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" wallust || echo "Wallust installation failed." ; else CR_USER "trizen -S --noconfirm wallust" || echo "Wallust installation failed." ; fi ; fi
+		if [[ "$SHELLsel" == "Quickshell" ]] && ! CR which quickshell &>/dev/null; then
+			if [[ "${OSsel,,}" != "void" ]]; then CR_USER "trizen -S --noconfirm quickshell-git" || echo "Quickshell installation failed." ; fi
+		fi
 		echo "Refining user..." ; mkdir -p /mnt/home/"$UNsel"/{.config/hypr,.cache}
 		for conf in "${SCRIPT_DIR}/Conf_files/"*; do
-			if [[ -d "$conf" && ! "$conf" =~ (Hyprland|Niri|Hyprlock)$ ]]; then local bname ; bname=$(basename "$conf") ; cp -rT "$conf" /mnt/home/"$UNsel"/.config/"${bname,,}" ; fi
+			if [[ -d "$conf" && ! "$conf" =~ (Hyprland|Niri|Hyprlock|Mango)$ ]]; then
+				local bname ; bname=$(basename "$conf")
+				if [[ "$SHELLsel" == "Quickshell" && "$bname" =~ ^(Waybar|Swaync|Fuzzel)$ ]]; then continue ; fi
+				if [[ "$SHELLsel" != "Quickshell" && "$bname" == "Quickshell" ]]; then continue ; fi
+				cp -rT "$conf" /mnt/home/"$UNsel"/.config/"${bname,,}"
+			fi
 		done
-		touch /mnt/home/"$UNsel"/.config/fuzzel/colors.ini /mnt/home/"$UNsel"/.config/wallust/colors-waybar.css
 		echo -e '$background = rgb(1e1e2e)\n$foreground = rgb(cdd6f4)\n$color4 = rgb(89b4fa)\n$color6 = rgb(94e2d5)' > /mnt/home/"$UNsel"/.config/hypr/colors.conf
-		for f in hypridle.conf hyprlock.conf; do if [[ -f "${SCRIPT_DIR}/Conf_files/Hyprlock/$f" ]]; then cp "${SCRIPT_DIR}/Conf_files/Hyprlock/$f" /mnt/home/"$UNsel"/.config/hypr/ ; fi ; done
+		if [[ -f "${SCRIPT_DIR}/Conf_files/Hyprlock/hypridle.conf" ]]; then cp "${SCRIPT_DIR}/Conf_files/Hyprlock/hypridle.conf" /mnt/home/"$UNsel"/.config/hypr/ ; fi
 		chmod +x /mnt/home/"$UNsel"/.config/wallpapers/theme-switcher.sh
-		echo -e "auth required pam_unix.so nullok\naccount required pam_unix.so\npassword required pam_unix.so\nsession required pam_unix.so" > /mnt/etc/pam.d/hyprlock
+		local pam_str="auth required pam_unix.so nullok\naccount required pam_unix.so\npassword required pam_unix.so\nsession required pam_unix.so"
 		local cfg="/mnt/home/$UNsel/.config/wallust/templates/colors-niri.conf"
 		if [[ "$DEsel" == "Niri" && ! -f "$cfg" ]]; then
 			mkdir -p /mnt/home/"$UNsel"/.config/niri ; cp -rT "${SCRIPT_DIR}/Conf_files/Niri" /mnt/home/"$UNsel"/.config/niri
 			cfg="/mnt/home/$UNsel/.config/niri/config.kdl"
 		elif [[ "$DEsel" == "Hyprland" ]]; then
-			cp -rT "${SCRIPT_DIR}/Conf_files/Hyprland" /mnt/home/"$UNsel"/.config/hypr ; touch /mnt/home/"$UNsel"/.config/hypr/hyprpaper.conf
+			cp -rT "${SCRIPT_DIR}/Conf_files/Hyprland" /mnt/home/"$UNsel"/.config/hypr
 			cfg="/mnt/home/$UNsel/.config/hypr/hyprland.conf"
+		fi
+		if [[ "$SHELLsel" == "Quickshell" ]]; then
+			echo -e "$pam_str" > /mnt/etc/pam.d/quickshell
+			mkdir -p /mnt/home/"$UNsel"/.config/quickshell/lock
+			printf '{\n\t"wallpaper": "",\n\t"background": "#1e1e2e",\n\t"foreground": "#cdd6f4",\n\t"color0": "#1e1e2e",\n\t"color1": "#f38ba8",\n\t"color2": "#a6e3a1",\n\t"color3": "#f9e2af",\n\t"color4": "#89b4fa",\n\t"color5": "#cba6f7",\n\t"color6": "#94e2d5",\n\t"color7": "#bac2de",\n\t"color8": "#585b70"\n}\n' > /mnt/home/"$UNsel"/.config/quickshell/colors.json
+			local qs_run="env QSG_RHI_BACKEND=opengl quickshell" ; local qs_niri='"env" "QSG_RHI_BACKEND=opengl" "quickshell"'
+			if [[ "$VBTsel" -eq 1 ]]; then
+				qs_run="env -u LIBGL_ALWAYS_SOFTWARE QSG_RHI_BACKEND=opengl QSG_RENDER_LOOP=basic quickshell"
+				qs_niri='"env" "-u" "LIBGL_ALWAYS_SOFTWARE" "QSG_RHI_BACKEND=opengl" "QSG_RENDER_LOOP=basic" "quickshell"'
+			fi
+			sed -i "s|lock_cmd = .*|lock_cmd = pidof -x quickshell-lock \|\| $qs_run -p ~/.config/quickshell/lock|" /mnt/home/"$UNsel"/.config/hypr/hypridle.conf
+			if [[ "$DEsel" == "Niri" ]]; then
+				sed -i -e "s|spawn-at-startup \"waybar\"|spawn-at-startup $qs_niri|" \
+					-e '/spawn-at-startup "swaync"/d' \
+					-e '/spawn-at-startup "awww-daemon"/d' \
+					-e 's|spawn "fuzzel"|spawn "quickshell" "ipc" "call" "launcher" "toggle"|g' \
+					-e "s|spawn \"hyprlock\"|spawn $qs_niri \"-p\" \"/home/$UNsel/.config/quickshell/lock\"|g" \
+					-e 's|spawn "swaync-client" "-t" "-sw"|spawn "quickshell" "ipc" "call" "controlcenter" "toggle"|g' "$cfg"
+			else
+				sed -i -e "s|exec-once = waybar|exec-once = $qs_run|" \
+					-e '/exec-once = swaync/d' \
+					-e 's|exec-once = hyprpaper & |exec-once = |' \
+					-e 's|\$menu = fuzzel|\$menu = quickshell ipc call launcher toggle|' \
+					-e "s|exec, hyprlock|exec, $qs_run -p ~/.config/quickshell/lock|g" \
+					-e 's|exec, swaync-client -t -sw|exec, quickshell ipc call controlcenter toggle|g' "$cfg"
+			fi
+		else
+			echo -e "$pam_str" > /mnt/etc/pam.d/hyprlock
+			touch /mnt/home/"$UNsel"/.config/fuzzel/colors.ini /mnt/home/"$UNsel"/.config/wallust/colors-waybar.css
+			if [[ "$DEsel" == "Hyprland" ]]; then touch /mnt/home/"$UNsel"/.config/hypr/hyprpaper.conf ; fi
+			if [[ -f "${SCRIPT_DIR}/Conf_files/Hyprlock/hyprlock.conf" ]]; then cp "${SCRIPT_DIR}/Conf_files/Hyprlock/hyprlock.conf" /mnt/home/"$UNsel"/.config/hypr/ ; fi
 		fi
 		if [[ "$VBTsel" -eq 1 ]]; then
 			if [[ "$VM_TYPE" == "qemu" ]]; then printf '#!/bin/bash\npkill -x spice-vdagent 2>/dev/null\nexec spice-vdagent\n' > /mnt/usr/bin/vm-clipboard
 			else printf '#!/bin/bash\nfor pid in $(pgrep -u "$USER" -x vm-clipboard); do [[ "$pid" != "$$" && "$pid" != "$PPID" ]] && kill "$pid" 2>/dev/null; done\npkill -x VBoxClient 2>/dev/null\nsleep 1\nVBoxClient --clipboard\nold_x="" ; old_w=""\nwhile sleep 0.5; do\n\tpgrep -u "$USER" -x "niri|Hyprland" >/dev/null || exit 0\n\tx=$(xclip -o -selection clipboard -t UTF8_STRING 2>/dev/null || true)\n\tw=$(wl-paste -n 2>/dev/null || true)\n\tif [[ -n "$x" && "$x" != "$old_x" ]]; then old_x="$x"; old_w="$x"; printf "%%s" "$x" | wl-copy\n\telif [[ -n "$w" && "$w" != "$old_w" ]]; then old_w="$w"; old_x="$w"; printf "%%s" "$w" | xclip -selection clipboard -t UTF8_STRING; fi\ndone\n' > /mnt/usr/bin/vm-clipboard ; fi
 			chmod +x /mnt/usr/bin/vm-clipboard
-			sed -i 's/blur_passes = 3/blur_passes = 0/' /mnt/home/"$UNsel"/.config/hypr/hyprlock.conf
-			sed -i 's/&& hyprlock/\&\& env -u LIBGL_ALWAYS_SOFTWARE hyprlock/g; s/; hyprlock/; env -u LIBGL_ALWAYS_SOFTWARE hyprlock/g; s/) hyprlock/) env -u LIBGL_ALWAYS_SOFTWARE hyprlock/g' /mnt/home/"$UNsel"/.config/waybar/config.jsonc /mnt/home/"$UNsel"/.config/swaync/config.json /mnt/home/"$UNsel"/.config/hypr/hypridle.conf
-			sed -i 's/spawn "hyprlock"/spawn "env" "-u" "LIBGL_ALWAYS_SOFTWARE" "hyprlock"/g; s/exec, hyprlock/exec, env -u LIBGL_ALWAYS_SOFTWARE hyprlock/g' "$cfg"
+			if [[ "$SHELLsel" != "Quickshell" ]]; then
+				sed -i 's/blur_passes = 3/blur_passes = 0/' /mnt/home/"$UNsel"/.config/hypr/hyprlock.conf
+				sed -i 's/&& hyprlock/\&\& env -u LIBGL_ALWAYS_SOFTWARE hyprlock/g; s/; hyprlock/; env -u LIBGL_ALWAYS_SOFTWARE hyprlock/g; s/) hyprlock/) env -u LIBGL_ALWAYS_SOFTWARE hyprlock/g' /mnt/home/"$UNsel"/.config/waybar/config.jsonc /mnt/home/"$UNsel"/.config/swaync/config.json /mnt/home/"$UNsel"/.config/hypr/hypridle.conf
+				sed -i 's/spawn "hyprlock"/spawn "env" "-u" "LIBGL_ALWAYS_SOFTWARE" "hyprlock"/g; s/exec, hyprlock/exec, env -u LIBGL_ALWAYS_SOFTWARE hyprlock/g' "$cfg"
+			fi
 			if [[ "$DEsel" == "Niri" ]]; then
 				if grep -q "environment *{" "$cfg"; then sed -i '/environment *{/a\	LIBGL_ALWAYS_SOFTWARE "1"' "$cfg" ; else echo -e '\nenvironment {\n	LIBGL_ALWAYS_SOFTWARE "1"\n}' >> "$cfg" ; fi
 				echo -e '\noutput "Virtual-1" {\n	mode "1440x900"\n}' >> "$cfg"
@@ -490,7 +542,7 @@ InstallationSetup () {
 		for s in "${Personalization[@]}"; do "$s" ; done
 	fi
 	while true; do
-		local sum="\n=== CONFIGURATION SUMMARY ===\nOS: $OSsel | Init: $INITsel | Kernel: $KSel | Initramfs: $IRFSetup ($IRFSMode) | Bootloader: $BLsel\nOS Drive: $DRIVE | Sec. Drive: ${ADDITIONAL_DRIVE:-None}\nUser: $UNsel | Hostname: $HNsel | Locale: $LOCsel | Language: $LANGsel | Timezone: $TZsel\nFilesystem: $FSsel | Partition ID: $PIDsel | LUKS: $LUKS_ENC\nDesktop: $DEsel | DM: $DMsel\n"
+		local sum="\n=== CONFIGURATION SUMMARY ===\nOS: $OSsel | Init: $INITsel | Kernel: $KSel | Initramfs: $IRFSetup ($IRFSMode) | Bootloader: $BLsel\nOS Drive: $DRIVE | Sec. Drive: ${ADDITIONAL_DRIVE:-None}\nUser: $UNsel | Hostname: $HNsel | Locale: $LOCsel | Language: $LANGsel | Timezone: $TZsel\nFilesystem: $FSsel | Partition ID: $PIDsel | LUKS: $LUKS_ENC\nDesktop: $DEsel | Shell: ${SHELLsel:-None} | DM: $DMsel\n"
 		if [[ -n "$UCODEsel" ]]; then sum+="Microcode: $UCODEsel\n" ; fi
 		if [[ ${#nvidiadrivers[@]} -gt 0 ]]; then sum+="NVIDIA Driver: ${NVsel:-PROPRIETARY} | Manager: $GPUMANAGERsel\n" ; fi
 		if [[ ${#amddrivers[@]} -gt 0 ]]; then sum+="AMD Drivers included\n" ; fi
@@ -498,7 +550,9 @@ InstallationSetup () {
 		echo -e "${sum}============================="
 		YesNoSel "Is this configuration correct to proceed with partitioning?"
 		if [[ "$CC" -eq 1 ]]; then echo "Proceeding with installation..." ; break ; fi
-		local edit_options=( "Drive Selection" "Kernel" "Initramfs" "Initramfs Mode" "Bootloader" "Hostname" "Username" "Locale" "Language" "Timezone" "Filesystem" "Partition ID" "LUKS" "Desktop" "Display Manager" )
+		local edit_options=( "Drive Selection" "Kernel" "Initramfs" "Initramfs Mode" "Bootloader" "Hostname" "Username" "Locale" "Language" "Timezone" "Filesystem" "Partition ID" "LUKS" "Desktop" )
+		if [[ "$DEsel" =~ ^(Hyprland|Niri)$ ]]; then edit_options+=( "Shell" ) ; fi
+		edit_options+=( "Display Manager" )
 		if [[ "${OSsel,,}" == "artix" ]]; then edit_options+=( "Init System" "Arch Repos" ) ; fi
 		if [[ "${OSsel,,}" == "void" ]]; then edit_options+=( "Library" "Install Method" ) ; fi
 		if [[ "$HAS_NVIDIA" -eq 1 ]]; then edit_options+=( "NVIDIA Driver" "GPU Manager" ) ; fi
@@ -519,6 +573,7 @@ InstallationSetup () {
 			"Partition ID") PartIDSel ;;
 			"LUKS") LUKSSel ;;
 			"Desktop") DesktopEnvSel ;;
+			"Shell") ShellSel ;;
 			"Display Manager") DisplayManagerSel ;;
 			"Init System") InitSystemSel ;;
 			"Arch Repos") ArchRepoSel ;;
