@@ -23,3 +23,7 @@ target = "~/.config/wallust/colors-waybar.css"
 [templates.niri]
 template = "colors-niri.conf"
 target = "~/.config/niri/config.kdl"
+
+[templates.quickshell]
+template = "colors-quickshell.json"
+target = "~/.config/quickshell/colors.json"
