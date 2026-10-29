@@ -150,7 +150,11 @@ UEFIsel () {
 }
 ArchRepoSel() { YesNoSel "Do you want Arch repositories as well as Artix repositories?" ; if [[ "$CC" -eq 1 ]]; then ARCHrepo=1 ; echo "OK, adding Arch repositories!" ; else ARCHrepo='' ; echo "Proceeding without them..." ; fi ; }
 BootloaderSel() { if [[ "$UEFImode" -eq 0 ]]; then BLsel="grub" ; echo "BIOS mode: GRUB selected automatically" ; return 0 ; fi ; local bl_options=( "refind" "grub" "efistub" "limine" ) ; if [[ "${OSsel,,}" == "arch" ]]; then bl_options+=( "systemd-boot" "uki" ) ; fi ; MenuSel "BLsel" "Select Bootloader" "${bl_options[@]}" ; }
-DesktopEnvSel() { MenuSel "DEsel" "Select Desktop Environment / Window Manager" "KDE" "GNOME" "LXQt" "COSMIC" "Hyprland" "Niri" "None" ; }
+DesktopEnvSel() {
+	MenuSel "DEsel" "Select Desktop Environment / Window Manager" "KDE" "GNOME" "LXQt" "COSMIC" "Hyprland" "Niri" "None"
+	if [[ "$DEsel" =~ ^(Hyprland|Niri)$ ]]; then MenuSel "SHELLsel" "Select Desktop Shell for $DEsel" "Traditional (Waybar + Swaync + Fuzzel)" "Quickshell" ; if [[ "$SHELLsel" == "Traditional"* ]]; then SHELLsel="Traditional" ; fi
+	else SHELLsel="None" ; fi
+}
 DisplayManagerSel() { if [[ "$DEsel" == "GNOME" ]]; then DMsel="GDM" ; elif [[ "$DEsel" == "KDE" ]]; then DMsel="SDDM" ; else MenuSel "DMsel" "Select Display Manager" "Ly" "Greetd" "LightDM" "None" ; fi ; }
 FilesystemSel() { MenuSel "FSsel" "Select filesystem for ROOT" "ext4" "btrfs" ; }
 HostnameSel() { TextPromptSel "HNsel" "Enter preferred hostname" ; }
