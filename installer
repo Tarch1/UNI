@@ -396,7 +396,6 @@ UserSetup () {
 		echo -e '$background = rgb(1e1e2e)\n$foreground = rgb(cdd6f4)\n$color4 = rgb(89b4fa)\n$color6 = rgb(94e2d5)' > /mnt/home/"$UNsel"/.config/hypr/colors.conf
 		if [[ -f "${SCRIPT_DIR}/Conf_files/Hyprlock/hypridle.conf" ]]; then cp "${SCRIPT_DIR}/Conf_files/Hyprlock/hypridle.conf" /mnt/home/"$UNsel"/.config/hypr/ ; fi
 		chmod +x /mnt/home/"$UNsel"/.config/wallpapers/theme-switcher.sh
-		local pam_str="auth required pam_unix.so nullok\naccount required pam_unix.so\npassword required pam_unix.so\nsession required pam_unix.so"
 		local cfg="/mnt/home/$UNsel/.config/wallust/templates/colors-niri.conf"
 		if [[ "$DEsel" == "Niri" && ! -f "$cfg" ]]; then
 			mkdir -p /mnt/home/"$UNsel"/.config/niri ; cp -rT "${SCRIPT_DIR}/Conf_files/Niri" /mnt/home/"$UNsel"/.config/niri
@@ -406,7 +405,7 @@ UserSetup () {
 			cfg="/mnt/home/$UNsel/.config/hypr/hyprland.conf"
 		fi
 		if [[ "$SHELLsel" == "Quickshell" ]]; then
-			echo -e "$pam_str" > /mnt/etc/pam.d/quickshell
+			echo "auth required pam_unix.so nullok" > /mnt/etc/pam.d/quickshell
 			mkdir -p /mnt/home/"$UNsel"/.config/quickshell/lock
 			printf '{\n\t"wallpaper": "",\n\t"background": "#1e1e2e",\n\t"foreground": "#cdd6f4",\n\t"color0": "#1e1e2e",\n\t"color1": "#f38ba8",\n\t"color2": "#a6e3a1",\n\t"color3": "#f9e2af",\n\t"color4": "#89b4fa",\n\t"color5": "#cba6f7",\n\t"color6": "#94e2d5",\n\t"color7": "#bac2de",\n\t"color8": "#585b70"\n}\n' > /mnt/home/"$UNsel"/.config/quickshell/colors.json
 			local qs_run="env QSG_RHI_BACKEND=opengl quickshell" ; local qs_niri='"env" "QSG_RHI_BACKEND=opengl" "quickshell"'
@@ -414,7 +413,7 @@ UserSetup () {
 				qs_run="env -u LIBGL_ALWAYS_SOFTWARE QSG_RHI_BACKEND=opengl QSG_RENDER_LOOP=basic quickshell"
 				qs_niri='"env" "-u" "LIBGL_ALWAYS_SOFTWARE" "QSG_RHI_BACKEND=opengl" "QSG_RENDER_LOOP=basic" "quickshell"'
 			fi
-			sed -i "s|lock_cmd = .*|lock_cmd = pidof -x quickshell-lock \|\| $qs_run -p ~/.config/quickshell/lock|" /mnt/home/"$UNsel"/.config/hypr/hypridle.conf
+			sed -i "s|lock_cmd = .*|lock_cmd = pgrep -u \$USER -f 'quickshell/lock' >/dev/null \|\| $qs_run -p ~/.config/quickshell/lock|" /mnt/home/"$UNsel"/.config/hypr/hypridle.conf
 			if [[ "$DEsel" == "Niri" ]]; then
 				sed -i -e "s|spawn-at-startup \"waybar\"|spawn-at-startup $qs_niri|" \
 					-e '/spawn-at-startup "swaync"/d' \
@@ -431,7 +430,7 @@ UserSetup () {
 					-e 's|exec, swaync-client -t -sw|exec, quickshell ipc call controlcenter toggle|g' "$cfg"
 			fi
 		else
-			echo -e "$pam_str" > /mnt/etc/pam.d/hyprlock
+			echo -e "auth required pam_unix.so nullok\naccount required pam_unix.so\npassword required pam_unix.so\nsession required pam_unix.so" > /mnt/etc/pam.d/hyprlock
 			touch /mnt/home/"$UNsel"/.config/fuzzel/colors.ini /mnt/home/"$UNsel"/.config/wallust/colors-waybar.css
 			if [[ "$DEsel" == "Hyprland" ]]; then touch /mnt/home/"$UNsel"/.config/hypr/hyprpaper.conf ; fi
 			if [[ -f "${SCRIPT_DIR}/Conf_files/Hyprlock/hyprlock.conf" ]]; then cp "${SCRIPT_DIR}/Conf_files/Hyprlock/hyprlock.conf" /mnt/home/"$UNsel"/.config/hypr/ ; fi
