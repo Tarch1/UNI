@@ -94,26 +94,24 @@ DriveSelection() {
 		esac
 	fi
 }
-NvidiaSel () {
-	if [[ "${OSsel,,}" == "void" ]]; then
-		if [[ "$LIBsel" == "MUSL" ]]; then NVsel="MESA" ; GPUMANAGERsel="None" ; echo "MUSL selection detected, forcing Mesa/Nouveau." ; return 0 ; fi
-		MenuSel "NVsel" "NVIDIA gpu found, choose driver" "PROPRIETARY" "MESA"
-	else
-		MenuSel "NVsel" "NVIDIA gpu found, choose driver" "OPEN" "NOUVEAU" "PROPRIETARY" "MESA"
-	fi
-	if [[ "$NVsel" =~ ^(OPEN|PROPRIETARY)$ ]]; then
-		MenuSel "GPUMANAGERsel" "Select NVIDIA Optimus Manager" "Native" "Envycontrol" "Cardwire"
-	else
-		GPUMANAGERsel="None"
-	fi
-}
 GPUsel () {
 	echo "Detecting video chipset..."
 	HAS_AMD=0 ; HAS_NVIDIA=0 ; NVsel="None" ; GPUMANAGERsel="None"
 	local gpu_info ; if ! gpu_info=$(echo "$SYS_LSPCI" | grep -Ei 'VGA|3D'); then gpu_info="" ; fi
 	if [[ "$gpu_info" =~ (AMD|Radeon) ]]; then HAS_AMD=1 ; echo "Detected AMD/Radeon GPU" ; fi
 	if [[ "$gpu_info" =~ (VMware|VirtualBox|Virtio|QXL) ]]; then echo "VM detected: Default Mesa driver will be used" ; fi
-	if [[ "$gpu_info" =~ NVIDIA ]]; then HAS_NVIDIA=1 ; NvidiaSel ; fi
+	if [[ "$gpu_info" =~ NVIDIA ]]; then
+		HAS_NVIDIA=1
+		if [[ "${OSsel,,}" == "void" ]]; then
+			if [[ "$LIBsel" == "MUSL" ]]; then NVsel="MESA" ; echo "MUSL selection detected, forcing Mesa/Nouveau."
+			else MenuSel "NVsel" "NVIDIA gpu found, choose driver" "PROPRIETARY" "MESA" ; fi
+		else
+			MenuSel "NVsel" "NVIDIA gpu found, choose driver" "OPEN" "NOUVEAU" "PROPRIETARY" "MESA"
+		fi
+		if [[ "$NVsel" =~ ^(OPEN\vert{}PROPRIETARY)$ ]]; then
+			MenuSel "GPUMANAGERsel" "Select NVIDIA Optimus Manager" "Native" "Envycontrol" "Cardwire"
+		fi
+	fi
 	if [[ ! "$gpu_info" =~ (AMD|Radeon|VMware|VirtualBox|Virtio|QXL|NVIDIA) ]]; then echo "Generic/Intel GPU: Mesa will be used" ; fi
 }
 LUKSSel () {
