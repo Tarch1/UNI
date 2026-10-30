@@ -32,6 +32,7 @@ DiskPartition() {
 	if grep -qs '/mnt' /proc/mounts; then echo "[i] Found active mount point in /mnt. Unmounting..." ; umount -R /mnt ; fi
 	if [[ $(wc -l < /proc/swaps) -gt 1 ]]; then echo "[i] Found active Swap. Disabling..." ; swapoff -a ; fi
 	for dev in /dev/mapper/crypt*; do [[ -b "$dev" ]] && cryptsetup close "${dev##*/}" ; done
+	if $PKGmanager$PKGchk ntfs-3g &>/dev/null && ! command -v mkfs.ntfs &>/dev/null; then $PKGmanager$PKGrmv$PKGfrc "${PKGrsk[@]}" ntfs-3g || true ; fi
 	$PKGmanager$PKGinst "${PKGskp[@]}" "${fs[@]}"
 	for p in "$DRIVE"?*; do if grep -qs "^$p " /proc/mounts; then echo "[i] Unmounting active partition $p..." ; umount "$p" ; fi ; done
 	sgdisk -ozZ "$DRIVE"
@@ -112,10 +113,17 @@ FileSystemFormat() {
 					CRYPT_ADD_MAP+=("cryptdata:$(blkid -s UUID -o value "$part")")
 				fi
 				local flags=(-f -L)
-				if [[ "$ADD_FS" == "ext4" ]]; then flags=(-F -L) ; elif [[ "$ADD_FS" == "exfat" ]]; then flags=(-n) ; fi
+				if [[ "$ADD_FS" == "ext4" ]]; then flags=(-F -L) ; elif [[ "$ADD_FS" == "ntfs" ]]; then flags=(-f -F -L) ; elif [[ "$ADD_FS" == "exfat" ]]; then flags=(-n) ; fi
 				mkfs."$ADD_FS" "${flags[@]}" "$ADD_LABEL" "$target_add"
 			else
 				if grep -qs "^$part " /proc/mounts; then umount "$part" ; fi
+				local p_type ; p_type=$(blkid -s TYPE -o value "$part" 2>/dev/null || true)
+				if [[ "$p_type" == "crypto_LUKS" ]]; then
+					local cname="cryptdata$((idx+1))"
+					if [[ -n "$LUKS_PASS" ]] && echo -n "$LUKS_PASS" | cryptsetup luksOpen "$part" "$cname" -d - 2>/dev/null; then CRYPT_ADD_MAP+=("$cname:$(blkid -s UUID -o value "$part")")
+					else echo "Unlocking existing encrypted partition $part..." ; until cryptsetup luksOpen "$part" "$cname"; do echo "Try again..." ; done ; fi
+					target_add="/dev/mapper/$cname"
+				fi
 			fi
 			local mnt_name="HDD"
 			if [[ ${#ADD_PARTS[@]} -gt 1 ]]; then
@@ -200,7 +208,7 @@ PKGcheck () {
 	if [[ "$CPU_TYPE" == "Intel" ]]; then UCODEsel="intel-ucode"
 	elif [[ "$CPU_TYPE" == "AMD" ]]; then if [[ "${OSsel,,}" == "void" ]]; then UCODEsel="linux-firmware-amd" ; else UCODEsel="amd-ucode" ; fi ; fi
 	if [[ -n "$UCODEsel" ]]; then microcode=("$UCODEsel") ; fi
-	if [[ "$HAS_AMD" -eq 1 ]]; then	if [[ "${OSsel,,}" == "void" ]]; then amddrivers=(mesa-dri vulkan-loader mesa-vulkan-radeon) ; else amddrivers=(mesa vulkan-radeon) ; fi ; fi
+	if [[ "$HAS_AMD" -eq 1 ]]; then if [[ "${OSsel,,}" == "void" ]]; then amddrivers=(mesa-dri vulkan-loader mesa-vulkan-radeon) ; else amddrivers=(mesa vulkan-radeon) ; fi ; fi
 	if [[ "$HAS_NVIDIA" -eq 1 && "$NVsel" =~ ^(OPEN|PROPRIETARY)$ ]]; then
 		if [[ "${OSsel,,}" == "void" ]]; then
 			if [[ "$LIBsel" != "MUSL" ]]; then nvidiadrivers=(nvidia nvidia-libs-32bit) ; fi
@@ -236,7 +244,7 @@ PKGcheck () {
 	if [[ "${OSsel,,}" == "artix" ]]; then if [[ "${DMsel,,}" != "none" ]]; then displaymanager+=("${DMsel,,}-${init_sys,,}") ; fi ; fi
 	filemanager=(yazi pcmanfm-qt tumbler file-roller android-tools) ; if [[ "${OSsel,,}" != "void" ]]; then filemanager+=(gvfs-mtp) ; fi
 	if [[ "${OSsel,,}" == "void" ]]; then fonts=(nerd-fonts) ; else fonts=(ttf-jetbrains-mono-nerd) ; fi
-	fs=(dialog mtools parted gptfdisk dosfstools ntfs-3g)
+	fs=(dialog mtools parted gptfdisk dosfstools exfatprogs ntfs-3g) ; if [[ "${OSsel,,}" != "void" ]]; then fs+=(ntfsprogs) ; fi
 	if [[ "${BLsel,,}" == "grub" ]]; then grub=(grub) ; else grub=() ; fi
 	if [[ "$FSsel" == "btrfs" ]]; then if [[ "${OSsel,,}" != "void" ]]; then grubbtrfs=(grub-btrfs) ; else grubbtrfs=() ; fi ; else grubbtrfs=() ; fi
 	if [[ "${BLsel,,}" == "limine" ]]; then limine=(limine) ; else limine=() ; fi
