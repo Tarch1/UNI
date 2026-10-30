@@ -11,9 +11,12 @@ MenuSel () {
 	done
 }
 TextPromptSel () {
-	local -n var_name="$1" ; local prompt_msg="$2" ; local input_val
+	local -n var_name="$1" ; local prompt_msg="$2" ; local default_val="${3:-}" ; local input_val
 	while true; do
 		read -rp "$prompt_msg: " input_val
+		if [[ -z "$input_val" ]]; then
+			if [[ -n "$default_val" ]]; then input_val="$default_val" ; else echo "Input cannot be empty." ; continue ; fi
+		fi
 		YesNoSel "Confirm << $input_val >> is correct?"
 		if [[ "$CC" -eq 1 ]]; then var_name="$input_val" ; break ; else echo "Let's try again..." ; fi
 	done
@@ -69,8 +72,7 @@ DriveSelection() {
 				MenuSel "choice_str" "Select Secondary Drive to Format" "${add_disp[@]}"
 				ADDITIONAL_DRIVE="${choice_str%% *}"
 				MenuSel "ADD_FS" "Select the filesystem for the secondary drive" "ext4" "btrfs" "exfat" "ntfs"
-				TextPromptSel "ADD_LABEL" "Enter label for the secondary drive (leave empty for 'DATA')"
-				if [[ -z "$ADD_LABEL" ]]; then ADD_LABEL="DATA" ; fi
+				TextPromptSel "ADD_LABEL" "Enter label for the secondary drive (leave empty for 'DATA')" "DATA"
 				;;
 			"Mount a single"*|"Mount ALL"*)
 				local part_opts=() part_devs=()
