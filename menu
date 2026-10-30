@@ -51,11 +51,45 @@ CPUsel () {
 	else CPU_TYPE="Unknown" ; echo "No microcode needed or unknown CPU" ; fi
 }
 DriveSelection() {
+	udevadm settle || true
 	local avail_disks=() display_options=() choice_str
+	local -A p_size=() p_fstype=() p_label=() p_used=() p_valid=()
+	local tmp_mnt="/tmp/drv_probe_$$"
+	mkdir -p "$tmp_mnt"
+	echo -e "\n--- Detected Drives & Partitions ---"
 	while read -r name size type; do
 		if [[ "$type" == "loop" || "$type" == "rom" ]]; then continue ; fi
-		avail_disks+=("$name") ; display_options+=("$name ($size)")
+		local model ; model=$(lsblk -dnpo MODEL "$name" 2>/dev/null | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+		avail_disks+=("$name") ; display_options+=("$name ($size${model:+ - $model})")
+		echo "* $name ($size${model:+ - $model})"
+		local has_p=0
+		while read -r pname ptype psize; do
+			if [[ "$ptype" != "part" ]]; then continue ; fi
+			has_p=1
+			local pfstype plabel pparttype used_str=""
+			pfstype=$(lsblk -dnpo FSTYPE "$pname" 2>/dev/null | tr -d ' ')
+			[[ -z "$pfstype" ]] && pfstype=$(blkid -s TYPE -o value "$pname" 2>/dev/null || true)
+			plabel=$(lsblk -dnpo LABEL "$pname" 2>/dev/null | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+			[[ -z "$plabel" ]] && plabel=$(blkid -s LABEL -o value "$pname" 2>/dev/null || true)
+			pparttype=$(lsblk -dnpo PARTTYPE "$pname" 2>/dev/null | tr -d ' ')
+			if [[ -n "$pfstype" && ! "$pfstype" =~ ^(swap|crypto_LUKS|LVM2_member)$ ]]; then
+				if grep -qs "^$pname " /proc/mounts; then
+					used_str=$(df -h "$pname" 2>/dev/null | awk 'NR==2 {printf "Used: %s / %s (%s)", $3, $2, $5}')
+				elif mount -o ro "$pname" "$tmp_mnt" 2>/dev/null; then
+					used_str=$(df -h "$tmp_mnt" 2>/dev/null | awk 'NR==2 {printf "Used: %s / %s (%s)", $3, $2, $5}')
+					umount "$tmp_mnt" 2>/dev/null || true
+				fi
+			fi
+			p_size["$pname"]="$psize" ; p_fstype["$pname"]="$pfstype" ; p_label["$pname"]="$plabel" ; p_used["$pname"]="$used_str"
+			if [[ -n "$pfstype" && ! "$pfstype" =~ ^(swap|LVM2_member)$ && "${pparttype,,}" != "c12a7328-f81f-11d2-ba4b-00a0c93ec93b" && "${pparttype,,}" != "21686148-6449-6e6f-744e-656564454649" ]] && ! [[ "$pfstype" == "vfat" && "${plabel^^}" =~ ^(EFI|ESP|BOOT)$ ]]; then
+				p_valid["$pname"]=1
+			fi
+			echo "  └─ $pname [$psize${used_str:+ | $used_str} | ${pfstype:-unformatted} | ${plabel:-no-label}]"
+		done < <(lsblk -lnpo NAME,TYPE,SIZE "$name" 2>/dev/null)
+		if [[ "$has_p" -eq 0 ]]; then echo "  └─ [Empty / Unpartitioned]" ; fi
 	done < <(lsblk -dpno NAME,SIZE,TYPE)
+	rmdir "$tmp_mnt" 2>/dev/null || true
+	echo "------------------------------------"
 	if [[ ${#avail_disks[@]} -eq 0 ]]; then echo "No drives detected!" ; exit 1 ; fi
 	MenuSel "choice_str" "Select Target Drive for OS" "${display_options[@]}"
 	DRIVE="${choice_str%% *}"
@@ -66,8 +100,23 @@ DriveSelection() {
 	done
 	ADD_SETUP=0 ; ADD_FORMAT=0 ; ADD_FS="" ; ADD_LABEL="" ; ADDITIONAL_DRIVE="" ; ADD_PARTS=()
 	if [[ ${#add_avail[@]} -gt 0 ]]; then
-		local sec_mode
-		MenuSel "sec_mode" "Secondary drive(s) detected: select action" "Format and mount a drive (Wipe data)" "Mount a single existing partition (Keep data)" "Mount ALL existing partitions (Keep data)" "Skip secondary drive(s)"
+		local part_opts=() part_devs=()
+		for d in "${add_avail[@]}"; do
+			while read -r pname ptype; do
+				if [[ "$ptype" == "part" && "${p_valid[$pname]:-0}" -eq 1 ]]; then
+					part_devs+=("$pname")
+					part_opts+=("$pname (${p_size[$pname]}${p_used[$pname]:+ | ${p_used[$pname]}} | ${p_fstype[$pname]}${p_label[$pname]:+ | ${p_label[$pname]}})")
+				fi
+			done < <(lsblk -lnpo NAME,TYPE "$d" 2>/dev/null)
+		done
+		local sec_mode sec_options=()
+		if [[ ${#part_devs[@]} -gt 0 ]]; then
+			sec_options=( "Format and mount a drive (Wipe data)" "Mount a single existing partition (Keep data)" "Mount ALL existing partitions (Keep data)" "Skip secondary drive(s)" )
+		else
+			echo -e "\n[i] No mountable data partitions found on secondary drive(s)."
+			sec_options=( "Format and mount a drive (Wipe data)" "Skip secondary drive(s)" )
+		fi
+		MenuSel "sec_mode" "Secondary drive(s) detected: select action" "${sec_options[@]}"
 		case "$sec_mode" in
 			"Format"*)
 				ADD_SETUP=1 ; ADD_FORMAT=1
@@ -76,20 +125,13 @@ DriveSelection() {
 				MenuSel "ADD_FS" "Select the filesystem for the secondary drive" "ext4" "btrfs" "exfat" "ntfs"
 				TextPromptSel "ADD_LABEL" "Enter label for the secondary drive (leave empty for 'DATA')" "DATA"
 				;;
-			"Mount a single"*|"Mount ALL"*)
-				local part_opts=() part_devs=()
-				while read -r pname ptype psize pfstype plabel; do
-					if [[ "$ptype" != "part" || -z "$pfstype" || "$pfstype" =~ ^(swap|crypto_LUKS)$ || "${plabel^^}" == "EFI" ]]; then continue ; fi
-					part_devs+=("$pname") ; part_opts+=("$pname ($psize - $pfstype${plabel:+ - $plabel})")
-				done < <(lsblk -lnpo NAME,TYPE,SIZE,FSTYPE,LABEL "${add_avail[@]}")
-				if [[ ${#part_devs[@]} -eq 0 ]]; then echo "No valid data partitions found on secondary drive(s). Skipping."
-				elif [[ "$sec_mode" == "Mount a single"* ]]; then
-					ADD_SETUP=1 ; ADD_FORMAT=0
-					MenuSel "choice_str" "Select Existing Partition to Mount" "${part_opts[@]}"
-					ADD_PARTS=("${choice_str%% *}") ; ADDITIONAL_DRIVE="${ADD_PARTS[0]}"
-				else
-					ADD_SETUP=1 ; ADD_FORMAT=0 ; ADD_PARTS=("${part_devs[@]}") ; ADDITIONAL_DRIVE="${ADD_PARTS[*]}"
-				fi
+			"Mount a single"*)
+				ADD_SETUP=1 ; ADD_FORMAT=0
+				MenuSel "choice_str" "Select Existing Partition to Mount" "${part_opts[@]}"
+				ADD_PARTS=("${choice_str%% *}") ; ADDITIONAL_DRIVE="${ADD_PARTS[0]}"
+				;;
+			"Mount ALL"*)
+				ADD_SETUP=1 ; ADD_FORMAT=0 ; ADD_PARTS=("${part_devs[@]}") ; ADDITIONAL_DRIVE="${ADD_PARTS[*]}"
 				;;
 		esac
 	fi
