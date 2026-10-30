@@ -196,8 +196,22 @@ SetupEnvironment () {
 }
 PKGcheck () {
 	echo "Initializing package groups..."
-	if [[ ! -v amddrivers ]]; then amddrivers=() ; fi ; if [[ ! -v nvidiadrivers ]]; then nvidiadrivers=() ; fi
-	if [[ "${OSsel,,}" == "artix" ]]; then if [[ ${#nvidiadrivers[@]} -gt 0 ]]; then nvidiadrivers+=("nvidia-utils-${init_sys,,}") ; fi ; fi
+	UCODEsel="" ; microcode=() ; amddrivers=() ; nvidiadrivers=()
+	if [[ "$CPU_TYPE" == "Intel" ]]; then UCODEsel="intel-ucode"
+	elif [[ "$CPU_TYPE" == "AMD" ]]; then if [[ "${OSsel,,}" == "void" ]]; then UCODEsel="linux-firmware-amd" ; else UCODEsel="amd-ucode" ; fi ; fi
+	if [[ -n "$UCODEsel" ]]; then microcode=("$UCODEsel") ; fi
+	if [[ "$HAS_AMD" -eq 1 ]]; then	if [[ "${OSsel,,}" == "void" ]]; then amddrivers=(mesa-dri vulkan-loader mesa-vulkan-radeon) ; else amddrivers=(mesa vulkan-radeon) ; fi ; fi
+	if [[ "$HAS_NVIDIA" -eq 1 && "$NVsel" =~ ^(OPEN|PROPRIETARY)$ ]]; then
+		if [[ "${OSsel,,}" == "void" ]]; then
+			if [[ "$LIBsel" != "MUSL" ]]; then nvidiadrivers=(nvidia nvidia-libs-32bit) ; fi
+		else
+			local nv_main="nvidia-dkms"
+			if [[ "$NVsel" == "OPEN" ]]; then if [[ "$KSel" == "linux" ]]; then nv_main="nvidia-open" ; else nv_main="nvidia-open-dkms" ; fi
+			elif [[ "$NVsel" == "PROPRIETARY" ]]; then if [[ "$KSel" == "linux" ]]; then nv_main="nvidia" ; elif [[ "$KSel" == "linux-lts" ]]; then nv_main="nvidia-lts" ; fi ; fi
+			nvidiadrivers=("${nv_main}" nvidia-prime nvidia-settings nvidia-utils lib32-nvidia-utils opencl-nvidia lib32-opencl-nvidia libxnvctrl libvdpau)
+			if [[ "${OSsel,,}" == "artix" ]]; then nvidiadrivers+=("nvidia-utils-${init_sys,,}") ; fi
+		fi
+	fi
 	apps=(kitty telegram-desktop firefox) ; if [[ "${OSsel,,}" != "void" ]]; then apps+=(profile-sync-daemon) ; fi
 	archive=(bzip2 cpio gzip xz 7zip tar unrar zip unzip zstd)
 	audio=(pipewire wireplumber) ; if [[ "${OSsel,,}" == "void" ]]; then audio+=(alsa-pipewire libjack-pipewire sof-firmware) ; else audio+=(pipewire-pulse pipewire-alsa pipewire-jack sof-firmware) ; fi
@@ -232,13 +246,12 @@ PKGcheck () {
 	kernel=("${KSel}" "${KSel}-headers") ; if [[ "${OSsel,,}" == "void" ]]; then kernel+=(linux-firmware-network) ; else kernel+=(linux-firmware) ; fi
 	if [[ "$IRFSetup" == "booster" ]]; then kernel+=(booster) ; elif [[ "$IRFSetup" == "dracut" ]]; then kernel+=(dracut) ; elif [[ "$IRFSetup" == "mkinitcpio" ]]; then kernel+=(mkinitcpio) ; fi
 	if [[ "${OSsel,,}" == "artix" ]]; then logind=(elogind elogind-"${init_sys,,}" "${init_sys,,}"-settingsd) ; elif [[ "${OSsel,,}" == "void" ]]; then logind=(seatd elogind) ; else logind=() ; fi
-	if [[ -n "$UCODEsel" ]]; then microcode=("$UCODEsel") ; else microcode=() ; fi
 	net=(iwd chrony) ; if [[ "${OSsel,,}" == "void" ]]; then net+=(NetworkManager) ; else net+=(networkmanager) ; fi ; if [[ "${OSsel,,}" == "artix" ]]; then net+=("iwd-${init_sys,,}" "chrony-${init_sys,,}" "networkmanager-${init_sys,,}") ; fi
 	print=(cups cups-pdf) ; if [[ "${OSsel,,}" == "void" ]]; then print+=(avahi-daemon cups-filters) ; else print+=(avahi system-config-printer) ; fi ; if [[ "${OSsel,,}" == "artix" ]]; then print+=("avahi-${init_sys,,}" "cups-${init_sys,,}") ; fi
 	utility=(imv featherpad libqalculate fd btop fwupd fastfetch grim slurp wl-clipboard xclip swappy brightnessctl playerctl pavucontrol xorg-xwayland)
 	if [[ "$DEsel" == "Niri" && "$SHELLsel" != "Quickshell" ]]; then utility+=(awww) ; fi
 	if [[ "${OSsel,,}" != "void" ]]; then utility+=(lact cowfortune pacman-contrib) ; fi ; if [[ "${OSsel,,}" == "artix" ]]; then if [[ "$LUKS_ENC" -eq 1 ]]; then utility+=("cryptsetup-${init_sys,,}") ; fi ; fi
-	if compgen -G "/sys/class/power_supply/BAT*" >/dev/null; then if [[ "${OSsel,,}" == "arch" && "$DEsel" =~ ^(KDE|GNOME|COSMIC)$ ]]; then utility+=(power-profiles-daemon) ; else utility+=(tlp) ; if [[ "${OSsel,,}" == "artix" ]]; then utility+=("tlp-${init_sys,,}") ; fi ; fi ; if [[ "$UCODEsel" == "intel-ucode" ]]; then utility+=(thermald) ; if [[ "${OSsel,,}" == "artix" ]]; then utility+=("thermald-${init_sys,,}") ; fi ; fi ; fi
+	if compgen -G "/sys/class/power_supply/BAT*" >/dev/null; then if [[ "${OSsel,,}" == "arch" && "$DEsel" =~ ^(KDE|GNOME|COSMIC)$ ]]; then utility+=(power-profiles-daemon) ; else utility+=(tlp) ; if [[ "${OSsel,,}" == "artix" ]]; then utility+=("tlp-${init_sys,,}") ; fi ; fi ; if [[ "$CPU_TYPE" == "Intel" ]]; then utility+=(thermald) ; if [[ "${OSsel,,}" == "artix" ]]; then utility+=("thermald-${init_sys,,}") ; fi ; fi ; fi
 	if [[ "$VBTsel" -eq 1 ]]; then if [[ "$VM_TYPE" == "qemu" ]]; then utility+=(spice-vdagent) ; elif [[ "$VM_TYPE" == "vbox" ]]; then if [[ "${OSsel,,}" == "void" ]]; then utility+=(virtualbox-ose-guest) ; else utility+=(virtualbox-guest-utils) ; fi ; fi ; fi
 	if [[ "${GPUMANAGERsel,,}" == "envycontrol" ]]; then utility+=(envycontrol) ; elif [[ "${GPUMANAGERsel,,}" == "cardwire" ]]; then utility+=(cardwire) ; fi
 	if [[ "${OSsel,,}" == "void" ]]; then vulkan=(vulkan-loader) ; else vulkan=(vulkan-icd-loader vulkan-intel vulkan-mesa-layers) ; fi
@@ -271,12 +284,12 @@ PackageInstall () {
 	CR $PKGmanager$PKGinst$PKGupd$PKGupg "${PKGskp[@]}" "${FinalPKGs[@]}"
 }
 KernelSetup () {
-	if [[ "$UCODEsel" == "intel-ucode" ]]; then modules+=(vmd) ; fi
+	if [[ "$CPU_TYPE" == "Intel" ]]; then modules+=(vmd) ; fi
 	if [[ ${#nvidiadrivers[@]} -gt 0 ]]; then modules+=(nvidia nvidia_modeset nvidia_uvm nvidia_drm) ; mkdir -p /mnt/etc/modprobe.d ; echo -e "blacklist nouveau\noptions nouveau modeset=0\noptions nvidia-drm modeset=1 fbdev=1\noptions nvidia NVreg_DynamicPowerManagement=0x02 NVreg_UsePageAttributeTable=1" > /mnt/etc/modprobe.d/nvidia.conf ; fi
 	local kver ; kver="$(basename "$(find /mnt/usr/lib/modules/ -maxdepth 1 -mindepth 1 -type d ! -name 'extramodules*' -print -quit)")"
 	case "$IRFSetup" in
 		dracut)			mkdir -p /mnt/etc/dracut.conf.d
-						if [[ "$UCODEsel" == "intel-ucode" ]]; then echo 'add_drivers+=" vmd "' > /mnt/etc/dracut.conf.d/vmd.conf ; fi
+						if [[ "$CPU_TYPE" == "Intel" ]]; then echo 'add_drivers+=" vmd "' > /mnt/etc/dracut.conf.d/vmd.conf ; fi
 						if [[ "$LUKS_ENC" -eq 1 ]]; then echo -e 'add_dracutmodules+=" crypt "\ninstall_items+=" /etc/crypttab /etc/crypt_key.bin "' > /mnt/etc/dracut.conf.d/crypt.conf ; fi
 						if [[ "$FSsel" == "btrfs" ]]; then echo 'add_dracutmodules+=" btrfs "' > /mnt/etc/dracut.conf.d/btrfs.conf ; fi
 						if [[ ${#nvidiadrivers[@]} -gt 0 ]]; then echo 'force_drivers+=" nvidia nvidia_modeset nvidia_uvm nvidia_drm "' > /mnt/etc/dracut.conf.d/nvidia.conf ; fi
@@ -308,7 +321,7 @@ ServiceSetup () {
 		arch)	Services+=( iwd NetworkManager chronyd cups avahi-daemon bluetooth paccache.timer ) ; if [[ -v nvidiadrivers && ${#nvidiadrivers[@]} -gt 0 ]]; then Services+=( nvidia-suspend nvidia-hibernate nvidia-resume nvidia-powerd ); fi ;;
 		void)	Services+=( iwd NetworkManager chronyd cupsd dbus elogind avahi-daemon bluetoothd seatd ) ;;
 	esac
-	if compgen -G "/sys/class/power_supply/BAT*" >/dev/null; then if [[ "${OSsel,,}" == "arch" && "$DEsel" =~ ^(KDE|GNOME|COSMIC)$ ]]; then Services+=( power-profiles-daemon ) ; else Services+=( tlp ) ; fi ; if [[ "$UCODEsel" == "intel-ucode" ]]; then Services+=( thermald ) ; fi ; fi
+	if compgen -G "/sys/class/power_supply/BAT*" >/dev/null; then if [[ "${OSsel,,}" == "arch" && "$DEsel" =~ ^(KDE|GNOME|COSMIC)$ ]]; then Services+=( power-profiles-daemon ) ; else Services+=( tlp ) ; fi ; if [[ "$CPU_TYPE" == "Intel" ]]; then Services+=( thermald ) ; fi ; fi
 	if [[ "$VBTsel" -eq 1 && "$VM_TYPE" == "vbox" && "${OSsel,,}" != "artix" ]]; then Services+=( vboxservice ) ; fi
 	if [[ "${DMsel,,}" =~ ^(ly|greetd|lightdm|sddm|gdm)$ ]]; then Services+=("${DMsel,,}") ; fi
 	if [[ "${GPUMANAGERsel,,}" == "cardwire" ]]; then
@@ -514,7 +527,7 @@ BootloaderSetup () {
 	esac
 }
 InstallationSetup () {
-	SYS_LSPCI=$(lspci || true) ; SYS_CPU=$(cat /proc/cpuinfo || true) ; VBTsel=0 ; VM_TYPE="none" ; HAS_NVIDIA=0
+	SYS_LSPCI=$(lspci || true) ; SYS_CPU=$(cat /proc/cpuinfo || true) ; VBTsel=0 ; VM_TYPE="none" ; HAS_NVIDIA=0 ; HAS_AMD=0 ; CPU_TYPE="Unknown"
 	if echo "$SYS_LSPCI" | grep -qEi "(VirtualBox)"; then VM_TYPE="vbox" ; VBTsel=1
 	elif echo "$SYS_LSPCI" | grep -qEi "(VMware|Virtio|QXL)"; then VM_TYPE="qemu" ; VBTsel=1 ; fi
 	echo "Synchronizing system clock..." ; local t_ok=0
@@ -542,9 +555,9 @@ InstallationSetup () {
 	fi
 	while true; do
 		local sum="\n=== CONFIGURATION SUMMARY ===\nOS: $OSsel | Init: $INITsel | Kernel: $KSel | Initramfs: $IRFSetup ($IRFSMode) | Bootloader: $BLsel\nOS Drive: $DRIVE | Sec. Drive: ${ADDITIONAL_DRIVE:-None}\nUser: $UNsel | Hostname: $HNsel | Locale: $LOCsel | Language: $LANGsel | Timezone: $TZsel\nFilesystem: $FSsel | Partition ID: $PIDsel | LUKS: $LUKS_ENC\nDesktop: $DEsel | Shell: ${SHELLsel:-None} | DM: $DMsel\n"
-		if [[ -n "$UCODEsel" ]]; then sum+="Microcode: $UCODEsel\n" ; fi
-		if [[ ${#nvidiadrivers[@]} -gt 0 ]]; then sum+="NVIDIA Driver: ${NVsel:-PROPRIETARY} | Manager: $GPUMANAGERsel\n" ; fi
-		if [[ ${#amddrivers[@]} -gt 0 ]]; then sum+="AMD Drivers included\n" ; fi
+		if [[ "$CPU_TYPE" != "Unknown" ]]; then sum+="CPU: $CPU_TYPE (Microcode enabled)\n" ; fi
+		if [[ "$HAS_NVIDIA" -eq 1 ]]; then sum+="NVIDIA Driver: $NVsel | Manager: $GPUMANAGERsel\n" ; fi
+		if [[ "$HAS_AMD" -eq 1 ]]; then sum+="AMD GPU: Detected (Mesa/RADV)\n" ; fi
 		if [[ "$VBTsel" -eq 1 ]]; then sum+="Virtual Machine Mode: ON ($VM_TYPE)\n" ; fi
 		echo -e "${sum}============================="
 		YesNoSel "Is this configuration correct to proceed with partitioning?"
@@ -554,12 +567,12 @@ InstallationSetup () {
 		edit_options+=( "Display Manager" )
 		if [[ "${OSsel,,}" == "artix" ]]; then edit_options+=( "Init System" "Arch Repos" ) ; fi
 		if [[ "${OSsel,,}" == "void" ]]; then edit_options+=( "Library" "Install Method" ) ; fi
-		if [[ "$HAS_NVIDIA" -eq 1 ]]; then edit_options+=( "NVIDIA Driver" "GPU Manager" ) ; fi
+		if [[ "$HAS_NVIDIA" -eq 1 ]]; then edit_options+=( "NVIDIA Driver" ) ; fi
 		edit_options+=( "Abort Installation" )
 		MenuSel "EDIT_CHOICE" "What would you like to change?" "${edit_options[@]}"
 		case "$EDIT_CHOICE" in
 			"Drive Selection") DriveSelection ;;
-			"Kernel") KernelSel ; if [[ "$HAS_NVIDIA" -eq 1 ]]; then NVDriverUpdate ; fi ;;
+			"Kernel") KernelSel ;;
 			"Initramfs") IRFsel ;;
 			"Initramfs Mode") IRFSModeSel ;;
 			"Bootloader") BootloaderSel ;;
@@ -576,10 +589,9 @@ InstallationSetup () {
 			"Display Manager") DisplayManagerSel ;;
 			"Init System") InitSystemSel ;;
 			"Arch Repos") ArchRepoSel ;;
-			"Library") LibrarySel ; if [[ "$HAS_NVIDIA" -eq 1 ]]; then NVDriverUpdate ; fi ;;
+			"Library") LibrarySel ; if [[ "$HAS_NVIDIA" -eq 1 && "$LIBsel" == "MUSL" ]]; then NVsel="MESA" ; GPUMANAGERsel="None" ; fi ;;
 			"Install Method") VoidInstMethod ;;
-			"NVIDIA Driver") MenuSel "NVsel" "Choose driver" "OPEN" "NOUVEAU" "PROPRIETARY" "MESA" ; NVDriverUpdate ;;
-			"GPU Manager") MenuSel "GPUMANAGERsel" "Select Optimus Manager" "Native" "Envycontrol" "Cardwire" ;;
+			"NVIDIA Driver") NvidiaSel ;;
 			"Abort Installation") exit 1 ;;
 		esac
 	done
