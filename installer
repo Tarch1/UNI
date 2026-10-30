@@ -244,7 +244,7 @@ PKGcheck () {
 	if [[ "${OSsel,,}" == "artix" ]]; then if [[ "${DMsel,,}" != "none" ]]; then displaymanager+=("${DMsel,,}-${init_sys,,}") ; fi ; fi
 	filemanager=(yazi pcmanfm-qt tumbler file-roller android-tools) ; if [[ "${OSsel,,}" != "void" ]]; then filemanager+=(gvfs-mtp) ; fi
 	if [[ "${OSsel,,}" == "void" ]]; then fonts=(nerd-fonts) ; else fonts=(ttf-jetbrains-mono-nerd) ; fi
-	fs=(dialog mtools parted gptfdisk dosfstools exfatprogs ntfs-3g) ; if [[ "${OSsel,,}" != "void" ]]; then fs+=(ntfsprogs) ; fi
+	fs=(dialog mtools parted gptfdisk dosfstools ntfs-3g) ; if [[ "${OSsel,,}" != "void" ]]; then fs+=(ntfsprogs) ; fi
 	if [[ "${BLsel,,}" == "grub" ]]; then grub=(grub) ; else grub=() ; fi
 	if [[ "$FSsel" == "btrfs" ]]; then if [[ "${OSsel,,}" != "void" ]]; then grubbtrfs=(grub-btrfs) ; else grubbtrfs=() ; fi ; else grubbtrfs=() ; fi
 	if [[ "${BLsel,,}" == "limine" ]]; then limine=(limine) ; else limine=() ; fi
@@ -562,7 +562,9 @@ InstallationSetup () {
 		for s in "${Personalization[@]}"; do "$s" ; done
 	fi
 	while true; do
-		local sum="\n=== CONFIGURATION SUMMARY ===\nOS: $OSsel | Init: $INITsel | Kernel: $KSel | Initramfs: $IRFSetup ($IRFSMode) | Bootloader: $BLsel\nOS Drive: $DRIVE | Sec. Drive: ${ADDITIONAL_DRIVE:-None}\nUser: $UNsel | Hostname: $HNsel | Locale: $LOCsel | Language: $LANGsel | Timezone: $TZsel\nFilesystem: $FSsel | Partition ID: $PIDsel | LUKS: $LUKS_ENC\nDesktop: $DEsel | Shell: ${SHELLsel:-None} | DM: $DMsel\n"
+		local sec_str="None" ; local luks_str="No" ; if [[ "$LUKS_ENC" -eq 1 ]]; then luks_str="Yes" ; fi
+		if [[ "$ADD_SETUP" -eq 1 ]]; then if [[ "$ADD_FORMAT" -eq 1 ]]; then sec_str="$ADDITIONAL_DRIVE (Format) | FS: $ADD_FS | Label: $ADD_LABEL | LUKS: $luks_str" ; else sec_str="${ADD_PARTS[*]} (Mount existing - Keep data)" ; fi ; fi
+		local sum="\n=== CONFIGURATION SUMMARY ===\nOS: $OSsel | Init: $INITsel | Kernel: $KSel | Initramfs: $IRFSetup ($IRFSMode) | Bootloader: $BLsel\nOS Drive: $DRIVE | FS: $FSsel | LUKS: $luks_str | ID: $PIDsel\nSec. Drive: $sec_str\nUser: $UNsel | Hostname: $HNsel | Locale: $LOCsel | Language: $LANGsel | Timezone: $TZsel\nDesktop: $DEsel | Shell: ${SHELLsel:-None} | DM: $DMsel\n"
 		if [[ "$CPU_TYPE" != "Unknown" ]]; then sum+="CPU: $CPU_TYPE (Microcode enabled)\n" ; fi
 		if [[ "$HAS_NVIDIA" -eq 1 ]]; then sum+="NVIDIA Driver: $NVsel | Manager: $GPUMANAGERsel\n" ; fi
 		if [[ "$HAS_AMD" -eq 1 ]]; then sum+="AMD GPU: Detected (Mesa/RADV)\n" ; fi
