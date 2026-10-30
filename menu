@@ -46,7 +46,9 @@ AutoOSsel () {
 }
 CPUsel () {
 	local cpu_info ; if ! cpu_info=$(echo "$SYS_CPU" | grep -m1 -Ei 'GenuineIntel|AuthenticAMD'); then cpu_info="" ; fi
-	if [[ "$cpu_info" =~ Intel ]]; then echo 'Installing Intel microcode' ; UCODEsel='intel-ucode' ; elif [[ "$cpu_info" =~ AMD ]]; then echo 'Installing AMD microcode' ; if [[ "${OSsel,,}" == "void" ]]; then UCODEsel='linux-firmware-amd' ; else UCODEsel='amd-ucode' ; fi ; else echo 'No microcode needed or unknown CPU' ; UCODEsel="" ; fi
+	if [[ "$cpu_info" =~ Intel ]]; then CPU_TYPE="Intel" ; echo "Detected Intel CPU"
+	elif [[ "$cpu_info" =~ AMD ]]; then CPU_TYPE="AMD" ; echo "Detected AMD CPU"
+	else CPU_TYPE="Unknown" ; echo "No microcode needed or unknown CPU" ; fi
 }
 DriveSelection() {
 	local avail_disks=() display_options=() choice_str
@@ -92,36 +94,27 @@ DriveSelection() {
 		esac
 	fi
 }
-NVDriverUpdate () {
+NvidiaSel () {
 	if [[ "${OSsel,,}" == "void" ]]; then
-		if [[ "$LIBsel" == "MUSL" ]]; then nvidiadrivers=() ; echo 'MUSL selection detected, forcing Mesa/Nouveau.' ; else nvidiadrivers=(nvidia nvidia-libs-32bit) ; fi
+		if [[ "$LIBsel" == "MUSL" ]]; then NVsel="MESA" ; GPUMANAGERsel="None" ; echo "MUSL selection detected, forcing Mesa/Nouveau." ; return 0 ; fi
+		MenuSel "NVsel" "NVIDIA gpu found, choose driver" "PROPRIETARY" "MESA"
 	else
-		if [[ "$NVsel" =~ ^(MESA|NOUVEAU)$ ]]; then nvidiadrivers=() ; echo "Using default Mesa/Nouveau"
-		elif [[ "$NVsel" =~ ^(OPEN|PROPRIETARY)$ ]]; then
-			local nv_main="nvidia-dkms"
-			if [[ "$NVsel" == "OPEN" ]]; then if [[ "$KSel" == "linux" ]]; then nv_main="nvidia-open" ; else nv_main="nvidia-open-dkms" ; fi
-			elif [[ "$NVsel" == "PROPRIETARY" ]]; then if [[ "$KSel" == "linux" ]]; then nv_main="nvidia" ; elif [[ "$KSel" == "linux-lts" ]]; then nv_main="nvidia-lts" ; fi ; fi
-			nvidiadrivers=("${nv_main}" nvidia-prime nvidia-settings nvidia-utils lib32-nvidia-utils opencl-nvidia lib32-opencl-nvidia libxnvctrl libvdpau)
-		fi
+		MenuSel "NVsel" "NVIDIA gpu found, choose driver" "OPEN" "NOUVEAU" "PROPRIETARY" "MESA"
+	fi
+	if [[ "$NVsel" =~ ^(OPEN|PROPRIETARY)$ ]]; then
+		MenuSel "GPUMANAGERsel" "Select NVIDIA Optimus Manager" "Native" "Envycontrol" "Cardwire"
+	else
+		GPUMANAGERsel="None"
 	fi
 }
 GPUsel () {
 	echo "Detecting video chipset..."
+	HAS_AMD=0 ; HAS_NVIDIA=0 ; NVsel="None" ; GPUMANAGERsel="None"
 	local gpu_info ; if ! gpu_info=$(echo "$SYS_LSPCI" | grep -Ei 'VGA|3D'); then gpu_info="" ; fi
-	if [[ "$gpu_info" =~ (AMD|Radeon) ]]; then if [[ "${OSsel,,}" == "void" ]]; then amddrivers=(mesa-dri vulkan-loader mesa-vulkan-radeon) ; else amddrivers=(mesa vulkan-radeon) ; fi ; fi
-	if [[ "$gpu_info" =~ (VMware|VirtualBox|Virtio|QXL) ]]; then echo "VM detected: The default Mesa driver will be installed" ; fi
-	if [[ "$gpu_info" =~ NVIDIA ]]; then
-		HAS_NVIDIA=1
-		if [[ "${OSsel,,}" == "void" ]]; then
-			NVDriverUpdate
-			if [[ ${#nvidiadrivers[@]} -gt 0 ]]; then MenuSel "GPUMANAGERsel" "Select NVIDIA Optimus Manager" "Native" "Envycontrol" "Cardwire" ; echo 'NVIDIA selected' ; fi
-		else
-			MenuSel "NVsel" "NVIDIA gpu found, choose driver" "OPEN" "NOUVEAU" "PROPRIETARY" "MESA"
-			NVDriverUpdate
-			if [[ "$NVsel" =~ ^(OPEN|PROPRIETARY)$ ]]; then echo "Setting up NVIDIA $NVsel Drivers" ; MenuSel "GPUMANAGERsel" "Select NVIDIA Optimus Manager" "Native" "Envycontrol" "Cardwire" ; fi
-		fi
-	fi
-	if [[ ! "$gpu_info" =~ (AMD|Radeon|VMware|VirtualBox|Virtio|QXL|NVIDIA) ]]; then echo "Generic/Intel GPU: Mesa will be installed" ; fi
+	if [[ "$gpu_info" =~ (AMD|Radeon) ]]; then HAS_AMD=1 ; echo "Detected AMD/Radeon GPU" ; fi
+	if [[ "$gpu_info" =~ (VMware|VirtualBox|Virtio|QXL) ]]; then echo "VM detected: Default Mesa driver will be used" ; fi
+	if [[ "$gpu_info" =~ NVIDIA ]]; then HAS_NVIDIA=1 ; NvidiaSel ; fi
+	if [[ ! "$gpu_info" =~ (AMD|Radeon|VMware|VirtualBox|Virtio|QXL|NVIDIA) ]]; then echo "Generic/Intel GPU: Mesa will be used" ; fi
 }
 LUKSSel () {
 	YesNoSel "Do you want to encrypt your system with LUKS (Full Disk Encryption)?"
@@ -152,11 +145,8 @@ UEFIsel () {
 }
 ArchRepoSel() { YesNoSel "Do you want Arch repositories as well as Artix repositories?" ; if [[ "$CC" -eq 1 ]]; then ARCHrepo=1 ; echo "OK, adding Arch repositories!" ; else ARCHrepo='' ; echo "Proceeding without them..." ; fi ; }
 BootloaderSel() { if [[ "$UEFImode" -eq 0 ]]; then BLsel="grub" ; echo "BIOS mode: GRUB selected automatically" ; return 0 ; fi ; local bl_options=( "refind" "grub" "efistub" "limine" ) ; if [[ "${OSsel,,}" == "arch" ]]; then bl_options+=( "systemd-boot" "uki" ) ; fi ; MenuSel "BLsel" "Select Bootloader" "${bl_options[@]}" ; }
-DesktopEnvSel() {
-	MenuSel "DEsel" "Select Desktop Environment / Window Manager" "KDE" "GNOME" "LXQt" "COSMIC" "Hyprland" "Niri" "None"
-	if [[ "$DEsel" =~ ^(Hyprland|Niri)$ ]]; then MenuSel "SHELLsel" "Select Desktop Shell for $DEsel" "Traditional (Waybar + Swaync + Fuzzel)" "Quickshell" ; if [[ "$SHELLsel" == "Traditional"* ]]; then SHELLsel="Traditional" ; fi
-	else SHELLsel="None" ; fi
-}
+DesktopEnvSel() { MenuSel "DEsel" "Select Desktop Environment / Window Manager" "KDE" "GNOME" "LXQt" "COSMIC" "Hyprland" "Niri" "None" ; ShellSel ; }
+ShellSel() { if [[ "$DEsel" =~ ^(Hyprland|Niri)$ ]]; then MenuSel "SHELLsel" "Select Desktop Shell for $DEsel" "Traditional (Waybar + Swaync + Fuzzel)" "Quickshell" ; if [[ "$SHELLsel" == "Traditional"* ]]; then SHELLsel="Traditional" ; fi ; else SHELLsel="None" ; fi ; }
 DisplayManagerSel() { if [[ "$DEsel" == "GNOME" ]]; then DMsel="GDM" ; elif [[ "$DEsel" == "KDE" ]]; then DMsel="SDDM" ; else MenuSel "DMsel" "Select Display Manager" "Ly" "Greetd" "LightDM" "None" ; fi ; }
 FilesystemSel() { MenuSel "FSsel" "Select filesystem for ROOT" "ext4" "btrfs" ; }
 HostnameSel() { TextPromptSel "HNsel" "Enter preferred hostname" ; }
