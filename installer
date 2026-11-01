@@ -428,13 +428,16 @@ UserSetup () {
 		if [[ "$SHELLsel" == "Quickshell" ]]; then
 			echo "auth required pam_unix.so nullok" > /mnt/etc/pam.d/quickshell
 			mkdir -p /mnt/home/"$UNsel"/.config/quickshell/lock
-			printf '{\n\t"wallpaper": "",\n\t"background": "#1e1e2e",\n\t"foreground": "#cdd6f4",\n\t"color0": "#1e1e2e",\n\t"color1": "#f38ba8",\n\t"color2": "#a6e3a1",\n\t"color3": "#f9e2af",\n\t"color4": "#89b4fa",\n\t"color5": "#cba6f7",\n\t"color6": "#94e2d5",\n\t"color7": "#bac2de",\n\t"color8": "#585b70"\n}\n' > /mnt/home/"$UNsel"/.config/quickshell/colors.json
+			sed -i -e '/\[templates\.fuzzel\]/,/^$/d' -e '/\[templates\.waybar\]/,/^$/d' /mnt/home/"$UNsel"/.config/wallust/wallust.toml
+			local init_wall="" ; init_wall=$(find /mnt/home/"$UNsel"/.config/wallpapers/day -type f -print -quit 2>/dev/null || true)
+			init_wall="${init_wall#/mnt}"
+			printf '{\n\t"wallpaper": "%s",\n\t"background": "#1e1e2e",\n\t"foreground": "#cdd6f4",\n\t"color0": "#1e1e2e",\n\t"color1": "#f38ba8",\n\t"color2": "#a6e3a1",\n\t"color3": "#f9e2af",\n\t"color4": "#89b4fa",\n\t"color5": "#cba6f7",\n\t"color6": "#94e2d5",\n\t"color7": "#bac2de",\n\t"color8": "#585b70"\n}\n' "$init_wall" > /mnt/home/"$UNsel"/.config/quickshell/colors.json
 			local qs_run="env QSG_RHI_BACKEND=opengl quickshell" ; local qs_niri='"env" "QSG_RHI_BACKEND=opengl" "quickshell"'
 			if [[ "$VBTsel" -eq 1 ]]; then
 				qs_run="env -u LIBGL_ALWAYS_SOFTWARE QSG_RHI_BACKEND=opengl QSG_RENDER_LOOP=basic quickshell"
 				qs_niri='"env" "-u" "LIBGL_ALWAYS_SOFTWARE" "QSG_RHI_BACKEND=opengl" "QSG_RENDER_LOOP=basic" "quickshell"'
 			fi
-			sed -i "s|lock_cmd = .*|lock_cmd = pgrep -u \$USER -f 'quickshell/lock' >/dev/null \|\| $qs_run -p ~/.config/quickshell/lock|" /mnt/home/"$UNsel"/.config/hypr/hypridle.conf
+			sed -i "s|lock_cmd = .*|lock_cmd = pgrep -u \$UID -f 'quickshell/lock' >/dev/null \|\| $qs_run -p ~/.config/quickshell/lock|" /mnt/home/"$UNsel"/.config/hypr/hypridle.conf
 			if [[ "$DEsel" == "Niri" ]]; then
 				sed -i -e "s|spawn-at-startup \"waybar\"|spawn-at-startup $qs_niri|" \
 					-e '/spawn-at-startup "swaync"/d' \
@@ -452,13 +455,14 @@ UserSetup () {
 			fi
 		else
 			echo -e "auth required pam_unix.so nullok\naccount required pam_unix.so\npassword required pam_unix.so\nsession required pam_unix.so" > /mnt/etc/pam.d/hyprlock
+			sed -i '/\[templates\.quickshell\]/,/^$/d' /mnt/home/"$UNsel"/.config/wallust/wallust.toml
 			touch /mnt/home/"$UNsel"/.config/fuzzel/colors.ini /mnt/home/"$UNsel"/.config/wallust/colors-waybar.css
 			if [[ "$DEsel" == "Hyprland" ]]; then touch /mnt/home/"$UNsel"/.config/hypr/hyprpaper.conf ; fi
 			if [[ -f "${SCRIPT_DIR}/Conf_files/Hyprlock/hyprlock.conf" ]]; then cp "${SCRIPT_DIR}/Conf_files/Hyprlock/hyprlock.conf" /mnt/home/"$UNsel"/.config/hypr/ ; fi
 		fi
 		if [[ "$VBTsel" -eq 1 ]]; then
 			if [[ "$VM_TYPE" == "qemu" ]]; then printf '#!/bin/bash\npkill -x spice-vdagent 2>/dev/null\nexec spice-vdagent\n' > /mnt/usr/bin/vm-clipboard
-			else printf '#!/bin/bash\nfor pid in $(pgrep -u "$USER" -x vm-clipboard); do [[ "$pid" != "$$" && "$pid" != "$PPID" ]] && kill "$pid" 2>/dev/null; done\npkill -x VBoxClient 2>/dev/null\nsleep 1\nVBoxClient --clipboard\nold_x="" ; old_w=""\nwhile sleep 0.5; do\n\tpgrep -u "$USER" -x "niri|Hyprland" >/dev/null || exit 0\n\tx=$(xclip -o -selection clipboard -t UTF8_STRING 2>/dev/null || true)\n\tw=$(wl-paste -n 2>/dev/null || true)\n\tif [[ -n "$x" && "$x" != "$old_x" ]]; then old_x="$x"; old_w="$x"; printf "%%s" "$x" | wl-copy\n\telif [[ -n "$w" && "$w" != "$old_w" ]]; then old_w="$w"; old_x="$w"; printf "%%s" "$w" | xclip -selection clipboard -t UTF8_STRING; fi\ndone\n' > /mnt/usr/bin/vm-clipboard ; fi
+			else printf '#!/bin/bash\nfor pid in $(pgrep -u "$UID" -x vm-clipboard); do [[ "$pid" != "$$" && "$pid" != "$PPID" ]] && kill "$pid" 2>/dev/null; done\npkill -x VBoxClient 2>/dev/null\nsleep 1\nVBoxClient --clipboard\nold_x="" ; old_w=""\nwhile sleep 0.5; do\n\tpgrep -u "$UID" -x "niri|Hyprland" >/dev/null || exit 0\n\tx=$(xclip -o -selection clipboard -t UTF8_STRING 2>/dev/null || true)\n\tw=$(wl-paste -n 2>/dev/null || true)\n\tif [[ -n "$x" && "$x" != "$old_x" ]]; then old_x="$x"; old_w="$x"; printf "%%s" "$x" | wl-copy\n\telif [[ -n "$w" && "$w" != "$old_w" ]]; then old_w="$w"; old_x="$w"; printf "%%s" "$w" | xclip -selection clipboard -t UTF8_STRING; fi\ndone\n' > /mnt/usr/bin/vm-clipboard ; fi
 			chmod +x /mnt/usr/bin/vm-clipboard
 			if [[ "$SHELLsel" != "Quickshell" ]]; then
 				sed -i 's/blur_passes = 3/blur_passes = 0/' /mnt/home/"$UNsel"/.config/hypr/hyprlock.conf
@@ -476,7 +480,7 @@ UserSetup () {
 			fi
 		fi
 		if [[ "${OSsel,,}" != "arch" && "$init_sys" != "systemd" ]]; then
-			local pw_cmd='pgrep -u $USER -x pipewire >/dev/null || (pipewire & sleep 1; wireplumber & pipewire-pulse &)'
+			local pw_cmd='pgrep -u $UID -x pipewire >/dev/null || (pipewire & sleep 1; wireplumber & pipewire-pulse &)'
 			if [[ "$DEsel" == "Niri" ]]; then sed -i -e "/spawn-at-startup/{i\\spawn-at-startup \"bash\" \"-c\" \"$pw_cmd\"" -e ':a;n;ba}' "$cfg"
 			else sed -i -e "/exec-once/{i\\exec-once = bash -c '$pw_cmd'" -e ':a;n;ba}' "$cfg" ; fi
 		fi
