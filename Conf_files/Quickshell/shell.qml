@@ -9,6 +9,7 @@ import Quickshell.Services.Pipewire
 import Quickshell.Services.UPower
 import Quickshell.Services.Mpris
 import Quickshell.Services.Notifications
+import Quickshell.Services.SystemTray
 import Quickshell.Services.Pam
 
 ShellRoot {
@@ -31,13 +32,29 @@ ShellRoot {
 	property color color6: "#94e2d5"
 	property color color8: "#585b70"
 
-	// Stato globale UI
-	property string centerMode: "none" // "none" | "calendar" | "system"
-	property string sysSubmenu: ""     // "" | "net" | "bt" | "rec" | "display" | "sound" | "mic" | "cpu" | "power"
-	property bool launcherVisible: false
+	// Stato globale UI: "none" | "calendar" | "system" | "launcher"
+	property string centerMode: "none"
+	// Sottomenu Sistema: "" | "net" | "bt" | "tray" | "battery" | "rec" | "display" | "sound" | "mic" | "cpu" | "power"
+	property string sysSubmenu: ""
 	property bool screenLocked: false
 	property bool wsExpanded: false
 	property int lastActiveWs: 1
+
+	// Ricerca App Launcher integrato nella pillola
+	property string searchQuery: ""
+	property int selectedAppIndex: 0
+	property var filteredApps: {
+		let all = DesktopEntries.applications.values
+		let q = searchQuery.toLowerCase().trim()
+		let res = []
+		for (let i = 0; i < all.length; i++) {
+			let app = all[i]
+			if (q === "" || (app.name && app.name.toLowerCase().includes(q)) || (app.genericName && app.genericName.toLowerCase().includes(q))) {
+				res.push(app)
+			}
+		}
+		return res
+	}
 
 	// Orologio, Calendario e Meteo
 	property string timeStr: ""
@@ -58,18 +75,24 @@ ShellRoot {
 	property bool isHeadphones: false
 	property bool isHeadsetMic: false
 
-	// Stato Rete, Bluetooth, Audio, Display, Registrazione e CPU Info
+	// Stato Rete, Bluetooth, Audio, Display, Registrazione, Batteria e CPU Info
 	property bool wifiEnabled: true
 	property string netName: "LAN"
 	property bool btEnabled: true
 	property string btName: "On"
 	property var netList: []
 	property string wifiPromptSsid: ""
-	property string wifiPasswordInput: ""
 	property var btList: []
 	property var audioSinks: []
 	property var audioSources: []
 	property var displayOutputs: []
+
+	// Dettagli Batteria (per sottomenu Battery)
+	property string batHealth: "100%"
+	property string batPowerDraw: "0.0 W"
+	property string batCycles: "0"
+	property string batTech: "Li-ion"
+	property string batTimeRem: "Calculating..."
 
 	// Registrazione Schermo (wf-recorder)
 	property bool isRecording: false
@@ -120,14 +143,54 @@ ShellRoot {
 		return m + ":" + (r < 10 ? "0" + r : r)
 	}
 
+	function closeCenterPill() {
+		root.centerMode = "none"
+		root.sysSubmenu = ""
+		root.wifiPromptSsid = ""
+	}
+
+	function openLauncher() {
+		if (root.centerMode === "launcher") {
+			root.closeCenterPill()
+		} else {
+			root.searchQuery = ""
+			root.selectedAppIndex = 0
+			root.sysSubmenu = ""
+			root.centerMode = "launcher"
+		}
+	}
+
+	function openCalendar() {
+		if (root.centerMode === "calendar") {
+			root.closeCenterPill()
+		} else {
+			root.calMonth = (new Date()).getMonth()
+			root.calYear = (new Date()).getFullYear()
+			root.updateCalendar()
+			root.sysSubmenu = ""
+			root.centerMode = "calendar"
+		}
+	}
+
+	function openSystemPanel() {
+		if (root.centerMode === "system") {
+			root.closeCenterPill()
+		} else {
+			root.sysSubmenu = ""
+			root.wifiPromptSsid = ""
+			root.centerMode = "system"
+			sysPoll.running = true
+			subPoll.running = true
+		}
+	}
+
 	function triggerOsd(mode) {
 		root.osdMode = mode
 		osdTimer.restart()
 	}
 
 	function triggerLock() {
-		root.centerMode = "none"
-		root.launcherVisible = false
+		root.closeCenterPill()
 		root.screenLocked = true
 	}
 
@@ -142,7 +205,7 @@ ShellRoot {
 			if (root.recMicAudio) aFlag = "-a"
 			else if (root.recSysAudio) aFlag = "-a=\"$(pactl get-default-sink 2>/dev/null).monitor\""
 			if (root.recAreaSelect) {
-				root.centerMode = "none"
+				root.closeCenterPill()
 				runCmd("geom=$(slurp) || exit 0; wf-recorder -g \"$geom\" " + aFlag + " -f \"" + f + "\"")
 			} else {
 				runCmd("wf-recorder " + aFlag + " -f \"" + f + "\"")
@@ -154,7 +217,7 @@ ShellRoot {
 
 	function updateCalendar() {
 		let firstDay = new Date(root.calYear, root.calMonth, 1)
-		let startDow = (firstDay.getDay() + 6) % 7 // Monday = 0
+		let startDow = (firstDay.getDay() + 6) % 7
 		let daysInMonth = new Date(root.calYear, root.calMonth + 1, 0).getDate()
 		let now = new Date()
 		let arr = []
@@ -193,12 +256,10 @@ ShellRoot {
 		}
 	}
 
-	// Pipewire Tracker
 	PwObjectTracker {
 		objects: [Pipewire.defaultAudioSink, Pipewire.defaultAudioSource]
 	}
 
-	// Rilevamento variazioni Microfono per OSD circolare di 2s
 	Connections {
 		target: (Pipewire.defaultAudioSource && Pipewire.defaultAudioSource.audio) ? Pipewire.defaultAudioSource.audio : null
 		function onVolumeChanged() {
@@ -227,7 +288,18 @@ ShellRoot {
 		onTriggered: root.wsExpanded = false
 	}
 
-	// Server Notifiche Desktop
+	// Timer di auto-chiusura quando il mouse esce dal pannello aperto (4s)
+	Timer {
+		id: autoCloseTimer
+		interval: 4000
+		repeat: false
+		onTriggered: {
+			if (root.centerMode !== "none" && root.wifiPromptSsid === "") {
+				root.closeCenterPill()
+			}
+		}
+	}
+
 	NotificationServer {
 		id: notifServer
 		onNotification: function(n) {
@@ -250,40 +322,25 @@ ShellRoot {
 	// IPC Handlers (Mod+Space, Mod+N, Mod+L, Theme Switcher)
 	IpcHandler {
 		target: "launcher"
-		function toggle(): void {
-			root.launcherVisible = !root.launcherVisible
-			if (root.launcherVisible) root.centerMode = "none"
-		}
+		function toggle(): void { root.openLauncher() }
 	}
 
 	IpcHandler {
 		target: "controlcenter"
-		function toggle(): void {
-			if (root.centerMode === "system") root.centerMode = "none"
-			else {
-				root.sysSubmenu = ""
-				root.centerMode = "system"
-				root.launcherVisible = false
-				subPoll.running = true
-			}
-		}
+		function toggle(): void { root.openSystemPanel() }
 	}
 
 	IpcHandler {
 		target: "lock"
-		function lock(): void {
-			root.triggerLock()
-		}
+		function lock(): void { root.triggerLock() }
 	}
 
 	IpcHandler {
 		target: "theme"
-		function reload(): void {
-			colorFile.reload()
-		}
+		function reload(): void { colorFile.reload() }
 	}
 
-	// Polling Rapido Workspaces + Luminosità (ogni 300ms per reattività immediata)
+	// Polling Rapido Workspaces + Luminosità (ogni 300ms)
 	Process {
 		id: fastPoll
 		command: ["bash", "-c", "
@@ -349,7 +406,7 @@ ShellRoot {
 		}
 	}
 
-	// Polling Stato Sistema, Cuffie, Rete, BT e CPU/RAM/Storage (ogni 3s)
+	// Polling Stato Sistema, Cuffie, Rete, BT, Dettagli Batteria e CPU/RAM/Storage (ogni 3s)
 	Process {
 		id: sysPoll
 		command: ["bash", "-c", "
@@ -378,12 +435,24 @@ ShellRoot {
 			d_sec=$(df -h | awk '$6 ~ /^\\/media\\//{printf \"%s: %s / %s (%s)\", $6, $3, $2, $5; exit}')
 			kern=$(uname -r)
 			upt=$(uptime -p 2>/dev/null | sed 's/^up //')
-			printf '%d|%s|%s|%d|%s|%d|%d|%s|%d|%s|%s|%s|%s|%s\n' \"$((t/1000))\" \"${w_rad:-enabled}\" \"$net\" \"$bt_en\" \"$bt_name\" \"$hp\" \"$hmic\" \"${cpu_m:-CPU}\" \"${cpu_u:-10}\" \"$ram_s\" \"$d_root\" \"${d_sec:-No secondary drive}\" \"$kern\" \"${upt:-0m}\"
+			bat_dir=$(ls -d /sys/class/power_supply/BAT* 2>/dev/null | head -n1)
+			if [[ -n \"$bat_dir\" ]]; then
+				ef=$(cat \"$bat_dir/energy_full\" 2>/dev/null || cat \"$bat_dir/charge_full\" 2>/dev/null || echo 100)
+				efd=$(cat \"$bat_dir/energy_full_design\" 2>/dev/null || cat \"$bat_dir/charge_full_design\" 2>/dev/null || echo 100)
+				b_hlth=\"$(( ef * 100 / (efd > 0 ? efd : 100) ))%\"
+				pw=$(cat \"$bat_dir/power_now\" 2>/dev/null || echo 0)
+				b_pwr=$(awk -v p=\"$pw\" 'BEGIN{printf \"%.1f W\", p/1000000}')
+				b_cyc=$(cat \"$bat_dir/cycle_count\" 2>/dev/null || echo 0)
+				b_tech=$(cat \"$bat_dir/technology\" 2>/dev/null || echo \"Li-ion\")
+			else
+				b_hlth=\"AC Power\"; b_pwr=\"0.0 W\"; b_cyc=\"N/A\"; b_tech=\"Virtual / AC\"
+			fi
+			printf '%d|%s|%s|%d|%s|%d|%d|%s|%d|%s|%s|%s|%s|%s|%s|%s|%s|%s\n' \"$((t/1000))\" \"${w_rad:-enabled}\" \"$net\" \"$bt_en\" \"$bt_name\" \"$hp\" \"$hmic\" \"${cpu_m:-CPU}\" \"${cpu_u:-10}\" \"$ram_s\" \"$d_root\" \"${d_sec:-No secondary drive}\" \"$kern\" \"${upt:-0m}\" \"$b_hlth\" \"$b_pwr\" \"$b_cyc\" \"$b_tech\"
 		"]
 		stdout: SplitParser {
 			onRead: data => {
 				let p = data.trim().split("|")
-				if (p.length >= 16) {
+				if (p.length >= 20) {
 					root.cpuTemp = parseInt(p[0]) || 40
 					root.wifiEnabled = (p[1] === "enabled")
 					root.netName = p[2]
@@ -400,12 +469,16 @@ ShellRoot {
 					root.diskSecInfo = p[13]
 					root.kernelVer = p[14]
 					root.uptimeStr = p[15]
+					root.batHealth = p[16]
+					root.batPowerDraw = p[17]
+					root.batCycles = p[18]
+					root.batTech = p[19]
 				}
 			}
 		}
 	}
 
-	// Polling Liste Sottomenu (Reti Wi-Fi/LAN, Bluetooth, Dispositivi Audio e Video)
+	// Polling Liste Sottomenu
 	Process {
 		id: subPoll
 		command: ["bash", "-c", "
@@ -506,7 +579,6 @@ ShellRoot {
 		}
 	}
 
-	// Meteo ogni 30 minuti
 	Process {
 		id: weatherProc
 		command: ["bash", "-c", "
@@ -556,7 +628,30 @@ ShellRoot {
 	}
 
 	// =========================================================
-	// 2. DYNAMIC ISLAND TOP BAR (Media + Workspaces + Center + Right OSD)
+	// 2. STRATO INVISIBILE CLICK-OUTSIDE (Chiude i pannelli cliccando fuori)
+	// =========================================================
+	Variants {
+		model: Quickshell.screens
+		PanelWindow {
+			required property var modelData
+			screen: modelData
+			visible: root.centerMode !== "none"
+			WlrLayershell.layer: WlrLayer.Top
+			WlrLayershell.namespace: "qs-backdrop"
+			WlrLayershell.exclusionMode: ExclusionMode.Ignore
+			anchors { top: true; bottom: true; left: true; right: true }
+			color: "transparent"
+
+			MouseArea {
+				anchors.fill: parent
+				acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+				onClicked: root.closeCenterPill()
+			}
+		}
+	}
+
+	// =========================================================
+	// 3. DYNAMIC ISLAND TOP BAR (Media + Workspaces + Center + Right OSD)
 	// =========================================================
 	Variants {
 		model: Quickshell.screens
@@ -565,6 +660,8 @@ ShellRoot {
 			screen: modelData
 			WlrLayershell.layer: WlrLayer.Top
 			WlrLayershell.namespace: "waybar"
+			WlrLayershell.exclusionMode: root.centerMode === "none" ? ExclusionMode.Auto : ExclusionMode.Ignore
+			WlrLayershell.keyboardFocus: (root.centerMode === "launcher" || root.wifiPromptSsid !== "") ? WlrKeyboardFocus.Exclusive : (root.centerMode !== "none" ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None)
 			exclusiveZone: 44
 			anchors { top: true }
 			margins.top: 8
@@ -599,7 +696,6 @@ ShellRoot {
 
 					HoverHandler { id: mediaHover }
 
-					// Vista Chiusa: Pallino con miniatura o icona musicale
 					Item {
 						anchors.fill: parent
 						visible: !mediaPill.expanded
@@ -627,7 +723,6 @@ ShellRoot {
 						}
 					}
 
-					// Vista Espansa (Card Media in Hover)
 					ColumnLayout {
 						anchors.fill: parent
 						anchors.margins: 14
@@ -688,7 +783,6 @@ ShellRoot {
 							}
 						}
 
-						// Barra progresso + minutaggio
 						ColumnLayout {
 							Layout.fillWidth: true
 							spacing: 3
@@ -723,7 +817,6 @@ ShellRoot {
 							}
 						}
 
-						// Controlli Prev / Play-Pause / Next
 						RowLayout {
 							Layout.alignment: Qt.AlignHCenter
 							spacing: 22
@@ -786,7 +879,6 @@ ShellRoot {
 
 					HoverHandler { id: wsHover }
 
-					// Stato Chiuso: Cerchio col numero del workspace attivo
 					Text {
 						anchors.centerIn: parent
 						visible: !wsPill.showAll
@@ -797,7 +889,6 @@ ShellRoot {
 						font.bold: true
 					}
 
-					// Stato Espanso a Pillola (1s al cambio workspace o in hover)
 					RowLayout {
 						id: wsRow
 						anchors.centerIn: parent
@@ -837,32 +928,52 @@ ShellRoot {
 				}
 
 				// ---------------------------------------------------------
-				// C. PILLOLA CENTRALE (Ora/Data/Meteo + Hover Cal + Click Sinistro/Destro)
+				// C. PILLOLA CENTRALE (Ora/Data/Meteo + Hover Cal + Cal + System + App Launcher)
 				// ---------------------------------------------------------
 				Rectangle {
 					id: centerPill
 					Layout.alignment: Qt.AlignTop
+					focus: root.centerMode !== "none"
+					Keys.onEscapePressed: root.closeCenterPill()
+
 					property bool isHoverPreview: centerHover.hovered && root.centerMode === "none"
 					property bool isCalOpen: root.centerMode === "calendar"
 					property bool isSysOpen: root.centerMode === "system"
+					property bool isLauncherOpen: root.centerMode === "launcher"
 
-					implicitWidth: isSysOpen ? 390 : ((isHoverPreview || isCalOpen) ? 350 : (compactClockRow.implicitWidth + 28))
-					implicitHeight: isSysOpen ? (sysContainer.implicitHeight + 28) : (isCalOpen ? (calCardCol.implicitHeight + 28) : (isHoverPreview ? (calPreviewBox.implicitHeight + 60) : 38))
-					radius: (isHoverPreview || isCalOpen || isSysOpen) ? 22 : 19
+					implicitWidth: isLauncherOpen ? 420 : (isSysOpen ? 390 : ((isHoverPreview || isCalOpen) ? 350 : (compactClockRow.implicitWidth + 28)))
+					implicitHeight: isLauncherOpen ? 410 : (isSysOpen ? (sysContainer.implicitHeight + 28) : (isCalOpen ? (calCardCol.implicitHeight + 52) : (isHoverPreview ? (calPreviewBox.implicitHeight + 56) : 38)))
+					radius: (isHoverPreview || isCalOpen || isSysOpen || isLauncherOpen) ? 22 : 19
 					color: root.withAlpha(root.bg, root.isVM ? 0.96 : 0.88)
-					border.width: (isCalOpen || isSysOpen) ? 2 : (isHoverPreview ? 0 : 1)
-					border.color: (isCalOpen || isSysOpen) ? root.color4 : root.withAlpha(root.color4, 0.6)
+					border.width: (isCalOpen || isSysOpen || isLauncherOpen) ? 2 : (isHoverPreview ? 0 : 1)
+					border.color: (isCalOpen || isSysOpen || isLauncherOpen) ? root.color4 : root.withAlpha(root.color4, 0.6)
 					clip: true
 
 					Behavior on implicitWidth { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
 					Behavior on implicitHeight { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
 
-					HoverHandler { id: centerHover }
+					HoverHandler {
+						id: centerHover
+						onHoveredChanged: {
+							if (hovered) {
+								autoCloseTimer.stop()
+							} else if (root.centerMode === "calendar" || root.centerMode === "system") {
+								autoCloseTimer.restart()
+							}
+						}
+					}
 
-					// Header Pillola Base / Trigger Click Sinistro e Destro (visibile in stato chiuso, hover e calendario)
+					onIsLauncherOpenChanged: {
+						if (isLauncherOpen) {
+							launcherSearchInput.text = ""
+							launcherSearchInput.forceActiveFocus()
+						}
+					}
+
+					// Header Pillola Base (visibile in stato chiuso, hover e calendario)
 					Item {
 						id: topPillBar
-						visible: !centerPill.isSysOpen
+						visible: !centerPill.isSysOpen && !centerPill.isLauncherOpen
 						anchors.top: parent.top
 						anchors.left: parent.left
 						anchors.right: parent.right
@@ -909,26 +1020,11 @@ ShellRoot {
 
 						MouseArea {
 							anchors.fill: parent
-							acceptedButtons: Qt.LeftButton | Qt.RightButton
+							acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
 							onClicked: mouse => {
-								if (mouse.button === Qt.LeftButton) {
-									if (root.centerMode === "calendar") root.centerMode = "none"
-									else {
-										root.calMonth = (new Date()).getMonth()
-										root.calYear = (new Date()).getFullYear()
-										root.updateCalendar()
-										root.centerMode = "calendar"
-										root.launcherVisible = false
-									}
-								} else if (mouse.button === Qt.RightButton) {
-									if (root.centerMode === "system") root.centerMode = "none"
-									else {
-										root.sysSubmenu = ""
-										root.centerMode = "system"
-										root.launcherVisible = false
-										subPoll.running = true
-									}
-								}
+								if (mouse.button === Qt.LeftButton) root.openCalendar()
+								else if (mouse.button === Qt.RightButton) root.openSystemPanel()
+								else if (mouse.button === Qt.MiddleButton) root.openLauncher()
 							}
 						}
 					}
@@ -943,92 +1039,110 @@ ShellRoot {
 						anchors.margins: 14
 						spacing: 10
 
-						// Box Calendario Mensile (stessa posizione in Hover e Click)
-						ColumnLayout {
+						// Box Calendario Mensile (Interamente cliccabile in Hover con Sinistro e Destro!)
+						Item {
 							id: calPreviewBox
 							Layout.fillWidth: true
-							spacing: 6
+							implicitHeight: calInnerCol.implicitHeight
 
-							RowLayout {
-								Layout.fillWidth: true
-								Rectangle {
-									visible: centerPill.isCalOpen
-									implicitWidth: 26; implicitHeight: 26; radius: 8
-									color: Qt.rgba(1, 1, 1, 0.08)
-									Text { anchors.centerIn: parent; text: "‹"; color: root.fg; font.pixelSize: 16; font.bold: true }
-									MouseArea {
-										anchors.fill: parent
-										onClicked: {
-											if (root.calMonth === 0) { root.calMonth = 11; root.calYear-- }
-											else root.calMonth--
-											root.updateCalendar()
+							ColumnLayout {
+								id: calInnerCol
+								anchors.left: parent.left
+								anchors.right: parent.right
+								spacing: 6
+
+								RowLayout {
+									Layout.fillWidth: true
+									Rectangle {
+										visible: centerPill.isCalOpen
+										implicitWidth: 26; implicitHeight: 26; radius: 8
+										color: Qt.rgba(1, 1, 1, 0.08)
+										Text { anchors.centerIn: parent; text: "‹"; color: root.fg; font.pixelSize: 16; font.bold: true }
+										MouseArea {
+											anchors.fill: parent
+											onClicked: {
+												if (root.calMonth === 0) { root.calMonth = 11; root.calYear-- }
+												else root.calMonth--
+												root.updateCalendar()
+											}
+										}
+									}
+									Text {
+										Layout.fillWidth: true
+										horizontalAlignment: Text.AlignHCenter
+										text: Qt.formatDate(new Date(root.calYear, root.calMonth, 1), "MMMM yyyy")
+										color: root.color4
+										font.family: "JetBrainsMono Nerd Font"
+										font.pixelSize: 14
+										font.bold: true
+									}
+									Rectangle {
+										visible: centerPill.isCalOpen
+										implicitWidth: 26; implicitHeight: 26; radius: 8
+										color: Qt.rgba(1, 1, 1, 0.08)
+										Text { anchors.centerIn: parent; text: "›"; color: root.fg; font.pixelSize: 16; font.bold: true }
+										MouseArea {
+											anchors.fill: parent
+											onClicked: {
+												if (root.calMonth === 11) { root.calMonth = 0; root.calYear++ }
+												else root.calMonth++
+												root.updateCalendar()
+											}
 										}
 									}
 								}
-								Text {
+
+								GridLayout {
 									Layout.fillWidth: true
-									horizontalAlignment: Text.AlignHCenter
-									text: Qt.formatDate(new Date(root.calYear, root.calMonth, 1), "MMMM yyyy")
-									color: root.color4
-									font.family: "JetBrainsMono Nerd Font"
-									font.pixelSize: 14
-									font.bold: true
-								}
-								Rectangle {
-									visible: centerPill.isCalOpen
-									implicitWidth: 26; implicitHeight: 26; radius: 8
-									color: Qt.rgba(1, 1, 1, 0.08)
-									Text { anchors.centerIn: parent; text: "›"; color: root.fg; font.pixelSize: 16; font.bold: true }
-									MouseArea {
-										anchors.fill: parent
-										onClicked: {
-											if (root.calMonth === 11) { root.calMonth = 0; root.calYear++ }
-											else root.calMonth++
-											root.updateCalendar()
+									columns: 7
+									rowSpacing: 4
+									columnSpacing: 4
+
+									Repeater {
+										model: ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
+										Text {
+											required property string modelData
+											Layout.fillWidth: true
+											horizontalAlignment: Text.AlignHCenter
+											text: modelData
+											color: root.color8
+											font.family: "JetBrainsMono Nerd Font"
+											font.pixelSize: 11
+											font.bold: true
+										}
+									}
+
+									Repeater {
+										model: root.calendarDays
+										Rectangle {
+											required property var modelData
+											Layout.fillWidth: true
+											implicitHeight: 26
+											radius: 8
+											color: modelData.today ? root.color4 : "transparent"
+
+											Text {
+												anchors.centerIn: parent
+												text: modelData.day
+												color: modelData.today ? root.bg : root.fg
+												font.family: "JetBrainsMono Nerd Font"
+												font.pixelSize: 12
+												font.bold: modelData.today
+											}
 										}
 									}
 								}
 							}
 
-							// Intestazione Giorni Settimana
-							GridLayout {
-								Layout.fillWidth: true
-								columns: 7
-								rowSpacing: 4
-								columnSpacing: 4
-
-								Repeater {
-									model: ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
-									Text {
-										required property string modelData
-										Layout.fillWidth: true
-										horizontalAlignment: Text.AlignHCenter
-										text: modelData
-										color: root.color8
-										font.family: "JetBrainsMono Nerd Font"
-										font.pixelSize: 11
-										font.bold: true
-									}
-								}
-
-								Repeater {
-									model: root.calendarDays
-									Rectangle {
-										required property var modelData
-										Layout.fillWidth: true
-										implicitHeight: 26
-										radius: 8
-										color: modelData.today ? root.color4 : "transparent"
-
-										Text {
-											anchors.centerIn: parent
-											text: modelData.day
-											color: modelData.today ? root.bg : root.fg
-											font.family: "JetBrainsMono Nerd Font"
-											font.pixelSize: 12
-											font.bold: modelData.today
-										}
-									}
+							// MouseArea attiva durante l'anteprima Hover per aprire Calendario (Sinistro) o Sistema (Destro)
+							MouseArea {
+								anchors.fill: parent
+								visible: centerPill.isHoverPreview
+								acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+								onClicked: mouse => {
+									if (mouse.button === Qt.LeftButton) root.openCalendar()
+									else if (mouse.button === Qt.RightButton) root.openSystemPanel()
+									else if (mouse.button === Qt.MiddleButton) root.openLauncher()
 								}
 							}
 						}
@@ -1160,7 +1274,120 @@ ShellRoot {
 						}
 					}
 
-					// CONTENUTO 2: CLICK DESTRO (Pannello di Gestione Sistema + Sottomenu a tutta card)
+					// =========================================================
+					// CONTENUTO 2: APP LAUNCHER INTEGRATO NELLA PILLOLA (Mod+Space)
+					// =========================================================
+					ColumnLayout {
+						id: launcherCol
+						visible: centerPill.isLauncherOpen
+						anchors.fill: parent
+						anchors.margins: 16
+						spacing: 10
+
+						Rectangle {
+							Layout.fillWidth: true
+							implicitHeight: 40
+							radius: 12
+							color: root.color0
+							border.width: 1
+							border.color: root.color4
+
+							RowLayout {
+								anchors.fill: parent
+								anchors.leftMargin: 12; anchors.rightMargin: 12
+								spacing: 6
+								Text {
+									text: "󰍉 "
+									color: root.color4
+									font.family: "JetBrainsMono Nerd Font"
+									font.pixelSize: 15
+								}
+								TextInput {
+									id: launcherSearchInput
+									Layout.fillWidth: true
+									color: root.fg
+									font.family: "JetBrainsMono Nerd Font"
+									font.pixelSize: 14
+									font.bold: true
+									clip: true
+									onTextChanged: {
+										root.searchQuery = text
+										root.selectedAppIndex = 0
+									}
+									Keys.onDownPressed: {
+										if (root.selectedAppIndex < root.filteredApps.length - 1) root.selectedAppIndex++
+									}
+									Keys.onUpPressed: {
+										if (root.selectedAppIndex > 0) root.selectedAppIndex--
+									}
+									Keys.onEscapePressed: root.closeCenterPill()
+									Keys.onReturnPressed: {
+										if (root.filteredApps.length > 0) {
+											let app = root.filteredApps[root.selectedAppIndex]
+											root.closeCenterPill()
+											app.execute()
+										}
+									}
+								}
+							}
+						}
+
+						ListView {
+							Layout.fillWidth: true
+							Layout.fillHeight: true
+							clip: true
+							spacing: 4
+							model: root.filteredApps
+							currentIndex: root.selectedAppIndex
+
+							delegate: Rectangle {
+								required property var modelData
+								required property int index
+								width: ListView.view.width
+								height: 38
+								radius: 10
+								property bool isSel: index === root.selectedAppIndex
+								color: isSel ? root.withAlpha(root.color4, 0.25) : (appMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.05) : "transparent")
+								border.width: isSel ? 1 : 0
+								border.color: root.color4
+
+								RowLayout {
+									anchors.fill: parent
+									anchors.leftMargin: 10; anchors.rightMargin: 10
+									spacing: 10
+
+									IconImage {
+										implicitSize: 22
+										source: Quickshell.iconPath(modelData.icon, true)
+									}
+
+									Text {
+										text: modelData.name
+										color: parent.parent.isSel ? root.color4 : root.fg
+										font.family: "JetBrainsMono Nerd Font"
+										font.pixelSize: 13
+										font.bold: true
+										elide: Text.ElideRight
+										Layout.fillWidth: true
+									}
+								}
+
+								MouseArea {
+									id: appMouse
+									anchors.fill: parent
+									hoverEnabled: true
+									onClicked: {
+										root.closeCenterPill()
+										modelData.execute()
+									}
+								}
+							}
+						}
+					}
+
+					// =========================================================
+					// CONTENUTO 3: CLICK DESTRO (Pannello di Gestione Sistema + Sottomenu)
+					// =========================================================
 					Item {
 						id: sysContainer
 						visible: centerPill.isSysOpen
@@ -1180,7 +1407,7 @@ ShellRoot {
 							anchors.right: parent.right
 							spacing: 10
 
-							// 1. RIGA IN CIMA: Sinistra Ora/Data/Meteo | Destra Icona CPU + Icona Power + Chiudi
+							// 1. RIGA IN CIMA: Sinistra Ora/Data/Meteo | Destra Icona CPU + Icona Power
 							RowLayout {
 								Layout.fillWidth: true
 								spacing: 8
@@ -1194,7 +1421,7 @@ ShellRoot {
 									MouseArea {
 										anchors.fill: parent
 										acceptedButtons: Qt.LeftButton | Qt.RightButton
-										onClicked: root.centerMode = "none"
+										onClicked: root.closeCenterPill()
 									}
 								}
 								Text {
@@ -1399,10 +1626,147 @@ ShellRoot {
 								}
 							}
 
-							// 3. SEZIONE REGISTRAZIONE SCHERMO (3 Pulsanti: Start/Stop, Screenshot Area, Sottomenu >)
+							// 3. GRIGLIA SYSTEM TRAY (Sinistra) & BATTERY (Destra)
+							RowLayout {
+								Layout.fillWidth: true
+								spacing: 10
+
+								// Box Sinistro: System Tray (3-4 icone in anteprima + Sottomenu >)
+								Rectangle {
+									Layout.fillWidth: true
+									implicitHeight: 58
+									radius: 16
+									color: root.color0
+
+									RowLayout {
+										anchors.fill: parent
+										anchors.margins: 10
+										spacing: 6
+
+										ColumnLayout {
+											Layout.fillWidth: true
+											spacing: 4
+											Text {
+												text: "App Tray (" + SystemTray.items.values.length + ")"
+												color: root.fg
+												font.family: "JetBrainsMono Nerd Font"
+												font.pixelSize: 12
+												font.bold: true
+											}
+
+											RowLayout {
+												spacing: 6
+												Repeater {
+													model: SystemTray.items.values.slice(0, 4)
+													Rectangle {
+														required property var modelData
+														implicitWidth: 22; implicitHeight: 22; radius: 6
+														color: Qt.rgba(1, 1, 1, 0.08)
+
+														IconImage {
+															anchors.centerIn: parent
+															implicitSize: 16
+															source: modelData.icon
+														}
+														MouseArea {
+															anchors.fill: parent
+															acceptedButtons: Qt.LeftButton | Qt.RightButton
+															onClicked: mouse => {
+																if (mouse.button === Qt.RightButton) modelData.secondaryActivate()
+																else modelData.activate()
+															}
+														}
+													}
+												}
+												Text {
+													visible: SystemTray.items.values.length === 0
+													text: "Empty"
+													color: root.color8
+													font.family: "JetBrainsMono Nerd Font"
+													font.pixelSize: 11
+												}
+											}
+										}
+
+										Rectangle {
+											implicitWidth: 26; implicitHeight: 36; radius: 8
+											color: Qt.rgba(1, 1, 1, 0.05)
+											Text { anchors.centerIn: parent; text: "›"; color: root.fg; font.pixelSize: 18 }
+											MouseArea {
+												anchors.fill: parent
+												onClicked: root.sysSubmenu = "tray"
+											}
+										}
+									}
+								}
+
+								// Box Destro: Battery con percentuale + Sottomenu dettagli >
+								Rectangle {
+									Layout.fillWidth: true
+									implicitHeight: 58
+									radius: 16
+									color: root.color0
+									property var bat: UPower.displayDevice
+									property int pct: (bat && bat.isLaptopBattery) ? Math.round(bat.percentage * 100) : 100
+									property bool charging: bat && bat.state === UPowerDeviceState.Charging
+
+									RowLayout {
+										anchors.fill: parent
+										anchors.margins: 10
+										spacing: 8
+
+										Rectangle {
+											implicitWidth: 36; implicitHeight: 36; radius: 18
+											color: root.withAlpha(root.color2, 0.2)
+											Text {
+												anchors.centerIn: parent
+												text: parent.parent.parent.charging ? "󰂄" : "󰁹"
+												color: root.color2
+												font.family: "JetBrainsMono Nerd Font"
+												font.pixelSize: 17
+											}
+										}
+
+										ColumnLayout {
+											Layout.fillWidth: true
+											spacing: 1
+											Text {
+												text: "Battery"
+												color: root.fg
+												font.family: "JetBrainsMono Nerd Font"
+												font.pixelSize: 13
+												font.bold: true
+											}
+											Text {
+												text: parent.parent.parent.pct + "% • " + (parent.parent.parent.charging ? "Charging" : "Ready")
+												color: root.color2
+												font.family: "JetBrainsMono Nerd Font"
+												font.pixelSize: 11
+												elide: Text.ElideRight
+												Layout.fillWidth: true
+											}
+										}
+
+										Rectangle {
+											implicitWidth: 26; implicitHeight: 36; radius: 8
+											color: Qt.rgba(1, 1, 1, 0.05)
+											Text { anchors.centerIn: parent; text: "›"; color: root.fg; font.pixelSize: 18 }
+											MouseArea {
+												anchors.fill: parent
+												onClicked: {
+													sysPoll.running = true
+													root.sysSubmenu = "battery"
+												}
+											}
+										}
+									}
+								}
+							}
+
+							// 4. SEZIONE REGISTRAZIONE SCHERMO (3 Pulsanti: Start/Stop, Screenshot Area, Sottomenu >)
 							Rectangle {
 								Layout.fillWidth: true
-								implicitHeight: 58
+								implicitHeight: 56
 								radius: 16
 								color: root.color0
 
@@ -1411,10 +1775,9 @@ ShellRoot {
 									anchors.margins: 10
 									spacing: 10
 
-									// Pulsante 1: Variabile Start/Stop Registrazione
 									Rectangle {
 										Layout.fillWidth: true
-										implicitHeight: 38
+										implicitHeight: 36
 										radius: 12
 										color: root.isRecording ? root.color1 : Qt.rgba(1, 1, 1, 0.08)
 
@@ -1441,9 +1804,8 @@ ShellRoot {
 										}
 									}
 
-									// Pulsante 2: Screenshot Selettivo
 									Rectangle {
-										implicitWidth: 42; implicitHeight: 38; radius: 12
+										implicitWidth: 42; implicitHeight: 36; radius: 12
 										color: Qt.rgba(1, 1, 1, 0.08)
 										Text {
 											anchors.centerIn: parent
@@ -1455,15 +1817,14 @@ ShellRoot {
 										MouseArea {
 											anchors.fill: parent
 											onClicked: {
-												root.centerMode = "none"
+												root.closeCenterPill()
 												root.runCmd("sleep 0.2; grim -g \"$(slurp)\" - | swappy -f -")
 											}
 										}
 									}
 
-									// Pulsante 3: Apri Sottomenu Registrazione
 									Rectangle {
-										implicitWidth: 34; implicitHeight: 38; radius: 12
+										implicitWidth: 34; implicitHeight: 36; radius: 12
 										color: Qt.rgba(1, 1, 1, 0.05)
 										Text { anchors.centerIn: parent; text: "›"; color: root.fg; font.pixelSize: 18 }
 										MouseArea {
@@ -1474,10 +1835,10 @@ ShellRoot {
 								}
 							}
 
-							// 4. DISPLAY SLIDER
+							// 5. DISPLAY SLIDER
 							Rectangle {
 								Layout.fillWidth: true
-								implicitHeight: 64
+								implicitHeight: 62
 								radius: 16
 								color: root.color0
 
@@ -1522,10 +1883,10 @@ ShellRoot {
 								}
 							}
 
-							// 5. AUDIO OUTPUT (SOUND) SLIDER
+							// 6. AUDIO OUTPUT (SOUND) SLIDER
 							Rectangle {
 								Layout.fillWidth: true
-								implicitHeight: 64
+								implicitHeight: 62
 								radius: 16
 								color: root.color0
 								property var sink: Pipewire.defaultAudioSink
@@ -1577,10 +1938,10 @@ ShellRoot {
 								}
 							}
 
-							// 6. AUDIO INPUT (MICROPHONE) SLIDER
+							// 7. AUDIO INPUT (MICROPHONE) SLIDER
 							Rectangle {
 								Layout.fillWidth: true
-								implicitHeight: 64
+								implicitHeight: 62
 								radius: 16
 								color: root.color0
 								property var src: Pipewire.defaultAudioSource
@@ -1631,52 +1992,10 @@ ShellRoot {
 									}
 								}
 							}
-
-							// 7. BATTERY SECTION
-							Rectangle {
-								Layout.fillWidth: true
-								implicitHeight: 58
-								radius: 16
-								color: root.color0
-								property var bat: UPower.displayDevice
-								property int pct: (bat && bat.isLaptopBattery) ? Math.round(bat.percentage * 100) : 100
-								property bool charging: bat && bat.state === UPowerDeviceState.Charging
-
-								ColumnLayout {
-									anchors.fill: parent
-									anchors.margins: 10
-									spacing: 6
-									RowLayout {
-										Layout.fillWidth: true
-										Text { text: "Battery"; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12; font.bold: true; Layout.fillWidth: true }
-										Text {
-											text: parent.parent.charging ? "Charging" : ((parent.parent.bat && parent.parent.bat.isLaptopBattery) ? "Discharging" : "AC Power")
-											color: root.color6
-											font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11
-										}
-									}
-									RowLayout {
-										Layout.fillWidth: true
-										spacing: 10
-										Text { text: parent.parent.charging ? "󰂄" : "󰁹"; color: root.color2; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 16 }
-										Rectangle {
-											Layout.fillWidth: true
-											implicitHeight: 12; radius: 6
-											color: Qt.rgba(1, 1, 1, 0.1)
-											Rectangle {
-												width: parent.width * (parent.parent.parent.pct / 100.0)
-												height: parent.height; radius: 6
-												color: root.color2
-											}
-										}
-										Text { text: parent.parent.pct + "%"; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12; font.bold: true }
-									}
-								}
-							}
 						}
 
 						// =====================================================
-						// VISTA SOTTOMENU A TUTTA CARD (Sostituisce Vista Principale)
+						// VISTA SOTTOMENU A TUTTA CARD
 						// =====================================================
 						ColumnLayout {
 							id: sysSubCol
@@ -1708,6 +2027,8 @@ ShellRoot {
 									text: {
 										if (root.sysSubmenu === "net") return "Network"
 										if (root.sysSubmenu === "bt") return "Bluetooth"
+										if (root.sysSubmenu === "tray") return "System Tray Apps"
+										if (root.sysSubmenu === "battery") return "Battery Details"
 										if (root.sysSubmenu === "sound") return "Audio Output"
 										if (root.sysSubmenu === "mic") return "Audio Input"
 										if (root.sysSubmenu === "display") return "Display"
@@ -1785,6 +2106,125 @@ ShellRoot {
 										font.bold: true
 									}
 									MouseArea { anchors.fill: parent; onClicked: root.runCmd("loginctl poweroff") }
+								}
+							}
+
+							// CONTENUTO SOTTOMENU: SYSTEM TRAY APPS
+							ColumnLayout {
+								visible: root.sysSubmenu === "tray"
+								Layout.fillWidth: true
+								spacing: 6
+
+								Text {
+									visible: SystemTray.items.values.length === 0
+									text: "No applications currently in System Tray"
+									color: root.color8
+									font.family: "JetBrainsMono Nerd Font"
+									font.pixelSize: 12
+								}
+
+								Repeater {
+									model: SystemTray.items.values
+									Rectangle {
+										required property var modelData
+										Layout.fillWidth: true
+										implicitHeight: 44
+										radius: 12
+										color: trayItemMouse.containsMouse ? root.withAlpha(root.color4, 0.2) : root.color0
+
+										RowLayout {
+											anchors.fill: parent; anchors.margins: 10; spacing: 10
+											IconImage {
+												implicitSize: 22
+												source: modelData.icon
+											}
+											Text {
+												text: modelData.title || modelData.tooltipTitle || modelData.id || "Tray Application"
+												color: root.fg
+												font.family: "JetBrainsMono Nerd Font"
+												font.pixelSize: 13
+												font.bold: true
+												elide: Text.ElideRight
+												Layout.fillWidth: true
+											}
+											Text {
+												text: "Open"
+												color: root.color4
+												font.family: "JetBrainsMono Nerd Font"
+												font.pixelSize: 11
+											}
+										}
+										MouseArea {
+											id: trayItemMouse
+											anchors.fill: parent
+											hoverEnabled: true
+											acceptedButtons: Qt.LeftButton | Qt.RightButton
+											onClicked: mouse => {
+												if (mouse.button === Qt.RightButton) modelData.secondaryActivate()
+												else modelData.activate()
+											}
+										}
+									}
+								}
+							}
+
+							// CONTENUTO SOTTOMENU: BATTERY DETAILS
+							ColumnLayout {
+								visible: root.sysSubmenu === "battery"
+								Layout.fillWidth: true
+								spacing: 8
+								property var bat: UPower.displayDevice
+								property int pct: (bat && bat.isLaptopBattery) ? Math.round(bat.percentage * 100) : 100
+								property bool charging: bat && bat.state === UPowerDeviceState.Charging
+
+								Rectangle {
+									Layout.fillWidth: true; implicitHeight: 62; radius: 12; color: root.color0
+									ColumnLayout {
+										anchors.fill: parent; anchors.margins: 10; spacing: 6
+										RowLayout {
+											Layout.fillWidth: true
+											Text {
+												text: (parent.parent.parent.charging ? "󰂄  Charging" : "󰁹  Charge Level")
+												color: root.color2; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 13; font.bold: true; Layout.fillWidth: true
+											}
+											Text {
+												text: parent.parent.parent.pct + "%"
+												color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 13; font.bold: true
+											}
+										}
+										Rectangle {
+											Layout.fillWidth: true; implicitHeight: 10; radius: 5; color: Qt.rgba(1, 1, 1, 0.1)
+											Rectangle { width: parent.width * (parent.parent.parent.pct / 100.0); height: parent.height; radius: 5; color: root.color2 }
+										}
+									}
+								}
+
+								GridLayout {
+									Layout.fillWidth: true
+									columns: 2
+									rowSpacing: 8
+									columnSpacing: 8
+
+									Repeater {
+										model: [
+											{ "label": "Battery Health", "val": root.batHealth },
+											{ "label": "Power Draw", "val": root.batPowerDraw },
+											{ "label": "Cycle Count", "val": root.batCycles },
+											{ "label": "Technology", "val": root.batTech }
+										]
+										Rectangle {
+											required property var modelData
+											Layout.fillWidth: true
+											implicitHeight: 52
+											radius: 12
+											color: root.color0
+											ColumnLayout {
+												anchors.fill: parent; anchors.margins: 10; spacing: 2
+												Text { text: modelData.label; color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11 }
+												Text { text: modelData.val; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 13; font.bold: true }
+											}
+										}
+									}
 								}
 							}
 
@@ -1900,7 +2340,7 @@ ShellRoot {
 								}
 							}
 
-							// CONTENUTO SOTTOMENU: NETWORK (LAN + Wi-Fi List + Password Input)
+							// CONTENUTO SOTTOMENU: NETWORK
 							ColumnLayout {
 								visible: root.sysSubmenu === "net"
 								Layout.fillWidth: true
@@ -2228,13 +2668,11 @@ ShellRoot {
 							ctx.lineWidth = 2.6
 							ctx.lineCap = "round"
 
-							// Traccia circolare di sfondo
 							ctx.beginPath()
 							ctx.arc(cx, cy, r, 0, Math.PI * 2, false)
 							ctx.strokeStyle = Qt.rgba(1, 1, 1, 0.14)
 							ctx.stroke()
 
-							// Linea progressiva dalle ore 12 (-PI/2) in senso orario
 							if (rightOsdPill.arcPct > 0.005) {
 								var startAngle = -Math.PI / 2
 								var endAngle = startAngle + (Math.PI * 2 * rightOsdPill.arcPct)
@@ -2282,7 +2720,7 @@ ShellRoot {
 	}
 
 	// =========================================================
-	// 3. POPUP NOTIFICHE (Toast in alto senza spostare le finestre)
+	// 4. POPUP NOTIFICHE (Toast in alto senza spostare le finestre)
 	// =========================================================
 	PanelWindow {
 		visible: root.popupNotifications.length > 0 && root.centerMode === "none"
@@ -2332,158 +2770,6 @@ ShellRoot {
 							font.pixelSize: 11
 							elide: Text.ElideRight
 							Layout.fillWidth: true
-						}
-					}
-				}
-			}
-		}
-	}
-
-	// =========================================================
-	// 4. APP LAUNCHER (Mod+Space)
-	// =========================================================
-	PanelWindow {
-		id: launcherWin
-		visible: root.launcherVisible
-		WlrLayershell.layer: WlrLayer.Overlay
-		WlrLayershell.namespace: "launcher"
-		WlrLayershell.exclusionMode: ExclusionMode.Ignore
-		WlrLayershell.keyboardFocus: root.launcherVisible ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
-		implicitWidth: 460
-		implicitHeight: 420
-		color: "transparent"
-
-		property string searchQuery: ""
-		property int selectedIndex: 0
-
-		onVisibleChanged: {
-			if (visible) {
-				searchQuery = ""
-				selectedIndex = 0
-				searchInput.text = ""
-				searchInput.forceActiveFocus()
-			}
-		}
-
-		property var filteredApps: {
-			let all = DesktopEntries.applications.values
-			let q = searchQuery.toLowerCase().trim()
-			let res = []
-			for (let i = 0; i < all.length; i++) {
-				let app = all[i]
-				if (q === "" || (app.name && app.name.toLowerCase().includes(q)) || (app.genericName && app.genericName.toLowerCase().includes(q))) {
-					res.push(app)
-				}
-			}
-			return res
-		}
-
-		Rectangle {
-			anchors.fill: parent
-			radius: 18
-			color: root.withAlpha(root.bg, root.isVM ? 0.96 : 0.90)
-			border.width: 2
-			border.color: root.color4
-
-			ColumnLayout {
-				anchors.fill: parent
-				anchors.margins: 20
-				spacing: 12
-
-				Rectangle {
-					Layout.fillWidth: true
-					implicitHeight: 40
-					radius: 10
-					color: root.color0
-					border.width: 1
-					border.color: root.color4
-
-					RowLayout {
-						anchors.fill: parent
-						anchors.leftMargin: 12; anchors.rightMargin: 12
-						Text {
-							text: "> "
-							color: root.color2
-							font.family: "JetBrainsMono Nerd Font"
-							font.pixelSize: 15
-							font.bold: true
-						}
-						TextInput {
-							id: searchInput
-							Layout.fillWidth: true
-							color: root.fg
-							font.family: "JetBrainsMono Nerd Font"
-							font.pixelSize: 15
-							font.bold: true
-							clip: true
-							onTextChanged: {
-								launcherWin.searchQuery = text
-								launcherWin.selectedIndex = 0
-							}
-							Keys.onDownPressed: {
-								if (launcherWin.selectedIndex < launcherWin.filteredApps.length - 1) launcherWin.selectedIndex++
-							}
-							Keys.onUpPressed: {
-								if (launcherWin.selectedIndex > 0) launcherWin.selectedIndex--
-							}
-							Keys.onEscapePressed: root.launcherVisible = false
-							Keys.onReturnPressed: {
-								if (launcherWin.filteredApps.length > 0) {
-									let app = launcherWin.filteredApps[launcherWin.selectedIndex]
-									root.launcherVisible = false
-									app.execute()
-								}
-							}
-						}
-					}
-				}
-
-				ListView {
-					Layout.fillWidth: true
-					Layout.fillHeight: true
-					clip: true
-					spacing: 4
-					model: launcherWin.filteredApps
-					currentIndex: launcherWin.selectedIndex
-
-					delegate: Rectangle {
-						required property var modelData
-						required property int index
-						width: ListView.view.width
-						height: 36
-						radius: 8
-						property bool isSel: index === launcherWin.selectedIndex
-						color: isSel ? root.withAlpha(root.color8, 0.9) : (appMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.05) : "transparent")
-
-						RowLayout {
-							anchors.fill: parent
-							anchors.leftMargin: 10; anchors.rightMargin: 10
-							spacing: 10
-
-							IconImage {
-								implicitSize: 22
-								source: Quickshell.iconPath(modelData.icon, true)
-							}
-
-							Text {
-								text: modelData.name
-								color: parent.parent.isSel ? root.color2 : root.fg
-								font.family: "JetBrainsMono Nerd Font"
-								font.pixelSize: 14
-								font.bold: true
-								elide: Text.ElideRight
-								Layout.fillWidth: true
-							}
-						}
-
-						MouseArea {
-							id: appMouse
-							anchors.fill: parent
-							hoverEnabled: true
-							onClicked: {
-								root.launcherVisible = false
-								modelData.execute()
-							}
 						}
 					}
 				}
