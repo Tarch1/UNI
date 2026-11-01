@@ -70,12 +70,13 @@ ShellRoot {
 	FileView {
 		id: colorFile
 		path: root.homeDir + "/.config/quickshell/colors.json"
+		blockLoading: true
 		watchChanges: true
 		onFileChanged: reload()
 		onLoaded: {
 			try {
 				let d = JSON.parse(text())
-				if (d.wallpaper !== undefined) root.wallpaperPath = d.wallpaper
+				if (d.wallpaper !== undefined && d.wallpaper !== "") root.wallpaperPath = d.wallpaper
 				if (d.background) root.bg = d.background
 				if (d.foreground) root.fg = d.foreground
 				if (d.color0) root.color0 = d.color0
@@ -117,7 +118,7 @@ ShellRoot {
 		onTriggered: root.popupNotifications = []
 	}
 
-	// IPC Handlers per Mod+Space (launcher) e Mod+N (controlcenter)
+	// IPC Handlers per Mod+Space (launcher), Mod+N (controlcenter) e theme-switcher (theme)
 	IpcHandler {
 		target: "launcher"
 		function toggle(): void {
@@ -131,6 +132,13 @@ ShellRoot {
 		function toggle(): void {
 			root.ccVisible = !root.ccVisible
 			if (root.ccVisible) root.launcherVisible = false
+		}
+	}
+
+	IpcHandler {
+		target: "theme"
+		function reload(): void {
+			colorFile.reload()
 		}
 	}
 
@@ -296,8 +304,8 @@ ShellRoot {
 						model: root.workspacesList
 						Rectangle {
 							required property var modelData
-							width: 26
-							height: 26
+							implicitWidth: 26
+							implicitHeight: 26
 							radius: 13
 							color: wsMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.1) : "transparent"
 
@@ -332,8 +340,8 @@ ShellRoot {
 					spacing: 12
 
 					Rectangle {
-						height: 30
-						width: clkTxt.implicitWidth + 20
+						implicitHeight: 30
+						implicitWidth: clkTxt.implicitWidth + 20
 						radius: 15
 						color: clkMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.1) : "transparent"
 
@@ -497,7 +505,7 @@ ShellRoot {
 						spacing: 4
 
 						Rectangle {
-							width: 28; height: 28; radius: 14
+							implicitWidth: 28; implicitHeight: 28; radius: 14
 							color: pwrMainMouse.containsMouse ? root.color4 : "transparent"
 							Text {
 								anchors.centerIn: parent
@@ -525,7 +533,7 @@ ShellRoot {
 							] : []
 							Rectangle {
 								required property var modelData
-								width: 28; height: 28; radius: 14
+								implicitWidth: 28; implicitHeight: 28; radius: 14
 								color: subPwrMouse.containsMouse ? root.color4 : "transparent"
 								Text {
 									anchors.centerIn: parent
@@ -559,6 +567,7 @@ ShellRoot {
 		visible: root.popupNotifications.length > 0 && !root.ccVisible
 		WlrLayershell.layer: WlrLayer.Overlay
 		WlrLayershell.namespace: "swaync-notification-window"
+		WlrLayershell.exclusionMode: ExclusionMode.Ignore
 		anchors { top: true }
 		margins.top: 58
 		implicitWidth: 400
@@ -616,6 +625,7 @@ ShellRoot {
 		visible: root.ccVisible
 		WlrLayershell.layer: WlrLayer.Top
 		WlrLayershell.namespace: "swaync-control-center"
+		WlrLayershell.exclusionMode: ExclusionMode.Ignore
 		anchors { top: true }
 		margins.top: 58
 		implicitWidth: 400
@@ -646,7 +656,7 @@ ShellRoot {
 						Layout.fillWidth: true
 					}
 					Rectangle {
-						width: 90; height: 32; radius: 10
+						implicitWidth: 90; implicitHeight: 32; radius: 10
 						color: clrMouse.containsMouse ? root.color4 : "transparent"
 						border.width: 1; border.color: root.color4
 						Text {
@@ -673,7 +683,7 @@ ShellRoot {
 				// Griglia 5 Pulsanti Rapidi (DND, Screenshot, Mic, Lock, Power)
 				Rectangle {
 					Layout.fillWidth: true
-					height: 68
+					implicitHeight: 68
 					radius: 15
 					color: root.color0
 					RowLayout {
@@ -724,7 +734,7 @@ ShellRoot {
 				// Widget Volume Slider
 				Rectangle {
 					Layout.fillWidth: true
-					height: 48
+					implicitHeight: 48
 					radius: 15
 					color: root.color0
 					RowLayout {
@@ -739,7 +749,7 @@ ShellRoot {
 						}
 						Rectangle {
 							Layout.fillWidth: true
-							height: 10
+							implicitHeight: 10
 							radius: 5
 							color: Qt.rgba(1, 1, 1, 0.1)
 							property real pct: (Pipewire.defaultAudioSink && Pipewire.defaultAudioSink.audio) ? Math.min(1, Pipewire.defaultAudioSink.audio.volume) : 0
@@ -763,7 +773,7 @@ ShellRoot {
 				// Widget Backlight Slider
 				Rectangle {
 					Layout.fillWidth: true
-					height: 48
+					implicitHeight: 48
 					radius: 15
 					color: root.color0
 					RowLayout {
@@ -778,7 +788,7 @@ ShellRoot {
 						}
 						Rectangle {
 							Layout.fillWidth: true
-							height: 10
+							implicitHeight: 10
 							radius: 5
 							color: Qt.rgba(1, 1, 1, 0.1)
 							Rectangle {
@@ -838,7 +848,7 @@ ShellRoot {
 								}
 							}
 							Rectangle {
-								width: 24; height: 24; radius: 12
+								implicitWidth: 24; implicitHeight: 24; radius: 12
 								color: root.color1
 								Text {
 									anchors.centerIn: parent
@@ -867,6 +877,7 @@ ShellRoot {
 		visible: root.launcherVisible
 		WlrLayershell.layer: WlrLayer.Overlay
 		WlrLayershell.namespace: "launcher"
+		WlrLayershell.exclusionMode: ExclusionMode.Ignore
 		WlrLayershell.keyboardFocus: root.launcherVisible ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 		implicitWidth: 460
 		implicitHeight: 420
@@ -912,7 +923,7 @@ ShellRoot {
 				// Barra di ricerca
 				Rectangle {
 					Layout.fillWidth: true
-					height: 40
+					implicitHeight: 40
 					radius: 10
 					color: root.color0
 					border.width: 1
