@@ -208,7 +208,7 @@ PKGcheck () {
 	if [[ "$CPU_TYPE" == "Intel" ]]; then UCODEsel="intel-ucode"
 	elif [[ "$CPU_TYPE" == "AMD" ]]; then if [[ "${OSsel,,}" == "void" ]]; then UCODEsel="linux-firmware-amd" ; else UCODEsel="amd-ucode" ; fi ; fi
 	if [[ -n "$UCODEsel" ]]; then microcode=("$UCODEsel") ; fi
-	if [[ "$HAS_AMD" -eq 1 ]]; then if [[ "${OSsel,,}" == "void" ]]; then amddrivers=(mesa-dri vulkan-loader mesa-vulkan-radeon) ; else amddrivers=(mesa vulkan-radeon) ; fi ; fi
+	if [[ "$HAS_AMD" -eq 1 ]]; then	if [[ "${OSsel,,}" == "void" ]]; then amddrivers=(mesa-dri vulkan-loader mesa-vulkan-radeon) ; else amddrivers=(mesa vulkan-radeon) ; fi ; fi
 	if [[ "$HAS_NVIDIA" -eq 1 && "$NVsel" =~ ^(OPEN|PROPRIETARY)$ ]]; then
 		if [[ "${OSsel,,}" == "void" ]]; then
 			if [[ "$LIBsel" != "MUSL" ]]; then nvidiadrivers=(nvidia nvidia-libs-32bit) ; fi
@@ -225,7 +225,8 @@ PKGcheck () {
 	audio=(pipewire wireplumber) ; if [[ "${OSsel,,}" == "void" ]]; then audio+=(alsa-pipewire libjack-pipewire sof-firmware) ; else audio+=(pipewire-pulse pipewire-alsa pipewire-jack sof-firmware) ; fi
 	baselinux=(base-devel) ; if [[ "${OSsel,,}" == "void" ]]; then baselinux+=(base-system) ; else baselinux+=(base) ; fi ; if [[ "${OSsel,,}" == "artix" ]]; then baselinux+=("${init_sys,,}") ; fi
 	baseutils=(bash-completion vim nano wget git binutils cryptsetup rsync) ; if [[ "${OSsel,,}" == "void" ]]; then baseutils+=(man-pages) ; else baseutils+=(man-db) ; fi
-	bluetooth=(bluez blueman) ; if [[ "${OSsel,,}" != "void" ]]; then bluetooth+=(bluez-utils bluetui) ; fi ; if [[ "${OSsel,,}" == "artix" ]]; then bluetooth+=("bluez-${init_sys,,}" bluez-cups) ; fi
+	bluetooth=(bluez) ; if [[ "$SHELLsel" != "Quickshell" ]]; then bluetooth+=(blueman) ; fi
+	if [[ "${OSsel,,}" != "void" ]]; then bluetooth+=(bluez-utils bluetui) ; fi ; if [[ "${OSsel,,}" == "artix" ]]; then bluetooth+=("bluez-${init_sys,,}" bluez-cups) ; fi
 	bootloaderutility=(efibootmgr os-prober) ; if [[ "${OSsel,,}" != "void" ]]; then bootloaderutility+=(sbsigntools) ; fi
 	if [[ "${OSsel,,}" != "void" ]]; then booster=(booster) ; else booster=() ; fi
 	if [[ "$FSsel" == "btrfs" ]]; then btrfsutility=(snapper btrfs-progs) ; else btrfsutility=() ; fi
@@ -256,7 +257,7 @@ PKGcheck () {
 	if [[ "${OSsel,,}" == "artix" ]]; then logind=(elogind elogind-"${init_sys,,}" "${init_sys,,}"-settingsd) ; elif [[ "${OSsel,,}" == "void" ]]; then logind=(seatd elogind) ; else logind=() ; fi
 	net=(iwd chrony) ; if [[ "${OSsel,,}" == "void" ]]; then net+=(NetworkManager) ; else net+=(networkmanager) ; fi ; if [[ "${OSsel,,}" == "artix" ]]; then net+=("iwd-${init_sys,,}" "chrony-${init_sys,,}" "networkmanager-${init_sys,,}") ; fi
 	print=(cups cups-pdf) ; if [[ "${OSsel,,}" == "void" ]]; then print+=(avahi-daemon cups-filters) ; else print+=(avahi system-config-printer) ; fi ; if [[ "${OSsel,,}" == "artix" ]]; then print+=("avahi-${init_sys,,}" "cups-${init_sys,,}") ; fi
-	utility=(imv featherpad libqalculate fd btop fwupd fastfetch grim slurp wl-clipboard xclip swappy brightnessctl playerctl pavucontrol xorg-xwayland)
+	utility=(imv featherpad libqalculate fd btop fwupd fastfetch grim slurp wf-recorder wl-clipboard xclip swappy brightnessctl playerctl pavucontrol xorg-xwayland)
 	if [[ "$DEsel" == "Niri" && "$SHELLsel" != "Quickshell" ]]; then utility+=(awww) ; fi
 	if [[ "${OSsel,,}" != "void" ]]; then utility+=(lact cowfortune pacman-contrib) ; fi ; if [[ "${OSsel,,}" == "artix" ]]; then if [[ "$LUKS_ENC" -eq 1 ]]; then utility+=("cryptsetup-${init_sys,,}") ; fi ; fi
 	if compgen -G "/sys/class/power_supply/BAT*" >/dev/null; then if [[ "${OSsel,,}" == "arch" && "$DEsel" =~ ^(KDE|GNOME|COSMIC)$ ]]; then utility+=(power-profiles-daemon) ; else utility+=(tlp) ; if [[ "${OSsel,,}" == "artix" ]]; then utility+=("tlp-${init_sys,,}") ; fi ; fi ; if [[ "$CPU_TYPE" == "Intel" ]]; then utility+=(thermald) ; if [[ "${OSsel,,}" == "artix" ]]; then utility+=("thermald-${init_sys,,}") ; fi ; fi ; fi
@@ -377,7 +378,7 @@ UserSetup () {
 	echo "Choose password for root"
 	while ! CR passwd; do echo "Error: Try again..." ; done
 	echo "Copying configuration files..."
-	mkdir -p /mnt/home/"$UNsel"/{.config/kitty,.config/swappy,Pictures/Screenshots}
+	mkdir -p /mnt/home/"$UNsel"/{.config/kitty,.config/swappy,Pictures/Screenshots,Videos/Recordings}
 	if [[ "${OSsel,,}" == "void" ]]; then
 		mkdir -p /mnt/etc/bash ; if [[ -f "${SCRIPT_DIR}/Conf_files/bashrc" ]]; then cp "${SCRIPT_DIR}/Conf_files/bashrc" /mnt/home/"$UNsel"/.bashrc ; fi
 	else
@@ -437,20 +438,20 @@ UserSetup () {
 				qs_run="env -u LIBGL_ALWAYS_SOFTWARE QSG_RHI_BACKEND=opengl QSG_RENDER_LOOP=basic quickshell"
 				qs_niri='"env" "-u" "LIBGL_ALWAYS_SOFTWARE" "QSG_RHI_BACKEND=opengl" "QSG_RENDER_LOOP=basic" "quickshell"'
 			fi
-			sed -i "s|lock_cmd = .*|lock_cmd = pgrep -u \$UID -f 'quickshell/lock' >/dev/null \|\| $qs_run -p ~/.config/quickshell/lock|" /mnt/home/"$UNsel"/.config/hypr/hypridle.conf
+			sed -i "s|lock_cmd = .*|lock_cmd = quickshell ipc call lock lock|" /mnt/home/"$UNsel"/.config/hypr/hypridle.conf
 			if [[ "$DEsel" == "Niri" ]]; then
 				sed -i -e "s|spawn-at-startup \"waybar\"|spawn-at-startup $qs_niri|" \
 					-e '/spawn-at-startup "swaync"/d' \
 					-e '/spawn-at-startup "awww-daemon"/d' \
 					-e 's|spawn "fuzzel"|spawn "quickshell" "ipc" "call" "launcher" "toggle"|g' \
-					-e "s|spawn \"hyprlock\"|spawn $qs_niri \"-p\" \"/home/$UNsel/.config/quickshell/lock\"|g" \
+					-e 's|spawn "hyprlock"|spawn "quickshell" "ipc" "call" "lock" "lock"|g' \
 					-e 's|spawn "swaync-client" "-t" "-sw"|spawn "quickshell" "ipc" "call" "controlcenter" "toggle"|g' "$cfg"
 			else
 				sed -i -e "s|exec-once = waybar|exec-once = $qs_run|" \
 					-e '/exec-once = swaync/d' \
 					-e 's|exec-once = hyprpaper & |exec-once = |' \
 					-e 's|\$menu = fuzzel|\$menu = quickshell ipc call launcher toggle|' \
-					-e "s|exec, hyprlock|exec, $qs_run -p ~/.config/quickshell/lock|g" \
+					-e 's|exec, hyprlock|exec, quickshell ipc call lock lock|g' \
 					-e 's|exec, swaync-client -t -sw|exec, quickshell ipc call controlcenter toggle|g' "$cfg"
 			fi
 		else
