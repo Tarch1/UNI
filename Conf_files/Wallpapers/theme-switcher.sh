@@ -18,9 +18,7 @@ apply_theme() {
 	local wall ; wall=$(find "$target_dir" -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.webp" \) | shuf -n 1)
 	[[ -z "$wall" ]] && return 1
 	[[ "$CURRENT_WALL" == "$wall" ]] && return 0
-	if command -v quickshell >/dev/null 2>&1; then
-		if ! pgrep -u "$UID" -x quickshell >/dev/null; then env QSG_RHI_BACKEND=opengl quickshell & sleep 1 ; fi
-	else
+	if ! command -v quickshell >/dev/null 2>&1; then
 		if [[ "$XDG_CURRENT_DESKTOP" == "Hyprland" ]]; then
 			pgrep -u "$UID" -x hyprpaper >/dev/null || { hyprpaper & sleep 1; }
 			hyprctl hyprpaper preload "$wall" >/dev/null 2>&1 || return 1
@@ -32,7 +30,12 @@ apply_theme() {
 	fi
 	if [[ "$theme" == "night" ]]; then wallust run -s "$wall" --palette dark16 ; else wallust run -s "$wall" ; fi
 	killall -SIGUSR1 kitty 2>/dev/null || true
-	if ! command -v quickshell >/dev/null 2>&1; then
+	if command -v quickshell >/dev/null 2>&1; then
+		if [[ -f "$HOME/.config/quickshell/colors.json" ]]; then
+			sed -i "s|\"wallpaper\": *\"[^\"]*\"|\"wallpaper\": \"$wall\"|" "$HOME/.config/quickshell/colors.json"
+		fi
+		quickshell ipc call theme reload >/dev/null 2>&1 || true
+	else
 		if pgrep -u "$UID" -x waybar >/dev/null; then killall -SIGUSR2 waybar ; else waybar & fi
 		swaync-client -rs >/dev/null 2>&1 || true
 	fi
@@ -42,16 +45,14 @@ apply_theme() {
 
 sleep 2
 while true; do
-	pgrep -u "$UID" -x "niri|Hyprland" >/dev/null || exit 0
+	if ! pgrep -u "$UID" -x niri >/dev/null && ! pgrep -u "$UID" -x Hyprland >/dev/null; then exit 0 ; fi
 	printf -v HOUR '%(%k)T' -1
 	if (( HOUR >= 7 && HOUR < 19 )); then
 		[[ "$CURRENT_THEME" != "day" ]] && apply_theme "day" "$DAY_DIR"
 	else
 		[[ "$CURRENT_THEME" != "night" ]] && apply_theme "night" "$NIGHT_DIR"
 	fi
-	if command -v quickshell >/dev/null 2>&1; then
-		if ! pgrep -u "$UID" -x quickshell >/dev/null; then env QSG_RHI_BACKEND=opengl quickshell & fi
-	else
+	if ! command -v quickshell >/dev/null 2>&1; then
 		if ! pgrep -u "$UID" -x waybar >/dev/null; then waybar & fi
 	fi
 	if [[ -z "$CURRENT_THEME" ]]; then sleep 2 ; else sleep 10 ; fi
