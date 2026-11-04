@@ -176,7 +176,7 @@ ShellRoot {
 	function toggleWallpaperMode() {
 		root.animWallpapers = !root.animWallpapers
 		let m = root.animWallpapers ? "animated" : "static"
-		runCmd("printf '%s' '" + m + "' > \"" + root.homeDir + "/.config/quickshell/wall_mode\" && \"" + root.homeDir + "/.config/wallpapers/theme-switcher.sh\" &")
+		runCmd("\"" + root.homeDir + "/.config/wallpapers/theme-switcher.sh\" " + m + " &")
 	}
 
 	function togglePrimaryNetwork() {
@@ -365,13 +365,12 @@ ShellRoot {
 				b_p=$(awk -v p=\"$(cat \"$bat_d/power_now\" 2>/dev/null || echo 0)\" 'BEGIN{printf \"%.1f W\", p/1000000}')
 				b_c=$(cat \"$bat_d/cycle_count\" 2>/dev/null || echo 0); b_t=$(cat \"$bat_d/technology\" 2>/dev/null || echo \"Li-ion\")
 			else b_h=\"AC Power\"; b_p=\"0.0 W\"; b_c=\"N/A\"; b_t=\"Virtual / AC\"; fi
-			w_mode=$(cat ~/.config/quickshell/wall_mode 2>/dev/null || echo static)
-			printf '%d|%s|%d|%s|%d|%s|%s|%d|%d|%s|%d|%d|%s|%d|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s\n' \"$((t/1000))\" \"${e_dev:-}\" \"$e_on\" \"$e_ip\" \"$w_hw\" \"${w_rad:-disabled}\" \"$net\" \"$bt_hw\" \"$bt_en\" \"$bt_name\" \"$hp\" \"$hmic\" \"${cpu_m:-CPU}\" \"${cpu_u:-10}\" \"$ram_s\" \"$d_root\" \"${d_sec:-No secondary drive}\" \"$(uname -r)\" \"$(uptime -p 2>/dev/null | sed 's/^up //')\" \"$b_h\" \"$b_p\" \"$b_c\" \"$b_t\" \"$w_mode\"
+			printf '%d|%s|%d|%s|%d|%s|%s|%d|%d|%s|%d|%d|%s|%d|%s|%s|%s|%s|%s|%s|%s|%s|%s\n' \"$((t/1000))\" \"${e_dev:-}\" \"$e_on\" \"$e_ip\" \"$w_hw\" \"${w_rad:-disabled}\" \"$net\" \"$bt_hw\" \"$bt_en\" \"$bt_name\" \"$hp\" \"$hmic\" \"${cpu_m:-CPU}\" \"${cpu_u:-10}\" \"$ram_s\" \"$d_root\" \"${d_sec:-No secondary drive}\" \"$(uname -r)\" \"$(uptime -p 2>/dev/null | sed 's/^up //')\" \"$b_h\" \"$b_p\" \"$b_c\" \"$b_t\" \"$w_mode\"
 		"]
 		stdout: SplitParser {
 			onRead: data => {
 				let p = data.trim().split("|")
-				if (p.length >= 26) {
+				if (p.length >= 25) {
 					root.cpuTemp = parseInt(p[0]) || 40
 					root.ethIface = p[1]
 					root.ethConnected = (p[2] === "1")
@@ -397,7 +396,6 @@ ShellRoot {
 					root.batPowerDraw = p[22]
 					root.batCycles = p[23]
 					root.batTech = p[24]
-					root.animWallpapers = (p[25] === "animated")
 				}
 			}
 		}
