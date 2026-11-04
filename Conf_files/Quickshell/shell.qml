@@ -16,11 +16,13 @@ ShellRoot {
 	id: root
 
 	property string homeDir: Quickshell.env("HOME")
-	property bool isVM: Quickshell.env("QSG_RENDER_LOOP") === "basic"
+	property bool isVM: Quickshell.env("QSG_RENDER_LOOP") === "basic" || Quickshell.env("QSG_RHI_BACKEND") === "software"
 	property bool isHyprland: Quickshell.env("XDG_CURRENT_DESKTOP") === "Hyprland"
 
-	// Palette dinamica Wallust (~/.config/quickshell/colors.json)
+	// Palette dinamica Wallust (~/.config/quickshell/colors.json) e Sfondi Statici/Animati
 	property string wallpaperPath: ""
+	property bool animWallpapers: false
+	property bool isAnimatedFile: wallpaperPath.toLowerCase().endsWith(".gif") || (animWallpapers && wallpaperPath.toLowerCase().endsWith(".webp"))
 	property color bg: "#1e1e2e"
 	property color fg: "#cdd6f4"
 	property color color0: "#1e1e2e"
@@ -151,7 +153,6 @@ ShellRoot {
 			root.sysSubmenu = ""
 			root.wifiPromptSsid = ""
 			root.centerMode = "launcher"
-			focusTimer.restart()
 		}
 	}
 	function openCalendar() {
@@ -171,6 +172,12 @@ ShellRoot {
 	}
 	function triggerOsd(mode) { root.osdMode = mode; osdTimer.restart() }
 	function triggerLock() { root.closeCenterPill(); root.screenLocked = true }
+
+	function toggleWallpaperMode() {
+		root.animWallpapers = !root.animWallpapers
+		let m = root.animWallpapers ? "animated" : "static"
+		runCmd("printf '%s' '" + m + "' > \"" + root.homeDir + "/.config/quickshell/wall_mode\" && \"" + root.homeDir + "/.config/wallpapers/theme-switcher.sh\" &")
+	}
 
 	function togglePrimaryNetwork() {
 		if (root.ethIface !== "" && (!root.hasWifiHw || root.ethConnected)) {
@@ -224,6 +231,7 @@ ShellRoot {
 			try {
 				let d = JSON.parse(text())
 				if (d.wallpaper) root.wallpaperPath = d.wallpaper
+				if (d.wallMode) root.animWallpapers = (d.wallMode === "animated")
 				if (d.background) root.bg = d.background
 				if (d.foreground) root.fg = d.foreground
 				if (d.color0) root.color0 = d.color0
@@ -256,19 +264,6 @@ ShellRoot {
 	Timer { id: wsCollapseTimer; interval: 1000; onTriggered: root.wsExpanded = false }
 	Timer { id: autoCloseTimer; interval: 4500; onTriggered: { if (root.centerMode !== "none" && root.wifiPromptSsid === "") root.closeCenterPill() } }
 	Timer { id: popupTimer; interval: 5000; onTriggered: root.popupNotifications = [] }
-	Timer {
-		id: focusTimer
-		interval: 40
-		repeat: false
-		onTriggered: {
-			if (root.centerMode === "launcher") {
-				launcherSearchInput.text = ""
-				launcherSearchInput.forceActiveFocus()
-			} else if (root.wifiPromptSsid !== "") {
-				wifiPwField.forceActiveFocus()
-			}
-		}
-	}
 
 	NotificationServer {
 		id: notifServer
@@ -370,12 +365,13 @@ ShellRoot {
 				b_p=$(awk -v p=\"$(cat \"$bat_d/power_now\" 2>/dev/null || echo 0)\" 'BEGIN{printf \"%.1f W\", p/1000000}')
 				b_c=$(cat \"$bat_d/cycle_count\" 2>/dev/null || echo 0); b_t=$(cat \"$bat_d/technology\" 2>/dev/null || echo \"Li-ion\")
 			else b_h=\"AC Power\"; b_p=\"0.0 W\"; b_c=\"N/A\"; b_t=\"Virtual / AC\"; fi
-			printf '%d|%s|%d|%s|%d|%s|%s|%d|%d|%s|%d|%d|%s|%d|%s|%s|%s|%s|%s|%s|%s|%s|%s\n' \"$((t/1000))\" \"${e_dev:-}\" \"$e_on\" \"$e_ip\" \"$w_hw\" \"${w_rad:-disabled}\" \"$net\" \"$bt_hw\" \"$bt_en\" \"$bt_name\" \"$hp\" \"$hmic\" \"${cpu_m:-CPU}\" \"${cpu_u:-10}\" \"$ram_s\" \"$d_root\" \"${d_sec:-No secondary drive}\" \"$(uname -r)\" \"$(uptime -p 2>/dev/null | sed 's/^up //')\" \"$b_h\" \"$b_p\" \"$b_c\" \"$b_t\"
+			w_mode=$(cat ~/.config/quickshell/wall_mode 2>/dev/null || echo static)
+			printf '%d|%s|%d|%s|%d|%s|%s|%d|%d|%s|%d|%d|%s|%d|%s|%s|%s|%s|%s|%s|%s|%s|%s|%s\n' \"$((t/1000))\" \"${e_dev:-}\" \"$e_on\" \"$e_ip\" \"$w_hw\" \"${w_rad:-disabled}\" \"$net\" \"$bt_hw\" \"$bt_en\" \"$bt_name\" \"$hp\" \"$hmic\" \"${cpu_m:-CPU}\" \"${cpu_u:-10}\" \"$ram_s\" \"$d_root\" \"${d_sec:-No secondary drive}\" \"$(uname -r)\" \"$(uptime -p 2>/dev/null | sed 's/^up //')\" \"$b_h\" \"$b_p\" \"$b_c\" \"$b_t\" \"$w_mode\"
 		"]
 		stdout: SplitParser {
 			onRead: data => {
 				let p = data.trim().split("|")
-				if (p.length >= 25) {
+				if (p.length >= 26) {
 					root.cpuTemp = parseInt(p[0]) || 40
 					root.ethIface = p[1]
 					root.ethConnected = (p[2] === "1")
@@ -401,6 +397,7 @@ ShellRoot {
 					root.batPowerDraw = p[22]
 					root.batCycles = p[23]
 					root.batTech = p[24]
+					root.animWallpapers = (p[25] === "animated")
 				}
 			}
 		}
@@ -536,7 +533,7 @@ ShellRoot {
 		}
 	}
 
-	// 1. SFONDO DESKTOP NATIVO
+	// 1. SFONDO DESKTOP NATIVO (Static Image a 0% CPU + AnimatedImage per GIF/WebP animati)
 	Variants {
 		model: Quickshell.screens
 		PanelWindow {
@@ -547,7 +544,25 @@ ShellRoot {
 			WlrLayershell.exclusionMode: ExclusionMode.Ignore
 			anchors { top: true; bottom: true; left: true; right: true }
 			color: root.bg
-			Image { anchors.fill: parent; source: root.wallpaperPath !== "" ? "file://" + root.wallpaperPath : ""; fillMode: Image.PreserveAspectCrop; asynchronous: true; smooth: true }
+
+			Image {
+				anchors.fill: parent
+				visible: !root.isAnimatedFile
+				source: (!root.isAnimatedFile && root.wallpaperPath !== "") ? "file://" + root.wallpaperPath : ""
+				fillMode: Image.PreserveAspectCrop
+				asynchronous: true
+				smooth: true
+			}
+
+			AnimatedImage {
+				anchors.fill: parent
+				visible: root.isAnimatedFile
+				source: (root.isAnimatedFile && root.wallpaperPath !== "") ? "file://" + root.wallpaperPath : ""
+				playing: visible && !root.screenLocked
+				fillMode: Image.PreserveAspectCrop
+				asynchronous: true
+				smooth: true
+			}
 		}
 	}
 
@@ -588,6 +603,7 @@ ShellRoot {
 	Variants {
 		model: Quickshell.screens
 		PanelWindow {
+			id: islandWin
 			required property var modelData
 			screen: modelData
 			visible: root.barVisible
@@ -600,6 +616,36 @@ ShellRoot {
 			implicitWidth: islandRow.implicitWidth + 16
 			implicitHeight: islandRow.implicitHeight + 8
 			color: "transparent"
+
+			function grabKeyboardNow() {
+				if (root.centerMode === "launcher") {
+					islandWin.requestActivate()
+					launcherSearchInput.forceActiveFocus()
+				} else if (root.wifiPromptSsid !== "") {
+					islandWin.requestActivate()
+					wifiPwField.forceActiveFocus()
+				}
+			}
+
+			Timer { id: focusTimer1; interval: 20; repeat: false; onTriggered: islandWin.grabKeyboardNow() }
+			Timer { id: focusTimer2; interval: 90; repeat: false; onTriggered: islandWin.grabKeyboardNow() }
+
+			Connections {
+				target: root
+				function onCenterModeChanged() {
+					if (root.centerMode === "launcher") {
+						launcherSearchInput.text = ""
+						focusTimer1.restart()
+						focusTimer2.restart()
+					}
+				}
+				function onWifiPromptSsidChanged() {
+					if (root.wifiPromptSsid !== "") {
+						focusTimer1.restart()
+						focusTimer2.restart()
+					}
+				}
+			}
 
 			RowLayout {
 				id: islandRow
@@ -884,6 +930,7 @@ ShellRoot {
 								Text { text: "󰍉 "; color: root.color4; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 15 }
 								TextInput {
 									id: launcherSearchInput; Layout.fillWidth: true; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 14; font.bold: true; clip: true
+									focus: true
 									onTextChanged: { root.searchQuery = text; root.selectedAppIndex = 0 }
 									Keys.onDownPressed: { if (root.selectedAppIndex < root.filteredApps.length - 1) root.selectedAppIndex++ }
 									Keys.onUpPressed: { if (root.selectedAppIndex > 0) root.selectedAppIndex-- }
@@ -953,10 +1000,11 @@ ShellRoot {
 								}
 							}
 
-							// 2. GRIGLIA 2x2 PERFETTAMENTE ALLINEATA AL 50% (Network, Bluetooth, App Tray, Battery)
+							// 2. GRIGLIA 2x2 CON LARGHEZZA UNIFORME GARANTITA (Network, Bluetooth, App Tray, Battery)
 							GridLayout {
 								Layout.fillWidth: true
 								columns: 2
+								uniformCellWidths: true
 								rowSpacing: 10
 								columnSpacing: 10
 
@@ -1015,22 +1063,34 @@ ShellRoot {
 									}
 								}
 
-								// Tile 3: App Tray (Allineata a Network)
+								// Tile 3: App Tray (Cerchio con contatore a sinistra, Titolo + Icone al centro, Freccia a destra)
 								Rectangle {
 									Layout.fillWidth: true; Layout.preferredWidth: 1; implicitHeight: 58; radius: 16; color: root.color0
+									property int trayCount: SystemTray.items.values.length
 									RowLayout {
 										anchors.fill: parent; anchors.margins: 10; spacing: 8
+										Rectangle {
+											implicitWidth: 36; implicitHeight: 36; radius: 18
+											color: parent.parent.trayCount > 0 ? root.color4 : Qt.rgba(1, 1, 1, 0.08)
+											Text {
+												anchors.centerIn: parent
+												text: parent.parent.parent.trayCount.toString()
+												color: parent.parent.parent.trayCount > 0 ? root.bg : root.fg
+												font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 14; font.bold: true
+											}
+											MouseArea { anchors.fill: parent; onClicked: root.sysSubmenu = "tray" }
+										}
 										ColumnLayout {
-											Layout.fillWidth: true; spacing: 4
-											Text { text: "App Tray (" + SystemTray.items.values.length + ")"; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12; font.bold: true }
+											Layout.fillWidth: true; spacing: 2
+											Text { text: "App Tray"; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 13; font.bold: true }
 											RowLayout {
-												spacing: 5
+												spacing: 4
 												Repeater {
-													model: SystemTray.items.values.slice(0, 4)
+													model: SystemTray.items.values.slice(0, 3)
 													Rectangle {
 														required property var modelData
-														implicitWidth: 20; implicitHeight: 20; radius: 5; color: Qt.rgba(1, 1, 1, 0.08)
-														IconImage { anchors.centerIn: parent; implicitSize: 14; source: modelData.icon }
+														implicitWidth: 18; implicitHeight: 18; radius: 4; color: Qt.rgba(1, 1, 1, 0.08)
+														IconImage { anchors.centerIn: parent; implicitSize: 13; source: modelData.icon }
 														MouseArea { anchors.fill: parent; acceptedButtons: Qt.LeftButton | Qt.RightButton; onClicked: mouse => { if (mouse.button === Qt.RightButton) modelData.secondaryActivate(); else modelData.activate() } }
 													}
 												}
@@ -1121,7 +1181,6 @@ ShellRoot {
 									RowLayout {
 										anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 10; spacing: 8
 
-										// Nome + Percentuale allineati a larghezza fissa
 										RowLayout {
 											Layout.preferredWidth: 124
 											Layout.fillWidth: false
@@ -1137,7 +1196,6 @@ ShellRoot {
 											}
 										}
 
-										// Icona cliccabile per Mute/Unmute
 										Text {
 											text: parent.parent.iconTxt
 											color: parent.parent.isMuted ? root.color1 : root.color4
@@ -1151,7 +1209,6 @@ ShellRoot {
 											}
 										}
 
-										// Barra di regolazione trascinabile in tempo reale
 										Rectangle {
 											Layout.fillWidth: true; implicitHeight: 14; radius: 7; color: Qt.rgba(1, 1, 1, 0.1)
 											Rectangle {
@@ -1166,7 +1223,6 @@ ShellRoot {
 											}
 										}
 
-										// Freccia Sottomenu rivolta in giù
 										Rectangle {
 											implicitWidth: 26; implicitHeight: 28; radius: 8; color: Qt.rgba(1, 1, 1, 0.05)
 											Text { anchors.centerIn: parent; text: "󰅀"; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 14 }
@@ -1200,7 +1256,6 @@ ShellRoot {
 									color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 16; font.bold: true
 								}
 
-								// Switch On/Off Header: per Network controlla Ethernet, per BT/Sound/Mic controlla il relativo stato
 								Rectangle {
 									visible: (root.sysSubmenu === "net" && root.ethIface !== "") || root.sysSubmenu === "bt" || root.sysSubmenu === "sound" || root.sysSubmenu === "mic"
 									implicitWidth: 46; implicitHeight: 24; radius: 12
@@ -1235,7 +1290,7 @@ ShellRoot {
 								}
 							}
 
-							// SOTTOMENU SOUND / MIC (Slider Trascinabile + Lista Dispositivi)
+							// SOTTOMENU SOUND / MIC
 							ColumnLayout {
 								visible: root.sysSubmenu === "sound" || root.sysSubmenu === "mic"
 								Layout.fillWidth: true; spacing: 8
@@ -1303,7 +1358,6 @@ ShellRoot {
 											anchors { top: parent.top; left: parent.left; right: parent.right; margins: 12 }
 											spacing: 10
 
-											// Intestazione Monitor
 											RowLayout {
 												Layout.fillWidth: true; spacing: 10
 												Rectangle {
@@ -1318,7 +1372,6 @@ ShellRoot {
 												Text { text: "focused"; color: root.color2; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; font.bold: true }
 											}
 
-											// Barra Luminosità Trascinabile
 											RowLayout {
 												Layout.fillWidth: true; spacing: 10
 												Rectangle {
@@ -1339,7 +1392,6 @@ ShellRoot {
 												Text { text: root.brightnessPct + "%"; color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12; font.bold: true }
 											}
 
-											// Pulsanti Scala (1.0x, 1.25x, 1.5x, 1.75x, 2.0x)
 											RowLayout {
 												Layout.fillWidth: true; spacing: 6
 												Repeater {
@@ -1365,7 +1417,6 @@ ShellRoot {
 												}
 											}
 
-											// Riga Selettore Risoluzione @ Refresh Rate (Hz)
 											RowLayout {
 												Layout.fillWidth: true
 												Text { text: "Resolution"; color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12; Layout.fillWidth: true }
@@ -1380,7 +1431,6 @@ ShellRoot {
 												}
 											}
 
-											// Menu a tendina Risoluzioni/Refresh Rate disponibili
 											ColumnLayout {
 												visible: root.expandedResMon === modelData.name
 												Layout.fillWidth: true; spacing: 4
@@ -1414,7 +1464,6 @@ ShellRoot {
 									}
 								}
 
-								// Card Night Light (Filtro Luce Blu via wlsunset)
 								Rectangle {
 									Layout.fillWidth: true; implicitHeight: 88; radius: 14; color: root.color0
 									ColumnLayout {
@@ -1477,7 +1526,7 @@ ShellRoot {
 								}
 							}
 
-							// SOTTOMENU BATTERY DETAILS
+							// SOTTOMENU BATTERY DETAILS + SELETTORE SFONDI STATICI / ANIMATI
 							ColumnLayout {
 								visible: root.sysSubmenu === "battery"; Layout.fillWidth: true; spacing: 8
 								Rectangle {
@@ -1492,8 +1541,48 @@ ShellRoot {
 										Rectangle { Layout.fillWidth: true; implicitHeight: 10; radius: 5; color: Qt.rgba(1, 1, 1, 0.1); Rectangle { width: parent.width * (root.batPct / 100.0); height: parent.height; radius: 5; color: root.color2 } }
 									}
 								}
+
+								// Toggle Sfondi Statici vs Animati (Risparmio Batteria)
+								Rectangle {
+									Layout.fillWidth: true; implicitHeight: 52; radius: 12; color: root.color0
+									RowLayout {
+										anchors.fill: parent; anchors.margins: 10; spacing: 10
+										Rectangle {
+											implicitWidth: 32; implicitHeight: 32; radius: 16
+											color: root.animWallpapers ? root.color4 : Qt.rgba(1, 1, 1, 0.08)
+											Text {
+												anchors.centerIn: parent
+												text: root.animWallpapers ? "🎬" : "󰸉"
+												color: root.animWallpapers ? root.bg : root.fg
+												font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 15
+											}
+										}
+										ColumnLayout {
+											Layout.fillWidth: true; spacing: 1
+											Text { text: "Animated Wallpapers"; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12; font.bold: true }
+											Text {
+												text: root.animWallpapers ? "Active (day_animated / night_animated)" : "Off • Static Power Saving (day / night)"
+												color: root.animWallpapers ? root.color4 : root.color2
+												font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 10
+											}
+										}
+										Rectangle {
+											implicitWidth: 44; implicitHeight: 22; radius: 11
+											color: root.animWallpapers ? root.color4 : Qt.rgba(1, 1, 1, 0.15)
+											Rectangle {
+												width: 16; height: 16; radius: 8
+												anchors.verticalCenter: parent.verticalCenter
+												x: root.animWallpapers ? 24 : 4
+												color: root.animWallpapers ? root.bg : root.fg
+												Behavior on x { NumberAnimation { duration: 120 } }
+											}
+										}
+									}
+									MouseArea { anchors.fill: parent; onClicked: root.toggleWallpaperMode() }
+								}
+
 								GridLayout {
-									Layout.fillWidth: true; columns: 2; rowSpacing: 8; columnSpacing: 8
+									Layout.fillWidth: true; columns: 2; uniformCellWidths: true; rowSpacing: 8; columnSpacing: 8
 									Repeater {
 										model: [ { "l": "Battery Health", "v": root.batHealth }, { "l": "Power Draw", "v": root.batPowerDraw }, { "l": "Cycle Count", "v": root.batCycles }, { "l": "Technology", "v": root.batTech } ]
 										Rectangle {
@@ -1509,11 +1598,10 @@ ShellRoot {
 								}
 							}
 
-							// SOTTOMENU NETWORK (Sezione Ethernet + Sezione Wi-Fi con Switch, Disponibili e Salvate)
+							// SOTTOMENU NETWORK
 							ColumnLayout {
 								visible: root.sysSubmenu === "net"; Layout.fillWidth: true; spacing: 8
 
-								// Card Stato Porta Ethernet
 								Rectangle {
 									Layout.fillWidth: true; implicitHeight: 50; radius: 12; color: root.color0
 									RowLayout {
@@ -1528,7 +1616,6 @@ ShellRoot {
 									}
 								}
 
-								// Barra Switch Dedicato Wi-Fi + Statistiche
 								Rectangle {
 									Layout.fillWidth: true; implicitHeight: 50; radius: 12; color: root.color0
 									RowLayout {
@@ -1557,7 +1644,6 @@ ShellRoot {
 									}
 								}
 
-								// Prompt Password Wi-Fi
 								Rectangle {
 									visible: root.wifiPromptSsid !== ""; Layout.fillWidth: true; implicitHeight: 74; radius: 12; color: root.color0; border.width: 1; border.color: root.color4
 									ColumnLayout {
@@ -1579,7 +1665,6 @@ ShellRoot {
 									}
 								}
 
-								// Lista Reti Connesse e Collegabili
 								Repeater {
 									model: (root.sysSubmenu === "net" && root.wifiEnabled) ? root.netList : []
 									Rectangle {
@@ -1596,13 +1681,12 @@ ShellRoot {
 											onClicked: {
 												if (modelData.connected) root.runCmd("nmcli con down id \"" + modelData.ssid + "\"")
 												else if (root.savedWifiList.includes(modelData.ssid) || modelData.sec === "" || modelData.sec === "--") root.runCmd("nmcli dev wifi connect \"" + modelData.ssid + "\"")
-												else { root.wifiPromptSsid = modelData.ssid; focusTimer.restart() }
+												else root.wifiPromptSsid = modelData.ssid
 											}
 										}
 									}
 								}
 
-								// Lista Profili Wi-Fi Salvati
 								Text { visible: root.savedWifiList.length > 0; text: "Saved Wi-Fi Profiles"; color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; font.bold: true }
 								Repeater {
 									model: root.sysSubmenu === "net" ? root.savedWifiList : []
@@ -1750,6 +1834,13 @@ ShellRoot {
 					property string centerIcon: root.osdMode === "brightness" ? "󰃠" : (root.osdMode === "mic" ? (root.micMuted ? (root.isHeadsetMic ? "󰋐" : "󰍭") : (root.isHeadsetMic ? "󰋎" : "󰍬")) : (root.outMuted ? (root.isHeadphones ? "󰟎" : "󰖁") : (root.isHeadphones ? "󰋋" : "󰕾")))
 					onArcPctChanged: osdCanvas.requestPaint()
 					onCenterIconChanged: osdCanvas.requestPaint()
+
+					Connections {
+						target: root
+						function onColor4Changed() { osdCanvas.requestPaint() }
+						function onColor2Changed() { osdCanvas.requestPaint() }
+						function onColor3Changed() { osdCanvas.requestPaint() }
+					}
 
 					Canvas {
 						id: osdCanvas; anchors.fill: parent
