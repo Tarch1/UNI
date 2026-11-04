@@ -12,24 +12,26 @@ NIGHT_DIR="$WALL_DIR/night"
 DAY_ANIM_DIR="$WALL_DIR/day_animated"
 NIGHT_ANIM_DIR="$WALL_DIR/night_animated"
 QS_DIR="$HOME/.config/quickshell"
-MODE_FILE="$QS_DIR/wall_mode"
+FORCED_MODE="${1:-}"
 CURRENT_WALL=""
 CURRENT_THEME=""
 LAST_MODE=""
 
 get_wall_mode() {
-	if [[ -f "$MODE_FILE" ]]; then
-		local m
-		m=$(<"$MODE_FILE")
-		[[ "$m" == "animated" ]] && { echo "animated"; return; }
+	if [[ "$FORCED_MODE" =~ ^(animated|static)$ ]]; then
+		echo "$FORCED_MODE"
+		return
 	fi
-	echo "static"
+	local m
+	m=$(grep -o '"wallMode": *"[^"]*"' "$QS_DIR/colors.json" 2>/dev/null | cut -d'"' -f4)
+	[[ "$m" == "animated" ]] && echo "animated" || echo "static"
 }
 
 update_quickshell_json() {
 	local wall="$1"
 	local mode
 	mode=$(get_wall_mode)
+	FORCED_MODE=""
 	mkdir -p "$QS_DIR"
 	if [[ -f "$QS_DIR/colors-wallust.json" ]] && grep -q '"color4": *"#' "$QS_DIR/colors-wallust.json" 2>/dev/null; then
 		sed "s|{|{\n\t\"wallpaper\": \"$wall\",\n\t\"wallMode\": \"$mode\",|" "$QS_DIR/colors-wallust.json" > "$QS_DIR/colors.json"
@@ -94,7 +96,7 @@ apply_theme() {
 	LAST_MODE="$mode"
 }
 
-sleep 1
+[[ -z "$FORCED_MODE" ]] && sleep 1
 while true; do
 	if ! pgrep -u "$UID" -x niri >/dev/null && ! pgrep -u "$UID" -x Hyprland >/dev/null; then exit 0 ; fi
 	NOW_MODE=$(get_wall_mode)
