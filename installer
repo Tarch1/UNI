@@ -431,7 +431,6 @@ UserSetup () {
 		if [[ "$SHELLsel" == "Quickshell" ]]; then
 			echo "auth required pam_unix.so nullok" > /mnt/etc/pam.d/quickshell
 			mkdir -p /mnt/home/"$UNsel"/.config/{quickshell,wallust/templates}
-			echo "static" > /mnt/home/"$UNsel"/.config/quickshell/wall_mode
 			sed -i -e '/\[templates\.fuzzel\]/,/^$/d' -e '/\[templates\.waybar\]/,/^$/d' -e '/\[templates\.quickshell\]/,/^$/d' /mnt/home/"$UNsel"/.config/wallust/wallust.toml
 			printf '{\n\t"background": "{{background}}",\n\t"foreground": "{{foreground}}",\n\t"color0": "{{color0}}",\n\t"color1": "{{color1}}",\n\t"color2": "{{color2}}",\n\t"color3": "{{color3}}",\n\t"color4": "{{color4}}",\n\t"color5": "{{color5}}",\n\t"color6": "{{color6}}",\n\t"color7": "{{color7}}",\n\t"color8": "{{color8}}"\n}\n' > /mnt/home/"$UNsel"/.config/wallust/templates/colors-quickshell.json
 			printf '\n[templates.quickshell]\ntemplate = "colors-quickshell.json"\ntarget = "~/.config/quickshell/colors-wallust.json"\n' >> /mnt/home/"$UNsel"/.config/wallust/wallust.toml
