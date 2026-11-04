@@ -16,9 +16,8 @@ CURRENT_THEME=""
 update_quickshell_json() {
 	local wall="$1"
 	mkdir -p "$QS_DIR"
-	if [[ -f "$QS_DIR/colors-wallust.json" ]]; then
-		sed "s|{|{\n\t\"wallpaper\": \"$wall\",|" "$QS_DIR/colors-wallust.json" > "$QS_DIR/colors.json.tmp"
-		mv -f "$QS_DIR/colors.json.tmp" "$QS_DIR/colors.json"
+	if [[ -f "$QS_DIR/colors-wallust.json" ]] && grep -q '"color4": *"#' "$QS_DIR/colors-wallust.json" 2>/dev/null; then
+		sed "s|{|{\n\t\"wallpaper\": \"$wall\",|" "$QS_DIR/colors-wallust.json" > "$QS_DIR/colors.json"
 	elif [[ -f "$HOME/.config/kitty/colors.conf" ]]; then
 		awk -v w="$wall" '
 		BEGIN {
@@ -31,8 +30,7 @@ update_quickshell_json() {
 		END {
 			printf "{\n\t\"wallpaper\": \"%s\",\n\t\"background\": \"%s\",\n\t\"foreground\": \"%s\",\n\t\"color0\": \"%s\",\n\t\"color1\": \"%s\",\n\t\"color2\": \"%s\",\n\t\"color3\": \"%s\",\n\t\"color4\": \"%s\",\n\t\"color5\": \"%s\",\n\t\"color6\": \"%s\",\n\t\"color7\": \"%s\",\n\t\"color8\": \"%s\"\n}\n",
 			w, c["background"], c["foreground"], c["color0"], c["color1"], c["color2"], c["color3"], c["color4"], c["color5"], c["color6"], c["color7"], c["color8"]
-		}' "$HOME/.config/kitty/colors.conf" > "$QS_DIR/colors.json.tmp"
-		mv -f "$QS_DIR/colors.json.tmp" "$QS_DIR/colors.json"
+		}' "$HOME/.config/kitty/colors.conf" > "$QS_DIR/colors.json"
 	fi
 	quickshell ipc call theme reload >/dev/null 2>&1 || true
 }
@@ -53,7 +51,11 @@ apply_theme() {
 			awww img "$wall" --transition-type grow --transition-pos 0.5,0.5 >/dev/null 2>&1 || return 1
 		fi
 	fi
-	if [[ "$theme" == "night" ]]; then wallust run -s "$wall" --palette dark16 ; else wallust run -s "$wall" ; fi
+	if [[ "$theme" == "night" ]]; then
+		wallust run -s --backend resized -t 2 "$wall" --palette dark16 2>/dev/null || wallust run -s -t 2 "$wall" --palette dark16
+	else
+		wallust run -s --backend resized -t 2 "$wall" 2>/dev/null || wallust run -s -t 2 "$wall"
+	fi
 	killall -SIGUSR1 kitty 2>/dev/null || true
 	if command -v quickshell >/dev/null 2>&1; then
 		update_quickshell_json "$wall"
