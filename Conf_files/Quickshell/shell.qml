@@ -19,7 +19,6 @@ ShellRoot {
 	property bool isVM: Quickshell.env("QSG_RENDER_LOOP") === "basic" || Quickshell.env("QSG_RHI_BACKEND") === "software"
 	property bool isHyprland: Quickshell.env("XDG_CURRENT_DESKTOP") === "Hyprland"
 
-	// Palette dinamica Wallust (~/.config/quickshell/colors.json) e Sfondi Statici/Animati
 	property string wallpaperPath: ""
 	property bool animWallpapers: false
 	property bool isAnimatedFile: wallpaperPath.toLowerCase().endsWith(".gif") || (animWallpapers && wallpaperPath.toLowerCase().endsWith(".webp"))
@@ -34,16 +33,13 @@ ShellRoot {
 	property color color6: "#94e2d5"
 	property color color8: "#585b70"
 
-	// Stato Globale UI: "none" | "calendar" | "system" | "launcher"
 	property bool barVisible: true
 	property string centerMode: "none"
-	// Sottomenu: "" | "net" | "bt" | "tray" | "battery" | "rec" | "display" | "sound" | "mic" | "cpu" | "power"
 	property string sysSubmenu: ""
 	property bool screenLocked: false
 	property bool wsExpanded: false
 	property int lastActiveWs: 1
 
-	// App Launcher integrato nella pillola
 	property string searchQuery: ""
 	property int selectedAppIndex: 0
 	property var filteredApps: {
@@ -55,7 +51,6 @@ ShellRoot {
 		return res
 	}
 
-	// Orologio, Calendario e Meteo
 	property string timeStr: ""
 	property string dateStr: ""
 	property string fullDateStr: ""
@@ -65,7 +60,6 @@ ShellRoot {
 	property int calYear: (new Date()).getFullYear()
 	property var calendarDays: []
 
-	// Stato Audio/Luminosità reattivo e OSD Destro
 	property string osdMode: "volume"
 	property int brightnessPct: 100
 	property int lastBrightnessPct: -1
@@ -78,7 +72,6 @@ ShellRoot {
 	property bool isHeadphones: false
 	property bool isHeadsetMic: false
 
-	// Stato Rete (Ethernet + Wi-Fi) e Bluetooth
 	property string ethIface: ""
 	property bool ethConnected: false
 	property string ethIp: "Disconnected"
@@ -93,7 +86,6 @@ ShellRoot {
 	property string btName: "No Adapter"
 	property var btList: []
 
-	// Dispositivi Audio, Monitor/Display e Night Light (wlsunset)
 	property var audioSinks: []
 	property var audioSources: []
 	property var monitorsList: []
@@ -101,7 +93,6 @@ ShellRoot {
 	property bool nightLightOn: false
 	property int nightLightTemp: 4000
 
-	// Batteria, Registrazione Schermo e System Info
 	property int batPct: (UPower.displayDevice && UPower.displayDevice.isLaptopBattery) ? Math.round(UPower.displayDevice.percentage * 100) : 100
 	property bool batCharging: UPower.displayDevice && UPower.displayDevice.state === UPowerDeviceState.Charging
 	property string batHealth: "100%"
@@ -176,7 +167,7 @@ ShellRoot {
 	function toggleWallpaperMode() {
 		root.animWallpapers = !root.animWallpapers
 		let m = root.animWallpapers ? "animated" : "static"
-		runCmd("\"" + root.homeDir + "/.config/wallpapers/theme-switcher.sh\" " + m + " &")
+		runCmd("printf '%s' '" + m + "' > \"" + root.homeDir + "/.config/quickshell/wall_mode\" && \"" + root.homeDir + "/.config/wallpapers/theme-switcher.sh\" " + m + " &")
 	}
 
 	function togglePrimaryNetwork() {
@@ -364,13 +355,13 @@ ShellRoot {
 				b_h=\"$(( ef * 100 / (efd > 0 ? efd : 100) ))%\"
 				b_p=$(awk -v p=\"$(cat \"$bat_d/power_now\" 2>/dev/null || echo 0)\" 'BEGIN{printf \"%.1f W\", p/1000000}')
 				b_c=$(cat \"$bat_d/cycle_count\" 2>/dev/null || echo 0); b_t=$(cat \"$bat_d/technology\" 2>/dev/null || echo \"Li-ion\")
-			else b_h=\"AC Power\"; b_p=\"0.0 W\"; b_c=\"N/A\"; b_t=\"Virtual / AC\"; fi"
+			else b_h=\"AC Power\"; b_p=\"0.0 W\"; b_c=\"N/A\"; b_t=\"Virtual / AC\"; fi
 			printf '%d|%s|%d|%s|%d|%s|%s|%d|%d|%s|%d|%d|%s|%d|%s|%s|%s|%s|%s|%s|%s|%s|%s\n' \"$((t/1000))\" \"${e_dev:-}\" \"$e_on\" \"$e_ip\" \"$w_hw\" \"${w_rad:-disabled}\" \"$net\" \"$bt_hw\" \"$bt_en\" \"$bt_name\" \"$hp\" \"$hmic\" \"${cpu_m:-CPU}\" \"${cpu_u:-10}\" \"$ram_s\" \"$d_root\" \"${d_sec:-No secondary drive}\" \"$(uname -r)\" \"$(uptime -p 2>/dev/null | sed 's/^up //')\" \"$b_h\" \"$b_p\" \"$b_c\" \"$b_t\"
 		"]
 		stdout: SplitParser {
 			onRead: data => {
 				let p = data.trim().split("|")
-				if (p.length >= 25) {
+				if (p.length >= 24) {
 					root.cpuTemp = parseInt(p[0]) || 40
 					root.ethIface = p[1]
 					root.ethConnected = (p[2] === "1")
@@ -531,7 +522,6 @@ ShellRoot {
 		}
 	}
 
-	// 1. SFONDO DESKTOP NATIVO (Static Image a 0% CPU + AnimatedImage per GIF/WebP animati)
 	Variants {
 		model: Quickshell.screens
 		PanelWindow {
@@ -564,7 +554,6 @@ ShellRoot {
 		}
 	}
 
-	// 2. FERMO FISSO INVISIBILE DA 46px (Impedisce alle finestre di salire sotto i pallini o muoversi in hover)
 	Variants {
 		model: Quickshell.screens
 		PanelWindow {
@@ -581,7 +570,6 @@ ShellRoot {
 		}
 	}
 
-	// 3. STRATO CLICK-OUTSIDE (Sotto all'isola quando aperta)
 	Variants {
 		model: Quickshell.screens
 		PanelWindow {
@@ -597,7 +585,6 @@ ShellRoot {
 		}
 	}
 
-	// 4. DYNAMIC ISLAND TOP BAR
 	Variants {
 		model: Quickshell.screens
 		PanelWindow {
@@ -651,7 +638,6 @@ ShellRoot {
 				anchors.horizontalCenter: parent.horizontalCenter
 				spacing: 10
 
-				// A. PALLINO / CARD MEDIA (Estrema Sinistra)
 				Rectangle {
 					id: mediaPill
 					visible: root.activePlayer !== null
@@ -717,7 +703,6 @@ ShellRoot {
 					}
 				}
 
-				// B. PALLINO / PILLOLA WORKSPACES
 				Rectangle {
 					id: wsPill
 					Layout.alignment: Qt.AlignTop
@@ -746,7 +731,6 @@ ShellRoot {
 					}
 				}
 
-				// C. PILLOLA CENTRALE (Larghezza Unificata 390px per Anteprima, Calendario, Sistema e Launcher)
 				Rectangle {
 					id: centerPill
 					Layout.alignment: Qt.AlignTop
@@ -774,7 +758,6 @@ ShellRoot {
 						}
 					}
 
-					// Click Destro ovunque nel Calendario (anche aperto) -> Pannello di Controllo
 					MouseArea {
 						anchors.fill: parent
 						visible: centerPill.isCalOpen || centerPill.isHoverPreview
@@ -782,7 +765,6 @@ ShellRoot {
 						onClicked: root.openSystemPanel()
 					}
 
-					// Header Pillola Chiusa / Calendario
 					Item {
 						id: topPillBar
 						visible: !centerPill.isSysOpen && !centerPill.isLauncherOpen
@@ -806,7 +788,6 @@ ShellRoot {
 						}
 					}
 
-					// CONTENUTO 1: HOVER PREVIEW & CALENDARIO + METEO + NOTIFICHE
 					ColumnLayout {
 						id: calCardCol
 						visible: centerPill.isHoverPreview || centerPill.isCalOpen
@@ -918,7 +899,6 @@ ShellRoot {
 						}
 					}
 
-					// CONTENUTO 2: APP LAUNCHER INTEGRATO NELLA PILLOLA
 					ColumnLayout {
 						visible: centerPill.isLauncherOpen; anchors.fill: parent; anchors.margins: 16; spacing: 10
 						Rectangle {
@@ -955,21 +935,18 @@ ShellRoot {
 						}
 					}
 
-					// CONTENUTO 3: PANNELLO DI GESTIONE SISTEMA + SOTTOMENU A TUTTA CARD
 					Item {
 						id: sysContainer
 						visible: centerPill.isSysOpen
 						anchors { top: parent.top; left: parent.left; right: parent.right; margins: 14 }
 						implicitHeight: root.sysSubmenu === "" ? sysMainCol.implicitHeight : sysSubCol.implicitHeight
 
-						// VISTA PRINCIPALE PANNELLO DI SISTEMA
 						ColumnLayout {
 							id: sysMainCol
 							visible: root.sysSubmenu === ""
 							anchors { left: parent.left; right: parent.right }
 							spacing: 10
 
-							// 1. RIGA IN CIMA: Sinistra Ora/Data/Meteo (UNICO punto che riporta al Calendario) | Destra CPU + Power
 							RowLayout {
 								Layout.fillWidth: true; spacing: 8
 								Item {
@@ -998,7 +975,6 @@ ShellRoot {
 								}
 							}
 
-							// 2. GRIGLIA 2x2 CON LARGHEZZA UNIFORME GARANTITA (Network, Bluetooth, App Tray, Battery)
 							GridLayout {
 								Layout.fillWidth: true
 								columns: 2
@@ -1006,7 +982,6 @@ ShellRoot {
 								rowSpacing: 10
 								columnSpacing: 10
 
-								// Tile 1: Network
 								Rectangle {
 									Layout.fillWidth: true; Layout.preferredWidth: 1; implicitHeight: 58; radius: 16; color: root.color0
 									property bool netActive: root.ethConnected || (root.wifiEnabled && root.netName !== "Offline")
@@ -1030,7 +1005,6 @@ ShellRoot {
 									}
 								}
 
-								// Tile 2: Bluetooth
 								Rectangle {
 									Layout.fillWidth: true; Layout.preferredWidth: 1; implicitHeight: 58; radius: 16; color: root.color0
 									RowLayout {
@@ -1061,7 +1035,6 @@ ShellRoot {
 									}
 								}
 
-								// Tile 3: App Tray (Cerchio con contatore a sinistra, Titolo + Icone al centro, Freccia a destra)
 								Rectangle {
 									Layout.fillWidth: true; Layout.preferredWidth: 1; implicitHeight: 58; radius: 16; color: root.color0
 									property int trayCount: SystemTray.items.values.length
@@ -1103,7 +1076,6 @@ ShellRoot {
 									}
 								}
 
-								// Tile 4: Battery (Allineata a Bluetooth)
 								Rectangle {
 									Layout.fillWidth: true; Layout.preferredWidth: 1; implicitHeight: 58; radius: 16; color: root.color0
 									RowLayout {
@@ -1126,7 +1098,6 @@ ShellRoot {
 								}
 							}
 
-							// 3. SEZIONE REGISTRAZIONE SCHERMO (3 Pulsanti)
 							Rectangle {
 								Layout.fillWidth: true; implicitHeight: 54; radius: 16; color: root.color0
 								RowLayout {
@@ -1153,7 +1124,6 @@ ShellRoot {
 								}
 							}
 
-							// 4. SLIDERS SU SINGOLA RIGA CON TRASCINAMENTO FLUIDO (Display, Sound, Microphone)
 							Repeater {
 								model: ["display", "sound", "mic"]
 								Rectangle {
@@ -1231,16 +1201,12 @@ ShellRoot {
 							}
 						}
 
-						// =====================================================
-						// VISTA SOTTOMENU A TUTTA CARD
-						// =====================================================
 						ColumnLayout {
 							id: sysSubCol
 							visible: root.sysSubmenu !== ""
 							anchors { left: parent.left; right: parent.right }
 							spacing: 12
 
-							// HEADER UNIVERSALE SOTTOMENU
 							RowLayout {
 								Layout.fillWidth: true; implicitHeight: 34; spacing: 10
 								Rectangle {
@@ -1288,7 +1254,6 @@ ShellRoot {
 								}
 							}
 
-							// SOTTOMENU SOUND / MIC
 							ColumnLayout {
 								visible: root.sysSubmenu === "sound" || root.sysSubmenu === "mic"
 								Layout.fillWidth: true; spacing: 8
@@ -1338,7 +1303,6 @@ ShellRoot {
 								}
 							}
 
-							// SOTTOMENU DISPLAY (Monitor, Luminosità, Scala, Risoluzione@Hz e Night Light)
 							ColumnLayout {
 								visible: root.sysSubmenu === "display"
 								Layout.fillWidth: true; spacing: 10
@@ -1501,7 +1465,6 @@ ShellRoot {
 								}
 							}
 
-							// SOTTOMENU SYSTEM TRAY
 							ColumnLayout {
 								visible: root.sysSubmenu === "tray"; Layout.fillWidth: true; spacing: 6
 								Rectangle {
@@ -1524,7 +1487,6 @@ ShellRoot {
 								}
 							}
 
-							// SOTTOMENU BATTERY DETAILS + SELETTORE SFONDI STATICI / ANIMATI
 							ColumnLayout {
 								visible: root.sysSubmenu === "battery"; Layout.fillWidth: true; spacing: 8
 								Rectangle {
@@ -1540,7 +1502,6 @@ ShellRoot {
 									}
 								}
 
-								// Toggle Sfondi Statici vs Animati (Risparmio Batteria)
 								Rectangle {
 									Layout.fillWidth: true; implicitHeight: 52; radius: 12; color: root.color0
 									RowLayout {
@@ -1596,7 +1557,6 @@ ShellRoot {
 								}
 							}
 
-							// SOTTOMENU NETWORK
 							ColumnLayout {
 								visible: root.sysSubmenu === "net"; Layout.fillWidth: true; spacing: 8
 
@@ -1689,7 +1649,7 @@ ShellRoot {
 								Repeater {
 									model: root.sysSubmenu === "net" ? root.savedWifiList : []
 									Rectangle {
-										required property string modelData
+										required property var modelData
 										Layout.fillWidth: true; implicitHeight: 38; radius: 10; color: root.color0
 										RowLayout {
 											anchors.fill: parent; anchors.margins: 10; spacing: 8
@@ -1705,7 +1665,6 @@ ShellRoot {
 								}
 							}
 
-							// SOTTOMENU BLUETOOTH
 							ColumnLayout {
 								visible: root.sysSubmenu === "bt"; Layout.fillWidth: true; spacing: 6
 								RowLayout {
@@ -1739,7 +1698,6 @@ ShellRoot {
 								}
 							}
 
-							// SOTTOMENU SCREEN RECORDER
 							ColumnLayout {
 								visible: root.sysSubmenu === "rec"; Layout.fillWidth: true; spacing: 8
 								Repeater {
@@ -1761,7 +1719,6 @@ ShellRoot {
 								}
 							}
 
-							// SOTTOMENU SYSTEM INFO (CPU, RAM, Storage, Kernel)
 							ColumnLayout {
 								visible: root.sysSubmenu === "cpu"; Layout.fillWidth: true; spacing: 8
 								Repeater {
@@ -1795,7 +1752,6 @@ ShellRoot {
 								}
 							}
 
-							// SOTTOMENU POWER (Reboot, Suspend, Hibernate, Lock Screen, Log Out)
 							ColumnLayout {
 								visible: root.sysSubmenu === "power"; Layout.fillWidth: true; spacing: 8
 								Repeater {
@@ -1822,7 +1778,6 @@ ShellRoot {
 					}
 				}
 
-				// D. PALLINO DI DESTRA: VOLUME PERMANENTE + OSD 2s (Mic / Luminosità)
 				Rectangle {
 					id: rightOsdPill
 					Layout.alignment: Qt.AlignTop
@@ -1855,7 +1810,7 @@ ShellRoot {
 							}
 						}
 					}
-					Text { anchors.centerIn: parent; text: rightOsdPill.centerIcon; color: ((root.osdMode === "volume" && root.outMuted) || (root.osdMode === "mic" && root.micMuted)) ? root.color1 : root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 15; font.bold: true }
+					Text { anchors.centerIn: parent; text: rightOsdPill.centerIcon; color: ((root.osdMode === "volume" && rightOsdPill.outMuted) || (root.osdMode === "mic" && rightOsdPill.micMuted)) ? root.color1 : root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 15; font.bold: true }
 					MouseArea {
 						anchors.fill: parent; acceptedButtons: Qt.LeftButton | Qt.RightButton
 						onClicked: mouse => {
@@ -1875,33 +1830,34 @@ ShellRoot {
 		}
 	}
 
-	// 5. POPUP NOTIFICHE
-	PanelWindow {
-		visible: root.popupNotifications.length > 0 && root.centerMode === "none"
-		WlrLayershell.layer: WlrLayer.Overlay
-		WlrLayershell.namespace: "swaync-notification-window"
-		WlrLayershell.exclusionMode: ExclusionMode.Ignore
-		anchors { top: true }
-		margins.top: 56
-		implicitWidth: 360; implicitHeight: notifPopupCol.implicitHeight + 16; color: "transparent"
-		ColumnLayout {
-			id: notifPopupCol; anchors.fill: parent; anchors.margins: 8; spacing: 8
-			Repeater {
-				model: root.popupNotifications
-				Rectangle {
-					required property var modelData
-					Layout.fillWidth: true; implicitHeight: 68; radius: 16; color: root.withAlpha(root.color0, root.isVM ? 0.96 : 0.88); border.width: 2; border.color: root.color4
-					ColumnLayout {
-						anchors.fill: parent; anchors.margins: 12; spacing: 3
-						Text { text: modelData.summary || "Notification"; color: root.color4; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 13; font.bold: true; elide: Text.ElideRight; Layout.fillWidth: true }
-						Text { text: modelData.body || ""; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; elide: Text.ElideRight; Layout.fillWidth: true }
+	Variants {
+		model: Quickshell.screens
+		PanelWindow {
+			visible: root.popupNotifications.length > 0 && root.centerMode === "none"
+			WlrLayershell.layer: WlrLayer.Overlay
+			WlrLayershell.namespace: "swaync-notification-window"
+			WlrLayershell.exclusionMode: ExclusionMode.Ignore
+			anchors { top: true }
+			margins.top: 56
+			implicitWidth: 360; implicitHeight: notifPopupCol.implicitHeight + 16; color: "transparent"
+			ColumnLayout {
+				id: notifPopupCol; anchors.fill: parent; anchors.margins: 8; spacing: 8
+				Repeater {
+					model: root.popupNotifications
+					Rectangle {
+						required property var modelData
+						Layout.fillWidth: true; implicitHeight: 68; radius: 16; color: root.withAlpha(root.color0, root.isVM ? 0.96 : 0.88); border.width: 2; border.color: root.color4
+						ColumnLayout {
+							anchors.fill: parent; anchors.margins: 12; spacing: 3
+							Text { text: modelData.summary || "Notification"; color: root.color4; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 13; font.bold: true; elide: Text.ElideRight; Layout.fillWidth: true }
+							Text { text: modelData.body || ""; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; elide: Text.ElideRight; Layout.fillWidth: true }
+						}
 					}
 				}
 			}
 		}
 	}
 
-	// 6. LOCKSCREEN INTEGRATO
 	property bool authError: false
 	property bool authBusy: false
 	property string pendingPassword: ""
