@@ -208,7 +208,7 @@ PKGcheck () {
 	if [[ "$CPU_TYPE" == "Intel" ]]; then UCODEsel="intel-ucode"
 	elif [[ "$CPU_TYPE" == "AMD" ]]; then if [[ "${OSsel,,}" == "void" ]]; then UCODEsel="linux-firmware-amd" ; else UCODEsel="amd-ucode" ; fi ; fi
 	if [[ -n "$UCODEsel" ]]; then microcode=("$UCODEsel") ; fi
-	if [[ "$HAS_AMD" -eq 1 ]]; then	if [[ "${OSsel,,}" == "void" ]]; then amddrivers=(mesa-dri vulkan-loader mesa-vulkan-radeon) ; else amddrivers=(mesa vulkan-radeon) ; fi ; fi
+	if [[ "$HAS_AMD" -eq 1 ]]; then	if [[ "${OSsel,,}" == "void" ]]; then amddrivers=(mesa-dri vulkan-loader mesa-vulkan-radeon) ; else amddrivers=(mesa vulkan-radeon) ; fi ;	fi
 	if [[ "$HAS_NVIDIA" -eq 1 && "$NVsel" =~ ^(OPEN|PROPRIETARY)$ ]]; then
 		if [[ "${OSsel,,}" == "void" ]]; then
 			if [[ "$LIBsel" != "MUSL" ]]; then nvidiadrivers=(nvidia nvidia-libs-32bit) ; fi
@@ -257,7 +257,7 @@ PKGcheck () {
 	if [[ "${OSsel,,}" == "artix" ]]; then logind=(elogind elogind-"${init_sys,,}" "${init_sys,,}"-settingsd) ; elif [[ "${OSsel,,}" == "void" ]]; then logind=(seatd elogind) ; else logind=() ; fi
 	net=(iwd chrony) ; if [[ "${OSsel,,}" == "void" ]]; then net+=(NetworkManager) ; else net+=(networkmanager) ; fi ; if [[ "${OSsel,,}" == "artix" ]]; then net+=("iwd-${init_sys,,}" "chrony-${init_sys,,}" "networkmanager-${init_sys,,}") ; fi
 	print=(cups cups-pdf) ; if [[ "${OSsel,,}" == "void" ]]; then print+=(avahi-daemon cups-filters) ; else print+=(avahi system-config-printer) ; fi ; if [[ "${OSsel,,}" == "artix" ]]; then print+=("avahi-${init_sys,,}" "cups-${init_sys,,}") ; fi
-	utility=(imv featherpad libqalculate fd btop fwupd fastfetch grim slurp wf-recorder wl-clipboard xclip swappy brightnessctl playerctl pavucontrol xorg-xwayland)
+	utility=(imv featherpad libqalculate fd btop fwupd fastfetch grim slurp wf-recorder wlsunset libnotify wl-clipboard xclip swappy brightnessctl playerctl pavucontrol xorg-xwayland)
 	if [[ "$DEsel" == "Niri" && "$SHELLsel" != "Quickshell" ]]; then utility+=(awww) ; fi
 	if [[ "${OSsel,,}" != "void" ]]; then utility+=(lact cowfortune pacman-contrib) ; fi ; if [[ "${OSsel,,}" == "artix" ]]; then if [[ "$LUKS_ENC" -eq 1 ]]; then utility+=("cryptsetup-${init_sys,,}") ; fi ; fi
 	if compgen -G "/sys/class/power_supply/BAT*" >/dev/null; then if [[ "${OSsel,,}" == "arch" && "$DEsel" =~ ^(KDE|GNOME|COSMIC)$ ]]; then utility+=(power-profiles-daemon) ; else utility+=(tlp) ; if [[ "${OSsel,,}" == "artix" ]]; then utility+=("tlp-${init_sys,,}") ; fi ; fi ; if [[ "$CPU_TYPE" == "Intel" ]]; then utility+=(thermald) ; if [[ "${OSsel,,}" == "artix" ]]; then utility+=("thermald-${init_sys,,}") ; fi ; fi ; fi
@@ -415,6 +415,7 @@ UserSetup () {
 				cp -rT "$conf" /mnt/home/"$UNsel"/.config/"${bname,,}"
 			fi
 		done
+		sed -i -e 's/^backend *=.*/backend = "resized"/' -e 's/^threshold *=.*/threshold = 2/' /mnt/home/"$UNsel"/.config/wallust/wallust.toml 2>/dev/null || true
 		echo -e '$background = rgb(1e1e2e)\n$foreground = rgb(cdd6f4)\n$color4 = rgb(89b4fa)\n$color6 = rgb(94e2d5)' > /mnt/home/"$UNsel"/.config/hypr/colors.conf
 		if [[ -f "${SCRIPT_DIR}/Conf_files/Hyprlock/hypridle.conf" ]]; then cp "${SCRIPT_DIR}/Conf_files/Hyprlock/hypridle.conf" /mnt/home/"$UNsel"/.config/hypr/ ; fi
 		chmod +x /mnt/home/"$UNsel"/.config/wallpapers/theme-switcher.sh
@@ -429,6 +430,7 @@ UserSetup () {
 		if [[ "$SHELLsel" == "Quickshell" ]]; then
 			echo "auth required pam_unix.so nullok" > /mnt/etc/pam.d/quickshell
 			mkdir -p /mnt/home/"$UNsel"/.config/{quickshell,wallust/templates}
+			rm -rf /mnt/home/"$UNsel"/.config/quickshell/lock
 			sed -i -e '/\[templates\.fuzzel\]/,/^$/d' -e '/\[templates\.waybar\]/,/^$/d' -e '/\[templates\.quickshell\]/,/^$/d' /mnt/home/"$UNsel"/.config/wallust/wallust.toml
 			printf '{\n\t"background": "{{background}}",\n\t"foreground": "{{foreground}}",\n\t"color0": "{{color0}}",\n\t"color1": "{{color1}}",\n\t"color2": "{{color2}}",\n\t"color3": "{{color3}}",\n\t"color4": "{{color4}}",\n\t"color5": "{{color5}}",\n\t"color6": "{{color6}}",\n\t"color7": "{{color7}}",\n\t"color8": "{{color8}}"\n}\n' > /mnt/home/"$UNsel"/.config/wallust/templates/colors-quickshell.json
 			printf '\n[templates.quickshell]\ntemplate = "colors-quickshell.json"\ntarget = "~/.config/quickshell/colors-wallust.json"\n' >> /mnt/home/"$UNsel"/.config/wallust/wallust.toml
