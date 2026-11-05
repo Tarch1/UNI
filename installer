@@ -208,7 +208,7 @@ PKGcheck () {
 	if [[ "$CPU_TYPE" == "Intel" ]]; then UCODEsel="intel-ucode"
 	elif [[ "$CPU_TYPE" == "AMD" ]]; then if [[ "${OSsel,,}" == "void" ]]; then UCODEsel="linux-firmware-amd" ; else UCODEsel="amd-ucode" ; fi ; fi
 	if [[ -n "$UCODEsel" ]]; then microcode=("$UCODEsel") ; fi
-	if [[ "$HAS_AMD" -eq 1 ]]; then	if [[ "${OSsel,,}" == "void" ]]; then amddrivers=(mesa-dri vulkan-loader mesa-vulkan-radeon) ; else amddrivers=(mesa vulkan-radeon) ; fi ;	fi
+	if [[ "$HAS_AMD" -eq 1 ]]; then if [[ "${OSsel,,}" == "void" ]]; then amddrivers=(mesa-dri vulkan-loader mesa-vulkan-radeon) ; else amddrivers=(mesa vulkan-radeon) ; fi ; fi
 	if [[ "$HAS_NVIDIA" -eq 1 && "$NVsel" =~ ^(OPEN|PROPRIETARY)$ ]]; then
 		if [[ "${OSsel,,}" == "void" ]]; then
 			if [[ "$LIBsel" != "MUSL" ]]; then nvidiadrivers=(nvidia nvidia-libs-32bit) ; fi
@@ -236,10 +236,16 @@ PKGcheck () {
 	elif [[ "$DEsel" == "LXQt" ]]; then desktop=(lxqt xdg-desktop-portal-lxqt)
 	elif [[ "$DEsel" == "Hyprland" ]]; then
 		desktop=(hyprland hypridle polkit-kde-agent xdg-desktop-portal-hyprland xdg-desktop-portal-gtk)
-		if [[ "$SHELLsel" == "Quickshell" ]]; then desktop+=(quickshell qt6-svg qt6-5compat) ; else desktop+=(hyprpaper fuzzel waybar swaync hyprlock) ; fi
+		if [[ "$SHELLsel" == "Quickshell" ]]; then
+			desktop+=(quickshell qt6-svg qt6-5compat qt6-imageformats qt6-multimedia)
+			[[ "${OSsel,,}" != "void" ]] && desktop+=(qt6-multimedia-ffmpeg)
+		else desktop+=(hyprpaper fuzzel waybar swaync hyprlock) ; fi
 	elif [[ "$DEsel" == "Niri" ]]; then
 		desktop=(niri hypridle polkit-kde-agent xdg-desktop-portal-gnome xdg-desktop-portal-gtk xwayland-satellite)
-		if [[ "$SHELLsel" == "Quickshell" ]]; then desktop+=(quickshell qt6-svg qt6-5compat) ; else desktop+=(fuzzel waybar swaync hyprlock) ; fi
+		if [[ "$SHELLsel" == "Quickshell" ]]; then
+			desktop+=(quickshell qt6-svg qt6-5compat qt6-imageformats qt6-multimedia)
+			[[ "${OSsel,,}" != "void" ]] && desktop+=(qt6-multimedia-ffmpeg)
+		else desktop+=(fuzzel waybar swaync hyprlock) ; fi
 	else desktop=() ; fi
 	if [[ "${DMsel,,}" == "gdm" ]]; then displaymanager=(gdm) ; elif [[ "${DMsel,,}" == "greetd" ]]; then displaymanager=(greetd greetd-tuigreet) ; elif [[ "${DMsel,,}" == "lightdm" ]]; then displaymanager=(lightdm lightdm-gtk-greeter lightdm-gtk-greeter-settings) ; elif [[ "${DMsel,,}" == "ly" ]]; then displaymanager=(ly) ; elif [[ "${DMsel,,}" == "sddm" ]]; then displaymanager=(sddm) ; else displaymanager=() ; fi
 	if [[ "${OSsel,,}" == "artix" ]]; then if [[ "${DMsel,,}" != "none" ]]; then displaymanager+=("${DMsel,,}-${init_sys,,}") ; fi ; fi
@@ -257,7 +263,7 @@ PKGcheck () {
 	if [[ "${OSsel,,}" == "artix" ]]; then logind=(elogind elogind-"${init_sys,,}" "${init_sys,,}"-settingsd) ; elif [[ "${OSsel,,}" == "void" ]]; then logind=(seatd elogind) ; else logind=() ; fi
 	net=(iwd chrony) ; if [[ "${OSsel,,}" == "void" ]]; then net+=(NetworkManager) ; else net+=(networkmanager) ; fi ; if [[ "${OSsel,,}" == "artix" ]]; then net+=("iwd-${init_sys,,}" "chrony-${init_sys,,}" "networkmanager-${init_sys,,}") ; fi
 	print=(cups cups-pdf) ; if [[ "${OSsel,,}" == "void" ]]; then print+=(avahi-daemon cups-filters) ; else print+=(avahi system-config-printer) ; fi ; if [[ "${OSsel,,}" == "artix" ]]; then print+=("avahi-${init_sys,,}" "cups-${init_sys,,}") ; fi
-	utility=(imv featherpad libqalculate fd btop fwupd fastfetch grim slurp wf-recorder wlsunset libnotify wl-clipboard xclip swappy brightnessctl playerctl pavucontrol xorg-xwayland)
+	utility=(imv featherpad ffmpeg libqalculate fd btop fwupd fastfetch grim slurp wf-recorder wlsunset libnotify wl-clipboard xclip swappy brightnessctl playerctl pavucontrol xorg-xwayland)
 	if [[ "$DEsel" == "Niri" && "$SHELLsel" != "Quickshell" ]]; then utility+=(awww) ; fi
 	if [[ "${OSsel,,}" != "void" ]]; then utility+=(lact cowfortune pacman-contrib) ; fi ; if [[ "${OSsel,,}" == "artix" ]]; then if [[ "$LUKS_ENC" -eq 1 ]]; then utility+=("cryptsetup-${init_sys,,}") ; fi ; fi
 	if compgen -G "/sys/class/power_supply/BAT*" >/dev/null; then if [[ "${OSsel,,}" == "arch" && "$DEsel" =~ ^(KDE|GNOME|COSMIC)$ ]]; then utility+=(power-profiles-daemon) ; else utility+=(tlp) ; if [[ "${OSsel,,}" == "artix" ]]; then utility+=("tlp-${init_sys,,}") ; fi ; fi ; if [[ "$CPU_TYPE" == "Intel" ]]; then utility+=(thermald) ; if [[ "${OSsel,,}" == "artix" ]]; then utility+=("thermald-${init_sys,,}") ; fi ; fi ; fi
@@ -416,14 +422,18 @@ UserSetup () {
 			fi
 		done
 		mkdir -p /mnt/home/"$UNsel"/.config/wallpapers/{day,night,day_animated,night_animated}
-		sed -i -e 's/^backend *=.*/backend = "resized"/' -e 's/^threshold *=.*/threshold = 2/' /mnt/home/"$UNsel"/.config/wallust/wallust.toml 2>/dev/null || true
+		sed -i -e 's/^[[:space:]]*backend *=.*/backend = "resized"/' -e 's/^[[:space:]]*threshold *=.*/threshold = 2/' /mnt/home/"$UNsel"/.config/wallust/wallust.toml 2>/dev/null || true
 		echo -e '$background = rgb(1e1e2e)\n$foreground = rgb(cdd6f4)\n$color4 = rgb(89b4fa)\n$color6 = rgb(94e2d5)' > /mnt/home/"$UNsel"/.config/hypr/colors.conf
 		if [[ -f "${SCRIPT_DIR}/Conf_files/Hyprlock/hypridle.conf" ]]; then cp "${SCRIPT_DIR}/Conf_files/Hyprlock/hypridle.conf" /mnt/home/"$UNsel"/.config/hypr/ ; fi
 		chmod +x /mnt/home/"$UNsel"/.config/wallpapers/theme-switcher.sh
 		local cfg="/mnt/home/$UNsel/.config/wallust/templates/colors-niri.conf"
-		if [[ "$DEsel" == "Niri" && ! -f "$cfg" ]]; then
-			mkdir -p /mnt/home/"$UNsel"/.config/niri ; cp -rT "${SCRIPT_DIR}/Conf_files/Niri" /mnt/home/"$UNsel"/.config/niri
-			cfg="/mnt/home/$UNsel/.config/niri/config.kdl"
+		if [[ "$DEsel" == "Niri" ]]; then
+			if [[ ! -f "$cfg" ]]; then
+				mkdir -p /mnt/home/"$UNsel"/.config/niri ; cp -rT "${SCRIPT_DIR}/Conf_files/Niri" /mnt/home/"$UNsel"/.config/niri
+				cfg="/mnt/home/$UNsel/.config/niri/config.kdl"
+			elif ! grep -q '\[templates\.niri\]' /mnt/home/"$UNsel"/.config/wallust/wallust.toml 2>/dev/null; then
+				printf '\n[templates.niri]\ntemplate = "colors-niri.conf"\ntarget = "~/.config/niri/config.kdl"\n' >> /mnt/home/"$UNsel"/.config/wallust/wallust.toml
+			fi
 		elif [[ "$DEsel" == "Hyprland" ]]; then
 			cp -rT "${SCRIPT_DIR}/Conf_files/Hyprland" /mnt/home/"$UNsel"/.config/hypr
 			cfg="/mnt/home/$UNsel/.config/hypr/hyprland.conf"
@@ -436,11 +446,12 @@ UserSetup () {
 			printf '\n[templates.quickshell]\ntemplate = "colors-quickshell.json"\ntarget = "~/.config/quickshell/colors-wallust.json"\n' >> /mnt/home/"$UNsel"/.config/wallust/wallust.toml
 			local init_wall="" ; init_wall=$(find /mnt/home/"$UNsel"/.config/wallpapers/day -type f -print -quit 2>/dev/null || true)
 			init_wall="${init_wall#/mnt}"
-			printf '{\n\t"wallpaper": "%s",\n\t"background": "#1e1e2e",\n\t"foreground": "#cdd6f4",\n\t"color0": "#1e1e2e",\n\t"color1": "#f38ba8",\n\t"color2": "#a6e3a1",\n\t"color3": "#f9e2af",\n\t"color4": "#89b4fa",\n\t"color5": "#cba6f7",\n\t"color6": "#94e2d5",\n\t"color7": "#bac2de",\n\t"color8": "#585b70"\n}\n' "$init_wall" > /mnt/home/"$UNsel"/.config/quickshell/colors.json
-			local qs_run="env QSG_RHI_BACKEND=opengl quickshell" ; local qs_niri='"env" "QSG_RHI_BACKEND=opengl" "quickshell"'
+			printf '{\n\t"wallpaper": "%s",\n\t"wallMode": "static",\n\t"background": "#1e1e2e",\n\t"foreground": "#cdd6f4",\n\t"color0": "#1e1e2e",\n\t"color1": "#f38ba8",\n\t"color2": "#a6e3a1",\n\t"color3": "#f9e2af",\n\t"color4": "#89b4fa",\n\t"color5": "#cba6f7",\n\t"color6": "#94e2d5",\n\t"color7": "#bac2de",\n\t"color8": "#585b70"\n}\n' "$init_wall" > /mnt/home/"$UNsel"/.config/quickshell/colors.json
+			local qs_run="env DRI_PRIME=0 __NV_PRIME_RENDER_OFFLOAD=0 QT_FFMPEG_DECODING_HW_DEVICE_TYPES= QSG_RHI_BACKEND=opengl quickshell"
+			local qs_niri='"env" "DRI_PRIME=0" "__NV_PRIME_RENDER_OFFLOAD=0" "QT_FFMPEG_DECODING_HW_DEVICE_TYPES=" "QSG_RHI_BACKEND=opengl" "quickshell"'
 			if [[ "$VBTsel" -eq 1 ]]; then
-				qs_run="env QSG_RHI_BACKEND=software QSG_RENDER_LOOP=basic quickshell"
-				qs_niri='"env" "QSG_RHI_BACKEND=software" "QSG_RENDER_LOOP=basic" "quickshell"'
+				qs_run="env QSG_RHI_BACKEND=opengl QSG_RENDER_LOOP=basic quickshell"
+				qs_niri='"env" "QSG_RHI_BACKEND=opengl" "QSG_RENDER_LOOP=basic" "quickshell"'
 			fi
 			sed -i "s|lock_cmd = .*|lock_cmd = quickshell ipc call lock lock|" /mnt/home/"$UNsel"/.config/hypr/hypridle.conf
 			if [[ "$DEsel" == "Niri" ]]; then
