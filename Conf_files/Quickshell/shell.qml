@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Effects
+import QtMultimedia
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
@@ -16,12 +17,20 @@ ShellRoot {
 	id: root
 
 	property string homeDir: Quickshell.env("HOME")
-	property bool isVM: Quickshell.env("QSG_RENDER_LOOP") === "basic" || Quickshell.env("QSG_RHI_BACKEND") === "software"
+	property bool isVM: Quickshell.env("QSG_RENDER_LOOP") === "basic"
+	property int animMs: isVM ? 0 : 180
 	property bool isHyprland: Quickshell.env("XDG_CURRENT_DESKTOP") === "Hyprland"
 
 	property string wallpaperPath: ""
 	property bool animWallpapers: false
-	property bool isAnimatedFile: wallpaperPath.toLowerCase().endsWith(".gif") || (animWallpapers && wallpaperPath.toLowerCase().endsWith(".webp"))
+	property bool isVideoFile: wallpaperPath.toLowerCase().endsWith(".webm") || wallpaperPath.toLowerCase().endsWith(".mp4")
+	property bool isAnimatedGif: !isVideoFile && (wallpaperPath.toLowerCase().endsWith(".gif") || (animWallpapers && wallpaperPath.toLowerCase().endsWith(".webp")))
+	property string wallpaperLabel: {
+		if (wallpaperPath === "") return "None"
+		let p = wallpaperPath.split("/")
+		return p.length >= 2 ? (p[p.length - 2] + " / " + p[p.length - 1]) : wallpaperPath
+	}
+
 	property color bg: "#1e1e2e"
 	property color fg: "#cdd6f4"
 	property color color0: "#1e1e2e"
@@ -63,10 +72,10 @@ ShellRoot {
 	property string osdMode: "volume"
 	property int brightnessPct: 100
 	property int lastBrightnessPct: -1
-	property int outVolPct: (Pipewire.defaultAudioSink && Pipewire.defaultAudioSink.audio) ? Math.round(Pipewire.defaultAudioSink.audio.volume * 100) : 0
-	property bool outMuted: (Pipewire.defaultAudioSink && Pipewire.defaultAudioSink.audio) ? Pipewire.defaultAudioSink.audio.muted : false
-	property int micVolPct: (Pipewire.defaultAudioSource && Pipewire.defaultAudioSource.audio) ? Math.round(Pipewire.defaultAudioSource.audio.volume * 100) : 0
-	property bool micMuted: (Pipewire.defaultAudioSource && Pipewire.defaultAudioSource.audio) ? Pipewire.defaultAudioSource.audio.muted : false
+	property int outVolPct: 45
+	property bool outMuted: false
+	property int micVolPct: 100
+	property bool micMuted: false
 	property int lastMicVol: -1
 	property bool lastMicMuted: false
 	property bool isHeadphones: false
@@ -164,10 +173,22 @@ ShellRoot {
 	function triggerOsd(mode) { root.osdMode = mode; osdTimer.restart() }
 	function triggerLock() { root.closeCenterPill(); root.screenLocked = true }
 
+	function setSinkVolume(pct) {
+		let p = Math.max(0, Math.min(100, Math.round(pct)))
+		root.outVolPct = p
+		runCmd("wpctl set-volume -l 1 @DEFAULT_AUDIO_SINK@ " + p + "%")
+	}
+
+	function setSourceVolume(pct) {
+		let p = Math.max(0, Math.min(100, Math.round(pct)))
+		root.micVolPct = p
+		runCmd("wpctl set-volume -l 1 @DEFAULT_AUDIO_SOURCE@ " + p + "%")
+	}
+
 	function toggleWallpaperMode() {
 		root.animWallpapers = !root.animWallpapers
 		let m = root.animWallpapers ? "animated" : "static"
-		runCmd("printf '%s' '" + m + "' > \"" + root.homeDir + "/.config/quickshell/wall_mode\" && \"" + root.homeDir + "/.config/wallpapers/theme-switcher.sh\" " + m + " &")
+		runCmd("\"" + root.homeDir + "/.config/wallpapers/theme-switcher.sh\" " + m + " &")
 	}
 
 	function togglePrimaryNetwork() {
@@ -239,18 +260,6 @@ ShellRoot {
 
 	PwObjectTracker { objects: [Pipewire.defaultAudioSink, Pipewire.defaultAudioSource] }
 
-	Connections {
-		target: (Pipewire.defaultAudioSource && Pipewire.defaultAudioSource.audio) ? Pipewire.defaultAudioSource.audio : null
-		function onVolumeChanged() {
-			if (root.lastMicVol !== -1 && root.micVolPct !== root.lastMicVol) root.triggerOsd("mic")
-			root.lastMicVol = root.micVolPct
-		}
-		function onMutedChanged() {
-			if (root.micMuted !== root.lastMicMuted) root.triggerOsd("mic")
-			root.lastMicMuted = root.micMuted
-		}
-	}
-
 	Timer { id: osdTimer; interval: 2000; onTriggered: root.osdMode = "volume" }
 	Timer { id: wsCollapseTimer; interval: 1000; onTriggered: root.wsExpanded = false }
 	Timer { id: autoCloseTimer; interval: 4500; onTriggered: { if (root.centerMode !== "none" && root.wifiPromptSsid === "") root.closeCenterPill() } }
@@ -276,6 +285,8 @@ ShellRoot {
 		id: fastPoll
 		command: ["bash", "-c", "
 			b=$(brightnessctl -m 2>/dev/null | cut -d, -f4 | tr -d '%' || echo 100)
+			sv=$(wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null)
+			mv=$(wpctl get-volume @DEFAULT_AUDIO_SOURCE@ 2>/dev/null)
 			if [[ -n \"$NIRI_SOCKET\" ]]; then
 				ws=$(niri msg -j workspaces 2>/dev/null | awk 'BEGIN{RS=\"}\";ORS=\"\"}/\"idx\":/{match($0,/\"idx\":[0-9]+/);idx=substr($0,RSTART+6,RLENGTH-6);act=($0~/\"is_active\":true/)?\"1\":\"0\";occ=($0~/\"active_window_id\":null/)?\"0\":\"1\";print idx\":\"act\":\"occ\" \"}')
 			elif [[ -n \"$HYPRLAND_INSTANCE_SIGNATURE\" ]]; then
@@ -283,7 +294,7 @@ ShellRoot {
 				occ_l=$(hyprctl workspaces -j 2>/dev/null | awk 'BEGIN{RS=\"}\"}/\"windows\": *[1-9]/{match($0,/\"id\": *[0-9]+/);print substr($0,RSTART+5,RLENGTH-5)}')
 				ws=\"\"; for i in 1 2 3 4 5; do a=0; [[ \"$i\" == \"$act\" ]] && a=1; o=0; echo \"$occ_l\" | grep -qx \"$i\" && o=1; ws+=\"$i:$a:$o \"; done
 			fi
-			printf '%s|%s\n' \"${b:-100}\" \"$ws\"
+			printf '%s|%s|%s|%s\n' \"${b:-100}\" \"$ws\" \"$sv\" \"$mv\"
 		"]
 		stdout: SplitParser {
 			onRead: data => {
@@ -292,6 +303,7 @@ ShellRoot {
 				let b = parseInt(p[0]) || 100
 				if (root.lastBrightnessPct !== -1 && b !== root.lastBrightnessPct) root.triggerOsd("brightness")
 				root.brightnessPct = b; root.lastBrightnessPct = b
+
 				let items = p[1].trim().split(/\s+/), list = [], cur = root.lastActiveWs
 				for (let i = 0; i < items.length; i++) {
 					let kv = items[i].split(":")
@@ -304,6 +316,25 @@ ShellRoot {
 				if (list.length > 0) {
 					list.sort((a, b) => a.idx - b.idx); root.workspacesList = list
 					if (cur !== root.lastActiveWs) { root.lastActiveWs = cur; root.wsExpanded = true; wsCollapseTimer.restart() }
+				}
+
+				if (p.length >= 3 && p[2].includes("Volume:")) {
+					let m = p[2].includes("MUTED")
+					let num = parseFloat(p[2].replace(/[^0-9.]/g, ""))
+					if (!isNaN(num)) root.outVolPct = Math.round(num * 100)
+					root.outMuted = m
+				}
+				if (p.length >= 4 && p[3].includes("Volume:")) {
+					let mm = p[3].includes("MUTED")
+					let mnum = parseFloat(p[3].replace(/[^0-9.]/g, ""))
+					if (!isNaN(mnum)) {
+						let mvPct = Math.round(mnum * 100)
+						if (root.lastMicVol !== -1 && (mvPct !== root.lastMicVol || mm !== root.lastMicMuted)) root.triggerOsd("mic")
+						root.micVolPct = mvPct
+						root.lastMicVol = mvPct
+					}
+					root.micMuted = mm
+					root.lastMicMuted = mm
 				}
 			}
 		}
@@ -404,8 +435,18 @@ ShellRoot {
 					printf '%s^%s^%d;' \"$mac\" \"$name\" \"$con\"
 				done)
 			fi
-			sinks=$(wpctl status 2>/dev/null | awk '/Sinks:/,/Sources:/' | grep -E '[0-9]+\\.' | sed 's/│//g; s/^[[:space:]]*//' | while read -r l; do act=0; [[ \"$l\" == \\** ]] && act=1; c=$(echo \"$l\" | sed 's/^\\*[[:space:]]*//'); id=${c%%.*}; r=${c#*. }; printf '%s^%s^%d;' \"$id\" \"${r%% \\[vol*}\" \"$act\"; done)
-			srcs=$(wpctl status 2>/dev/null | awk '/Sources:/,/Filters:|Streams:/' | grep -E '[0-9]+\\.' | sed 's/│//g; s/^[[:space:]]*//' | while read -r l; do act=0; [[ \"$l\" == \\** ]] && act=1; c=$(echo \"$l\" | sed 's/^\\*[[:space:]]*//'); id=${c%%.*}; r=${c#*. }; printf '%s^%s^%d;' \"$id\" \"${r%% \\[vol*}\" \"$act\"; done)
+			sinks=$(wpctl status 2>/dev/null | awk '/Sinks:/,/Sources:/' | grep -E '[0-9]+\\.' | while read -r l; do
+				act=0; [[ \"$l\" == *\"*\"* ]] && act=1
+				c=$(echo \"$l\" | sed 's/^[^0-9]*//')
+				id=${c%%.*}; r=${c#*. }
+				printf '%s^%s^%d;' \"$id\" \"${r%% \\[vol*}\" \"$act\"
+			done)
+			srcs=$(wpctl status 2>/dev/null | awk '/Sources:/,/Filters:|Streams:/' | grep -E '[0-9]+\\.' | while read -r l; do
+				act=0; [[ \"$l\" == *\"*\"* ]] && act=1
+				c=$(echo \"$l\" | sed 's/^[^0-9]*//')
+				id=${c%%.*}; r=${c#*. }
+				printf '%s^%s^%d;' \"$id\" \"${r%% \\[vol*}\" \"$act\"
+			done)
 			if [[ -n \"$NIRI_SOCKET\" ]]; then
 				disp=$(niri msg outputs 2>/dev/null | awk '
 				/^Output / {
@@ -504,7 +545,7 @@ ShellRoot {
 		}
 	}
 
-	Timer { interval: 300; running: true; repeat: true; onTriggered: fastPoll.running = true }
+	Timer { interval: root.isVM ? 800 : 350; running: true; repeat: true; onTriggered: fastPoll.running = true }
 	Timer { interval: 1800000; running: true; repeat: true; triggeredOnStart: true; onTriggered: weatherProc.running = true }
 	Timer {
 		interval: 1000; running: true; repeat: true; triggeredOnStart: true
@@ -522,6 +563,7 @@ ShellRoot {
 		}
 	}
 
+	// 1. SFONDO DESKTOP NATIVO (Static Image, AnimatedImage o VideoOutput .webm/.mp4)
 	Variants {
 		model: Quickshell.screens
 		PanelWindow {
@@ -535,8 +577,8 @@ ShellRoot {
 
 			Image {
 				anchors.fill: parent
-				visible: !root.isAnimatedFile
-				source: (!root.isAnimatedFile && root.wallpaperPath !== "") ? "file://" + root.wallpaperPath : ""
+				visible: !root.isVideoFile && !root.isAnimatedGif
+				source: (visible && root.wallpaperPath !== "") ? "file://" + root.wallpaperPath : ""
 				fillMode: Image.PreserveAspectCrop
 				asynchronous: true
 				smooth: true
@@ -544,16 +586,44 @@ ShellRoot {
 
 			AnimatedImage {
 				anchors.fill: parent
-				visible: root.isAnimatedFile
-				source: (root.isAnimatedFile && root.wallpaperPath !== "") ? "file://" + root.wallpaperPath : ""
+				visible: root.isAnimatedGif
+				source: (root.isAnimatedGif && root.wallpaperPath !== "") ? "file://" + root.wallpaperPath : ""
 				playing: visible && !root.screenLocked
 				fillMode: Image.PreserveAspectCrop
 				asynchronous: true
 				smooth: true
 			}
+
+			MediaPlayer {
+				id: wallVideoPlayer
+				source: (root.isVideoFile && root.wallpaperPath !== "") ? "file://" + root.wallpaperPath : ""
+				loops: MediaPlayer.Infinite
+				videoOutput: wallVideoOut
+				onSourceChanged: {
+					if (root.isVideoFile && root.wallpaperPath !== "" && !root.screenLocked) play()
+					else stop()
+				}
+			}
+
+			Connections {
+				target: root
+				function onScreenLockedChanged() {
+					if (!root.isVideoFile) return
+					if (root.screenLocked) wallVideoPlayer.pause()
+					else wallVideoPlayer.play()
+				}
+			}
+
+			VideoOutput {
+				id: wallVideoOut
+				anchors.fill: parent
+				visible: root.isVideoFile
+				fillMode: VideoOutput.PreserveAspectCrop
+			}
 		}
 	}
 
+	// 2. FERMO FISSO INVISIBILE DA 46px
 	Variants {
 		model: Quickshell.screens
 		PanelWindow {
@@ -570,6 +640,7 @@ ShellRoot {
 		}
 	}
 
+	// 3. STRATO CLICK-OUTSIDE
 	Variants {
 		model: Quickshell.screens
 		PanelWindow {
@@ -585,6 +656,7 @@ ShellRoot {
 		}
 	}
 
+	// 4. DYNAMIC ISLAND TOP BAR
 	Variants {
 		model: Quickshell.screens
 		PanelWindow {
@@ -650,8 +722,8 @@ ShellRoot {
 					border.width: expanded ? 2 : 1
 					border.color: expanded ? root.color4 : root.withAlpha(root.color4, 0.6)
 					clip: true
-					Behavior on implicitWidth { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
-					Behavior on implicitHeight { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+					Behavior on implicitWidth { NumberAnimation { duration: root.animMs; easing.type: Easing.OutCubic } }
+					Behavior on implicitHeight { NumberAnimation { duration: root.animMs; easing.type: Easing.OutCubic } }
 					HoverHandler { id: mediaHover }
 
 					Rectangle {
@@ -711,7 +783,7 @@ ShellRoot {
 					implicitHeight: 38; radius: 19
 					color: root.withAlpha(root.bg, root.isVM ? 0.96 : 0.85)
 					border.width: 1; border.color: root.withAlpha(root.color4, 0.6); clip: true
-					Behavior on implicitWidth { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+					Behavior on implicitWidth { NumberAnimation { duration: root.animMs; easing.type: Easing.OutCubic } }
 					HoverHandler { id: wsHover }
 
 					Text { anchors.centerIn: parent; visible: !wsPill.showAll; text: root.lastActiveWs.toString(); color: root.color4; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 14; font.bold: true }
@@ -747,8 +819,8 @@ ShellRoot {
 					border.width: (isCalOpen || isSysOpen || isLauncherOpen) ? 2 : (isHoverPreview ? 0 : 1)
 					border.color: (isCalOpen || isSysOpen || isLauncherOpen) ? root.color4 : root.withAlpha(root.color4, 0.6)
 					clip: true
-					Behavior on implicitWidth { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
-					Behavior on implicitHeight { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+					Behavior on implicitWidth { NumberAnimation { duration: root.animMs; easing.type: Easing.OutCubic } }
+					Behavior on implicitHeight { NumberAnimation { duration: root.animMs; easing.type: Easing.OutCubic } }
 
 					HoverHandler {
 						id: centerHover
@@ -1127,6 +1199,7 @@ ShellRoot {
 							Repeater {
 								model: ["display", "sound", "mic"]
 								Rectangle {
+									id: mainSliderCard
 									required property string modelData
 									Layout.fillWidth: true; implicitHeight: 46; radius: 14; color: root.color0
 									property int valPct: modelData === "display" ? root.brightnessPct : (modelData === "sound" ? root.outVolPct : root.micVolPct)
@@ -1139,10 +1212,10 @@ ShellRoot {
 											let p = Math.max(5, Math.round(cl * 100))
 											root.brightnessPct = p
 											root.runCmd("brightnessctl s " + p + "%")
-										} else if (modelData === "sound" && Pipewire.defaultAudioSink && Pipewire.defaultAudioSink.audio) {
-											Pipewire.defaultAudioSink.audio.volume = cl
-										} else if (modelData === "mic" && Pipewire.defaultAudioSource && Pipewire.defaultAudioSource.audio) {
-											Pipewire.defaultAudioSource.audio.volume = cl
+										} else if (modelData === "sound") {
+											root.setSinkVolume(cl * 100)
+										} else if (modelData === "mic") {
+											root.setSourceVolume(cl * 100)
 										}
 									}
 
@@ -1154,25 +1227,25 @@ ShellRoot {
 											Layout.fillWidth: false
 											spacing: 4
 											Text {
-												text: modelData === "display" ? "Display" : (modelData === "sound" ? "Sound" : "Mic")
+												text: mainSliderCard.modelData === "display" ? "Display" : (mainSliderCard.modelData === "sound" ? "Sound" : "Mic")
 												color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12; font.bold: true
 											}
 											Item { Layout.fillWidth: true }
 											Text {
-												text: parent.parent.parent.isMuted ? "Mute" : (parent.parent.parent.valPct + "%")
+												text: mainSliderCard.isMuted ? "Mute" : (mainSliderCard.valPct + "%")
 												color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11
 											}
 										}
 
 										Text {
-											text: parent.parent.iconTxt
-											color: parent.parent.isMuted ? root.color1 : root.color4
+											text: mainSliderCard.iconTxt
+											color: mainSliderCard.isMuted ? root.color1 : root.color4
 											font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 16
 											MouseArea {
 												anchors.fill: parent
 												onClicked: {
-													if (modelData === "sound") root.runCmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle")
-													else if (modelData === "mic") root.runCmd("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle")
+													if (mainSliderCard.modelData === "sound") { root.outMuted = !root.outMuted; root.runCmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle") }
+													else if (mainSliderCard.modelData === "mic") { root.micMuted = !root.micMuted; root.runCmd("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle") }
 												}
 											}
 										}
@@ -1180,21 +1253,21 @@ ShellRoot {
 										Rectangle {
 											Layout.fillWidth: true; implicitHeight: 14; radius: 7; color: Qt.rgba(1, 1, 1, 0.1)
 											Rectangle {
-												width: parent.width * Math.min(1, parent.parent.parent.valPct / 100.0)
+												width: parent.width * Math.min(1, mainSliderCard.valPct / 100.0)
 												height: parent.height; radius: 7
-												color: parent.parent.parent.isMuted ? root.color8 : root.color4
+												color: mainSliderCard.isMuted ? root.color8 : root.color4
 											}
 											MouseArea {
 												anchors.fill: parent
-												onPressed: mouse => parent.parent.parent.setLevelFromRatio(mouse.x / width)
-												onPositionChanged: mouse => { if (pressed) parent.parent.parent.setLevelFromRatio(mouse.x / width) }
+												onPressed: mouse => mainSliderCard.setLevelFromRatio(mouse.x / width)
+												onPositionChanged: mouse => { if (pressed) mainSliderCard.setLevelFromRatio(mouse.x / width) }
 											}
 										}
 
 										Rectangle {
 											implicitWidth: 26; implicitHeight: 28; radius: 8; color: Qt.rgba(1, 1, 1, 0.05)
 											Text { anchors.centerIn: parent; text: "󰅀"; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 14 }
-											MouseArea { anchors.fill: parent; onClicked: { subPoll.running = true; root.sysSubmenu = modelData } }
+											MouseArea { anchors.fill: parent; onClicked: { subPoll.running = true; root.sysSubmenu = mainSliderCard.modelData } }
 										}
 									}
 								}
@@ -1234,8 +1307,10 @@ ShellRoot {
 											} else if (root.sysSubmenu === "bt" && root.hasBtAdapter) {
 												root.runCmd(root.btEnabled ? "bluetoothctl power off; rfkill block bluetooth" : "rfkill unblock bluetooth; bluetoothctl power on")
 											} else if (root.sysSubmenu === "sound") {
+												root.outMuted = !root.outMuted
 												root.runCmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle")
 											} else if (root.sysSubmenu === "mic") {
+												root.micMuted = !root.micMuted
 												root.runCmd("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle")
 											}
 											sysPoll.running = true
@@ -1259,27 +1334,28 @@ ShellRoot {
 								Layout.fillWidth: true; spacing: 8
 
 								Rectangle {
+									id: subAudioBox
 									Layout.fillWidth: true; implicitHeight: 54; radius: 14; color: root.color0
 									property int subPct: root.sysSubmenu === "sound" ? root.outVolPct : root.micVolPct
 									function updateAudioRatio(r) {
 										let cl = Math.max(0, Math.min(1, r))
-										if (root.sysSubmenu === "sound" && Pipewire.defaultAudioSink && Pipewire.defaultAudioSink.audio) Pipewire.defaultAudioSink.audio.volume = cl
-										else if (root.sysSubmenu === "mic" && Pipewire.defaultAudioSource && Pipewire.defaultAudioSource.audio) Pipewire.defaultAudioSource.audio.volume = cl
+										if (root.sysSubmenu === "sound") root.setSinkVolume(cl * 100)
+										else if (root.sysSubmenu === "mic") root.setSourceVolume(cl * 100)
 									}
 									ColumnLayout {
 										anchors.fill: parent; anchors.margins: 10; spacing: 6
 										RowLayout {
 											Layout.fillWidth: true
 											Text { text: root.sysSubmenu === "sound" ? "Output Volume" : "Input Volume"; color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; Layout.fillWidth: true }
-											Text { text: parent.parent.subPct + "%"; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; font.bold: true }
+											Text { text: subAudioBox.subPct + "%"; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; font.bold: true }
 										}
 										Rectangle {
 											Layout.fillWidth: true; implicitHeight: 12; radius: 6; color: Qt.rgba(1, 1, 1, 0.1)
-											Rectangle { width: parent.width * Math.min(1, parent.parent.subPct / 100.0); height: parent.height; radius: 6; color: root.color4 }
+											Rectangle { width: parent.width * Math.min(1, subAudioBox.subPct / 100.0); height: parent.height; radius: 6; color: root.color4 }
 											MouseArea {
 												anchors.fill: parent
-												onPressed: mouse => parent.parent.parent.updateAudioRatio(mouse.x / width)
-												onPositionChanged: mouse => { if (pressed) parent.parent.parent.updateAudioRatio(mouse.x / width) }
+												onPressed: mouse => subAudioBox.updateAudioRatio(mouse.x / width)
+												onPositionChanged: mouse => { if (pressed) subAudioBox.updateAudioRatio(mouse.x / width) }
 											}
 										}
 									}
@@ -1487,6 +1563,7 @@ ShellRoot {
 								}
 							}
 
+							// SOTTOMENU BATTERY + SELETTORE SFONDI E NOME SFONDO CARICATO
 							ColumnLayout {
 								visible: root.sysSubmenu === "battery"; Layout.fillWidth: true; spacing: 8
 								Rectangle {
@@ -1503,26 +1580,32 @@ ShellRoot {
 								}
 
 								Rectangle {
-									Layout.fillWidth: true; implicitHeight: 52; radius: 12; color: root.color0
+									Layout.fillWidth: true; implicitHeight: 68; radius: 12; color: root.color0
 									RowLayout {
 										anchors.fill: parent; anchors.margins: 10; spacing: 10
 										Rectangle {
-											implicitWidth: 32; implicitHeight: 32; radius: 16
+											implicitWidth: 34; implicitHeight: 34; radius: 17
 											color: root.animWallpapers ? root.color4 : Qt.rgba(1, 1, 1, 0.08)
 											Text {
 												anchors.centerIn: parent
-												text: root.animWallpapers ? "🎬" : "󰸉"
+												text: root.animWallpapers ? "󰕧" : "󰸉"
 												color: root.animWallpapers ? root.bg : root.fg
-												font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 15
+												font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 16
 											}
 										}
 										ColumnLayout {
-											Layout.fillWidth: true; spacing: 1
+											Layout.fillWidth: true; spacing: 2
 											Text { text: "Animated Wallpapers"; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12; font.bold: true }
 											Text {
 												text: root.animWallpapers ? "Active (day_animated / night_animated)" : "Off • Static Power Saving (day / night)"
 												color: root.animWallpapers ? root.color4 : root.color2
 												font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 10
+											}
+											Text {
+												text: "Loaded: " + root.wallpaperLabel
+												color: root.color8
+												font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 10
+												elide: Text.ElideMiddle; Layout.fillWidth: true
 											}
 										}
 										Rectangle {
@@ -1810,19 +1893,19 @@ ShellRoot {
 							}
 						}
 					}
-					Text { anchors.centerIn: parent; text: rightOsdPill.centerIcon; color: ((root.osdMode === "volume" && rightOsdPill.outMuted) || (root.osdMode === "mic" && rightOsdPill.micMuted)) ? root.color1 : root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 15; font.bold: true }
+					Text { anchors.centerIn: parent; text: rightOsdPill.centerIcon; color: ((root.osdMode === "volume" && root.outMuted) || (root.osdMode === "mic" && root.micMuted)) ? root.color1 : root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 15; font.bold: true }
 					MouseArea {
 						anchors.fill: parent; acceptedButtons: Qt.LeftButton | Qt.RightButton
 						onClicked: mouse => {
 							if (mouse.button === Qt.RightButton) root.runCmd("pavucontrol")
-							else if (root.osdMode === "mic") root.runCmd("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle")
-							else root.runCmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle")
+							else if (root.osdMode === "mic") { root.micMuted = !root.micMuted; root.runCmd("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle") }
+							else { root.outMuted = !root.outMuted; root.runCmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle") }
 						}
 						onWheel: wheel => {
 							let up = wheel.angleDelta.y > 0
 							if (root.osdMode === "brightness") root.runCmd("brightnessctl s 5%" + (up ? "+" : "-"))
-							else if (root.osdMode === "mic") root.runCmd("wpctl set-volume -l 1 @DEFAULT_AUDIO_SOURCE@ 5%" + (up ? "+" : "-"))
-							else root.runCmd("wpctl set-volume -l 1 @DEFAULT_AUDIO_SINK@ 5%" + (up ? "+" : "-"))
+							else if (root.osdMode === "mic") root.setSourceVolume(root.micVolPct + (up ? 5 : -5))
+							else root.setSinkVolume(root.outVolPct + (up ? 5 : -5))
 						}
 					}
 				}
@@ -1830,9 +1913,12 @@ ShellRoot {
 		}
 	}
 
+	// 5. POPUP NOTIFICHE
 	Variants {
 		model: Quickshell.screens
 		PanelWindow {
+			required property var modelData
+			screen: modelData
 			visible: root.popupNotifications.length > 0 && root.centerMode === "none"
 			WlrLayershell.layer: WlrLayer.Overlay
 			WlrLayershell.namespace: "swaync-notification-window"
@@ -1858,6 +1944,7 @@ ShellRoot {
 		}
 	}
 
+	// 6. LOCKSCREEN INTEGRATO
 	property bool authError: false
 	property bool authBusy: false
 	property string pendingPassword: ""
@@ -1882,7 +1969,11 @@ ShellRoot {
 			anchors { top: true; bottom: true; left: true; right: true }
 			color: root.bg
 			onVisibleChanged: { if (visible) { pwLockInput.text = ""; pwLockInput.forceActiveFocus() } }
-			Image { id: lockWall; anchors.fill: parent; source: root.wallpaperPath !== "" ? "file://" + root.wallpaperPath : ""; fillMode: Image.PreserveAspectCrop; visible: root.isVM }
+			Image {
+				id: lockWall; anchors.fill: parent
+				source: root.isVideoFile ? "file:///tmp/wall_frame.jpg" : (root.wallpaperPath !== "" ? "file://" + root.wallpaperPath : "")
+				fillMode: Image.PreserveAspectCrop; visible: root.isVM
+			}
 			MultiEffect { anchors.fill: parent; source: lockWall; visible: !root.isVM && root.wallpaperPath !== ""; blurEnabled: !root.isVM; blurMax: 48; blur: 1.0 }
 			Rectangle { anchors.fill: parent; color: Qt.rgba(0, 0, 0, 0.35) }
 			Text { anchors.horizontalCenter: parent.horizontalCenter; anchors.verticalCenter: parent.verticalCenter; anchors.verticalCenterOffset: -80; text: root.timeStr; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 64; font.bold: true }
