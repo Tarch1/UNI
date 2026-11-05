@@ -16,15 +16,81 @@ import Quickshell.Services.Pam
 ShellRoot {
 	id: root
 
+	// =========================================================================
+	// SEZIONE CONFIGURAZIONE UTENTE (EFFETTI, ANIMAZIONI, BLUR & AUTO-PAUSA)
+	// =========================================================================
+
+	// 1. Interruttore generale Effetti UI & Blur (modificabile anche dal menu Battery)
+	//    Opzioni: true (Attivo su PC reale) | false (Modalità risparmio energetico / VM)
+	property bool cfgEnableEffects: !isVM
+
+	// 2. Durata animazione di espansione della Dynamic Island (in millisecondi)
+	//    Opzioni: 0 (Istantanea) | 120 (Rapida) | 180 (Fluida standard) | 260 (Morbida)
+	property int cfgIslandAnimMs: 180
+
+	// 3. Curva di accelerazione (Easing) per l'espansione della Dynamic Island
+	//    Opzioni: Easing.OutCubic | Easing.OutExpo | Easing.OutBack | Easing.OutQuad | Easing.Linear
+	property int cfgIslandEasing: Easing.OutCubic
+
+	// 4. Stile animazione di ingresso nei Sottomenu del Pannello di Controllo
+	//    Opzioni: "slide" (Scorrimento laterale + Dissolvenza) | "fade" (Solo Dissolvenza) | "none" (Istantaneo)
+	property string cfgSubmenuAnimStyle: "slide"
+
+	// 5. Durata animazione dei Sottomenu (in millisecondi) e offset scorrimento (in pixel)
+	//    Opzioni durata: 100 - 250 | Opzioni offset: 10 - 30
+	property int cfgSubmenuAnimMs: 160
+	property int cfgSubmenuSlidePx: 18
+
+	// 6. Stile transizione al cambio Sfondo (Statico o Animato)
+	//    Opzioni: "crossfade" (Dissolvenza morbida) | "zoom" (Dissolvenza + leggero Zoom-in) | "none" (Istantaneo)
+	property string cfgWallpaperTransition: "crossfade"
+	property int cfgWallpaperTransitionMs: 420
+
+	// 7. Trasparenza Barra e Pannelli (per vedere il Blur reale del compositore sotto la barra)
+	//    Opzioni: 0.65 (Molto trasparente/vetro) | 0.76 (Bilanciato per Blur) | 0.88 (Scuro) | 0.96 (Opaco/Risparmio)
+	property real cfgGlassOpacity: 0.76
+	property real cfgSolidOpacity: 0.96
+
+	// 8. Comportamento Lockscreen con Sfondi Animati e Sfondi Statici
+	//    cfgLockKeepAnimated: true = se lo sfondo è animato, continua a muoversi anche sul Lockscreen
+	//                         false = mette in pausa il video e mostra un fotogramma sfocato
+	//    cfgLockBlurMax: Intensità sfocatura (Gaussian Blur) quando lo sfondo è statico (0 = spento, 32 = medio, 48 = forte, 64 = massimo)
+	property bool cfgLockKeepAnimated: true
+	property int cfgLockBlurMax: 48
+
+	// 9. Auto-Pausa Intelligente per gli Sfondi Animati (.webm / .mp4 / .gif)
+	//    cfgPauseOnFullscreen: true = mette in pausa lo sfondo animato quando c'è una finestra a tutto schermo
+	//    cfgPauseOnScreenOff:  true = mette in pausa lo sfondo animato quando lo schermo va in standby (DPMS Off)
+	property bool cfgPauseOnFullscreen: true
+	property bool cfgPauseOnScreenOff: true
+
+	// =========================================================================
+	// FINE SEZIONE CONFIGURAZIONE UTENTE
+	// =========================================================================
+
 	property string homeDir: Quickshell.env("HOME")
 	property bool isVM: Quickshell.env("QSG_RENDER_LOOP") === "basic"
-	property int animMs: isVM ? 0 : 180
 	property bool isHyprland: Quickshell.env("XDG_CURRENT_DESKTOP") === "Hyprland"
 
+	// Valori effettivi calcolati in base allo stato di cfgEnableEffects
+	property bool fxActive: cfgEnableEffects && !isVM
+	property int animMs: fxActive ? cfgIslandAnimMs : 0
+	property real panelAlpha: fxActive ? cfgGlassOpacity : cfgSolidOpacity
+
+	// Stato Sfondi e Rilevamento Intelligente Pausa
 	property string wallpaperPath: ""
 	property bool animWallpapers: false
 	property bool isVideoFile: wallpaperPath.toLowerCase().endsWith(".webm") || wallpaperPath.toLowerCase().endsWith(".mp4")
 	property bool isAnimatedGif: !isVideoFile && (wallpaperPath.toLowerCase().endsWith(".gif") || (animWallpapers && wallpaperPath.toLowerCase().endsWith(".webp")))
+	property bool hasActiveFullWindow: false
+	property bool isMonitorDpmsOff: false
+	property bool shouldPlayAnimation: {
+		if (!isVideoFile && !isAnimatedGif) return false
+		if (cfgPauseOnScreenOff && isMonitorDpmsOff) return false
+		if (screenLocked) return cfgLockKeepAnimated && animWallpapers
+		if (cfgPauseOnFullscreen && hasActiveFullWindow) return false
+		return true
+	}
 	property string wallpaperLabel: {
 		if (wallpaperPath === "") return "None"
 		let p = wallpaperPath.split("/")
@@ -191,6 +257,13 @@ ShellRoot {
 		runCmd("\"" + root.homeDir + "/.config/wallpapers/theme-switcher.sh\" " + m + " &")
 	}
 
+	function toggleUiEffects() {
+		root.cfgEnableEffects = !root.cfgEnableEffects
+		let fxStr = root.cfgEnableEffects ? "true" : "false"
+		let hyprCmd = root.isHyprland ? ("hyprctl keyword decoration:blur:enabled " + fxStr + " >/dev/null 2>&1; ") : ""
+		runCmd(hyprCmd + "sed -i 's/\"uiEffects\": *[a-z]*/\"uiEffects\": " + fxStr + "/' \"" + root.homeDir + "/.config/quickshell/colors.json\" 2>/dev/null || true")
+	}
+
 	function togglePrimaryNetwork() {
 		if (root.ethIface !== "" && (!root.hasWifiHw || root.ethConnected)) {
 			runCmd("nmcli dev " + (root.ethConnected ? "disconnect " : "connect ") + root.ethIface)
@@ -244,6 +317,7 @@ ShellRoot {
 				let d = JSON.parse(text())
 				if (d.wallpaper) root.wallpaperPath = d.wallpaper
 				if (d.wallMode) root.animWallpapers = (d.wallMode === "animated")
+				if (d.uiEffects !== undefined && !root.isVM) root.cfgEnableEffects = Boolean(d.uiEffects)
 				if (d.background) root.bg = d.background
 				if (d.foreground) root.fg = d.foreground
 				if (d.color0) root.color0 = d.color0
@@ -287,14 +361,17 @@ ShellRoot {
 			b=$(brightnessctl -m 2>/dev/null | cut -d, -f4 | tr -d '%' || echo 100)
 			sv=$(wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null)
 			mv=$(wpctl get-volume @DEFAULT_AUDIO_SOURCE@ 2>/dev/null)
+			fs=0
 			if [[ -n \"$NIRI_SOCKET\" ]]; then
 				ws=$(niri msg -j workspaces 2>/dev/null | awk 'BEGIN{RS=\"}\";ORS=\"\"}/\"idx\":/{match($0,/\"idx\":[0-9]+/);idx=substr($0,RSTART+6,RLENGTH-6);act=($0~/\"is_active\":true/)?\"1\":\"0\";occ=($0~/\"active_window_id\":null/)?\"0\":\"1\";print idx\":\"act\":\"occ\" \"}')
+				niri msg focused-window 2>/dev/null | grep -qiE 'fullscreen.*yes|is_fullscreen.*true' && fs=1
 			elif [[ -n \"$HYPRLAND_INSTANCE_SIGNATURE\" ]]; then
 				act=$(hyprctl activeworkspace -j 2>/dev/null | awk -F': ' '/\"id\":/{gsub(/,/,\"\",$2);print $2;exit}')
 				occ_l=$(hyprctl workspaces -j 2>/dev/null | awk 'BEGIN{RS=\"}\"}/\"windows\": *[1-9]/{match($0,/\"id\": *[0-9]+/);print substr($0,RSTART+5,RLENGTH-5)}')
 				ws=\"\"; for i in 1 2 3 4 5; do a=0; [[ \"$i\" == \"$act\" ]] && a=1; o=0; echo \"$occ_l\" | grep -qx \"$i\" && o=1; ws+=\"$i:$a:$o \"; done
+				hyprctl activewindow -j 2>/dev/null | grep -qE '\"fullscreen\": *(1|2|true)' && fs=1
 			fi
-			printf '%s|%s|%s|%s\n' \"${b:-100}\" \"$ws\" \"$sv\" \"$mv\"
+			printf '%s|%s|%s|%s|%d\n' \"${b:-100}\" \"$ws\" \"$sv\" \"$mv\" \"$fs\"
 		"]
 		stdout: SplitParser {
 			onRead: data => {
@@ -335,6 +412,9 @@ ShellRoot {
 					}
 					root.micMuted = mm
 					root.lastMicMuted = mm
+				}
+				if (p.length >= 5) {
+					root.hasActiveFullWindow = (p[4] === "1")
 				}
 			}
 		}
@@ -387,12 +467,14 @@ ShellRoot {
 				b_p=$(awk -v p=\"$(cat \"$bat_d/power_now\" 2>/dev/null || echo 0)\" 'BEGIN{printf \"%.1f W\", p/1000000}')
 				b_c=$(cat \"$bat_d/cycle_count\" 2>/dev/null || echo 0); b_t=$(cat \"$bat_d/technology\" 2>/dev/null || echo \"Li-ion\")
 			else b_h=\"AC Power\"; b_p=\"0.0 W\"; b_c=\"N/A\"; b_t=\"Virtual / AC\"; fi
-			printf '%d|%s|%d|%s|%d|%s|%s|%d|%d|%s|%d|%d|%s|%d|%s|%s|%s|%s|%s|%s|%s|%s|%s\n' \"$((t/1000))\" \"${e_dev:-}\" \"$e_on\" \"$e_ip\" \"$w_hw\" \"${w_rad:-disabled}\" \"$net\" \"$bt_hw\" \"$bt_en\" \"$bt_name\" \"$hp\" \"$hmic\" \"${cpu_m:-CPU}\" \"${cpu_u:-10}\" \"$ram_s\" \"$d_root\" \"${d_sec:-No secondary drive}\" \"$(uname -r)\" \"$(uptime -p 2>/dev/null | sed 's/^up //')\" \"$b_h\" \"$b_p\" \"$b_c\" \"$b_t\"
+			dpms_off=0
+			grep -q '^Off$' /sys/class/drm/*/dpms 2>/dev/null && dpms_off=1
+			printf '%d|%s|%d|%s|%d|%s|%s|%d|%d|%s|%d|%d|%s|%d|%s|%s|%s|%s|%s|%s|%s|%s|%s|%d\n' \"$((t/1000))\" \"${e_dev:-}\" \"$e_on\" \"$e_ip\" \"$w_hw\" \"${w_rad:-disabled}\" \"$net\" \"$bt_hw\" \"$bt_en\" \"$bt_name\" \"$hp\" \"$hmic\" \"${cpu_m:-CPU}\" \"${cpu_u:-10}\" \"$ram_s\" \"$d_root\" \"${d_sec:-No secondary drive}\" \"$(uname -r)\" \"$(uptime -p 2>/dev/null | sed 's/^up //')\" \"$b_h\" \"$b_p\" \"$b_c\" \"$b_t\" \"$dpms_off\"
 		"]
 		stdout: SplitParser {
 			onRead: data => {
 				let p = data.trim().split("|")
-				if (p.length >= 24) {
+				if (p.length >= 25) {
 					root.cpuTemp = parseInt(p[0]) || 40
 					root.ethIface = p[1]
 					root.ethConnected = (p[2] === "1")
@@ -418,6 +500,7 @@ ShellRoot {
 					root.batPowerDraw = p[22]
 					root.batCycles = p[23]
 					root.batTech = p[24]
+					if (p.length >= 26) root.isMonitorDpmsOff = (p[25] === "1")
 				}
 			}
 		}
@@ -563,10 +646,11 @@ ShellRoot {
 		}
 	}
 
-	// 1. SFONDO DESKTOP NATIVO (Static Image, AnimatedImage o VideoOutput .webm/.mp4)
+	// 1. SFONDO DESKTOP NATIVO (Con Crossfade/Zoom e Auto-Pausa Intelligente)
 	Variants {
 		model: Quickshell.screens
 		PanelWindow {
+			id: wallWin
 			required property var modelData
 			screen: modelData
 			WlrLayershell.layer: WlrLayer.Background
@@ -575,50 +659,81 @@ ShellRoot {
 			anchors { top: true; bottom: true; left: true; right: true }
 			color: root.bg
 
-			Image {
+			Item {
+				id: wallContainer
 				anchors.fill: parent
-				visible: !root.isVideoFile && !root.isAnimatedGif
-				source: (visible && root.wallpaperPath !== "") ? "file://" + root.wallpaperPath : ""
-				fillMode: Image.PreserveAspectCrop
-				asynchronous: true
-				smooth: true
-			}
 
-			AnimatedImage {
-				anchors.fill: parent
-				visible: root.isAnimatedGif
-				source: (root.isAnimatedGif && root.wallpaperPath !== "") ? "file://" + root.wallpaperPath : ""
-				playing: visible && !root.screenLocked
-				fillMode: Image.PreserveAspectCrop
-				asynchronous: true
-				smooth: true
-			}
-
-			MediaPlayer {
-				id: wallVideoPlayer
-				source: (root.isVideoFile && root.wallpaperPath !== "") ? "file://" + root.wallpaperPath : ""
-				loops: MediaPlayer.Infinite
-				videoOutput: wallVideoOut
-				onSourceChanged: {
-					if (root.isVideoFile && root.wallpaperPath !== "" && !root.screenLocked) play()
-					else stop()
+				NumberAnimation {
+					id: wallFadeAnim
+					target: wallContainer
+					property: "opacity"
+					from: 0.2
+					to: 1.0
+					duration: root.fxActive && root.cfgWallpaperTransition !== "none" ? root.cfgWallpaperTransitionMs : 0
+					easing.type: Easing.OutCubic
 				}
-			}
 
-			Connections {
-				target: root
-				function onScreenLockedChanged() {
-					if (!root.isVideoFile) return
-					if (root.screenLocked) wallVideoPlayer.pause()
-					else wallVideoPlayer.play()
+				NumberAnimation {
+					id: wallZoomAnim
+					target: wallContainer
+					property: "scale"
+					from: root.cfgWallpaperTransition === "zoom" ? 1.04 : 1.0
+					to: 1.0
+					duration: root.fxActive && root.cfgWallpaperTransition === "zoom" ? root.cfgWallpaperTransitionMs : 0
+					easing.type: Easing.OutCubic
 				}
-			}
 
-			VideoOutput {
-				id: wallVideoOut
-				anchors.fill: parent
-				visible: root.isVideoFile
-				fillMode: VideoOutput.PreserveAspectCrop
+				Connections {
+					target: root
+					function onWallpaperPathChanged() {
+						if (root.fxActive && root.cfgWallpaperTransition !== "none") {
+							wallFadeAnim.restart()
+							if (root.cfgWallpaperTransition === "zoom") wallZoomAnim.restart()
+						}
+					}
+					function onShouldPlayAnimationChanged() {
+						if (!root.isVideoFile) return
+						if (root.shouldPlayAnimation) wallVideoPlayer.play()
+						else wallVideoPlayer.pause()
+					}
+				}
+
+				Image {
+					anchors.fill: parent
+					visible: !root.isVideoFile && !root.isAnimatedGif
+					source: (visible && root.wallpaperPath !== "") ? "file://" + root.wallpaperPath : ""
+					fillMode: Image.PreserveAspectCrop
+					asynchronous: true
+					smooth: true
+				}
+
+				AnimatedImage {
+					anchors.fill: parent
+					visible: root.isAnimatedGif
+					source: (root.isAnimatedGif && root.wallpaperPath !== "") ? "file://" + root.wallpaperPath : ""
+					playing: visible && root.shouldPlayAnimation
+					fillMode: Image.PreserveAspectCrop
+					asynchronous: true
+					smooth: true
+				}
+
+				MediaPlayer {
+					id: wallVideoPlayer
+					source: (root.isVideoFile && root.wallpaperPath !== "") ? "file://" + root.wallpaperPath : ""
+					loops: MediaPlayer.Infinite
+					videoOutput: wallVideoOut
+					onSourceChanged: {
+						if (root.isVideoFile && root.wallpaperPath !== "" && root.shouldPlayAnimation) play()
+						else stop()
+					}
+				}
+
+				VideoOutput {
+					id: wallVideoOut
+					anchors.fill: parent
+					visible: root.isVideoFile
+					fillMode: VideoOutput.PreserveAspectCrop
+				}
 			}
 		}
 	}
@@ -718,12 +833,12 @@ ShellRoot {
 					implicitWidth: expanded ? 330 : 38
 					implicitHeight: expanded ? 150 : 38
 					radius: expanded ? 22 : 19
-					color: root.withAlpha(root.bg, root.isVM ? 0.96 : 0.85)
+					color: root.withAlpha(root.bg, root.panelAlpha)
 					border.width: expanded ? 2 : 1
 					border.color: expanded ? root.color4 : root.withAlpha(root.color4, 0.6)
 					clip: true
-					Behavior on implicitWidth { NumberAnimation { duration: root.animMs; easing.type: Easing.OutCubic } }
-					Behavior on implicitHeight { NumberAnimation { duration: root.animMs; easing.type: Easing.OutCubic } }
+					Behavior on implicitWidth { NumberAnimation { duration: root.animMs; easing.type: root.cfgIslandEasing } }
+					Behavior on implicitHeight { NumberAnimation { duration: root.animMs; easing.type: root.cfgIslandEasing } }
 					HoverHandler { id: mediaHover }
 
 					Rectangle {
@@ -781,9 +896,9 @@ ShellRoot {
 					property bool showAll: root.wsExpanded || wsHover.hovered
 					implicitWidth: showAll ? (wsRow.implicitWidth + 16) : 38
 					implicitHeight: 38; radius: 19
-					color: root.withAlpha(root.bg, root.isVM ? 0.96 : 0.85)
+					color: root.withAlpha(root.bg, root.panelAlpha)
 					border.width: 1; border.color: root.withAlpha(root.color4, 0.6); clip: true
-					Behavior on implicitWidth { NumberAnimation { duration: root.animMs; easing.type: Easing.OutCubic } }
+					Behavior on implicitWidth { NumberAnimation { duration: root.animMs; easing.type: root.cfgIslandEasing } }
 					HoverHandler { id: wsHover }
 
 					Text { anchors.centerIn: parent; visible: !wsPill.showAll; text: root.lastActiveWs.toString(); color: root.color4; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 14; font.bold: true }
@@ -815,12 +930,12 @@ ShellRoot {
 					implicitWidth: (isHoverPreview || isCalOpen || isSysOpen || isLauncherOpen) ? 390 : (compactClockRow.implicitWidth + 28)
 					implicitHeight: isLauncherOpen ? 410 : (isSysOpen ? (sysContainer.implicitHeight + 28) : (isCalOpen ? Math.max(410, calCardCol.implicitHeight + 52) : (isHoverPreview ? (calPreviewBox.implicitHeight + 56) : 38)))
 					radius: (isHoverPreview || isCalOpen || isSysOpen || isLauncherOpen) ? 22 : 19
-					color: root.withAlpha(root.bg, root.isVM ? 0.96 : 0.88)
+					color: root.withAlpha(root.bg, root.panelAlpha)
 					border.width: (isCalOpen || isSysOpen || isLauncherOpen) ? 2 : (isHoverPreview ? 0 : 1)
 					border.color: (isCalOpen || isSysOpen || isLauncherOpen) ? root.color4 : root.withAlpha(root.color4, 0.6)
 					clip: true
-					Behavior on implicitWidth { NumberAnimation { duration: root.animMs; easing.type: Easing.OutCubic } }
-					Behavior on implicitHeight { NumberAnimation { duration: root.animMs; easing.type: Easing.OutCubic } }
+					Behavior on implicitWidth { NumberAnimation { duration: root.animMs; easing.type: root.cfgIslandEasing } }
+					Behavior on implicitHeight { NumberAnimation { duration: root.animMs; easing.type: root.cfgIslandEasing } }
 
 					HoverHandler {
 						id: centerHover
@@ -1007,15 +1122,56 @@ ShellRoot {
 						}
 					}
 
+					// CONTENITORE SISTEMA CON TRANSIZIONE SLIDE + FADE CONFIGURABILE
 					Item {
 						id: sysContainer
 						visible: centerPill.isSysOpen
 						anchors { top: parent.top; left: parent.left; right: parent.right; margins: 14 }
 						implicitHeight: root.sysSubmenu === "" ? sysMainCol.implicitHeight : sysSubCol.implicitHeight
 
+						property real viewOffset: 0
+						property real viewOpacity: 1.0
+
+						NumberAnimation {
+							id: subSlideAnim
+							target: sysContainer
+							property: "viewOffset"
+							to: 0
+							duration: root.fxActive && root.cfgSubmenuAnimStyle === "slide" ? root.cfgSubmenuAnimMs : 0
+							easing.type: Easing.OutCubic
+						}
+
+						NumberAnimation {
+							id: subFadeAnim
+							target: sysContainer
+							property: "viewOpacity"
+							from: 0.15
+							to: 1.0
+							duration: root.fxActive && root.cfgSubmenuAnimStyle !== "none" ? root.cfgSubmenuAnimMs : 0
+							easing.type: Easing.OutCubic
+						}
+
+						Connections {
+							target: root
+							function onSysSubmenuChanged() {
+								if (!root.fxActive || root.cfgSubmenuAnimStyle === "none") {
+									sysContainer.viewOffset = 0
+									sysContainer.viewOpacity = 1.0
+									return
+								}
+								subFadeAnim.restart()
+								if (root.cfgSubmenuAnimStyle === "slide") {
+									subSlideAnim.from = root.sysSubmenu !== "" ? root.cfgSubmenuSlidePx : -root.cfgSubmenuSlidePx
+									subSlideAnim.restart()
+								}
+							}
+						}
+
 						ColumnLayout {
 							id: sysMainCol
 							visible: root.sysSubmenu === ""
+							opacity: sysContainer.viewOpacity
+							transform: Translate { x: sysContainer.viewOffset }
 							anchors { left: parent.left; right: parent.right }
 							spacing: 10
 
@@ -1277,6 +1433,8 @@ ShellRoot {
 						ColumnLayout {
 							id: sysSubCol
 							visible: root.sysSubmenu !== ""
+							opacity: sysContainer.viewOpacity
+							transform: Translate { x: sysContainer.viewOffset }
 							anchors { left: parent.left; right: parent.right }
 							spacing: 12
 
@@ -1563,7 +1721,7 @@ ShellRoot {
 								}
 							}
 
-							// SOTTOMENU BATTERY + SELETTORE SFONDI E NOME SFONDO CARICATO
+							// SOTTOMENU BATTERY + SWITCH SFONDI ANIMATI + SWITCH EFFETTI & BLUR
 							ColumnLayout {
 								visible: root.sysSubmenu === "battery"; Layout.fillWidth: true; spacing: 8
 								Rectangle {
@@ -1579,6 +1737,7 @@ ShellRoot {
 									}
 								}
 
+								// 1. Switch Animated Wallpapers + Indicatore Cartella/File
 								Rectangle {
 									Layout.fillWidth: true; implicitHeight: 68; radius: 12; color: root.color0
 									RowLayout {
@@ -1597,7 +1756,7 @@ ShellRoot {
 											Layout.fillWidth: true; spacing: 2
 											Text { text: "Animated Wallpapers"; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12; font.bold: true }
 											Text {
-												text: root.animWallpapers ? "Active (day_animated / night_animated)" : "Off • Static Power Saving (day / night)"
+												text: root.animWallpapers ? (root.shouldPlayAnimation ? "Playing (day_animated / night_animated)" : "Paused (Fullscreen / Standby)") : "Off • Static Power Saving (day / night)"
 												color: root.animWallpapers ? root.color4 : root.color2
 												font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 10
 											}
@@ -1621,6 +1780,45 @@ ShellRoot {
 										}
 									}
 									MouseArea { anchors.fill: parent; onClicked: root.toggleWallpaperMode() }
+								}
+
+								// 2. Switch UI Blur & Animations (Risparmio Batteria vs Estetica Glass Blur)
+								Rectangle {
+									Layout.fillWidth: true; implicitHeight: 54; radius: 12; color: root.color0
+									RowLayout {
+										anchors.fill: parent; anchors.margins: 10; spacing: 10
+										Rectangle {
+											implicitWidth: 34; implicitHeight: 34; radius: 17
+											color: root.fxActive ? root.color5 : Qt.rgba(1, 1, 1, 0.08)
+											Text {
+												anchors.centerIn: parent
+												text: "Auto" === "" ? "󰂵" : "󰂵"
+												color: root.fxActive ? root.bg : root.fg
+												font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 16
+											}
+										}
+										ColumnLayout {
+											Layout.fillWidth: true; spacing: 1
+											Text { text: "UI Blur & Animations"; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12; font.bold: true }
+											Text {
+												text: root.isVM ? "Disabled in VM Mode" : (root.fxActive ? "Active • Glass Blur & Smooth Transitions" : "Off • Solid Panels & Instant Transitions")
+												color: root.fxActive ? root.color5 : root.color8
+												font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 10
+											}
+										}
+										Rectangle {
+											implicitWidth: 44; implicitHeight: 22; radius: 11
+											color: root.fxActive ? root.color5 : Qt.rgba(1, 1, 1, 0.15)
+											Rectangle {
+												width: 16; height: 16; radius: 8
+												anchors.verticalCenter: parent.verticalCenter
+												x: root.fxActive ? 24 : 4
+												color: root.fxActive ? root.bg : root.fg
+												Behavior on x { NumberAnimation { duration: 120 } }
+											}
+										}
+									}
+									MouseArea { anchors.fill: parent; onClicked: { if (!root.isVM) root.toggleUiEffects() } }
 								}
 
 								GridLayout {
@@ -1835,15 +2033,16 @@ ShellRoot {
 								}
 							}
 
+							// SOTTOMENU POWER (Pausa immediata video su Suspend/Hibernate)
 							ColumnLayout {
 								visible: root.sysSubmenu === "power"; Layout.fillWidth: true; spacing: 8
 								Repeater {
 									model: [
-										{ "icon": "󰑐", "label": "Reboot System", "cmd": "loginctl reboot || reboot" },
-										{ "icon": "󰤄", "label": "Suspend", "cmd": "loginctl suspend || zzz" },
-										{ "icon": "󰒲", "label": "Hibernate", "cmd": "loginctl hibernate || ZZZ" },
-										{ "icon": "󰌾", "label": "Lock Screen", "cmd": "LOCK" },
-										{ "icon": "󰍃", "label": "Log Out", "cmd": "niri msg action quit -s 2>/dev/null || hyprctl dispatch exit 2>/dev/null || loginctl terminate-session \"$XDG_SESSION_ID\" 2>/dev/null || pkill -u \"$UID\" -x 'niri|Hyprland'" }
+										{ "icon": "󰑐", "label": "Reboot System", "cmd": "loginctl reboot || reboot", "pause": false },
+										{ "icon": "󰤄", "label": "Suspend", "cmd": "loginctl suspend || zzz", "pause": true },
+										{ "icon": "󰒲", "label": "Hibernate", "cmd": "loginctl hibernate || ZZZ", "pause": true },
+										{ "icon": "󰌾", "label": "Lock Screen", "cmd": "LOCK", "pause": false },
+										{ "icon": "󰍃", "label": "Log Out", "cmd": "niri msg action quit -s 2>/dev/null || hyprctl dispatch exit 2>/dev/null || loginctl terminate-session \"$XDG_SESSION_ID\" 2>/dev/null || pkill -u \"$UID\" -x 'niri|Hyprland'", "pause": false }
 									]
 									Rectangle {
 										required property var modelData
@@ -1853,7 +2052,17 @@ ShellRoot {
 											Text { text: modelData.icon; color: root.color4; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 16 }
 											Text { text: modelData.label; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 13; font.bold: true; Layout.fillWidth: true }
 										}
-										MouseArea { id: pwrItemMouse; anchors.fill: parent; hoverEnabled: true; onClicked: { if (modelData.cmd === "LOCK") root.triggerLock(); else root.runCmd(modelData.cmd) } }
+										MouseArea {
+											id: pwrItemMouse; anchors.fill: parent; hoverEnabled: true
+											onClicked: {
+												if (modelData.pause) {
+													root.isMonitorDpmsOff = true
+													root.triggerLock()
+												}
+												if (modelData.cmd === "LOCK") root.triggerLock()
+												else root.runCmd(modelData.cmd)
+											}
+										}
 									}
 								}
 							}
@@ -1865,7 +2074,7 @@ ShellRoot {
 					id: rightOsdPill
 					Layout.alignment: Qt.AlignTop
 					implicitWidth: 38; implicitHeight: 38; radius: 19
-					color: root.withAlpha(root.bg, root.isVM ? 0.96 : 0.85)
+					color: root.withAlpha(root.bg, root.panelAlpha)
 					property real arcPct: root.osdMode === "brightness" ? (root.brightnessPct / 100.0) : (root.osdMode === "mic" ? (root.micMuted ? 0 : root.micVolPct / 100.0) : (root.outMuted ? 0 : root.outVolPct / 100.0))
 					property string centerIcon: root.osdMode === "brightness" ? "󰃠" : (root.osdMode === "mic" ? (root.micMuted ? (root.isHeadsetMic ? "󰋐" : "󰍭") : (root.isHeadsetMic ? "󰋎" : "󰍬")) : (root.outMuted ? (root.isHeadphones ? "󰟎" : "󰖁") : (root.isHeadphones ? "󰋋" : "󰕾")))
 					onArcPctChanged: osdCanvas.requestPaint()
@@ -1932,7 +2141,7 @@ ShellRoot {
 					model: root.popupNotifications
 					Rectangle {
 						required property var modelData
-						Layout.fillWidth: true; implicitHeight: 68; radius: 16; color: root.withAlpha(root.color0, root.isVM ? 0.96 : 0.88); border.width: 2; border.color: root.color4
+						Layout.fillWidth: true; implicitHeight: 68; radius: 16; color: root.withAlpha(root.color0, root.panelAlpha); border.width: 2; border.color: root.color4
 						ColumnLayout {
 							anchors.fill: parent; anchors.margins: 12; spacing: 3
 							Text { text: modelData.summary || "Notification"; color: root.color4; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 13; font.bold: true; elide: Text.ElideRight; Layout.fillWidth: true }
@@ -1944,10 +2153,11 @@ ShellRoot {
 		}
 	}
 
-	// 6. LOCKSCREEN INTEGRATO
+	// 6. LOCKSCREEN INTEGRATO (Animato se Animated Wallpapers è ON, altrimenti Statico con Blur)
 	property bool authError: false
 	property bool authBusy: false
 	property string pendingPassword: ""
+	property bool showLiveLockWall: root.animWallpapers && root.cfgLockKeepAnimated && (root.isVideoFile || root.isAnimatedGif)
 
 	PamContext {
 		id: pamLock; config: "quickshell"
@@ -1967,14 +2177,28 @@ ShellRoot {
 			WlrLayershell.exclusionMode: ExclusionMode.Ignore
 			WlrLayershell.keyboardFocus: root.screenLocked ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 			anchors { top: true; bottom: true; left: true; right: true }
-			color: root.bg
-			onVisibleChanged: { if (visible) { pwLockInput.text = ""; pwLockInput.forceActiveFocus() } }
+			color: root.showLiveLockWall ? "transparent" : root.bg
+			onVisibleChanged: {
+				if (visible) {
+					root.isMonitorDpmsOff = false
+					pwLockInput.text = ""
+					pwLockInput.forceActiveFocus()
+				}
+			}
 			Image {
 				id: lockWall; anchors.fill: parent
-				source: root.isVideoFile ? "file:///tmp/wall_frame.jpg" : (root.wallpaperPath !== "" ? "file://" + root.wallpaperPath : "")
-				fillMode: Image.PreserveAspectCrop; visible: root.isVM
+				source: (!root.showLiveLockWall && root.wallpaperPath !== "") ? (root.isVideoFile ? "file:///tmp/wall_frame.jpg" : "file://" + root.wallpaperPath) : ""
+				fillMode: Image.PreserveAspectCrop
+				visible: !root.showLiveLockWall && (!root.fxActive || root.cfgLockBlurMax <= 0)
 			}
-			MultiEffect { anchors.fill: parent; source: lockWall; visible: !root.isVM && root.wallpaperPath !== ""; blurEnabled: !root.isVM; blurMax: 48; blur: 1.0 }
+			MultiEffect {
+				anchors.fill: parent
+				source: lockWall
+				visible: !root.showLiveLockWall && root.fxActive && root.cfgLockBlurMax > 0 && root.wallpaperPath !== ""
+				blurEnabled: visible
+				blurMax: root.cfgLockBlurMax
+				blur: 1.0
+			}
 			Rectangle { anchors.fill: parent; color: Qt.rgba(0, 0, 0, 0.35) }
 			Text { anchors.horizontalCenter: parent.horizontalCenter; anchors.verticalCenter: parent.verticalCenter; anchors.verticalCenterOffset: -80; text: root.timeStr; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 64; font.bold: true }
 			Rectangle {
