@@ -1,4 +1,34 @@
 #!/bin/bash
+# ==============================================================================
+# CONFIGURAZIONE UTENTE (THEME SWITCHER & WALLUST)
+# ==============================================================================
+# Orario di inizio fascia Diurna (0-23, default: 7 -> ore 07:00)
+DAY_START_HOUR=7
+
+# Orario di inizio fascia Notturna (0-23, default: 19 -> ore 19:00)
+NIGHT_START_HOUR=19
+
+# Intervallo (in secondi) di controllo cambio fascia oraria (default: 5)
+CHECK_INTERVAL=5
+
+# Rotazione periodica dello sfondo nella stessa fascia oraria (in secondi)
+# Opzioni: 0 = Disabilitato (cambia solo alle 07:00, alle 19:00 o da switch manuale)
+#          900 = Ogni 15 min | 1800 = Ogni 30 min | 3600 = Ogni ora
+ROTATE_INTERVAL=0
+
+# Backend di estrazione colori Wallust
+# Opzioni: "resized" (consigliato, ~0.1s) | "kmeans" (preciso ma lento) | "wal"
+WALLUST_BACKEND="resized"
+
+# Soglia differenza colori Wallust (1-20)
+# Opzioni: 2 = Ideale per illustrazioni/pochi colori | 11 = Standard | 20 = Foto
+WALLUST_THRESHOLD=2
+
+# Palette Wallust per la fascia notturna
+# Opzioni: "dark16" | "harddark16" | "softdark16"
+WALLUST_NIGHT_PALETTE="dark16"
+# ==============================================================================
+
 PIDFILE="/tmp/theme-switcher-$UID.pid"
 if [[ -f "$PIDFILE" ]]; then
 	old_pid=$(<"$PIDFILE")
@@ -17,6 +47,7 @@ FORCED_MODE="${1:-}"
 CURRENT_WALL=""
 CURRENT_THEME=""
 LAST_MODE=""
+LAST_ROTATE_TS=$SECONDS
 
 get_wall_mode() {
 	if [[ "$FORCED_MODE" =~ ^(animated|static)$ ]]; then
@@ -28,16 +59,23 @@ get_wall_mode() {
 	[[ "$m" == "animated" ]] && echo "animated" || echo "static"
 }
 
+get_ui_effects() {
+	local fx
+	fx=$(grep -o '"uiEffects": *[a-z]*' "$QS_DIR/colors.json" 2>/dev/null | awk -F: '{gsub(/[[:space:]]/,"",$2); print $2}')
+	[[ "$fx" == "false" ]] && echo "false" || echo "true"
+}
+
 update_quickshell_json() {
 	local wall="$1"
-	local mode
+	local mode fx
 	mode=$(get_wall_mode)
+	fx=$(get_ui_effects)
 	FORCED_MODE=""
 	mkdir -p "$QS_DIR"
 	if [[ -f "$QS_DIR/colors-wallust.json" ]] && grep -q '"color4": *"#' "$QS_DIR/colors-wallust.json" 2>/dev/null; then
-		sed "s|{|{\n\t\"wallpaper\": \"$wall\",\n\t\"wallMode\": \"$mode\",|" "$QS_DIR/colors-wallust.json" > "$QS_DIR/colors.json"
+		sed "s|{|{\n\t\"wallpaper\": \"$wall\",\n\t\"wallMode\": \"$mode\",\n\t\"uiEffects\": $fx,|" "$QS_DIR/colors-wallust.json" > "$QS_DIR/colors.json"
 	elif [[ -f "$HOME/.config/kitty/colors.conf" ]]; then
-		awk -v w="$wall" -v m="$mode" '
+		awk -v w="$wall" -v m="$mode" -v fx="$fx" '
 		BEGIN {
 			c["background"]="#1e1e2e"; c["foreground"]="#cdd6f4";
 			c["color0"]="#1e1e2e"; c["color1"]="#f38ba8"; c["color2"]="#a6e3a1";
@@ -46,8 +84,8 @@ update_quickshell_json() {
 		}
 		/^(background|foreground|color[0-8])[[:space:]]+#/ { c[$1]=$2 }
 		END {
-			printf "{\n\t\"wallpaper\": \"%s\",\n\t\"wallMode\": \"%s\",\n\t\"background\": \"%s\",\n\t\"foreground\": \"%s\",\n\t\"color0\": \"%s\",\n\t\"color1\": \"%s\",\n\t\"color2\": \"%s\",\n\t\"color3\": \"%s\",\n\t\"color4\": \"%s\",\n\t\"color5\": \"%s\",\n\t\"color6\": \"%s\",\n\t\"color7\": \"%s\",\n\t\"color8\": \"%s\"\n}\n",
-			w, m, c["background"], c["foreground"], c["color0"], c["color1"], c["color2"], c["color3"], c["color4"], c["color5"], c["color6"], c["color7"], c["color8"]
+			printf "{\n\t\"wallpaper\": \"%s\",\n\t\"wallMode\": \"%s\",\n\t\"uiEffects\": %s,\n\t\"background\": \"%s\",\n\t\"foreground\": \"%s\",\n\t\"color0\": \"%s\",\n\t\"color1\": \"%s\",\n\t\"color2\": \"%s\",\n\t\"color3\": \"%s\",\n\t\"color4\": \"%s\",\n\t\"color5\": \"%s\",\n\t\"color6\": \"%s\",\n\t\"color7\": \"%s\",\n\t\"color8\": \"%s\"\n}\n",
+			w, m, fx, c["background"], c["foreground"], c["color0"], c["color1"], c["color2"], c["color3"], c["color4"], c["color5"], c["color6"], c["color7"], c["color8"]
 		}' "$HOME/.config/kitty/colors.conf" > "$QS_DIR/colors.json"
 	fi
 	quickshell ipc call theme reload >/dev/null 2>&1 || true
@@ -90,9 +128,9 @@ apply_theme() {
 	fi
 
 	if [[ "$theme" == "night" ]]; then
-		wallust run -s --backend resized -t 2 "$wall_img" --palette dark16 2>/dev/null
+		wallust run -s --backend "$WALLUST_BACKEND" -t "$WALLUST_THRESHOLD" "$wall_img" --palette "$WALLUST_NIGHT_PALETTE" 2>/dev/null
 	else
-		wallust run -s --backend resized -t 2 "$wall_img" 2>/dev/null
+		wallust run -s --backend "$WALLUST_BACKEND" -t "$WALLUST_THRESHOLD" "$wall_img" 2>/dev/null
 	fi
 	killall -SIGUSR1 kitty 2>/dev/null || true
 	if command -v quickshell >/dev/null 2>&1; then
@@ -104,24 +142,29 @@ apply_theme() {
 	CURRENT_WALL="$wall"
 	CURRENT_THEME="$theme"
 	LAST_MODE="$mode"
+	LAST_ROTATE_TS=$SECONDS
 }
 
 [[ -z "$FORCED_MODE" ]] && sleep 1
 while true; do
 	if ! pgrep -u "$UID" -x niri >/dev/null && ! pgrep -u "$UID" -x Hyprland >/dev/null; then exit 0 ; fi
 	NOW_MODE=$(get_wall_mode)
+	FORCE_ROTATE=0
+	if (( ROTATE_INTERVAL > 0 && (SECONDS - LAST_ROTATE_TS) >= ROTATE_INTERVAL )); then
+		FORCE_ROTATE=1
+	fi
 	printf -v HOUR '%(%k)T' -1
-	if (( HOUR >= 7 && HOUR < 19 )); then
-		if [[ "$CURRENT_THEME" != "day" || "$LAST_MODE" != "$NOW_MODE" ]]; then
+	if (( HOUR >= DAY_START_HOUR && HOUR < NIGHT_START_HOUR )); then
+		if [[ "$CURRENT_THEME" != "day" || "$LAST_MODE" != "$NOW_MODE" || "$FORCE_ROTATE" -eq 1 ]]; then
 			apply_theme "day" "$DAY_DIR" "$DAY_ANIM_DIR"
 		fi
 	else
-		if [[ "$CURRENT_THEME" != "night" || "$LAST_MODE" != "$NOW_MODE" ]]; then
+		if [[ "$CURRENT_THEME" != "night" || "$LAST_MODE" != "$NOW_MODE" || "$FORCE_ROTATE" -eq 1 ]]; then
 			apply_theme "night" "$NIGHT_DIR" "$NIGHT_ANIM_DIR"
 		fi
 	fi
 	if ! command -v quickshell >/dev/null 2>&1; then
 		if ! pgrep -u "$UID" -x waybar >/dev/null; then waybar & fi
 	fi
-	if [[ -z "$CURRENT_THEME" ]]; then sleep 2 ; else sleep 5 ; fi
+	if [[ -z "$CURRENT_THEME" ]]; then sleep 2 ; else sleep "$CHECK_INTERVAL" ; fi
 done
