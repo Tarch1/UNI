@@ -12,6 +12,7 @@ NIGHT_DIR="$WALL_DIR/night"
 DAY_ANIM_DIR="$WALL_DIR/day_animated"
 NIGHT_ANIM_DIR="$WALL_DIR/night_animated"
 QS_DIR="$HOME/.config/quickshell"
+FRAME_CACHE="/tmp/wall_frame.jpg"
 FORCED_MODE="${1:-}"
 CURRENT_WALL=""
 CURRENT_THEME=""
@@ -60,29 +61,38 @@ apply_theme() {
 	mode=$(get_wall_mode)
 	local target_dir="$static_dir"
 	if [[ "$mode" == "animated" && -d "$anim_dir" ]]; then
-		if [[ -n $(find "$anim_dir" -type f \( -iname "*.gif" -o -iname "*.webp" -o -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" \) -print -quit 2>/dev/null) ]]; then
+		if [[ -n $(find "$anim_dir" -type f \( -iname "*.webm" -o -iname "*.mp4" -o -iname "*.gif" -o -iname "*.webp" -o -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" \) -print -quit 2>/dev/null) ]]; then
 			target_dir="$anim_dir"
 		fi
 	fi
 	[[ ! -d "$target_dir" ]] && return 1
 	local wall
-	wall=$(find "$target_dir" -type f \( -iname "*.gif" -o -iname "*.webp" -o -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" \) | shuf -n 1)
+	wall=$(find "$target_dir" -type f \( -iname "*.webm" -o -iname "*.mp4" -o -iname "*.gif" -o -iname "*.webp" -o -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" \) | shuf -n 1)
 	[[ -z "$wall" ]] && return 1
 	[[ "$CURRENT_WALL" == "$wall" && "$LAST_MODE" == "$mode" ]] && return 0
+
+	local wall_img="$wall"
+	if [[ "${wall,,}" =~ \.(webm|mp4)$ ]]; then
+		wall_img="$FRAME_CACHE"
+		ffmpeg -y -loglevel quiet -ss 00:00:00.300 -i "$wall" -frames:v 1 -q:v 2 "$wall_img" 2>/dev/null || \
+			ffmpeg -y -loglevel quiet -i "$wall" -frames:v 1 -q:v 2 "$wall_img" 2>/dev/null
+	fi
+
 	if ! command -v quickshell >/dev/null 2>&1; then
 		if [[ "$XDG_CURRENT_DESKTOP" == "Hyprland" ]]; then
 			pgrep -u "$UID" -x hyprpaper >/dev/null || { hyprpaper & sleep 1; }
-			hyprctl hyprpaper preload "$wall" >/dev/null 2>&1 || return 1
-			hyprctl hyprpaper wallpaper ",$wall" >/dev/null 2>&1 || return 1
+			hyprctl hyprpaper preload "$wall_img" >/dev/null 2>&1 || return 1
+			hyprctl hyprpaper wallpaper ",$wall_img" >/dev/null 2>&1 || return 1
 		else
 			pgrep -u "$UID" -x awww-daemon >/dev/null || { awww-daemon & sleep 1; }
-			awww img "$wall" --transition-type grow --transition-pos 0.5,0.5 >/dev/null 2>&1 || return 1
+			awww img "$wall_img" --transition-type grow --transition-pos 0.5,0.5 >/dev/null 2>&1 || return 1
 		fi
 	fi
+
 	if [[ "$theme" == "night" ]]; then
-		wallust run -s --backend resized -t 2 "$wall" --palette dark16 2>/dev/null || wallust run -s -t 2 "$wall" --palette dark16
+		wallust run -s --backend resized -t 2 "$wall_img" --palette dark16 2>/dev/null
 	else
-		wallust run -s --backend resized -t 2 "$wall" 2>/dev/null || wallust run -s -t 2 "$wall"
+		wallust run -s --backend resized -t 2 "$wall_img" 2>/dev/null
 	fi
 	killall -SIGUSR1 kitty 2>/dev/null || true
 	if command -v quickshell >/dev/null 2>&1; then
