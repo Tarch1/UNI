@@ -160,10 +160,10 @@ binds {
     Alt+Down        { focus-window-down; }
 
     // Window Snap / Half-Screen Positioning (Super + Shift + Arrows)
-    Mod+Shift+Left  { set-column-width "50%"; move-column-left; }
-    Mod+Shift+Right { set-column-width "50%"; move-column-right; }
-    Mod+Shift+Up    { consume-or-expel-window-left; move-window-up; }
-    Mod+Shift+Down  { consume-or-expel-window-left; move-window-down; }
+    Mod+Shift+Left  { spawn "sh" "-c" "niri msg action set-column-width 50% && niri msg action move-column-left"; }
+    Mod+Shift+Right { spawn "sh" "-c" "niri msg action set-column-width 50% && niri msg action move-column-right"; }
+    Mod+Shift+Up    { spawn "sh" "-c" "niri msg action consume-or-expel-window-left && niri msg action move-window-up"; }
+    Mod+Shift+Down  { spawn "sh" "-c" "niri msg action consume-or-expel-window-left && niri msg action move-window-down"; }
 
     // Mouse Wheel Horizontal Window Scroll
     Mod+WheelScrollUp   { focus-column-left; }
