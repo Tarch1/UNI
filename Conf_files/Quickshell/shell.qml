@@ -17,67 +17,67 @@ ShellRoot {
 	id: root
 
 	// =========================================================================
-	// SEZIONE CONFIGURAZIONE UTENTE (EFFETTI, ANIMAZIONI, BLUR & AUTO-PAUSA)
+	// USER CONFIGURATION & TUNING VARIABLES (EFFECTS, ANIMATIONS, BLUR & PAUSE)
 	// =========================================================================
 
-	// 1. Interruttore generale Effetti UI & Blur (modificabile anche dal menu Battery)
-	//    Opzioni: true (Attivo su PC reale) | false (Modalità risparmio energetico / VM)
+	// 1. Master UI Effects & Blur Switch (can also be toggled in the Battery menu)
+	//    Options: true (Enabled on bare-metal PC) | false (Power-saving / VM mode)
 	property bool cfgEnableEffects: !isVM
 
-	// 2. Durata animazione di espansione della Dynamic Island (in millisecondi)
-	//    Opzioni: 0 (Istantanea) | 120 (Rapida) | 180 (Fluida standard) | 260 (Morbida)
+	// 2. Dynamic Island Morphing Animation Duration (in milliseconds)
+	//    Options: 0 (Instant) | 120 (Fast) | 180 (Standard smooth) | 260 (Soft)
 	property int cfgIslandAnimMs: 180
 
-	// 3. Curva di accelerazione (Easing) per l'espansione della Dynamic Island
-	//    Opzioni: Easing.OutCubic | Easing.OutExpo | Easing.OutBack | Easing.OutQuad | Easing.Linear
+	// 3. Easing Curve for Dynamic Island Expansion
+	//    Options: Easing.OutCubic | Easing.OutExpo | Easing.OutBack | Easing.OutQuad | Easing.Linear
 	property int cfgIslandEasing: Easing.OutCubic
 
-	// 4. Stile animazione di ingresso nei Sottomenu del Pannello di Controllo
-	//    Opzioni: "slide" (Scorrimento laterale + Dissolvenza) | "fade" (Solo Dissolvenza) | "none" (Istantaneo)
+	// 4. Control Center Submenu Transition Style
+	//    Options: "slide" (Horizontal Slide + Fade) | "fade" (Fade only) | "none" (Instant)
 	property string cfgSubmenuAnimStyle: "slide"
 
-	// 5. Durata animazione dei Sottomenu (in millisecondi) e offset scorrimento (in pixel)
-	//    Opzioni durata: 100 - 250 | Opzioni offset: 10 - 30
+	// 5. Submenu Animation Duration (ms) & Horizontal Slide Offset (px)
+	//    Duration options: 100 - 250 | Offset options: 10 - 30
 	property int cfgSubmenuAnimMs: 160
 	property int cfgSubmenuSlidePx: 18
 
-	// 6. Stile transizione al cambio Sfondo (Statico o Animato)
-	//    Opzioni: "crossfade" (Dissolvenza morbida) | "zoom" (Dissolvenza + leggero Zoom-in) | "none" (Istantaneo)
+	// 6. Wallpaper Switch Transition Style (Static & Animated)
+	//    Options: "crossfade" (Smooth opacity fade) | "zoom" (Fade + subtle zoom-in) | "none" (Instant)
 	property string cfgWallpaperTransition: "crossfade"
 	property int cfgWallpaperTransitionMs: 420
 
-	// 7. Trasparenza Barra e Pannelli (per vedere il Blur reale del compositore sotto la barra)
-	//    Opzioni: 0.65 (Molto trasparente/vetro) | 0.76 (Bilanciato per Blur) | 0.88 (Scuro) | 0.96 (Opaco/Risparmio)
+	// 7. Bar & Panel Opacity (allows real-time compositor blur to show through)
+	//    Options: 0.65 (Ultra glass) | 0.76 (Balanced blur) | 0.88 (Dark glass) | 0.96 (Solid / Power-saving)
 	property real cfgGlassOpacity: 0.76
 	property real cfgSolidOpacity: 0.96
 
-	// 8. Comportamento Lockscreen con Sfondi Animati e Sfondi Statici
-	//    cfgLockKeepAnimated: true = se lo sfondo è animato, continua a muoversi anche sul Lockscreen
-	//                         false = mette in pausa il video e mostra un fotogramma sfocato
-	//    cfgLockBlurMax: Intensità sfocatura (Gaussian Blur) quando lo sfondo è statico (0 = spento, 32 = medio, 48 = forte, 64 = massimo)
+	// 8. Lockscreen Behavior with Animated & Static Wallpapers
+	//    cfgLockKeepAnimated: true = keeps animated wallpaper playing on the lockscreen
+	//                         false = pauses video and displays a blurred static frame
+	//    cfgLockBlurMax: Gaussian blur radius for static lockscreen (0 = off, 32 = medium, 48 = high, 64 = max)
 	property bool cfgLockKeepAnimated: true
 	property int cfgLockBlurMax: 48
 
-	// 9. Auto-Pausa Intelligente per gli Sfondi Animati (.webm / .mp4 / .gif)
-	//    cfgPauseOnFullscreen: true = mette in pausa lo sfondo animato quando c'è una finestra a tutto schermo
-	//    cfgPauseOnScreenOff:  true = mette in pausa lo sfondo animato quando lo schermo va in standby (DPMS Off)
+	// 9. Smart Auto-Pause Rules for Animated Wallpapers (.webm / .mp4 / .gif)
+	//    cfgPauseOnFullscreen: true = pauses animated wallpaper when a window is fullscreen
+	//    cfgPauseOnScreenOff:  true = pauses animated wallpaper when monitor enters DPMS standby
 	property bool cfgPauseOnFullscreen: true
 	property bool cfgPauseOnScreenOff: true
 
 	// =========================================================================
-	// FINE SEZIONE CONFIGURAZIONE UTENTE
+	// END OF USER CONFIGURATION SECTION
 	// =========================================================================
 
 	property string homeDir: Quickshell.env("HOME")
 	property bool isVM: Quickshell.env("QSG_RENDER_LOOP") === "basic"
 	property bool isHyprland: Quickshell.env("XDG_CURRENT_DESKTOP") === "Hyprland"
 
-	// Valori effettivi calcolati in base allo stato di cfgEnableEffects
+	// Effective runtime values computed from cfgEnableEffects
 	property bool fxActive: cfgEnableEffects && !isVM
 	property int animMs: fxActive ? cfgIslandAnimMs : 0
 	property real panelAlpha: fxActive ? cfgGlassOpacity : cfgSolidOpacity
 
-	// Stato Sfondi e Rilevamento Intelligente Pausa
+	// Wallpaper State & Smart Auto-Pause Detection
 	property string wallpaperPath: ""
 	property bool animWallpapers: false
 	property bool isVideoFile: wallpaperPath.toLowerCase().endsWith(".webm") || wallpaperPath.toLowerCase().endsWith(".mp4")
@@ -108,12 +108,14 @@ ShellRoot {
 	property color color6: "#94e2d5"
 	property color color8: "#585b70"
 
+	// UI Modes: "none" | "calendar" | "system" | "launcher" | "overview"
 	property bool barVisible: true
 	property string centerMode: "none"
 	property string sysSubmenu: ""
 	property bool screenLocked: false
 	property bool wsExpanded: false
 	property int lastActiveWs: 1
+	property var overviewWindows: []
 
 	property string searchQuery: ""
 	property int selectedAppIndex: 0
@@ -219,6 +221,15 @@ ShellRoot {
 			root.sysSubmenu = ""
 			root.wifiPromptSsid = ""
 			root.centerMode = "launcher"
+		}
+	}
+	function openOverview() {
+		if (root.centerMode === "overview") root.closeCenterPill()
+		else {
+			root.sysSubmenu = ""
+			root.wifiPromptSsid = ""
+			overviewPoll.running = true
+			root.centerMode = "overview"
 		}
 	}
 	function openCalendar() {
@@ -350,10 +361,48 @@ ShellRoot {
 	}
 
 	IpcHandler { target: "launcher"; function toggle(): void { root.openLauncher() } }
+	IpcHandler { target: "overview"; function toggle(): void { root.openOverview() }; function close(): void { if (root.centerMode === "overview") root.closeCenterPill() } }
 	IpcHandler { target: "controlcenter"; function toggle(): void { if (root.centerMode === "system") root.closeCenterPill(); else root.openSystemPanel() } }
 	IpcHandler { target: "lock"; function lock(): void { root.triggerLock() } }
 	IpcHandler { target: "theme"; function reload(): void { colorFile.reload() } }
 	IpcHandler { target: "bar"; function toggle(): void { root.barVisible = !root.barVisible } }
+
+	Process {
+		id: overviewPoll
+		command: ["bash", "-c", "
+			if [[ -n \"$HYPRLAND_INSTANCE_SIGNATURE\" ]]; then
+				hyprctl clients -j 2>/dev/null | awk '
+				BEGIN{RS=\"}\"}
+				/\"address\":/{
+					match($0,/\"address\": *\"[^\"]*\"/); addr=substr($0,RSTART+11,RLENGTH-12); gsub(/^\"|\"$/,\"\",addr)
+					match($0,/\"id\": *[0-9-]+/); ws=substr($0,RSTART+5,RLENGTH-5); gsub(/[^0-9-]/,\"\",ws)
+					match($0,/\"class\": *\"[^\"]*\"/); cls=substr($0,RSTART+9,RLENGTH-10); gsub(/^\"|\"$/,\"\",cls)
+					match($0,/\"title\": *\"[^\"]*\"/); ttl=substr($0,RSTART+9,RLENGTH-10); gsub(/^\"|\"$/,\"\",ttl)
+					if (ws > 0 && addr != \"\") printf \"%s^%s^%s^%s;\", ws, cls, ttl, addr
+				}'
+			elif [[ -n \"$NIRI_SOCKET\" ]]; then
+				niri msg -j windows 2>/dev/null | awk '
+				BEGIN{RS=\"}\"}
+				/\"id\":/{
+					match($0,/\"id\": *[0-9]+/); id=substr($0,RSTART+5,RLENGTH-5); gsub(/[^0-9]/,\"\",id)
+					match($0,/\"workspace_id\": *[0-9]+/); ws=substr($0,RSTART+15,RLENGTH-15); gsub(/[^0-9]/,\"\",ws)
+					match($0,/\"app_id\": *\"[^\"]*\"/); cls=substr($0,RSTART+10,RLENGTH-11); gsub(/^\"|\"$/,\"\",cls)
+					match($0,/\"title\": *\"[^\"]*\"/); ttl=substr($0,RSTART+9,RLENGTH-10); gsub(/^\"|\"$/,\"\",ttl)
+					if (id != \"\") printf \"%s^%s^%s^%s;\", ws, cls, ttl, id
+				}'
+			fi
+		"]
+		stdout: SplitParser {
+			onRead: data => {
+				let r = data.trim().split(";"), arr = []
+				for (let i = 0; i < r.length; i++) {
+					let f = r[i].split("^")
+					if (f.length >= 4 && f[3] !== "") arr.push({ "ws": f[0], "app": f[1], "title": f[2], "id": f[3] })
+				}
+				root.overviewWindows = arr
+			}
+		}
+	}
 
 	Process {
 		id: fastPoll
@@ -646,7 +695,7 @@ ShellRoot {
 		}
 	}
 
-	// 1. SFONDO DESKTOP NATIVO (Con Crossfade/Zoom e Auto-Pausa Intelligente)
+	// 1. NATIVE DESKTOP WALLPAPER (With Crossfade/Zoom & Smart Auto-Pause)
 	Variants {
 		model: Quickshell.screens
 		PanelWindow {
@@ -738,7 +787,7 @@ ShellRoot {
 		}
 	}
 
-	// 2. FERMO FISSO INVISIBILE DA 46px
+	// 2. INVISIBLE 46px TOP SPACER (Reserves top bar zone without shifting windows on hover)
 	Variants {
 		model: Quickshell.screens
 		PanelWindow {
@@ -755,7 +804,7 @@ ShellRoot {
 		}
 	}
 
-	// 3. STRATO CLICK-OUTSIDE
+	// 3. CLICK-OUTSIDE BACKDROP LAYER
 	Variants {
 		model: Quickshell.screens
 		PanelWindow {
@@ -926,13 +975,14 @@ ShellRoot {
 					property bool isCalOpen: root.centerMode === "calendar"
 					property bool isSysOpen: root.centerMode === "system"
 					property bool isLauncherOpen: root.centerMode === "launcher"
+					property bool isOverviewOpen: root.centerMode === "overview"
 
-					implicitWidth: (isHoverPreview || isCalOpen || isSysOpen || isLauncherOpen) ? 390 : (compactClockRow.implicitWidth + 28)
-					implicitHeight: isLauncherOpen ? 410 : (isSysOpen ? (sysContainer.implicitHeight + 28) : (isCalOpen ? Math.max(410, calCardCol.implicitHeight + 52) : (isHoverPreview ? (calPreviewBox.implicitHeight + 56) : 38)))
-					radius: (isHoverPreview || isCalOpen || isSysOpen || isLauncherOpen) ? 22 : 19
+					implicitWidth: (isHoverPreview || isCalOpen || isSysOpen || isLauncherOpen || isOverviewOpen) ? 390 : (compactClockRow.implicitWidth + 28)
+					implicitHeight: (isLauncherOpen || isOverviewOpen) ? 410 : (isSysOpen ? (sysContainer.implicitHeight + 28) : (isCalOpen ? Math.max(410, calCardCol.implicitHeight + 52) : (isHoverPreview ? (calPreviewBox.implicitHeight + 56) : 38)))
+					radius: (isHoverPreview || isCalOpen || isSysOpen || isLauncherOpen || isOverviewOpen) ? 22 : 19
 					color: root.withAlpha(root.bg, root.panelAlpha)
-					border.width: (isCalOpen || isSysOpen || isLauncherOpen) ? 2 : (isHoverPreview ? 0 : 1)
-					border.color: (isCalOpen || isSysOpen || isLauncherOpen) ? root.color4 : root.withAlpha(root.color4, 0.6)
+					border.width: (isCalOpen || isSysOpen || isLauncherOpen || isOverviewOpen) ? 2 : (isHoverPreview ? 0 : 1)
+					border.color: (isCalOpen || isSysOpen || isLauncherOpen || isOverviewOpen) ? root.color4 : root.withAlpha(root.color4, 0.6)
 					clip: true
 					Behavior on implicitWidth { NumberAnimation { duration: root.animMs; easing.type: root.cfgIslandEasing } }
 					Behavior on implicitHeight { NumberAnimation { duration: root.animMs; easing.type: root.cfgIslandEasing } }
@@ -954,7 +1004,7 @@ ShellRoot {
 
 					Item {
 						id: topPillBar
-						visible: !centerPill.isSysOpen && !centerPill.isLauncherOpen
+						visible: !centerPill.isSysOpen && !centerPill.isLauncherOpen && !centerPill.isOverviewOpen
 						anchors { top: parent.top; left: parent.left; right: parent.right }
 						height: 38
 						RowLayout {
@@ -1086,6 +1136,47 @@ ShellRoot {
 						}
 					}
 
+					// WORKSPACE WINDOWS OVERVIEW (Super + Tab / 3-Finger Swipe Up on Hyprland)
+					ColumnLayout {
+						visible: centerPill.isOverviewOpen; anchors.fill: parent; anchors.margins: 16; spacing: 10
+						RowLayout {
+							Layout.fillWidth: true
+							Text { text: "󰕰  Workspace Windows Overview"; color: root.color4; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 14; font.bold: true; Layout.fillWidth: true }
+							Text { text: root.overviewWindows.length + " open"; color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11 }
+						}
+						ListView {
+							Layout.fillWidth: true; Layout.fillHeight: true; clip: true; spacing: 6
+							model: root.overviewWindows
+							Text { anchors.centerIn: parent; visible: root.overviewWindows.length === 0; text: "No open windows in workspaces"; color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12 }
+							delegate: Rectangle {
+								required property var modelData
+								width: ListView.view.width; height: 46; radius: 12; color: ovMouse.containsMouse ? root.withAlpha(root.color4, 0.25) : root.color0
+								border.width: ovMouse.containsMouse ? 1 : 0; border.color: root.color4
+								RowLayout {
+									anchors.fill: parent; anchors.margins: 10; spacing: 10
+									Rectangle {
+										implicitWidth: 26; implicitHeight: 26; radius: 13; color: root.color4
+										Text { anchors.centerIn: parent; text: modelData.ws; color: root.bg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12; font.bold: true }
+									}
+									ColumnLayout {
+										Layout.fillWidth: true; spacing: 1
+										Text { text: modelData.title || modelData.app; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12; font.bold: true; elide: Text.ElideRight; Layout.fillWidth: true }
+										Text { text: modelData.app; color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 10; elide: Text.ElideRight; Layout.fillWidth: true }
+									}
+								}
+								MouseArea {
+									id: ovMouse; anchors.fill: parent; hoverEnabled: true
+									onClicked: {
+										root.closeCenterPill()
+										if (root.isHyprland) root.runCmd("hyprctl dispatch focuswindow address:" + modelData.id)
+										else root.runCmd("niri msg action focus-window --id " + modelData.id)
+									}
+								}
+							}
+						}
+					}
+
+					// INTEGRATED APPLICATION LAUNCHER
 					ColumnLayout {
 						visible: centerPill.isLauncherOpen; anchors.fill: parent; anchors.margins: 16; spacing: 10
 						Rectangle {
@@ -1122,7 +1213,7 @@ ShellRoot {
 						}
 					}
 
-					// CONTENITORE SISTEMA CON TRANSIZIONE SLIDE + FADE CONFIGURABILE
+					// SYSTEM CONTROL CENTER WITH CONFIGURABLE SLIDE + FADE TRANSITION
 					Item {
 						id: sysContainer
 						visible: centerPill.isSysOpen
@@ -1721,7 +1812,7 @@ ShellRoot {
 								}
 							}
 
-							// SOTTOMENU BATTERY + SWITCH SFONDI ANIMATI + SWITCH EFFETTI & BLUR
+							// BATTERY SUBMENU + ANIMATED WALLPAPERS TOGGLE + UI BLUR & ANIMATIONS TOGGLE
 							ColumnLayout {
 								visible: root.sysSubmenu === "battery"; Layout.fillWidth: true; spacing: 8
 								Rectangle {
@@ -1737,7 +1828,7 @@ ShellRoot {
 									}
 								}
 
-								// 1. Switch Animated Wallpapers + Indicatore Cartella/File
+								// 1. Animated Wallpapers Switch + Loaded Folder/File Indicator
 								Rectangle {
 									Layout.fillWidth: true; implicitHeight: 68; radius: 12; color: root.color0
 									RowLayout {
@@ -1782,7 +1873,7 @@ ShellRoot {
 									MouseArea { anchors.fill: parent; onClicked: root.toggleWallpaperMode() }
 								}
 
-								// 2. Switch UI Blur & Animations (Risparmio Batteria vs Estetica Glass Blur)
+								// 2. UI Blur & Animations Switch (Power-Saving vs Real Glass Blur)
 								Rectangle {
 									Layout.fillWidth: true; implicitHeight: 54; radius: 12; color: root.color0
 									RowLayout {
@@ -1792,7 +1883,7 @@ ShellRoot {
 											color: root.fxActive ? root.color5 : Qt.rgba(1, 1, 1, 0.08)
 											Text {
 												anchors.centerIn: parent
-												text: "Auto" === "" ? "󰂵" : "󰂵"
+												text: "󰂵"
 												color: root.fxActive ? root.bg : root.fg
 												font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 16
 											}
@@ -2033,7 +2124,7 @@ ShellRoot {
 								}
 							}
 
-							// SOTTOMENU POWER (Pausa immediata video su Suspend/Hibernate)
+							// POWER SUBMENU (Immediate Video Pause on Suspend/Hibernate)
 							ColumnLayout {
 								visible: root.sysSubmenu === "power"; Layout.fillWidth: true; spacing: 8
 								Repeater {
@@ -2122,7 +2213,7 @@ ShellRoot {
 		}
 	}
 
-	// 5. POPUP NOTIFICHE
+	// 5. NOTIFICATION POPUP WINDOW
 	Variants {
 		model: Quickshell.screens
 		PanelWindow {
@@ -2153,7 +2244,7 @@ ShellRoot {
 		}
 	}
 
-	// 6. LOCKSCREEN INTEGRATO (Animato se Animated Wallpapers è ON, altrimenti Statico con Blur)
+	// 6. INTEGRATED LOCKSCREEN (Animated when Animated Wallpapers is ON, Blurred Static otherwise)
 	property bool authError: false
 	property bool authBusy: false
 	property string pendingPassword: ""
