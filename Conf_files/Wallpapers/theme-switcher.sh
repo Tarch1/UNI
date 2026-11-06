@@ -1,31 +1,31 @@
 #!/bin/bash
 # ==============================================================================
-# CONFIGURAZIONE UTENTE (THEME SWITCHER & WALLUST)
+# USER CONFIGURATION & TUNING VARIABLES (THEME SWITCHER & WALLUST)
 # ==============================================================================
-# Orario di inizio fascia Diurna (0-23, default: 7 -> ore 07:00)
+# Day theme start hour (0-23, default: 7 -> 07:00 AM)
 DAY_START_HOUR=7
 
-# Orario di inizio fascia Notturna (0-23, default: 19 -> ore 19:00)
+# Night theme start hour (0-23, default: 19 -> 07:00 PM)
 NIGHT_START_HOUR=19
 
-# Intervallo (in secondi) di controllo cambio fascia oraria (default: 5)
+# Time check interval in seconds (default: 5)
 CHECK_INTERVAL=5
 
-# Rotazione periodica dello sfondo nella stessa fascia oraria (in secondi)
-# Opzioni: 0 = Disabilitato (cambia solo alle 07:00, alle 19:00 o da switch manuale)
-#          900 = Ogni 15 min | 1800 = Ogni 30 min | 3600 = Ogni ora
+# Automatic wallpaper rotation interval within the same time period (in seconds)
+# Options: 0 = Disabled (changes only at 07:00, 19:00, or manual toggle)
+#          900 = Every 15 min | 1800 = Every 30 min | 3600 = Every hour
 ROTATE_INTERVAL=0
 
-# Backend di estrazione colori Wallust
-# Opzioni: "resized" (consigliato, ~0.1s) | "kmeans" (preciso ma lento) | "wal"
+# Wallust color extraction backend
+# Options: "resized" (recommended, ~0.1s) | "kmeans" (slower) | "wal"
 WALLUST_BACKEND="resized"
 
-# Soglia differenza colori Wallust (1-20)
-# Opzioni: 2 = Ideale per illustrazioni/pochi colori | 11 = Standard | 20 = Foto
+# Wallust color difference threshold (1-20)
+# Options: 2 = Best for flat illustrations | 11 = Balanced | 20 = Photographs
 WALLUST_THRESHOLD=2
 
-# Palette Wallust per la fascia notturna
-# Opzioni: "dark16" | "harddark16" | "softdark16"
+# Wallust palette for Night mode
+# Options: "dark16" | "harddark16" | "softdark16"
 WALLUST_NIGHT_PALETTE="dark16"
 # ==============================================================================
 
