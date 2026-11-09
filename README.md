@@ -128,24 +128,23 @@ MAPPA COMPLETA DEL REPOSITORY
 
 
 
-{
-	find uni -not -path '*/.git*' | sort
-	find uni -type f -not -path '*/.git*' -not -name "dump_repository.txt" \
-		-not \( \
-			-iname "*.ttf" -o -iname "*.otf" -o -iname "*.pf2" -o -iname "*.woff*" -o -iname "*.psf" \
-			-o -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.gif" -o -iname "*.bmp" \
-			-o -iname "*.webp" -o -iname "*.ico" -o -iname "*.svg" -o -iname "*.xcf" \
-			-o -iname "*.zip" -o -iname "*.tar" -o -iname "*.gz" -o -iname "*.xz" -o -iname "*.zst" \
-			-o -iname "*.7z" -o -iname "*.iso" -o -iname "*.img" -o -iname "*.bin" -o -iname "*.pdf" \
-			-o -iname "*.mp3" -o -iname "*.mp4" -o -iname "*.wav" -o -iname "*.ogg" \
-		\) -exec sh -c '
-		for f do
-			if [ ! -s "$f" ]; then
-				printf "\n=========================================\nFILE: %s (Empty file)\n=========================================\n" "$f"
-			elif grep -Iq . "$f"; then
-				printf "\n=========================================\nFILE: %s\n=========================================\n" "$f"
-				cat "$f"
-			fi
-		done
-	' sh {} +
-} > dump_repository.txt
+find uni -not -path '*/.git*' | sort
+find uni -type f -not -path '*/.git*' -not -name "dump_repository.txt" \
+-not \( \
+    -name "*.ttf" -o -name "*.otf" -o -name "*.pf2" -o -name "*.woff*" -o -name "*.psf" \
+    -o -name "*.png" -o -name "*.jpg" -o -name "*.jpeg" -o -name "*.gif" -o -name "*.bmp" \
+    -o -name "*.webp" -o -name "*.ico" -o -name "*.svg" -o -name "*.xcf" \
+    -o -name "*.zip" -o -name "*.tar" -o -name "*.gz" -o -name "*.xz" -o -name "*.zst" \
+    -o -name "*.7z" -o -name "*.iso" -o -name "*.img" -o -name "*.bin" -o -name "*.pdf" \
+    -o -name "*.mp3" -o -name "*.mp4" -o -name "*.wav" -o -name "*.ogg" \
+\) -exec sh -c '
+for f do
+    if [ ! -s "$f" ]; then
+        printf "\n=========================================\nFILE: %s (Empty file)\n=========================================\n" "$f"
+    elif grep -Iq . "$f"; then
+        printf "\n=========================================\nFILE: %s\n=========================================\n" "$f"
+        cat "$f"
+    fi
+done
+' sh {} +
+) > dump_repository.txt
