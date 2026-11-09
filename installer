@@ -208,7 +208,7 @@ PKGcheck () {
 	if [[ "$CPU_TYPE" == "Intel" ]]; then UCODEsel="intel-ucode"
 	elif [[ "$CPU_TYPE" == "AMD" ]]; then if [[ "${OSsel,,}" == "void" ]]; then UCODEsel="linux-firmware-amd" ; else UCODEsel="amd-ucode" ; fi ; fi
 	if [[ -n "$UCODEsel" ]]; then microcode=("$UCODEsel") ; fi
-	if [[ "$HAS_AMD" -eq 1 ]]; then if [[ "${OSsel,,}" == "void" ]]; then amddrivers=(mesa-dri vulkan-loader mesa-vulkan-radeon) ; else amddrivers=(mesa vulkan-radeon) ; fi ; fi
+	if [[ "$HAS_AMD" -eq 1 ]]; then	if [[ "${OSsel,,}" == "void" ]]; then amddrivers=(mesa-dri vulkan-loader mesa-vulkan-radeon) ; else amddrivers=(mesa vulkan-radeon) ; fi ;	fi
 	if [[ "$HAS_NVIDIA" -eq 1 && "$NVsel" =~ ^(OPEN|PROPRIETARY)$ ]]; then
 		if [[ "${OSsel,,}" == "void" ]]; then
 			if [[ "$LIBsel" != "MUSL" ]]; then nvidiadrivers=(nvidia nvidia-libs-32bit) ; fi
@@ -235,13 +235,13 @@ PKGcheck () {
 	elif [[ "$DEsel" == "KDE" ]]; then desktop=(plasma-meta dolphin konsole xdg-desktop-portal-kde)
 	elif [[ "$DEsel" == "LXQt" ]]; then desktop=(lxqt xdg-desktop-portal-lxqt)
 	elif [[ "$DEsel" == "Hyprland" ]]; then
-		desktop=(hyprland hypridle polkit-kde-agent xdg-desktop-portal-hyprland xdg-desktop-portal-gtk)
+		desktop=(hyprland hypridle polkit-kde-agent xdg-desktop-portal-hyprland xdg-desktop-portal-gtk qt6-wayland)
 		if [[ "$SHELLsel" == "Quickshell" ]]; then
 			desktop+=(quickshell qt6-svg qt6-5compat qt6-imageformats qt6-multimedia)
 			[[ "${OSsel,,}" != "void" ]] && desktop+=(qt6-multimedia-ffmpeg)
 		else desktop+=(hyprpaper fuzzel waybar swaync hyprlock) ; fi
 	elif [[ "$DEsel" == "Niri" ]]; then
-		desktop=(niri hypridle polkit-kde-agent xdg-desktop-portal-gnome xdg-desktop-portal-gtk xwayland-satellite)
+		desktop=(niri hypridle polkit-kde-agent xdg-desktop-portal-gnome xdg-desktop-portal-gtk xwayland-satellite qt6-wayland)
 		if [[ "$SHELLsel" == "Quickshell" ]]; then
 			desktop+=(quickshell qt6-svg qt6-5compat qt6-imageformats qt6-multimedia)
 			[[ "${OSsel,,}" != "void" ]] && desktop+=(qt6-multimedia-ffmpeg)
@@ -249,7 +249,7 @@ PKGcheck () {
 	else desktop=() ; fi
 	if [[ "${DMsel,,}" == "gdm" ]]; then displaymanager=(gdm) ; elif [[ "${DMsel,,}" == "greetd" ]]; then displaymanager=(greetd greetd-tuigreet) ; elif [[ "${DMsel,,}" == "lightdm" ]]; then displaymanager=(lightdm lightdm-gtk-greeter lightdm-gtk-greeter-settings) ; elif [[ "${DMsel,,}" == "ly" ]]; then displaymanager=(ly) ; elif [[ "${DMsel,,}" == "sddm" ]]; then displaymanager=(sddm) ; else displaymanager=() ; fi
 	if [[ "${OSsel,,}" == "artix" ]]; then if [[ "${DMsel,,}" != "none" ]]; then displaymanager+=("${DMsel,,}-${init_sys,,}") ; fi ; fi
-	filemanager=(yazi pcmanfm-qt tumbler file-roller android-tools) ; if [[ "${OSsel,,}" != "void" ]]; then filemanager+=(gvfs-mtp) ; fi
+	filemanager=(yazi pcmanfm-qt tumbler file-roller android-tools qt6ct papirus-icon-theme librsvg adwaita-icon-theme) ; if [[ "${OSsel,,}" != "void" ]]; then filemanager+=(gvfs-mtp) ; fi
 	if [[ "${OSsel,,}" == "void" ]]; then fonts=(nerd-fonts) ; else fonts=(ttf-jetbrains-mono-nerd) ; fi
 	fs=(dialog mtools parted gptfdisk dosfstools ntfs-3g) ; if [[ "${OSsel,,}" != "void" ]]; then fs+=(ntfsprogs) ; fi
 	if [[ "${BLsel,,}" == "grub" ]]; then grub=(grub) ; else grub=() ; fi
@@ -257,7 +257,7 @@ PKGcheck () {
 	if [[ "${BLsel,,}" == "limine" ]]; then limine=(limine) ; else limine=() ; fi
 	if [[ "${BLsel,,}" == "refind" ]]; then refind=(refind) ; else refind=() ; fi
 	if [[ "${BLsel,,}" == "uki" ]]; then uki=(systemd-ukify) ; else uki=() ; fi
-	if [[ "${OSsel,,}" == "void" ]]; then hardwareacceleration=(mesa-dri mesa-vaapi mesa-vulkan-radeon) ; else hardwareacceleration=(intel-media-driver vkd3d) ; fi
+	if [[ "${OSsel,,}" == "void" ]]; then hardwareacceleration=(mesa-dri mesa-vaapi mesa-vulkan-radeon) ; else hardwareacceleration=(intel-media-driver libva-mesa-driver vkd3d) ; fi
 	kernel=("${KSel}" "${KSel}-headers") ; if [[ "${OSsel,,}" == "void" ]]; then kernel+=(linux-firmware-network) ; else kernel+=(linux-firmware) ; fi
 	if [[ "$IRFSetup" == "booster" ]]; then kernel+=(booster) ; elif [[ "$IRFSetup" == "dracut" ]]; then kernel+=(dracut) ; elif [[ "$IRFSetup" == "mkinitcpio" ]]; then kernel+=(mkinitcpio) ; fi
 	if [[ "${OSsel,,}" == "artix" ]]; then logind=(elogind elogind-"${init_sys,,}" "${init_sys,,}"-settingsd) ; elif [[ "${OSsel,,}" == "void" ]]; then logind=(seatd elogind) ; else logind=() ; fi
@@ -384,7 +384,7 @@ UserSetup () {
 	echo "Choose password for root"
 	while ! CR passwd; do echo "Error: Try again..." ; done
 	echo "Copying configuration files..."
-	mkdir -p /mnt/home/"$UNsel"/{.config/kitty,.config/swappy,Pictures/Screenshots,Videos/Recordings}
+	mkdir -p /mnt/home/"$UNsel"/{.config/kitty,.config/swappy,.config/pcmanfm-qt/default,.config/featherpad,.config/qt6ct/colors,Pictures/Screenshots,Videos/Recordings}
 	if [[ "${OSsel,,}" == "void" ]]; then
 		mkdir -p /mnt/etc/bash ; if [[ -f "${SCRIPT_DIR}/Conf_files/bashrc" ]]; then cp "${SCRIPT_DIR}/Conf_files/bashrc" /mnt/home/"$UNsel"/.bashrc ; fi
 	else
@@ -394,9 +394,16 @@ UserSetup () {
 		mkdir -p /mnt/etc/bash/bashrc.d ; if [[ -f "${SCRIPT_DIR}/Conf_files/bashrc" ]]; then cp "${SCRIPT_DIR}/Conf_files/bashrc" /mnt/etc/bash/bashrc.d/"$UNsel".bashrc ; fi
 		if [[ -f "${SCRIPT_DIR}/Conf_files/50-bootbackup.hook" ]]; then mkdir -p /mnt/etc/pacman.d/hooks; cp "${SCRIPT_DIR}/Conf_files/50-bootbackup.hook" /mnt/etc/pacman.d/hooks/ ; fi
 	fi
-	if [[ -f "${SCRIPT_DIR}/Conf_files/kitty.conf" ]]; then cp "${SCRIPT_DIR}/Conf_files/kitty.conf" /mnt/home/"$UNsel"/.config/kitty/ ; touch /mnt/home/"$UNsel"/.config/kitty/colors.conf ; fi
+	if [[ -f "${SCRIPT_DIR}/Conf_files/kitty.conf" ]]; then
+		cp "${SCRIPT_DIR}/Conf_files/kitty.conf" /mnt/home/"$UNsel"/.config/kitty/
+		grep -q "^hide_window_decorations" /mnt/home/"$UNsel"/.config/kitty/kitty.conf || printf '\nhide_window_decorations yes\nbackground_opacity 0.85\n' >> /mnt/home/"$UNsel"/.config/kitty/kitty.conf
+		touch /mnt/home/"$UNsel"/.config/kitty/colors.conf
+	fi
+	printf '[System]\nIconThemeName=Papirus-Dark\nFallbackIconThemeName=AdwaitaLegacy\nUseFallbackIconTheme=true\n\n[Window]\nSidePaneMode=places\nAlwaysShowTabs=true\n' > /mnt/home/"$UNsel"/.config/pcmanfm-qt/default/settings.conf
+	printf '[main]\nbgColValue=30\ncurLineHighlight=40\ndarkColScheme=true\nfont="JetBrainsMono Nerd Font,10,-1,5,50,0,0,0,0,0"\nhideSearchbar=true\nshowWhiteSpace=false\ntransparent=true\n' > /mnt/home/"$UNsel"/.config/featherpad/fp.conf
+	printf '[ColorScheme]\nactive_colors=#ffcdd6f4, #ff1e1e2e, #ff585b70, #ff585b70, #ff1e1e2e, #ff585b70, #ffcdd6f4, #ffffffff, #ffcdd6f4, #ff1e1e2e, #ff1e1e2e, #ff1e1e2e, #ff89b4fa, #ff1e1e2e, #ff89b4fa, #ff89b4fa, #ff1e1e2e, #ffcdd6f4, #ff1e1e2e, #ffcdd6f4, #80cdd6f4\ndisabled_colors=#ff585b70, #ff1e1e2e, #ff585b70, #ff585b70, #ff1e1e2e, #ff585b70, #ff585b70, #ffffffff, #ff585b70, #ff1e1e2e, #ff1e1e2e, #ff1e1e2e, #ff585b70, #ff1e1e2e, #ff89b4fa, #ff89b4fa, #ff1e1e2e, #ff585b70, #ff1e1e2e, #ff585b70, #80585b70\ninactive_colors=#ffcdd6f4, #ff1e1e2e, #ff585b70, #ff585b70, #ff1e1e2e, #ff585b70, #ffcdd6f4, #ffffffff, #ffcdd6f4, #ff1e1e2e, #ff1e1e2e, #ff1e1e2e, #ff89b4fa, #ff1e1e2e, #ff89b4fa, #ff89b4fa, #ff1e1e2e, #ffcdd6f4, #ff1e1e2e, #ffcdd6f4, #80cdd6f4\n' > /mnt/home/"$UNsel"/.config/qt6ct/colors/wallust.conf
+	printf "[Appearance]\ncolor_scheme_path=/home/$UNsel/.config/qt6ct/colors/wallust.conf\ncustom_palette=true\nicon_theme=Papirus-Dark\nstandard_dialogs=default\nstyle=Fusion\n\n[Fonts]\ngeneral=\"JetBrainsMono Nerd Font,10,-1,5,50,0,0,0,0,0\"\nfixed=\"JetBrainsMono Nerd Font,10,-1,5,50,0,0,0,0,0\"\n" > /mnt/home/"$UNsel"/.config/qt6ct/qt6ct.conf
 	echo -e 'include "/usr/share/nano/*.nanorc"\nset linenumbers' > /mnt/etc/nanorc
-	if [[ "$VBTsel" -eq 0 ]]; then echo 'export MOZ_ENABLE_WAYLAND=1' >> /mnt/home/"$UNsel"/.profile ; fi
 	echo -e "[Default]\nsave_dir=/home/$UNsel/Pictures/Screenshots\nsave_filename_format=swappy-%Y%m%d-%H%M%S.png\nshow_panel=false\nline_size=5\ntext_size=20\ntext_font=sans-serif\npaint_mode=brush\nearly_exit=false\nfill_shape=false" > /mnt/home/"$UNsel"/.config/swappy/config
 	if [[ "$DEsel" =~ ^(Hyprland|Niri)$ ]]; then
 		echo "Installing Wallust..." ; local w_ok=0
@@ -433,10 +440,8 @@ UserSetup () {
 		elif [[ "$DEsel" == "Hyprland" ]]; then
 			cp -rT "${SCRIPT_DIR}/Conf_files/Hyprland" /mnt/home/"$UNsel"/.config/hypr
 			cfg="/mnt/home/$UNsel/.config/hypr/hyprland.conf"
-			if [[ "$VBTsel" -eq 0 ]] && ! grep -q "layerrule *= *blur, *waybar" "$cfg" 2>/dev/null; then
-				printf '\nlayerrule = blur, waybar\nlayerrule = ignorezero, waybar\nlayerrule = blur, swaync-notification-window\nlayerrule = ignorezero, swaync-notification-window\n' >> "$cfg"
-			fi
 		fi
+		local va_drv="iHD" ; [[ "$CPU_TYPE" == "AMD" ]] && va_drv="radeonsi"
 		if [[ "$SHELLsel" == "Quickshell" ]]; then
 			echo "auth required pam_unix.so nullok" > /mnt/etc/pam.d/quickshell
 			mkdir -p /mnt/home/"$UNsel"/.config/{quickshell,wallust/templates}
@@ -450,11 +455,11 @@ UserSetup () {
 			init_wall="${init_wall#/mnt}"
 			local init_fx="true" ; [[ "$VBTsel" -eq 1 ]] && init_fx="false"
 			printf '{\n\t"wallpaper": "%s",\n\t"wallMode": "static",\n\t"uiEffects": %s,\n\t"background": "#1e1e2e",\n\t"foreground": "#cdd6f4",\n\t"color0": "#1e1e2e",\n\t"color1": "#f38ba8",\n\t"color2": "#a6e3a1",\n\t"color3": "#f9e2af",\n\t"color4": "#89b4fa",\n\t"color5": "#cba6f7",\n\t"color6": "#94e2d5",\n\t"color7": "#bac2de",\n\t"color8": "#585b70"\n}\n' "$init_wall" "$init_fx" > /mnt/home/"$UNsel"/.config/quickshell/colors.json
-			local qs_run="env DRI_PRIME=0 __NV_PRIME_RENDER_OFFLOAD=0 QT_FFMPEG_DECODING_HW_DEVICE_TYPES= QSG_RHI_BACKEND=opengl quickshell"
-			local qs_niri='"env" "DRI_PRIME=0" "__NV_PRIME_RENDER_OFFLOAD=0" "QT_FFMPEG_DECODING_HW_DEVICE_TYPES=" "QSG_RHI_BACKEND=opengl" "quickshell"'
+			local qs_run="env DRI_PRIME=0 __NV_PRIME_RENDER_OFFLOAD=0 __GLX_VENDOR_LIBRARY_NAME=mesa VDPAU_DRIVER=null LIBVA_DRIVER_NAME=$va_drv QT_FFMPEG_DECODING_HW_DEVICE_TYPES=vaapi QSG_RHI_BACKEND=opengl quickshell"
+			local qs_niri="\"env\" \"DRI_PRIME=0\" \"__NV_PRIME_RENDER_OFFLOAD=0\" \"__GLX_VENDOR_LIBRARY_NAME=mesa\" \"VDPAU_DRIVER=null\" \"LIBVA_DRIVER_NAME=$va_drv\" \"QT_FFMPEG_DECODING_HW_DEVICE_TYPES=vaapi\" \"QSG_RHI_BACKEND=opengl\" \"quickshell\""
 			if [[ "$VBTsel" -eq 1 ]]; then
-				qs_run="env QSG_RHI_BACKEND=opengl QSG_RENDER_LOOP=basic quickshell"
-				qs_niri='"env" "QSG_RHI_BACKEND=opengl" "QSG_RENDER_LOOP=basic" "quickshell"'
+				qs_run="env VDPAU_DRIVER=null QSG_RHI_BACKEND=opengl QSG_RENDER_LOOP=basic quickshell"
+				qs_niri='"env" "VDPAU_DRIVER=null" "QSG_RHI_BACKEND=opengl" "QSG_RENDER_LOOP=basic" "quickshell"'
 			fi
 			sed -i "s|lock_cmd = .*|lock_cmd = quickshell ipc call lock lock|" /mnt/home/"$UNsel"/.config/hypr/hypridle.conf
 			if [[ "$DEsel" == "Niri" ]]; then
@@ -509,7 +514,12 @@ UserSetup () {
 		if [[ "$DEsel" == "Niri" && "$cfg" != */config.kdl ]]; then mkdir -p /mnt/home/"$UNsel"/.config/niri ; sed -e 's/{{color4}}/#8be9fd/g' -e 's/{{[^}]*}}/#282a36/g' "$cfg" > /mnt/home/"$UNsel"/.config/niri/config.kdl ; fi
 	fi
 	rm -f /mnt/etc/sudoers.d/99-installer-temp
-	if [[ "$VBTsel" -eq 1 ]]; then echo -e "WLR_NO_HARDWARE_CURSORS=1\nWLR_RENDERER_ALLOW_SOFTWARE=1\nLIBGL_ALWAYS_SOFTWARE=1\nKITTY_DISABLE_WAYLAND=1" >> /mnt/etc/environment ; fi
+	if [[ "$VBTsel" -eq 1 ]]; then
+		printf 'WLR_NO_HARDWARE_CURSORS=1\nWLR_RENDERER_ALLOW_SOFTWARE=1\nLIBGL_ALWAYS_SOFTWARE=1\nKITTY_DISABLE_WAYLAND=1\nVDPAU_DRIVER=null\nQT_QPA_PLATFORMTHEME=qt6ct\n' >> /mnt/etc/environment
+	else
+		local va_env="iHD" ; [[ "$CPU_TYPE" == "AMD" ]] && va_env="radeonsi"
+		printf 'MOZ_ENABLE_WAYLAND=1\nQT_QPA_PLATFORM="wayland;xcb"\nQT_QPA_PLATFORMTHEME=qt6ct\nGDK_BACKEND="wayland,x11"\nSDL_VIDEODRIVER=wayland\nELECTRON_OZONE_PLATFORM_HINT=auto\nDRI_PRIME=0\n__NV_PRIME_RENDER_OFFLOAD=0\n__GLX_VENDOR_LIBRARY_NAME=mesa\n__EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/50_mesa.json\nVDPAU_DRIVER=null\nLIBVA_DRIVER_NAME=%s\nQT_FFMPEG_DECODING_HW_DEVICE_TYPES=vaapi\n' "$va_env" >> /mnt/etc/environment
+	fi
 	CR chown -hR "$UNsel":users /home/"$UNsel"
 }
 BootloaderSetup () {
