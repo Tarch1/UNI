@@ -58,6 +58,110 @@ ShellRoot {
 	property bool cfgPauseOnScreenOff: true
 	// =========================================================================
 
+	// --- REUSABLE UI COMPONENTS ---
+	component QsSwitch : Rectangle {
+		id: swRoot
+		property bool checked: false
+		property color activeColor: root.color4
+		signal toggled()
+		implicitWidth: 44; implicitHeight: 22; radius: 11
+		color: checked ? activeColor : Qt.rgba(1, 1, 1, 0.15)
+		Rectangle {
+			width: 16; height: 16; radius: 8
+			anchors.verticalCenter: parent.verticalCenter
+			x: swRoot.checked ? 24 : 4
+			color: swRoot.checked ? root.bg : root.fg
+			Behavior on x { NumberAnimation { duration: 120 } }
+		}
+		MouseArea { anchors.fill: parent; onClicked: swRoot.toggled() }
+	}
+
+	component QsSlider : Rectangle {
+		id: slRoot
+		property real ratio: 0.5
+		property color fillColor: root.color4
+		signal moved(real newRatio)
+		Layout.fillWidth: true; implicitHeight: 14; radius: 7
+		color: Qt.rgba(1, 1, 1, 0.1)
+		Rectangle {
+			width: parent.width * Math.max(0, Math.min(1, slRoot.ratio))
+			height: parent.height; radius: parent.radius; color: slRoot.fillColor
+		}
+		MouseArea {
+			anchors.fill: parent
+			function fire(mx) { slRoot.moved(Math.max(0, Math.min(1, mx / width))) }
+			onPressed: mouse => fire(mouse.x)
+			onPositionChanged: mouse => { if (pressed) fire(mouse.x) }
+		}
+	}
+
+	component QuickTile : Rectangle {
+		id: qtRoot
+		property string iconTxt: ""
+		property string titleTxt: ""
+		property string subTxt: ""
+		property bool activeState: false
+		property color activeCol: root.color4
+		property color subCol: root.color8
+		signal iconClicked()
+		signal cardClicked()
+		Layout.fillWidth: true; Layout.preferredWidth: 1; implicitHeight: 58; radius: 16
+		color: cardMouse.containsMouse ? Qt.lighter(root.color0, 1.12) : root.color0
+		MouseArea { id: cardMouse; anchors.fill: parent; hoverEnabled: true; onClicked: qtRoot.cardClicked() }
+		Rectangle {
+			id: qtIcon
+			width: 36; height: 36; radius: 18
+			anchors.left: parent.left; anchors.leftMargin: 10; anchors.verticalCenter: parent.verticalCenter
+			color: qtRoot.activeState ? qtRoot.activeCol : Qt.rgba(1, 1, 1, 0.08)
+			Text { anchors.centerIn: parent; text: qtRoot.iconTxt; color: qtRoot.activeState ? root.bg : root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 16; font.bold: true }
+			MouseArea { anchors.fill: parent; onClicked: qtRoot.iconClicked() }
+		}
+		ColumnLayout {
+			anchors.left: qtIcon.right; anchors.leftMargin: 10
+			anchors.right: parent.right; anchors.rightMargin: 10
+			anchors.verticalCenter: parent.verticalCenter; spacing: 1
+			Text { text: qtRoot.titleTxt; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 13; font.bold: true; Layout.fillWidth: true; elide: Text.ElideRight }
+			Text { visible: qtRoot.subTxt !== ""; text: qtRoot.subTxt; color: qtRoot.subCol; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; Layout.fillWidth: true; elide: Text.ElideRight }
+		}
+	}
+
+	component ToggleCard : Rectangle {
+		id: tcRoot
+		property string iconTxt: ""
+		property string titleTxt: ""
+		property string subTxt: ""
+		property string extraTxt: ""
+		property bool checked: false
+		property color activeCol: root.color4
+		property color subCol: root.color8
+		signal toggled()
+		Layout.fillWidth: true; implicitHeight: extraTxt !== "" ? 68 : (subTxt !== "" ? 54 : 44); radius: 12; color: root.color0
+		MouseArea { anchors.fill: parent; onClicked: tcRoot.toggled() }
+		Rectangle {
+			id: tcIcon
+			visible: tcRoot.iconTxt !== ""
+			width: visible ? 34 : 0; height: 34; radius: 17
+			anchors.left: parent.left; anchors.leftMargin: visible ? 10 : 0; anchors.verticalCenter: parent.verticalCenter
+			color: tcRoot.checked ? tcRoot.activeCol : Qt.rgba(1, 1, 1, 0.08)
+			Text { anchors.centerIn: parent; text: tcRoot.iconTxt; color: tcRoot.checked ? root.bg : root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 16 }
+		}
+		QsSwitch {
+			id: tcSw
+			anchors.right: parent.right; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter
+			checked: tcRoot.checked; activeColor: tcRoot.activeCol
+			onToggled: tcRoot.toggled()
+		}
+		ColumnLayout {
+			anchors.left: tcIcon.right; anchors.leftMargin: 10
+			anchors.right: tcSw.left; anchors.rightMargin: 10
+			anchors.verticalCenter: parent.verticalCenter; spacing: 1
+			Text { text: tcRoot.titleTxt; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12; font.bold: true; Layout.fillWidth: true; elide: Text.ElideRight }
+			Text { visible: tcRoot.subTxt !== ""; text: tcRoot.subTxt; color: tcRoot.subCol; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 10; Layout.fillWidth: true; elide: Text.ElideRight }
+			Text { visible: tcRoot.extraTxt !== ""; text: tcRoot.extraTxt; color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 10; Layout.fillWidth: true; elide: Text.ElideMiddle }
+		}
+	}
+
+	// --- STATE & PROPERTIES ---
 	property string homeDir: Quickshell.env("HOME")
 	property bool isVM: Quickshell.env("QSG_RENDER_LOOP") === "basic"
 	property bool isHyprland: Quickshell.env("XDG_CURRENT_DESKTOP") === "Hyprland"
@@ -184,82 +288,49 @@ ShellRoot {
 	property var activePlayer: {
 		let list = Mpris.players.values
 		if (!list || list.length === 0) return null
-		for (let i = 0; i < list.length; i++) {
-			if (list[i].playbackState === MprisPlaybackState.Playing) return list[i]
-		}
+		for (let i = 0; i < list.length; i++) if (list[i].playbackState === MprisPlaybackState.Playing) return list[i]
 		return list[0]
 	}
 
-	function withAlpha(c, a) {
-		return Qt.rgba(c.r, c.g, c.b, a)
-	}
-	function runCmd(cmd) {
-		Quickshell.execDetached(["bash", "-c", cmd])
-	}
+	function withAlpha(c, a) { return Qt.rgba(c.r, c.g, c.b, a) }
+	function runCmd(cmd) { Quickshell.execDetached(["bash", "-c", cmd]) }
 	function formatSec(s) {
 		let sec = Math.max(0, Math.floor(s || 0)), m = Math.floor(sec / 60), r = sec % 60
 		return m + ":" + (r < 10 ? "0" + r : r)
 	}
 	function closeCenterPill() {
-		root.centerMode = "none"
-		root.sysSubmenu = ""
-		root.wifiPromptSsid = ""
-		root.expandedResMon = ""
+		root.centerMode = "none"; root.sysSubmenu = ""; root.wifiPromptSsid = ""; root.expandedResMon = ""
+	}
+	function openSubmenu(sub) {
+		root.sysSubmenu = sub
+		if (sub === "cpu" || sub === "battery") sysPoll.running = true
+		else if (sub === "net" || sub === "bt" || sub === "sound" || sub === "mic" || sub === "display") subPoll.running = true
 	}
 	function openLauncher() {
-		if (root.centerMode === "launcher") {
-			root.closeCenterPill()
-		} else {
-			root.searchQuery = ""
-			root.selectedAppIndex = 0
-			root.sysSubmenu = ""
-			root.wifiPromptSsid = ""
-			root.centerMode = "launcher"
-		}
+		if (root.centerMode === "launcher") root.closeCenterPill()
+		else { root.searchQuery = ""; root.selectedAppIndex = 0; root.sysSubmenu = ""; root.wifiPromptSsid = ""; root.centerMode = "launcher" }
 	}
 	function openOverview() {
-		if (root.centerMode === "overview") {
-			root.closeCenterPill()
-		} else {
-			root.sysSubmenu = ""
-			root.wifiPromptSsid = ""
-			overviewPoll.running = true
-			root.centerMode = "overview"
-		}
+		if (root.centerMode === "overview") root.closeCenterPill()
+		else { root.sysSubmenu = ""; root.wifiPromptSsid = ""; overviewPoll.running = true; root.centerMode = "overview" }
 	}
 	function openCalendar() {
-		root.calMonth = (new Date()).getMonth()
-		root.calYear = (new Date()).getFullYear()
-		root.updateCalendar()
-		root.sysSubmenu = ""
-		root.wifiPromptSsid = ""
-		root.centerMode = "calendar"
+		root.calMonth = (new Date()).getMonth(); root.calYear = (new Date()).getFullYear(); root.updateCalendar()
+		root.sysSubmenu = ""; root.wifiPromptSsid = ""; root.centerMode = "calendar"
 	}
 	function openSystemPanel() {
-		root.sysSubmenu = ""
-		root.wifiPromptSsid = ""
-		root.centerMode = "system"
-		sysPoll.running = true
-		subPoll.running = true
+		root.sysSubmenu = ""; root.wifiPromptSsid = ""; root.centerMode = "system"; sysPoll.running = true
 	}
-	function triggerOsd(mode) {
-		root.osdMode = mode
-		osdTimer.restart()
-	}
-	function triggerLock() {
-		root.closeCenterPill()
-		root.screenLocked = true
-	}
+	function triggerOsd(mode) { root.osdMode = mode; osdTimer.restart() }
+	function triggerLock() { root.closeCenterPill(); root.screenLocked = true }
 
 	function setSinkVolume(pct) {
 		let p = Math.max(0, Math.min(100, Math.round(pct)))
-		root.outVolPct = p
-		runCmd("wpctl set-volume -l 1 @DEFAULT_AUDIO_SINK@ " + p + "%")
+		root.outVolPct = p; runCmd("wpctl set-volume -l 1 @DEFAULT_AUDIO_SINK@ " + p + "%")
 	}
 	function setSourceVolume(pct) {
 		let p = Math.max(0, Math.min(100, Math.round(pct)))
-		root.micVolPct = p
-		runCmd("wpctl set-volume -l 1 @DEFAULT_AUDIO_SOURCE@ " + p + "%")
+		root.micVolPct = p; runCmd("wpctl set-volume -l 1 @DEFAULT_AUDIO_SOURCE@ " + p + "%")
 	}
 	function toggleWallpaperMode() {
 		root.animWallpapers = !root.animWallpapers
@@ -273,37 +344,25 @@ ShellRoot {
 		runCmd(hyprCmd + "sed -i 's/\"uiEffects\": *[a-z]*/\"uiEffects\": " + fxStr + "/' \"" + root.homeDir + "/.config/quickshell/colors.json\" 2>/dev/null || true")
 	}
 	function togglePrimaryNetwork() {
-		if (root.ethIface !== "" && (!root.hasWifiHw || root.ethConnected)) {
-			runCmd("nmcli dev " + (root.ethConnected ? "disconnect " : "connect ") + root.ethIface)
-		} else if (root.hasWifiHw) {
-			runCmd("nmcli radio wifi " + (root.wifiEnabled ? "off" : "on"))
-		}
+		if (root.ethIface !== "" && (!root.hasWifiHw || root.ethConnected)) runCmd("nmcli dev " + (root.ethConnected ? "disconnect " : "connect ") + root.ethIface)
+		else if (root.hasWifiHw) runCmd("nmcli radio wifi " + (root.wifiEnabled ? "off" : "on"))
 		sysPoll.running = true
 	}
 	function applyNightLight() {
-		if (root.nightLightOn) {
-			runCmd("pkill -x wlsunset 2>/dev/null; wlsunset -t " + root.nightLightTemp + " -T " + (root.nightLightTemp + 1) + " &")
-		} else {
-			runCmd("pkill -x wlsunset 2>/dev/null")
-		}
+		if (root.nightLightOn) runCmd("pkill -x wlsunset 2>/dev/null; wlsunset -t " + root.nightLightTemp + " -T " + (root.nightLightTemp + 1) + " &")
+		else runCmd("pkill -x wlsunset 2>/dev/null")
 	}
 	function toggleRecording() {
 		if (root.isRecording) {
 			runCmd("pkill -INT -x wf-recorder; notify-send 'Screen Recorder' 'Saved in ~/Videos/Recordings'")
-			root.isRecording = false
-			root.recSeconds = 0
+			root.isRecording = false; root.recSeconds = 0
 		} else {
 			let f = root.homeDir + "/Videos/Recordings/rec-" + Qt.formatDateTime(new Date(), "yyyyMMdd-HHmmss") + ".mp4"
 			let sinkName = (Pipewire.defaultAudioSink && Pipewire.defaultAudioSink.name) ? (Pipewire.defaultAudioSink.name + ".monitor") : ""
 			let aFlag = root.recMicAudio ? "-a" : ((root.recSysAudio && sinkName !== "") ? ("-a=\"" + sinkName + "\"") : "")
-			if (root.recAreaSelect) {
-				root.closeCenterPill()
-				runCmd("g=$(slurp) || exit 0; wf-recorder -g \"$g\" " + aFlag + " -f \"" + f + "\"")
-			} else {
-				runCmd("wf-recorder " + aFlag + " -f \"" + f + "\"")
-			}
-			root.isRecording = true
-			root.recSeconds = 0
+			if (root.recAreaSelect) { root.closeCenterPill(); runCmd("g=$(slurp) || exit 0; wf-recorder -g \"$g\" " + aFlag + " -f \"" + f + "\"") }
+			else runCmd("wf-recorder " + aFlag + " -f \"" + f + "\"")
+			root.isRecording = true; root.recSeconds = 0
 		}
 	}
 	function updateCalendar() {
@@ -311,19 +370,21 @@ ShellRoot {
 		let daysInMonth = new Date(root.calYear, root.calMonth + 1, 0).getDate()
 		let now = new Date(), arr = []
 		for (let i = 0; i < startDow; i++) arr.push({ "day": "", "today": false })
-		for (let d = 1; d <= daysInMonth; d++) {
+		for (let d = 1; d <= daysInMonth; d++)
 			arr.push({ "day": d.toString(), "today": (d === now.getDate() && root.calMonth === now.getMonth() && root.calYear === now.getFullYear()) })
-		}
 		root.calendarDays = arr
 	}
 
-	Component.onCompleted: updateCalendar()
+	Component.onCompleted: {
+		updateCalendar()
+		initPoll.running = true
+		sysPoll.running = true
+	}
 
 	FileView {
 		id: colorFile
 		path: root.homeDir + "/.config/quickshell/colors.json"
-		blockLoading: true
-		watchChanges: true
+		blockLoading: true; watchChanges: true
 		onFileChanged: reload()
 		onLoaded: {
 			try {
@@ -345,83 +406,58 @@ ShellRoot {
 		}
 	}
 
-	PwObjectTracker {
-		objects: [Pipewire.defaultAudioSink, Pipewire.defaultAudioSource]
-	}
+	PwObjectTracker { objects: [Pipewire.defaultAudioSink, Pipewire.defaultAudioSource] }
 
-	Timer {
-		id: osdTimer
-		interval: 2000
-		onTriggered: root.osdMode = "volume"
-	}
-	Timer {
-		id: wsCollapseTimer
-		interval: 1000
-		onTriggered: root.wsExpanded = false
-	}
-	Timer {
-		id: autoCloseTimer
-		interval: 4500
-		onTriggered: {
-			if (root.centerMode !== "none" && root.wifiPromptSsid === "") root.closeCenterPill()
-		}
-	}
-	Timer {
-		id: popupTimer
-		interval: 5000
-		onTriggered: root.popupNotifications = []
-	}
+	Timer { id: osdTimer; interval: 2000; onTriggered: root.osdMode = "volume" }
+	Timer { id: wsCollapseTimer; interval: 1000; onTriggered: root.wsExpanded = false }
+	Timer { id: autoCloseTimer; interval: 4500; onTriggered: { if (root.centerMode !== "none" && root.wifiPromptSsid === "") root.closeCenterPill() } }
+	Timer { id: popupTimer; interval: 5000; onTriggered: root.popupNotifications = [] }
 
 	NotificationServer {
 		id: notifServer
 		onNotification: function(n) {
 			n.tracked = true
 			let arr = root.popupNotifications.slice()
-			arr.unshift(n)
-			if (arr.length > 4) arr.pop()
-			root.popupNotifications = arr
-			popupTimer.restart()
+			arr.unshift(n); if (arr.length > 4) arr.pop()
+			root.popupNotifications = arr; popupTimer.restart()
 		}
 	}
 
 	IpcHandler {
 		target: "launcher"
-		function toggle(): void {
-			root.openLauncher()
-		}
+		function toggle(): void { root.openLauncher() }
 	}
 	IpcHandler {
 		target: "overview"
-		function toggle(): void {
-			root.openOverview()
-		}
-		function close(): void {
-			if (root.centerMode === "overview") root.closeCenterPill()
-		}
+		function toggle(): void { root.openOverview() }
+		function close(): void { if (root.centerMode === "overview") root.closeCenterPill() }
 	}
 	IpcHandler {
 		target: "controlcenter"
-		function toggle(): void {
-			if (root.centerMode === "system") root.closeCenterPill()
-			else root.openSystemPanel()
-		}
+		function toggle(): void { if (root.centerMode === "system") root.closeCenterPill(); else root.openSystemPanel() }
 	}
 	IpcHandler {
 		target: "lock"
-		function lock(): void {
-			root.triggerLock()
-		}
+		function lock(): void { root.triggerLock() }
 	}
 	IpcHandler {
 		target: "theme"
-		function reload(): void {
-			colorFile.reload()
-		}
+		function reload(): void { colorFile.reload() }
 	}
 	IpcHandler {
 		target: "bar"
-		function toggle(): void {
-			root.barVisible = !root.barVisible
+		function toggle(): void { root.barVisible = !root.barVisible }
+	}
+
+	// Read static hardware details once at startup
+	Process {
+		id: initPoll
+		command: ["bash", "-c", "printf '%s|%s\n' \"$(awk -F': ' '/model name/{print $2; exit}' /proc/cpuinfo)\" \"$(uname -r)\""]
+		stdout: SplitParser {
+			onRead: data => {
+				let p = data.trim().split("|")
+				if (p.length >= 2) { root.cpuModel = p[0] || "CPU"; root.kernelVer = p[1] || "Linux" }
+			}
 		}
 	}
 
@@ -470,8 +506,7 @@ ShellRoot {
 				if (p.length < 2) return
 				let b = parseInt(p[0]) || 100
 				if (root.lastBrightnessPct !== -1 && b !== root.lastBrightnessPct) root.triggerOsd("brightness")
-				root.brightnessPct = b
-				root.lastBrightnessPct = b
+				root.brightnessPct = b; root.lastBrightnessPct = b
 
 				let items = p[1].trim().split(/\s+/), list = [], cur = root.lastActiveWs
 				for (let i = 0; i < items.length; i++) {
@@ -483,13 +518,8 @@ ShellRoot {
 					}
 				}
 				if (list.length > 0) {
-					list.sort((a, b) => a.idx - b.idx)
-					root.workspacesList = list
-					if (cur !== root.lastActiveWs) {
-						root.lastActiveWs = cur
-						root.wsExpanded = true
-						wsCollapseTimer.restart()
-					}
+					list.sort((a, b) => a.idx - b.idx); root.workspacesList = list
+					if (cur !== root.lastActiveWs) { root.lastActiveWs = cur; root.wsExpanded = true; wsCollapseTimer.restart() }
 				}
 				if (p.length >= 3 && p[2].includes("Volume:")) {
 					let m = p[2].includes("MUTED"), num = parseFloat(p[2].replace(/[^0-9.]/g, ""))
@@ -501,11 +531,9 @@ ShellRoot {
 					if (!isNaN(mnum)) {
 						let mvPct = Math.round(mnum * 100)
 						if (root.lastMicVol !== -1 && (mvPct !== root.lastMicVol || mm !== root.lastMicMuted)) root.triggerOsd("mic")
-						root.micVolPct = mvPct
-						root.lastMicVol = mvPct
+						root.micVolPct = mvPct; root.lastMicVol = mvPct
 					}
-					root.micMuted = mm
-					root.lastMicMuted = mm
+					root.micMuted = mm; root.lastMicMuted = mm
 				}
 				if (p.length >= 5) root.hasActiveFullWindow = (p[4] === "1")
 			}
@@ -536,7 +564,6 @@ ShellRoot {
 			hp=0; hmic=0
 			[[ \"$(wpctl inspect @DEFAULT_AUDIO_SINK@ 2>/dev/null | tr '[:upper:]' '[:lower:]')\" =~ (headphone|headset|bluez|earphone|buds) ]] && hp=1
 			[[ \"$(wpctl inspect @DEFAULT_AUDIO_SOURCE@ 2>/dev/null | tr '[:upper:]' '[:lower:]')\" =~ (headset|bluez|buds|headphone) ]] && hmic=1
-			cpu_m=$(awk -F': ' '/model name/{print $2; exit}' /proc/cpuinfo)
 			cpu_u=$(awk '/^cpu /{u=$2+$4; t=$2+$4+$5; if(t>0) printf \"%d\", (u*100)/t; else print 0}' /proc/stat)
 			ram_s=$(free -m | awk '/^Mem:/{printf \"%.1f / %.1f GiB|%d\", $3/1024, $2/1024, ($3*100)/$2}')
 			d_root=$(df -h / | awk 'NR==2{gsub(/%/,\"\",$5); printf \"%s / %s (%s%%)|%d\", $3, $2, $5, $5}')
@@ -550,91 +577,71 @@ ShellRoot {
 				b_c=$(cat \"$bat_d/cycle_count\" 2>/dev/null || echo 0); b_t=$(cat \"$bat_d/technology\" 2>/dev/null || echo \"Li-ion\")
 			else b_h=\"AC Power\"; b_p=\"0.0 W\"; b_c=\"N/A\"; b_t=\"Virtual / AC\"; fi
 			dpms_off=0; grep -q '^Off$' /sys/class/drm/*/dpms 2>/dev/null && dpms_off=1
-			printf '%d|%s|%d|%s|%d|%s|%s|%d|%d|%s|%d|%d|%s|%d|%s|%s|%s|%s|%s|%s|%s|%s|%s|%d\n' \"$((t/1000))\" \"${e_dev:-}\" \"$e_on\" \"$e_ip\" \"$w_hw\" \"${w_rad:-disabled}\" \"$net\" \"$bt_hw\" \"$bt_en\" \"$bt_name\" \"$hp\" \"$hmic\" \"${cpu_m:-CPU}\" \"${cpu_u:-10}\" \"$ram_s\" \"$d_root\" \"${d_sec:-No secondary drive}\" \"$(uname -r)\" \"$(uptime -p 2>/dev/null | sed 's/^up //')\" \"$b_h\" \"$b_p\" \"$b_c\" \"$b_t\" \"$dpms_off\"
+			printf '%d|%s|%d|%s|%d|%s|%s|%d|%d|%s|%d|%d|%d|%s|%s|%s|%s|%s|%s|%s|%s|%d\n' \"$((t/1000))\" \"${e_dev:-}\" \"$e_on\" \"$e_ip\" \"$w_hw\" \"${w_rad:-disabled}\" \"$net\" \"$bt_hw\" \"$bt_en\" \"$bt_name\" \"$hp\" \"$hmic\" \"${cpu_u:-10}\" \"$ram_s\" \"$d_root\" \"${d_sec:-No secondary drive}\" \"$(uptime -p 2>/dev/null | sed 's/^up //')\" \"$b_h\" \"$b_p\" \"$b_c\" \"$b_t\" \"$dpms_off\"
 		"]
 		stdout: SplitParser {
 			onRead: data => {
 				let p = data.trim().split("|")
-				if (p.length >= 25) {
-					root.cpuTemp = parseInt(p[0]) || 40
-					root.ethIface = p[1]
-					root.ethConnected = (p[2] === "1")
-					root.ethIp = p[3]
-					root.hasWifiHw = (p[4] === "1")
-					root.wifiEnabled = (p[5] === "enabled") && root.hasWifiHw
-					root.netName = p[6]
-					root.hasBtAdapter = (p[7] === "1")
-					root.btEnabled = (p[8] === "1")
-					root.btName = p[9]
-					root.isHeadphones = (p[10] === "1")
-					root.isHeadsetMic = (p[11] === "1")
-					root.cpuModel = p[12]
-					root.cpuUsage = parseInt(p[13]) || 0
-					root.ramInfo = p[14] + " (" + p[15] + "%)"
-					root.ramPct = parseInt(p[15]) || 0
-					root.diskRootInfo = p[16]
-					root.diskRootPct = parseInt(p[17]) || 0
-					root.diskSecInfo = p[18]
-					root.kernelVer = p[19]
-					root.uptimeStr = p[20]
-					root.batHealth = p[21]
-					root.batPowerDraw = p[22]
-					root.batCycles = p[23]
-					root.batTech = p[24]
-					if (p.length >= 26) root.isMonitorDpmsOff = (p[25] === "1")
+				if (p.length >= 24) {
+					root.cpuTemp = parseInt(p[0]) || 40; root.ethIface = p[1]; root.ethConnected = (p[2] === "1"); root.ethIp = p[3]
+					root.hasWifiHw = (p[4] === "1"); root.wifiEnabled = (p[5] === "enabled") && root.hasWifiHw; root.netName = p[6]
+					root.hasBtAdapter = (p[7] === "1"); root.btEnabled = (p[8] === "1"); root.btName = p[9]
+					root.isHeadphones = (p[10] === "1"); root.isHeadsetMic = (p[11] === "1"); root.cpuUsage = parseInt(p[12]) || 0
+					root.ramInfo = p[13] + " (" + p[14] + "%)"; root.ramPct = parseInt(p[14]) || 0; root.diskRootInfo = p[15]; root.diskRootPct = parseInt(p[16]) || 0
+					root.diskSecInfo = p[17]; root.uptimeStr = p[18]; root.batHealth = p[19]; root.batPowerDraw = p[20]; root.batCycles = p[21]; root.batTech = p[22]
+					root.isMonitorDpmsOff = (p[23] === "1")
 				}
 			}
 		}
 	}
 
+	// Targeted submenu polling: queries only the active submenu's subsystem
 	Process {
 		id: subPoll
 		command: ["bash", "-c", "
-			nets=$(nmcli -t -f IN-USE,SIGNAL,SECURITY,SSID dev wifi list --rescan no 2>/dev/null | head -n 12 | awk -F: 'length($4)>0 {printf \"%s^%s^%s^%s;\", ($1==\"*\"?\"1\":\"0\"), $2, $3, $4}')
-			saved=$(nmcli -t -f NAME,TYPE connection show 2>/dev/null | awk -F: '$2==\"802-11-wireless\"{printf \"%s;\", $1}')
-			bts=\"\"
-			if bluetoothctl list 2>/dev/null | grep -q '^Controller'; then
-				bts=$(bluetoothctl devices 2>/dev/null | grep -E '^Device ([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}' | head -n 12 | while read -r _ mac name; do
-					con=0; bluetoothctl info \"$mac\" 2>/dev/null | grep -q 'Connected: yes' && con=1
-					printf '%s^%s^%d;' \"$mac\" \"$name\" \"$con\"
-				done)
+			sub=\"" + root.sysSubmenu + "\"
+			if [[ \"$sub\" == \"net\" ]]; then
+				nets=$(nmcli -t -f IN-USE,SIGNAL,SECURITY,SSID dev wifi list --rescan no 2>/dev/null | head -n 12 | awk -F: 'length($4)>0 {printf \"%s^%s^%s^%s;\", ($1==\"*\"?\"1\":\"0\"), $2, $3, $4}')
+				saved=$(nmcli -t -f NAME,TYPE connection show 2>/dev/null | awk -F: '$2==\"802-11-wireless\"{printf \"%s;\", $1}')
+				printf 'NET:%s\nSAVED:%s\n' \"$nets\" \"$saved\"
+			elif [[ \"$sub\" == \"bt\" ]]; then
+				bts=\"\"
+				if bluetoothctl list 2>/dev/null | grep -q '^Controller'; then
+					bts=$(bluetoothctl devices 2>/dev/null | grep -E '^Device ([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}' | head -n 12 | while read -r _ mac name; do
+						con=0; bluetoothctl info \"$mac\" 2>/dev/null | grep -q 'Connected: yes' && con=1
+						printf '%s^%s^%d;' \"$mac\" \"$name\" \"$con\"
+					done)
+				fi
+				printf 'BT:%s\n' \"$bts\"
+			elif [[ \"$sub\" == \"sound\" || \"$sub\" == \"mic\" ]]; then
+				sinks=$(wpctl status 2>/dev/null | awk '/Sinks:/,/Sources:/' | grep -E '[0-9]+\\.' | while read -r l; do act=0; [[ \"$l\" == *\"*\"* ]] && act=1; c=$(echo \"$l\" | sed 's/^[^0-9]*//'); id=${c%%.*}; r=${c#*. }; printf '%s^%s^%d;' \"$id\" \"${r%% \\[vol*}\" \"$act\"; done)
+				srcs=$(wpctl status 2>/dev/null | awk '/Sources:/,/Filters:|Streams:/' | grep -E '[0-9]+\\.' | while read -r l; do act=0; [[ \"$l\" == *\"*\"* ]] && act=1; c=$(echo \"$l\" | sed 's/^[^0-9]*//'); id=${c%%.*}; r=${c#*. }; printf '%s^%s^%d;' \"$id\" \"${r%% \\[vol*}\" \"$act\"; done)
+				printf 'SINK:%s\nSRC:%s\n' \"$sinks\" \"$srcs\"
+			elif [[ \"$sub\" == \"display\" ]]; then
+				if [[ -n \"$NIRI_SOCKET\" ]]; then
+					disp=$(niri msg outputs 2>/dev/null | awk '/^Output /{if(name!=\"\")printf \"%s^%s^%s^%s;\",name,cur,scale,modes; match($0,/\\([^)]+\\)/); name=substr($0,RSTART+1,RLENGTH-2); cur=\"1920x1080@60\"; scale=\"1.0\"; modes=\"\"; mcount=0} /\\(current\\)/{m=$1; sub(/\\..*@/,\"@\",m); cur=m; if(mcount<8){modes=modes (modes==\"\"?\"\":\",\") m; mcount++}} /^[[:space:]]+[0-9]+x[0-9]+@/ && !/\\(current\\)/{if(mcount<8){m=$1; sub(/\\..*@/,\"@\",m); if(index(modes,m)==0){modes=modes (modes==\"\"?\"\":\",\") m; mcount++}}} /Scale:/{scale=$2} END{if(name!=\"\")printf \"%s^%s^%s^%s;\",name,cur,scale,modes}')
+				elif [[ -n \"$HYPRLAND_INSTANCE_SIGNATURE\" ]]; then
+					disp=$(hyprctl monitors 2>/dev/null | awk '/^Monitor /{if(name!=\"\")printf \"%s^%s^%s^%s;\",name,cur,scale,modes; name=$2; cur=\"1920x1080@60\"; scale=\"1.0\"; modes=\"\"} /^[[:space:]]+[0-9]+x[0-9]+@/{m=$1; sub(/\\..*$/,\"\",m); cur=m} /^[[:space:]]+scale:/{scale=$2} /availableModes:/{for(i=2;i<=NF&&i<=9;i++){m=$i; sub(/\\..*Hz/,\"\",m); sub(/Hz/,\"\",m); modes=modes (modes==\"\"?\"\":\",\") m}} END{if(name!=\"\")printf \"%s^%s^%s^%s;\",name,cur,scale,modes}')
+				fi
+				printf 'DISP:%s\n' \"$disp\"
 			fi
-			sinks=$(wpctl status 2>/dev/null | awk '/Sinks:/,/Sources:/' | grep -E '[0-9]+\\.' | while read -r l; do act=0; [[ \"$l\" == *\"*\"* ]] && act=1; c=$(echo \"$l\" | sed 's/^[^0-9]*//'); id=${c%%.*}; r=${c#*. }; printf '%s^%s^%d;' \"$id\" \"${r%% \\[vol*}\" \"$act\"; done)
-			srcs=$(wpctl status 2>/dev/null | awk '/Sources:/,/Filters:|Streams:/' | grep -E '[0-9]+\\.' | while read -r l; do act=0; [[ \"$l\" == *\"*\"* ]] && act=1; c=$(echo \"$l\" | sed 's/^[^0-9]*//'); id=${c%%.*}; r=${c#*. }; printf '%s^%s^%d;' \"$id\" \"${r%% \\[vol*}\" \"$act\"; done)
-			if [[ -n \"$NIRI_SOCKET\" ]]; then
-				disp=$(niri msg outputs 2>/dev/null | awk '/^Output /{if(name!=\"\")printf \"%s^%s^%s^%s;\",name,cur,scale,modes; match($0,/\\([^)]+\\)/); name=substr($0,RSTART+1,RLENGTH-2); cur=\"1920x1080@60\"; scale=\"1.0\"; modes=\"\"; mcount=0} /\\(current\\)/{m=$1; sub(/\\..*@/,\"@\",m); cur=m; if(mcount<8){modes=modes (modes==\"\"?\"\":\",\") m; mcount++}} /^[[:space:]]+[0-9]+x[0-9]+@/ && !/\\(current\\)/{if(mcount<8){m=$1; sub(/\\..*@/,\"@\",m); if(index(modes,m)==0){modes=modes (modes==\"\"?\"\":\",\") m; mcount++}}} /Scale:/{scale=$2} END{if(name!=\"\")printf \"%s^%s^%s^%s;\",name,cur,scale,modes}')
-			elif [[ -n \"$HYPRLAND_INSTANCE_SIGNATURE\" ]]; then
-				disp=$(hyprctl monitors 2>/dev/null | awk '/^Monitor /{if(name!=\"\")printf \"%s^%s^%s^%s;\",name,cur,scale,modes; name=$2; cur=\"1920x1080@60\"; scale=\"1.0\"; modes=\"\"} /^[[:space:]]+[0-9]+x[0-9]+@/{m=$1; sub(/\\..*$/,\"\",m); cur=m} /^[[:space:]]+scale:/{scale=$2} /availableModes:/{for(i=2;i<=NF&&i<=9;i++){m=$i; sub(/\\..*Hz/,\"\",m); sub(/Hz/,\"\",m); modes=modes (modes==\"\"?\"\":\",\") m}} END{if(name!=\"\")printf \"%s^%s^%s^%s;\",name,cur,scale,modes}')
-			fi
-			printf 'NET:%s\nSAVED:%s\nBT:%s\nSINK:%s\nSRC:%s\nDISP:%s\n' \"$nets\" \"$saved\" \"$bts\" \"$sinks\" \"$srcs\" \"$disp\"
 		"]
 		stdout: SplitParser {
 			onRead: data => {
 				let l = data.trim()
 				if (l.startsWith("NET:")) {
 					let r = l.substring(4).split(";"), a = []
-					for (let i = 0; i < r.length; i++) {
-						let f = r[i].split("^")
-						if (f.length >= 4) a.push({ "connected": f[0] === "1", "signal": f[1], "sec": f[2], "ssid": f[3] })
-					}
+					for (let i = 0; i < r.length; i++) { let f = r[i].split("^"); if (f.length >= 4) a.push({ "connected": f[0] === "1", "signal": f[1], "sec": f[2], "ssid": f[3] }) }
 					root.netList = a
-				} else if (l.startsWith("SAVED:")) {
-					root.savedWifiList = l.substring(6).split(";").filter(x => x.trim() !== "")
-				} else if (l.startsWith("BT:")) {
+				} else if (l.startsWith("SAVED:")) root.savedWifiList = l.substring(6).split(";").filter(x => x.trim() !== "")
+				else if (l.startsWith("BT:")) {
 					let r = l.substring(3).split(";"), a = []
-					for (let i = 0; i < r.length; i++) {
-						let f = r[i].split("^")
-						if (f.length >= 3) a.push({ "mac": f[0], "name": f[1], "connected": f[2] === "1" })
-					}
+					for (let i = 0; i < r.length; i++) { let f = r[i].split("^"); if (f.length >= 3) a.push({ "mac": f[0], "name": f[1], "connected": f[2] === "1" }) }
 					root.btList = a
 				} else if (l.startsWith("SINK:") || l.startsWith("SRC:")) {
 					let isSink = l.startsWith("SINK:"), r = l.substring(isSink ? 5 : 4).split(";"), a = []
-					for (let i = 0; i < r.length; i++) {
-						let f = r[i].split("^")
-						if (f.length >= 3) a.push({ "id": f[0], "name": f[1], "active": f[2] === "1" })
-					}
-					if (isSink) root.audioSinks = a
-					else root.audioSources = a
+					for (let i = 0; i < r.length; i++) { let f = r[i].split("^"); if (f.length >= 3) a.push({ "id": f[0], "name": f[1], "active": f[2] === "1" }) }
+					if (isSink) root.audioSinks = a; else root.audioSources = a
 				} else if (l.startsWith("DISP:")) {
 					let r = l.substring(5).split(";"), a = []
 					for (let i = 0; i < r.length; i++) {
@@ -670,32 +677,15 @@ ShellRoot {
 		stdout: SplitParser {
 			onRead: data => {
 				let p = data.trim().split("|")
-				if (p.length >= 2 && p[0] !== "") {
-					root.weatherShort = p[0]
-					root.weatherDetail = p[1]
-				}
+				if (p.length >= 2 && p[0] !== "") { root.weatherShort = p[0]; root.weatherDetail = p[1] }
 			}
 		}
 	}
 
+	Timer { interval: root.isVM ? 800 : 350; running: !root.screenLocked; repeat: true; onTriggered: fastPoll.running = true }
+	Timer { interval: 1800000; running: true; repeat: true; triggeredOnStart: true; onTriggered: weatherProc.running = true }
 	Timer {
-		interval: root.isVM ? 800 : 350
-		running: true
-		repeat: true
-		onTriggered: fastPoll.running = true
-	}
-	Timer {
-		interval: 1800000
-		running: true
-		repeat: true
-		triggeredOnStart: true
-		onTriggered: weatherProc.running = true
-	}
-	Timer {
-		interval: 1000
-		running: true
-		repeat: true
-		triggeredOnStart: true
+		interval: 1000; running: true; repeat: true; triggeredOnStart: true
 		property int tick: 0
 		onTriggered: {
 			let now = new Date()
@@ -703,14 +693,15 @@ ShellRoot {
 			root.dateStr = Qt.formatDateTime(now, "dd MMM")
 			root.fullDateStr = Qt.formatDateTime(now, "ddd, MMM dd")
 			if (root.isRecording) root.recSeconds++
-			if (tick % 3 === 0) sysPoll.running = true
+			if (root.centerMode === "system" && tick % 3 === 0) sysPoll.running = true
+			else if (root.animWallpapers && tick % 6 === 0) sysPoll.running = true
 			if (tick % 10 === 0 && root.weatherShort.includes("--")) weatherProc.running = true
 			if (tick % 4 === 0 && root.centerMode === "system" && root.sysSubmenu !== "") subPoll.running = true
 			tick = (tick + 1) % 3600
 		}
 	}
 
-	// 1. NATIVE DESKTOP WALLPAPER (With Crossfade/Zoom & Smart Auto-Pause)
+	// 1. NATIVE DESKTOP WALLPAPER (With Crossfade/Zoom & Instant Stop on Mode Switch)
 	Variants {
 		model: Quickshell.screens
 		PanelWindow {
@@ -719,12 +710,7 @@ ShellRoot {
 			WlrLayershell.layer: WlrLayer.Background
 			WlrLayershell.namespace: "wallpaper"
 			WlrLayershell.exclusionMode: ExclusionMode.Ignore
-			anchors {
-				top: true
-				bottom: true
-				left: true
-				right: true
-			}
+			anchors { top: true; bottom: true; left: true; right: true }
 			color: root.bg
 
 			Item {
@@ -732,20 +718,12 @@ ShellRoot {
 				anchors.fill: parent
 
 				NumberAnimation {
-					id: wallFadeAnim
-					target: wallContainer
-					property: "opacity"
-					from: 0.2
-					to: 1.0
+					id: wallFadeAnim; target: wallContainer; property: "opacity"; from: 0.2; to: 1.0
 					duration: root.fxActive && root.cfgWallpaperTransition !== "none" ? root.cfgWallpaperTransitionMs : 0
 					easing.type: Easing.OutCubic
 				}
 				NumberAnimation {
-					id: wallZoomAnim
-					target: wallContainer
-					property: "scale"
-					from: root.cfgWallpaperTransition === "zoom" ? 1.04 : 1.0
-					to: 1.0
+					id: wallZoomAnim; target: wallContainer; property: "scale"; from: root.cfgWallpaperTransition === "zoom" ? 1.04 : 1.0; to: 1.0
 					duration: root.fxActive && root.cfgWallpaperTransition === "zoom" ? root.cfgWallpaperTransitionMs : 0
 					easing.type: Easing.OutCubic
 				}
@@ -759,10 +737,7 @@ ShellRoot {
 						}
 					}
 					function onShouldPlayAnimationChanged() {
-						if (!root.isVideoFile || !root.animWallpapers) {
-							wallVideoPlayer.stop()
-							return
-						}
+						if (!root.isVideoFile || !root.animWallpapers) { wallVideoPlayer.stop(); return }
 						if (root.shouldPlayAnimation) wallVideoPlayer.play()
 						else wallVideoPlayer.pause()
 					}
@@ -772,9 +747,7 @@ ShellRoot {
 					anchors.fill: parent
 					visible: !root.isVideoFile && !root.isAnimatedGif
 					source: (!root.isVideoFile && !root.isAnimatedGif && root.wallpaperPath !== "") ? "file://" + root.wallpaperPath : ""
-					fillMode: Image.PreserveAspectCrop
-					asynchronous: true
-					smooth: true
+					fillMode: Image.PreserveAspectCrop; asynchronous: true; smooth: true
 				}
 
 				AnimatedImage {
@@ -782,9 +755,7 @@ ShellRoot {
 					visible: root.isAnimatedGif
 					source: (root.isAnimatedGif && root.wallpaperPath !== "") ? "file://" + root.wallpaperPath : ""
 					playing: visible && root.shouldPlayAnimation
-					fillMode: Image.PreserveAspectCrop
-					asynchronous: true
-					smooth: true
+					fillMode: Image.PreserveAspectCrop; asynchronous: true; smooth: true
 				}
 
 				MediaPlayer {
@@ -799,10 +770,7 @@ ShellRoot {
 				}
 
 				VideoOutput {
-					id: wallVideoOut
-					anchors.fill: parent
-					visible: root.isVideoFile
-					fillMode: VideoOutput.PreserveAspectCrop
+					id: wallVideoOut; anchors.fill: parent; visible: root.isVideoFile; fillMode: VideoOutput.PreserveAspectCrop
 				}
 			}
 		}
@@ -813,19 +781,11 @@ ShellRoot {
 		model: Quickshell.screens
 		PanelWindow {
 			required property var modelData
-			screen: modelData
-			visible: root.barVisible
-			WlrLayershell.layer: WlrLayer.Top
-			WlrLayershell.namespace: "waybar-spacer"
-			WlrLayershell.exclusionMode: ExclusionMode.Normal
-			exclusiveZone: 46
-			anchors {
-				top: true
-				left: true
-				right: true
-			}
-			implicitHeight: 46
-			color: "transparent"
+			screen: modelData; visible: root.barVisible
+			WlrLayershell.layer: WlrLayer.Top; WlrLayershell.namespace: "waybar-spacer"
+			WlrLayershell.exclusionMode: ExclusionMode.Normal; exclusiveZone: 46
+			anchors { top: true; left: true; right: true }
+			implicitHeight: 46; color: "transparent"
 		}
 	}
 
@@ -834,17 +794,10 @@ ShellRoot {
 		model: Quickshell.screens
 		PanelWindow {
 			required property var modelData
-			screen: modelData
-			visible: root.centerMode !== "none"
-			WlrLayershell.layer: WlrLayer.Top
-			WlrLayershell.namespace: "qs-backdrop"
+			screen: modelData; visible: root.centerMode !== "none"
+			WlrLayershell.layer: WlrLayer.Top; WlrLayershell.namespace: "qs-backdrop"
 			WlrLayershell.exclusionMode: ExclusionMode.Ignore
-			anchors {
-				top: true
-				bottom: true
-				left: true
-				right: true
-			}
+			anchors { top: true; bottom: true; left: true; right: true }
 			color: "transparent"
 			MouseArea {
 				anchors.fill: parent
@@ -860,251 +813,94 @@ ShellRoot {
 		PanelWindow {
 			id: islandWin
 			required property var modelData
-			screen: modelData
-			visible: root.barVisible
+			screen: modelData; visible: root.barVisible
 			WlrLayershell.layer: (root.centerMode === "none" && !centerPill.isHoverPreview && !mediaPill.expanded) ? WlrLayer.Top : WlrLayer.Overlay
-			WlrLayershell.namespace: "waybar"
-			WlrLayershell.exclusionMode: ExclusionMode.Ignore
+			WlrLayershell.namespace: "waybar"; WlrLayershell.exclusionMode: ExclusionMode.Ignore
 			WlrLayershell.keyboardFocus: (root.centerMode === "launcher" || root.wifiPromptSsid !== "") ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
-			anchors {
-				top: true
-			}
+			anchors { top: true }
 			margins.top: 8
-			implicitWidth: islandRow.implicitWidth + 16
-			implicitHeight: islandRow.implicitHeight + 8
-			color: "transparent"
+			implicitWidth: islandRow.implicitWidth + 16; implicitHeight: islandRow.implicitHeight + 8; color: "transparent"
 
 			function grabKeyboardNow() {
 				if (root.centerMode === "launcher" && !launcherSearchInput.activeFocus) launcherSearchInput.forceActiveFocus()
 				else if (root.wifiPromptSsid !== "" && !wifiPwField.activeFocus) wifiPwField.forceActiveFocus()
 			}
 
-			Timer {
-				id: focusTimer1
-				interval: 30
-				repeat: false
-				onTriggered: islandWin.grabKeyboardNow()
-			}
+			Timer { id: focusTimer1; interval: 30; repeat: false; onTriggered: islandWin.grabKeyboardNow() }
 
 			Connections {
 				target: root
-				function onCenterModeChanged() {
-					if (root.centerMode === "launcher") {
-						launcherSearchInput.text = ""
-						focusTimer1.restart()
-					}
-				}
-				function onWifiPromptSsidChanged() {
-					if (root.wifiPromptSsid !== "") focusTimer1.restart()
-				}
+				function onCenterModeChanged() { if (root.centerMode === "launcher") { launcherSearchInput.text = ""; focusTimer1.restart() } }
+				function onWifiPromptSsidChanged() { if (root.wifiPromptSsid !== "") focusTimer1.restart() }
 			}
 
 			RowLayout {
 				id: islandRow
-				anchors.top: parent.top
-				anchors.horizontalCenter: parent.horizontalCenter
-				spacing: 10
+				anchors.top: parent.top; anchors.horizontalCenter: parent.horizontalCenter; spacing: 10
 
 				Rectangle {
 					id: mediaPill
-					visible: root.activePlayer !== null
-					Layout.alignment: Qt.AlignTop
+					visible: root.activePlayer !== null; Layout.alignment: Qt.AlignTop
 					property bool expanded: mediaHover.hovered
-					implicitWidth: expanded ? 330 : 38
-					implicitHeight: expanded ? 150 : 38
-					radius: expanded ? 22 : 19
+					implicitWidth: expanded ? 330 : 38; implicitHeight: expanded ? 150 : 38; radius: expanded ? 22 : 19
 					color: root.withAlpha(root.bg, root.panelAlpha)
-					border.width: expanded ? 2 : 1
-					border.color: expanded ? root.color4 : root.withAlpha(root.color4, 0.6)
-					clip: true
-					Behavior on implicitWidth {
-						NumberAnimation {
-							duration: root.animMs
-							easing.type: root.cfgIslandEasing
-						}
-					}
-					Behavior on implicitHeight {
-						NumberAnimation {
-							duration: root.animMs
-							easing.type: root.cfgIslandEasing
-						}
-					}
-					HoverHandler {
-						id: mediaHover
-					}
+					border.width: expanded ? 2 : 1; border.color: expanded ? root.color4 : root.withAlpha(root.color4, 0.6); clip: true
+					Behavior on implicitWidth { NumberAnimation { duration: root.animMs; easing.type: root.cfgIslandEasing } }
+					Behavior on implicitHeight { NumberAnimation { duration: root.animMs; easing.type: root.cfgIslandEasing } }
+					HoverHandler { id: mediaHover }
 
 					Rectangle {
-						anchors.centerIn: parent
-						visible: !mediaPill.expanded
-						width: 26
-						height: 26
-						radius: 8
-						color: root.color0
-						clip: true
-						Image {
-							anchors.fill: parent
-							source: (root.activePlayer && root.activePlayer.trackArtUrl) ? root.activePlayer.trackArtUrl : ""
-							fillMode: Image.PreserveAspectCrop
-							visible: source != ""
-						}
-						Text {
-							anchors.centerIn: parent
-							visible: !root.activePlayer || !root.activePlayer.trackArtUrl
-							text: "󰝚"
-							color: root.color4
-							font.family: "JetBrainsMono Nerd Font"
-							font.pixelSize: 15
-						}
+						anchors.centerIn: parent; visible: !mediaPill.expanded; width: 26; height: 26; radius: 8; color: root.color0; clip: true
+						Image { anchors.fill: parent; source: (root.activePlayer && root.activePlayer.trackArtUrl) ? root.activePlayer.trackArtUrl : ""; fillMode: Image.PreserveAspectCrop; visible: source != "" }
+						Text { anchors.centerIn: parent; visible: !root.activePlayer || !root.activePlayer.trackArtUrl; text: "󰝚"; color: root.color4; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 15 }
 					}
 
 					ColumnLayout {
-						anchors.fill: parent
-						anchors.margins: 14
-						visible: mediaPill.expanded
-						spacing: 8
+						anchors.fill: parent; anchors.margins: 14; visible: mediaPill.expanded; spacing: 8
 						RowLayout {
-							Layout.fillWidth: true
-							spacing: 12
+							Layout.fillWidth: true; spacing: 12
 							Rectangle {
-								implicitWidth: 64
-								implicitHeight: 64
-								radius: 12
-								color: root.color0
-								clip: true
-								Image {
-									anchors.fill: parent
-									source: (root.activePlayer && root.activePlayer.trackArtUrl) ? root.activePlayer.trackArtUrl : ""
-									fillMode: Image.PreserveAspectCrop
-								}
-								Text {
-									anchors.centerIn: parent
-									visible: !root.activePlayer || !root.activePlayer.trackArtUrl
-									text: "󰝚"
-									color: root.color4
-									font.family: "JetBrainsMono Nerd Font"
-									font.pixelSize: 26
-								}
+								implicitWidth: 64; implicitHeight: 64; radius: 12; color: root.color0; clip: true
+								Image { anchors.fill: parent; source: (root.activePlayer && root.activePlayer.trackArtUrl) ? root.activePlayer.trackArtUrl : ""; fillMode: Image.PreserveAspectCrop }
+								Text { anchors.centerIn: parent; visible: !root.activePlayer || !root.activePlayer.trackArtUrl; text: "󰝚"; color: root.color4; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 26 }
 							}
 							ColumnLayout {
-								Layout.fillWidth: true
-								spacing: 2
-								Text {
-									text: (root.activePlayer && root.activePlayer.trackTitle) ? root.activePlayer.trackTitle : "Media Playing"
-									color: root.fg
-									font.family: "JetBrainsMono Nerd Font"
-									font.pixelSize: 14
-									font.bold: true
-									elide: Text.ElideRight
-									Layout.fillWidth: true
-								}
-								Text {
-									text: (root.activePlayer && root.activePlayer.trackArtist) ? root.activePlayer.trackArtist : "Unknown Artist"
-									color: root.withAlpha(root.fg, 0.8)
-									font.family: "JetBrainsMono Nerd Font"
-									font.pixelSize: 12
-									elide: Text.ElideRight
-									Layout.fillWidth: true
-								}
-								Text {
-									text: (root.activePlayer && root.activePlayer.identity) ? root.activePlayer.identity : "Player"
-									color: root.color8
-									font.family: "JetBrainsMono Nerd Font"
-									font.pixelSize: 11
-									elide: Text.ElideRight
-									Layout.fillWidth: true
-								}
+								Layout.fillWidth: true; spacing: 2
+								Text { text: (root.activePlayer && root.activePlayer.trackTitle) ? root.activePlayer.trackTitle : "Media Playing"; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 14; font.bold: true; elide: Text.ElideRight; Layout.fillWidth: true }
+								Text { text: (root.activePlayer && root.activePlayer.trackArtist) ? root.activePlayer.trackArtist : "Unknown Artist"; color: root.withAlpha(root.fg, 0.8); font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12; elide: Text.ElideRight; Layout.fillWidth: true }
+								Text { text: (root.activePlayer && root.activePlayer.identity) ? root.activePlayer.identity : "Player"; color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; elide: Text.ElideRight; Layout.fillWidth: true }
 							}
 						}
 						ColumnLayout {
-							Layout.fillWidth: true
-							spacing: 3
+							Layout.fillWidth: true; spacing: 3
 							Rectangle {
-								Layout.fillWidth: true
-								implicitHeight: 5
-								radius: 3
-								color: Qt.rgba(1, 1, 1, 0.15)
+								Layout.fillWidth: true; implicitHeight: 5; radius: 3; color: Qt.rgba(1, 1, 1, 0.15)
 								property real prog: (root.activePlayer && root.activePlayer.length > 0) ? Math.min(1, root.activePlayer.position / root.activePlayer.length) : 0.25
-								Rectangle {
-									width: parent.width * parent.prog
-									height: parent.height
-									radius: 3
-									color: root.color6
-								}
+								Rectangle { width: parent.width * parent.prog; height: parent.height; radius: 3; color: root.color6 }
 							}
 							RowLayout {
 								Layout.fillWidth: true
-								Text {
-									text: root.activePlayer ? root.formatSec(root.activePlayer.position) : "0:00"
-									color: root.color8
-									font.family: "JetBrainsMono Nerd Font"
-									font.pixelSize: 10
-								}
-								Item {
-									Layout.fillWidth: true
-								}
-								Text {
-									text: (root.activePlayer && root.activePlayer.length > 0) ? root.formatSec(root.activePlayer.length) : ""
-									color: root.color8
-									font.family: "JetBrainsMono Nerd Font"
-									font.pixelSize: 10
-								}
+								Text { text: root.activePlayer ? root.formatSec(root.activePlayer.position) : "0:00"; color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 10 }
+								Item { Layout.fillWidth: true }
+								Text { text: (root.activePlayer && root.activePlayer.length > 0) ? root.formatSec(root.activePlayer.length) : ""; color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 10 }
 							}
 						}
 						RowLayout {
-							Layout.alignment: Qt.AlignHCenter
-							spacing: 22
+							Layout.alignment: Qt.AlignHCenter; spacing: 22
 							Item {
-								implicitWidth: 22
-								implicitHeight: 22
-								Text {
-									anchors.centerIn: parent
-									text: "󰒮"
-									color: root.fg
-									font.family: "JetBrainsMono Nerd Font"
-									font.pixelSize: 18
-								}
-								MouseArea {
-									anchors.fill: parent
-									onClicked: {
-										if (root.activePlayer) root.activePlayer.previous()
-									}
-								}
+								implicitWidth: 22; implicitHeight: 22
+								Text { anchors.centerIn: parent; text: "󰒮"; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 18 }
+								MouseArea { anchors.fill: parent; onClicked: { if (root.activePlayer) root.activePlayer.previous() } }
 							}
 							Rectangle {
-								implicitWidth: 32
-								implicitHeight: 32
-								radius: 16
-								color: Qt.rgba(1, 1, 1, 0.15)
-								Text {
-									anchors.centerIn: parent
-									text: (root.activePlayer && root.activePlayer.playbackState === MprisPlaybackState.Playing) ? "󰏤" : "󰐊"
-									color: root.fg
-									font.family: "JetBrainsMono Nerd Font"
-									font.pixelSize: 16
-								}
-								MouseArea {
-									anchors.fill: parent
-									onClicked: {
-										if (root.activePlayer) root.activePlayer.togglePlaying()
-									}
-								}
+								implicitWidth: 32; implicitHeight: 32; radius: 16; color: Qt.rgba(1, 1, 1, 0.15)
+								Text { anchors.centerIn: parent; text: (root.activePlayer && root.activePlayer.playbackState === MprisPlaybackState.Playing) ? "󰏤" : "󰐊"; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 16 }
+								MouseArea { anchors.fill: parent; onClicked: { if (root.activePlayer) root.activePlayer.togglePlaying() } }
 							}
 							Item {
-								implicitWidth: 22
-								implicitHeight: 22
-								Text {
-									anchors.centerIn: parent
-									text: "󰒭"
-									color: root.fg
-									font.family: "JetBrainsMono Nerd Font"
-									font.pixelSize: 18
-								}
-								MouseArea {
-									anchors.fill: parent
-									onClicked: {
-										if (root.activePlayer) root.activePlayer.next()
-									}
-								}
+								implicitWidth: 22; implicitHeight: 22
+								Text { anchors.centerIn: parent; text: "󰒭"; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 18 }
+								MouseArea { anchors.fill: parent; onClicked: { if (root.activePlayer) root.activePlayer.next() } }
 							}
 						}
 					}
@@ -1114,59 +910,24 @@ ShellRoot {
 					id: wsPill
 					Layout.alignment: Qt.AlignTop
 					property bool showAll: root.wsExpanded || wsHover.hovered
-					implicitWidth: showAll ? (wsRow.implicitWidth + 16) : 38
-					implicitHeight: 38
-					radius: 19
+					implicitWidth: showAll ? (wsRow.implicitWidth + 16) : 38; implicitHeight: 38; radius: 19
 					color: root.withAlpha(root.bg, root.panelAlpha)
-					border.width: 1
-					border.color: root.withAlpha(root.color4, 0.6)
-					clip: true
-					Behavior on implicitWidth {
-						NumberAnimation {
-							duration: root.animMs
-							easing.type: root.cfgIslandEasing
-						}
-					}
-					HoverHandler {
-						id: wsHover
-					}
+					border.width: 1; border.color: root.withAlpha(root.color4, 0.6); clip: true
+					Behavior on implicitWidth { NumberAnimation { duration: root.animMs; easing.type: root.cfgIslandEasing } }
+					HoverHandler { id: wsHover }
 
-					Text {
-						anchors.centerIn: parent
-						visible: !wsPill.showAll
-						text: root.lastActiveWs.toString()
-						color: root.color4
-						font.family: "JetBrainsMono Nerd Font"
-						font.pixelSize: 14
-						font.bold: true
-					}
+					Text { anchors.centerIn: parent; visible: !wsPill.showAll; text: root.lastActiveWs.toString(); color: root.color4; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 14; font.bold: true }
 					RowLayout {
-						id: wsRow
-						anchors.centerIn: parent
-						visible: wsPill.showAll
-						spacing: 6
+						id: wsRow; anchors.centerIn: parent; visible: wsPill.showAll; spacing: 6
 						Repeater {
 							model: root.workspacesList
 							Rectangle {
 								required property var modelData
-								implicitWidth: 26
-								implicitHeight: 26
-								radius: 13
+								implicitWidth: 26; implicitHeight: 26; radius: 13
 								color: modelData.active ? root.color4 : (modelData.occupied ? root.withAlpha(root.color2, 0.25) : Qt.rgba(1, 1, 1, 0.06))
-								border.width: modelData.occupied && !modelData.active ? 1 : 0
-								border.color: root.color2
-								Text {
-									anchors.centerIn: parent
-									text: modelData.idx.toString()
-									color: modelData.active ? root.bg : (modelData.occupied ? root.color2 : root.color8)
-									font.family: "JetBrainsMono Nerd Font"
-									font.pixelSize: 12
-									font.bold: true
-								}
-								MouseArea {
-									anchors.fill: parent
-									onClicked: root.runCmd((root.isHyprland ? "hyprctl dispatch workspace " : "niri msg action focus-workspace ") + modelData.idx)
-								}
+								border.width: modelData.occupied && !modelData.active ? 1 : 0; border.color: root.color2
+								Text { anchors.centerIn: parent; text: modelData.idx.toString(); color: modelData.active ? root.bg : (modelData.occupied ? root.color2 : root.color8); font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12; font.bold: true }
+								MouseArea { anchors.fill: parent; onClicked: root.runCmd((root.isHyprland ? "hyprctl dispatch workspace " : "niri msg action focus-workspace ") + modelData.idx) }
 							}
 						}
 					}
@@ -1189,18 +950,8 @@ ShellRoot {
 					border.width: (isCalOpen || isSysOpen || isLauncherOpen || isOverviewOpen) ? 2 : (isHoverPreview ? 0 : 1)
 					border.color: (isCalOpen || isSysOpen || isLauncherOpen || isOverviewOpen) ? root.color4 : root.withAlpha(root.color4, 0.6)
 					clip: true
-					Behavior on implicitWidth {
-						NumberAnimation {
-							duration: root.animMs
-							easing.type: root.cfgIslandEasing
-						}
-					}
-					Behavior on implicitHeight {
-						NumberAnimation {
-							duration: root.animMs
-							easing.type: root.cfgIslandEasing
-						}
-					}
+					Behavior on implicitWidth { NumberAnimation { duration: root.animMs; easing.type: root.cfgIslandEasing } }
+					Behavior on implicitHeight { NumberAnimation { duration: root.animMs; easing.type: root.cfgIslandEasing } }
 
 					HoverHandler {
 						id: centerHover
@@ -1211,71 +962,29 @@ ShellRoot {
 					}
 
 					MouseArea {
-						anchors.fill: parent
-						visible: centerPill.isCalOpen || centerPill.isHoverPreview
-						acceptedButtons: Qt.RightButton
-						onClicked: root.openSystemPanel()
+						anchors.fill: parent; visible: centerPill.isCalOpen || centerPill.isHoverPreview
+						acceptedButtons: Qt.RightButton; onClicked: root.openSystemPanel()
 					}
 
 					Item {
 						id: topPillBar
 						visible: !centerPill.isSysOpen && !centerPill.isLauncherOpen && !centerPill.isOverviewOpen
-						anchors {
-							top: parent.top
-							left: parent.left
-							right: parent.right
-						}
+						anchors { top: parent.top; left: parent.left; right: parent.right }
 						height: 38
 						RowLayout {
-							id: compactClockRow
-							anchors.centerIn: parent
-							spacing: 8
-							Rectangle {
-								visible: notifServer.trackedNotifications.values.length > 0
-								implicitWidth: 7
-								implicitHeight: 7
-								radius: 4
-								color: root.color2
-							}
-							Text {
-								text: root.timeStr
-								color: root.fg
-								font.family: "JetBrainsMono Nerd Font"
-								font.pixelSize: 13
-								font.bold: true
-							}
-							Text {
-								text: "•"
-								color: root.color8
-								font.pixelSize: 12
-							}
-							Text {
-								text: root.dateStr
-								color: root.color4
-								font.family: "JetBrainsMono Nerd Font"
-								font.pixelSize: 13
-								font.bold: true
-							}
-							Text {
-								text: root.weatherShort
-								color: root.fg
-								font.family: "JetBrainsMono Nerd Font"
-								font.pixelSize: 13
-								font.bold: true
-							}
+							id: compactClockRow; anchors.centerIn: parent; spacing: 8
+							Rectangle { visible: notifServer.trackedNotifications.values.length > 0; implicitWidth: 7; implicitHeight: 7; radius: 4; color: root.color2 }
+							Text { text: root.timeStr; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 13; font.bold: true }
+							Text { text: "•"; color: root.color8; font.pixelSize: 12 }
+							Text { text: root.dateStr; color: root.color4; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 13; font.bold: true }
+							Text { text: root.weatherShort; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 13; font.bold: true }
 						}
 						MouseArea {
-							anchors.fill: parent
-							acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+							anchors.fill: parent; acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
 							onClicked: mouse => {
-								if (mouse.button === Qt.LeftButton) {
-									if (root.centerMode === "calendar") root.closeCenterPill()
-									else root.openCalendar()
-								} else if (mouse.button === Qt.RightButton) {
-									root.openSystemPanel()
-								} else if (mouse.button === Qt.MiddleButton) {
-									root.openLauncher()
-								}
+								if (mouse.button === Qt.LeftButton) { if (root.centerMode === "calendar") root.closeCenterPill(); else root.openCalendar() }
+								else if (mouse.button === Qt.RightButton) root.openSystemPanel()
+								else if (mouse.button === Qt.MiddleButton) root.openLauncher()
 							}
 						}
 					}
@@ -1283,143 +992,59 @@ ShellRoot {
 					ColumnLayout {
 						id: calCardCol
 						visible: centerPill.isHoverPreview || centerPill.isCalOpen
-						anchors {
-							top: topPillBar.bottom
-							left: parent.left
-							right: parent.right
-							margins: 14
-						}
+						anchors { top: topPillBar.bottom; left: parent.left; right: parent.right; margins: 14 }
 						spacing: 10
 
 						Item {
-							id: calPreviewBox
-							Layout.fillWidth: true
-							implicitHeight: calInnerCol.implicitHeight
+							id: calPreviewBox; Layout.fillWidth: true; implicitHeight: calInnerCol.implicitHeight
 							ColumnLayout {
 								id: calInnerCol
-								anchors {
-									left: parent.left
-									right: parent.right
-								}
+								anchors { left: parent.left; right: parent.right }
 								spacing: 6
 								RowLayout {
 									Layout.fillWidth: true
 									Rectangle {
-										visible: centerPill.isCalOpen
-										implicitWidth: 26
-										implicitHeight: 26
-										radius: 8
-										color: Qt.rgba(1, 1, 1, 0.08)
-										Text {
-											anchors.centerIn: parent
-											text: "‹"
-											color: root.fg
-											font.family: "JetBrainsMono Nerd Font"
-											font.pixelSize: 16
-											font.bold: true
-										}
+										visible: centerPill.isCalOpen; implicitWidth: 26; implicitHeight: 26; radius: 8; color: Qt.rgba(1, 1, 1, 0.08)
+										Text { anchors.centerIn: parent; text: "‹"; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 16; font.bold: true }
 										MouseArea {
-											anchors.fill: parent
-											acceptedButtons: Qt.LeftButton | Qt.RightButton
+											anchors.fill: parent; acceptedButtons: Qt.LeftButton | Qt.RightButton
 											onClicked: mouse => {
-												if (mouse.button === Qt.RightButton) {
-													root.openSystemPanel()
-												} else {
-													if (root.calMonth === 0) {
-														root.calMonth = 11
-														root.calYear--
-													} else {
-														root.calMonth--
-													}
-													root.updateCalendar()
-												}
+												if (mouse.button === Qt.RightButton) root.openSystemPanel()
+												else { if (root.calMonth === 0) { root.calMonth = 11; root.calYear-- } else root.calMonth--; root.updateCalendar() }
 											}
 										}
 									}
-									Text {
-										Layout.fillWidth: true
-										horizontalAlignment: Text.AlignHCenter
-										text: Qt.formatDate(new Date(root.calYear, root.calMonth, 1), "MMMM yyyy")
-										color: root.color4
-										font.family: "JetBrainsMono Nerd Font"
-										font.pixelSize: 14
-										font.bold: true
-									}
+									Text { Layout.fillWidth: true; horizontalAlignment: Text.AlignHCenter; text: Qt.formatDate(new Date(root.calYear, root.calMonth, 1), "MMMM yyyy"); color: root.color4; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 14; font.bold: true }
 									Rectangle {
-										visible: centerPill.isCalOpen
-										implicitWidth: 26
-										implicitHeight: 26
-										radius: 8
-										color: Qt.rgba(1, 1, 1, 0.08)
-										Text {
-											anchors.centerIn: parent
-											text: "›"
-											color: root.fg
-											font.family: "JetBrainsMono Nerd Font"
-											font.pixelSize: 16
-											font.bold: true
-										}
+										visible: centerPill.isCalOpen; implicitWidth: 26; implicitHeight: 26; radius: 8; color: Qt.rgba(1, 1, 1, 0.08)
+										Text { anchors.centerIn: parent; text: "›"; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 16; font.bold: true }
 										MouseArea {
-											anchors.fill: parent
-											acceptedButtons: Qt.LeftButton | Qt.RightButton
+											anchors.fill: parent; acceptedButtons: Qt.LeftButton | Qt.RightButton
 											onClicked: mouse => {
-												if (mouse.button === Qt.RightButton) {
-													root.openSystemPanel()
-												} else {
-													if (root.calMonth === 11) {
-														root.calMonth = 0
-														root.calYear++
-													} else {
-														root.calMonth++
-													}
-													root.updateCalendar()
-												}
+												if (mouse.button === Qt.RightButton) root.openSystemPanel()
+												else { if (root.calMonth === 11) { root.calMonth = 0; root.calYear++ } else root.calMonth++; root.updateCalendar() }
 											}
 										}
 									}
 								}
 								GridLayout {
-									Layout.fillWidth: true
-									columns: 7
-									rowSpacing: 4
-									columnSpacing: 4
+									Layout.fillWidth: true; columns: 7; rowSpacing: 4; columnSpacing: 4
 									Repeater {
 										model: ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
-										Text {
-											required property string modelData
-											Layout.fillWidth: true
-											horizontalAlignment: Text.AlignHCenter
-											text: modelData
-											color: root.color8
-											font.family: "JetBrainsMono Nerd Font"
-											font.pixelSize: 11
-											font.bold: true
-										}
+										Text { required property string modelData; Layout.fillWidth: true; horizontalAlignment: Text.AlignHCenter; text: modelData; color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; font.bold: true }
 									}
 									Repeater {
 										model: root.calendarDays
 										Rectangle {
 											required property var modelData
-											Layout.fillWidth: true
-											implicitHeight: 26
-											radius: 8
-											color: modelData.today ? root.color4 : "transparent"
-											Text {
-												anchors.centerIn: parent
-												text: modelData.day
-												color: modelData.today ? root.bg : root.fg
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 12
-												font.bold: modelData.today
-											}
+											Layout.fillWidth: true; implicitHeight: 26; radius: 8; color: modelData.today ? root.color4 : "transparent"
+											Text { anchors.centerIn: parent; text: modelData.day; color: modelData.today ? root.bg : root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12; font.bold: modelData.today }
 										}
 									}
 								}
 							}
 							MouseArea {
-								anchors.fill: parent
-								visible: centerPill.isHoverPreview
-								acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+								anchors.fill: parent; visible: centerPill.isHoverPreview; acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
 								onClicked: mouse => {
 									if (mouse.button === Qt.LeftButton) root.openCalendar()
 									else if (mouse.button === Qt.RightButton) root.openSystemPanel()
@@ -1429,134 +1054,49 @@ ShellRoot {
 						}
 
 						Rectangle {
-							visible: centerPill.isCalOpen
-							Layout.fillWidth: true
-							implicitHeight: 54
-							radius: 14
-							color: root.color0
+							visible: centerPill.isCalOpen; Layout.fillWidth: true; implicitHeight: 54; radius: 14; color: root.color0
 							ColumnLayout {
-								anchors.fill: parent
-								anchors.margins: 10
-								spacing: 2
-								Text {
-									text: "Today's Weather   " + root.weatherShort
-									color: root.color4
-									font.family: "JetBrainsMono Nerd Font"
-									font.pixelSize: 12
-									font.bold: true
-								}
-								Text {
-									text: root.weatherDetail
-									color: root.fg
-									font.family: "JetBrainsMono Nerd Font"
-									font.pixelSize: 11
-									elide: Text.ElideRight
-									Layout.fillWidth: true
-								}
+								anchors.fill: parent; anchors.margins: 10; spacing: 2
+								Text { text: "Today's Weather   " + root.weatherShort; color: root.color4; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12; font.bold: true }
+								Text { text: root.weatherDetail; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; elide: Text.ElideRight; Layout.fillWidth: true }
 							}
 						}
 
 						ColumnLayout {
-							visible: centerPill.isCalOpen
-							Layout.fillWidth: true
-							spacing: 6
+							visible: centerPill.isCalOpen; Layout.fillWidth: true; spacing: 6
 							RowLayout {
 								Layout.fillWidth: true
-								Text {
-									text: "Notifications (" + notifServer.trackedNotifications.values.length + ")"
-									color: root.fg
-									font.family: "JetBrainsMono Nerd Font"
-									font.pixelSize: 13
-									font.bold: true
-									Layout.fillWidth: true
-								}
+								Text { text: "Notifications (" + notifServer.trackedNotifications.values.length + ")"; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 13; font.bold: true; Layout.fillWidth: true }
 								Rectangle {
-									implicitWidth: 74
-									implicitHeight: 24
-									radius: 8
-									color: Qt.rgba(1, 1, 1, 0.08)
-									Text {
-										anchors.centerIn: parent
-										text: "Clear all"
-										color: root.color4
-										font.family: "JetBrainsMono Nerd Font"
-										font.pixelSize: 11
-										font.bold: true
-									}
+									implicitWidth: 74; implicitHeight: 24; radius: 8; color: Qt.rgba(1, 1, 1, 0.08)
+									Text { anchors.centerIn: parent; text: "Clear all"; color: root.color4; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; font.bold: true }
 									MouseArea {
-										anchors.fill: parent
-										acceptedButtons: Qt.LeftButton | Qt.RightButton
+										anchors.fill: parent; acceptedButtons: Qt.LeftButton | Qt.RightButton
 										onClicked: mouse => {
-											if (mouse.button === Qt.RightButton) {
-												root.openSystemPanel()
-											} else {
-												let l = notifServer.trackedNotifications.values
-												for (let i = l.length - 1; i >= 0; i--) l[i].dismiss()
-												root.popupNotifications = []
-											}
+											if (mouse.button === Qt.RightButton) root.openSystemPanel()
+											else { let l = notifServer.trackedNotifications.values; for (let i = l.length - 1; i >= 0; i--) l[i].dismiss(); root.popupNotifications = [] }
 										}
 									}
 								}
 							}
 							ListView {
-								Layout.fillWidth: true
-								implicitHeight: Math.min(180, Math.max(60, contentHeight))
-								clip: true
-								spacing: 6
+								Layout.fillWidth: true; implicitHeight: Math.min(180, Math.max(60, contentHeight)); clip: true; spacing: 6
 								model: notifServer.trackedNotifications
-								Text {
-									anchors.centerIn: parent
-									visible: notifServer.trackedNotifications.values.length === 0
-									text: "No active notifications"
-									color: root.color8
-									font.family: "JetBrainsMono Nerd Font"
-									font.pixelSize: 12
-								}
+								Text { anchors.centerIn: parent; visible: notifServer.trackedNotifications.values.length === 0; text: "No active notifications"; color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12 }
 								delegate: Rectangle {
 									required property var modelData
-									width: ListView.view.width
-									height: 56
-									radius: 12
-									color: root.color0
+									width: ListView.view.width; height: 56; radius: 12; color: root.color0
 									RowLayout {
-										anchors.fill: parent
-										anchors.margins: 10
+										anchors.fill: parent; anchors.margins: 10
 										ColumnLayout {
-											Layout.fillWidth: true
-											spacing: 2
-											Text {
-												text: modelData.summary || "Notification"
-												color: root.color4
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 12
-												font.bold: true
-												elide: Text.ElideRight
-												Layout.fillWidth: true
-											}
-											Text {
-												text: modelData.body || ""
-												color: root.fg
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 11
-												elide: Text.ElideRight
-												Layout.fillWidth: true
-											}
+											Layout.fillWidth: true; spacing: 2
+											Text { text: modelData.summary || "Notification"; color: root.color4; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12; font.bold: true; elide: Text.ElideRight; Layout.fillWidth: true }
+											Text { text: modelData.body || ""; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; elide: Text.ElideRight; Layout.fillWidth: true }
 										}
 										Rectangle {
-											implicitWidth: 22
-											implicitHeight: 22
-											radius: 11
-											color: Qt.rgba(1, 1, 1, 0.1)
-											Text {
-												anchors.centerIn: parent
-												text: "✕"
-												color: root.fg
-												font.pixelSize: 11
-											}
-											MouseArea {
-												anchors.fill: parent
-												onClicked: modelData.dismiss()
-											}
+											implicitWidth: 22; implicitHeight: 22; radius: 11; color: Qt.rgba(1, 1, 1, 0.1)
+											Text { anchors.centerIn: parent; text: "✕"; color: root.fg; font.pixelSize: 11 }
+											MouseArea { anchors.fill: parent; onClicked: modelData.dismiss() }
 										}
 									}
 								}
@@ -1566,93 +1106,33 @@ ShellRoot {
 
 					// WORKSPACE WINDOWS OVERVIEW
 					ColumnLayout {
-						visible: centerPill.isOverviewOpen
-						anchors.fill: parent
-						anchors.margins: 16
-						spacing: 10
+						visible: centerPill.isOverviewOpen; anchors.fill: parent; anchors.margins: 16; spacing: 10
 						RowLayout {
 							Layout.fillWidth: true
-							Text {
-								text: "󰕰  Workspace Windows Overview"
-								color: root.color4
-								font.family: "JetBrainsMono Nerd Font"
-								font.pixelSize: 14
-								font.bold: true
-								Layout.fillWidth: true
-							}
-							Text {
-								text: root.overviewWindows.length + " open"
-								color: root.color8
-								font.family: "JetBrainsMono Nerd Font"
-								font.pixelSize: 11
-							}
+							Text { text: "󰕰  Workspace Windows Overview"; color: root.color4; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 14; font.bold: true; Layout.fillWidth: true }
+							Text { text: root.overviewWindows.length + " open"; color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11 }
 						}
 						ListView {
-							Layout.fillWidth: true
-							Layout.fillHeight: true
-							clip: true
-							spacing: 6
-							model: root.overviewWindows
-							Text {
-								anchors.centerIn: parent
-								visible: root.overviewWindows.length === 0
-								text: "No open windows in workspaces"
-								color: root.color8
-								font.family: "JetBrainsMono Nerd Font"
-								font.pixelSize: 12
-							}
+							Layout.fillWidth: true; Layout.fillHeight: true; clip: true; spacing: 6; model: root.overviewWindows
+							Text { anchors.centerIn: parent; visible: root.overviewWindows.length === 0; text: "No open windows in workspaces"; color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12 }
 							delegate: Rectangle {
 								required property var modelData
-								width: ListView.view.width
-								height: 46
-								radius: 12
-								color: ovMouse.containsMouse ? root.withAlpha(root.color4, 0.25) : root.color0
-								border.width: ovMouse.containsMouse ? 1 : 0
-								border.color: root.color4
+								width: ListView.view.width; height: 46; radius: 12; color: ovMouse.containsMouse ? root.withAlpha(root.color4, 0.25) : root.color0
+								border.width: ovMouse.containsMouse ? 1 : 0; border.color: root.color4
 								RowLayout {
-									anchors.fill: parent
-									anchors.margins: 10
-									spacing: 10
+									anchors.fill: parent; anchors.margins: 10; spacing: 10
 									Rectangle {
-										implicitWidth: 26
-										implicitHeight: 26
-										radius: 13
-										color: root.color4
-										Text {
-											anchors.centerIn: parent
-											text: modelData.ws
-											color: root.bg
-											font.family: "JetBrainsMono Nerd Font"
-											font.pixelSize: 12
-											font.bold: true
-										}
+										implicitWidth: 26; implicitHeight: 26; radius: 13; color: root.color4
+										Text { anchors.centerIn: parent; text: modelData.ws; color: root.bg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12; font.bold: true }
 									}
 									ColumnLayout {
-										Layout.fillWidth: true
-										spacing: 1
-										Text {
-											text: modelData.title || modelData.app
-											color: root.fg
-											font.family: "JetBrainsMono Nerd Font"
-											font.pixelSize: 12
-											font.bold: true
-											elide: Text.ElideRight
-											Layout.fillWidth: true
-										}
-										Text {
-											text: modelData.app
-											color: root.color8
-											font.family: "JetBrainsMono Nerd Font"
-											font.pixelSize: 10
-											elide: Text.ElideRight
-											Layout.fillWidth: true
-										}
+										Layout.fillWidth: true; spacing: 1
+										Text { text: modelData.title || modelData.app; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12; font.bold: true; elide: Text.ElideRight; Layout.fillWidth: true }
+										Text { text: modelData.app; color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 10; elide: Text.ElideRight; Layout.fillWidth: true }
 									}
 								}
 								MouseArea {
-									id: ovMouse
-									anchors.fill: parent
-									hoverEnabled: true
+									id: ovMouse; anchors.fill: parent; hoverEnabled: true
 									onClicked: {
 										root.closeCenterPill()
 										if (root.isHyprland) root.runCmd("hyprctl dispatch focuswindow address:" + modelData.id)
@@ -1665,102 +1145,36 @@ ShellRoot {
 
 					// INTEGRATED APPLICATION LAUNCHER
 					ColumnLayout {
-						visible: centerPill.isLauncherOpen
-						anchors.fill: parent
-						anchors.margins: 16
-						spacing: 10
+						visible: centerPill.isLauncherOpen; anchors.fill: parent; anchors.margins: 16; spacing: 10
 						Rectangle {
-							Layout.fillWidth: true
-							implicitHeight: 40
-							radius: 12
-							color: root.color0
-							border.width: 1
-							border.color: root.color4
+							Layout.fillWidth: true; implicitHeight: 40; radius: 12; color: root.color0; border.width: 1; border.color: root.color4
 							RowLayout {
-								anchors.fill: parent
-								anchors.leftMargin: 12
-								anchors.rightMargin: 12
-								spacing: 6
-								Text {
-									text: "󰍉 "
-									color: root.color4
-									font.family: "JetBrainsMono Nerd Font"
-									font.pixelSize: 15
-								}
+								anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12; spacing: 6
+								Text { text: "󰍉 "; color: root.color4; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 15 }
 								TextInput {
-									id: launcherSearchInput
-									Layout.fillWidth: true
-									color: root.fg
-									font.family: "JetBrainsMono Nerd Font"
-									font.pixelSize: 14
-									font.bold: true
-									clip: true
-									onTextChanged: {
-										root.searchQuery = text
-										root.selectedAppIndex = 0
-									}
-									Keys.onDownPressed: {
-										if (root.selectedAppIndex < root.filteredApps.length - 1) root.selectedAppIndex++
-									}
-									Keys.onUpPressed: {
-										if (root.selectedAppIndex > 0) root.selectedAppIndex--
-									}
+									id: launcherSearchInput; Layout.fillWidth: true; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 14; font.bold: true; clip: true
+									onTextChanged: { root.searchQuery = text; root.selectedAppIndex = 0 }
+									Keys.onDownPressed: { if (root.selectedAppIndex < root.filteredApps.length - 1) root.selectedAppIndex++ }
+									Keys.onUpPressed: { if (root.selectedAppIndex > 0) root.selectedAppIndex-- }
 									Keys.onEscapePressed: root.closeCenterPill()
-									Keys.onReturnPressed: {
-										if (root.filteredApps.length > 0) {
-											let a = root.filteredApps[root.selectedAppIndex]
-											root.closeCenterPill()
-											a.execute()
-										}
-									}
+									Keys.onReturnPressed: { if (root.filteredApps.length > 0) { let a = root.filteredApps[root.selectedAppIndex]; root.closeCenterPill(); a.execute() } }
 								}
 							}
 						}
 						ListView {
-							Layout.fillWidth: true
-							Layout.fillHeight: true
-							clip: true
-							spacing: 4
-							model: root.filteredApps
-							currentIndex: root.selectedAppIndex
+							Layout.fillWidth: true; Layout.fillHeight: true; clip: true; spacing: 4; model: root.filteredApps; currentIndex: root.selectedAppIndex
 							delegate: Rectangle {
-								required property var modelData
-								required property int index
-								width: ListView.view.width
-								height: 38
-								radius: 10
+								required property var modelData; required property int index
+								width: ListView.view.width; height: 38; radius: 10
 								property bool isSel: index === root.selectedAppIndex
 								color: isSel ? root.withAlpha(root.color4, 0.25) : (appMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.05) : "transparent")
-								border.width: isSel ? 1 : 0
-								border.color: root.color4
+								border.width: isSel ? 1 : 0; border.color: root.color4
 								RowLayout {
-									anchors.fill: parent
-									anchors.leftMargin: 10
-									anchors.rightMargin: 10
-									spacing: 10
-									IconImage {
-										implicitSize: 22
-										source: Quickshell.iconPath(modelData.icon, true)
-									}
-									Text {
-										text: modelData.name
-										color: parent.parent.isSel ? root.color4 : root.fg
-										font.family: "JetBrainsMono Nerd Font"
-										font.pixelSize: 13
-										font.bold: true
-										elide: Text.ElideRight
-										Layout.fillWidth: true
-									}
+									anchors.fill: parent; anchors.leftMargin: 10; anchors.rightMargin: 10; spacing: 10
+									IconImage { implicitSize: 22; source: Quickshell.iconPath(modelData.icon, true) }
+									Text { text: modelData.name; color: parent.parent.isSel ? root.color4 : root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 13; font.bold: true; elide: Text.ElideRight; Layout.fillWidth: true }
 								}
-								MouseArea {
-									id: appMouse
-									anchors.fill: parent
-									hoverEnabled: true
-									onClicked: {
-										root.closeCenterPill()
-										modelData.execute()
-									}
-								}
+								MouseArea { id: appMouse; anchors.fill: parent; hoverEnabled: true; onClicked: { root.closeCenterPill(); modelData.execute() } }
 							}
 						}
 					}
@@ -1769,43 +1183,25 @@ ShellRoot {
 					Item {
 						id: sysContainer
 						visible: centerPill.isSysOpen
-						anchors {
-							top: parent.top
-							left: parent.left
-							right: parent.right
-							margins: 14
-						}
+						anchors { top: parent.top; left: parent.left; right: parent.right; margins: 14 }
 						implicitHeight: root.sysSubmenu === "" ? sysMainCol.implicitHeight : sysSubCol.implicitHeight
 
 						property real viewOffset: 0
 						property real viewOpacity: 1.0
 
 						NumberAnimation {
-							id: subSlideAnim
-							target: sysContainer
-							property: "viewOffset"
-							to: 0
-							duration: root.fxActive && root.cfgSubmenuAnimStyle === "slide" ? root.cfgSubmenuAnimMs : 0
-							easing.type: Easing.OutCubic
+							id: subSlideAnim; target: sysContainer; property: "viewOffset"; to: 0
+							duration: root.fxActive && root.cfgSubmenuAnimStyle === "slide" ? root.cfgSubmenuAnimMs : 0; easing.type: Easing.OutCubic
 						}
 						NumberAnimation {
-							id: subFadeAnim
-							target: sysContainer
-							property: "viewOpacity"
-							from: 0.15
-							to: 1.0
-							duration: root.fxActive && root.cfgSubmenuAnimStyle !== "none" ? root.cfgSubmenuAnimMs : 0
-							easing.type: Easing.OutCubic
+							id: subFadeAnim; target: sysContainer; property: "viewOpacity"; from: 0.15; to: 1.0
+							duration: root.fxActive && root.cfgSubmenuAnimStyle !== "none" ? root.cfgSubmenuAnimMs : 0; easing.type: Easing.OutCubic
 						}
 
 						Connections {
 							target: root
 							function onSysSubmenuChanged() {
-								if (!root.fxActive || root.cfgSubmenuAnimStyle === "none") {
-									sysContainer.viewOffset = 0
-									sysContainer.viewOpacity = 1.0
-									return
-								}
+								if (!root.fxActive || root.cfgSubmenuAnimStyle === "none") { sysContainer.viewOffset = 0; sysContainer.viewOpacity = 1.0; return }
 								subFadeAnim.restart()
 								if (root.cfgSubmenuAnimStyle === "slide") {
 									subSlideAnim.from = root.sysSubmenu !== "" ? root.cfgSubmenuSlidePx : -root.cfgSubmenuSlidePx
@@ -1818,488 +1214,130 @@ ShellRoot {
 							id: sysMainCol
 							visible: root.sysSubmenu === ""
 							opacity: sysContainer.viewOpacity
-							transform: Translate {
-								x: sysContainer.viewOffset
-							}
-							anchors {
-								left: parent.left
-								right: parent.right
-							}
+							transform: Translate { x: sysContainer.viewOffset }
+							anchors { left: parent.left; right: parent.right }
 							spacing: 10
 
 							RowLayout {
-								Layout.fillWidth: true
-								spacing: 8
+								Layout.fillWidth: true; spacing: 8
 								Item {
-									implicitWidth: topSysClockRow.implicitWidth
-									implicitHeight: 32
+									implicitWidth: topSysClockRow.implicitWidth; implicitHeight: 32
 									RowLayout {
-										id: topSysClockRow
-										anchors.verticalCenter: parent.verticalCenter
-										spacing: 8
-										Text {
-											text: root.timeStr
-											color: root.fg
-											font.family: "JetBrainsMono Nerd Font"
-											font.pixelSize: 16
-											font.bold: true
-										}
-										Text {
-											text: root.fullDateStr
-											color: root.withAlpha(root.fg, 0.8)
-											font.family: "JetBrainsMono Nerd Font"
-											font.pixelSize: 12
-										}
+										id: topSysClockRow; anchors.verticalCenter: parent.verticalCenter; spacing: 8
+										Text { text: root.timeStr; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 16; font.bold: true }
+										Text { text: root.fullDateStr; color: root.withAlpha(root.fg, 0.8); font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12 }
 										Rectangle {
-											implicitHeight: 24
-											implicitWidth: wTopTxt.implicitWidth + 14
-											radius: 12
-											color: root.color0
-											Text {
-												id: wTopTxt
-												anchors.centerIn: parent
-												text: root.weatherShort
-												color: root.fg
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 11
-												font.bold: true
-											}
+											implicitHeight: 24; implicitWidth: wTopTxt.implicitWidth + 14; radius: 12; color: root.color0
+											Text { id: wTopTxt; anchors.centerIn: parent; text: root.weatherShort; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; font.bold: true }
 										}
 									}
-									MouseArea {
-										anchors.fill: parent
-										onClicked: root.openCalendar()
-									}
+									MouseArea { anchors.fill: parent; onClicked: root.openCalendar() }
 								}
-								Item {
-									Layout.fillWidth: true
+								Item { Layout.fillWidth: true }
+								Rectangle {
+									implicitWidth: 34; implicitHeight: 34; radius: 17; color: cpuBtnMouse.containsMouse ? root.color4 : root.color0
+									Text { anchors.centerIn: parent; text: "󰻠"; color: cpuBtnMouse.containsMouse ? root.bg : root.color4; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 17 }
+									MouseArea { id: cpuBtnMouse; anchors.fill: parent; hoverEnabled: true; onClicked: root.openSubmenu("cpu") }
 								}
 								Rectangle {
-									implicitWidth: 34
-									implicitHeight: 34
-									radius: 17
-									color: cpuBtnMouse.containsMouse ? root.color4 : root.color0
-									Text {
-										anchors.centerIn: parent
-										text: "󰻠"
-										color: cpuBtnMouse.containsMouse ? root.bg : root.color4
-										font.family: "JetBrainsMono Nerd Font"
-										font.pixelSize: 17
-									}
-									MouseArea {
-										id: cpuBtnMouse
-										anchors.fill: parent
-										hoverEnabled: true
-										onClicked: {
-											sysPoll.running = true
-											root.sysSubmenu = "cpu"
-										}
-									}
-								}
-								Rectangle {
-									implicitWidth: 34
-									implicitHeight: 34
-									radius: 17
-									color: pwrBtnMouse.containsMouse ? root.color1 : root.color0
-									Text {
-										anchors.centerIn: parent
-										text: "󰐥"
-										color: pwrBtnMouse.containsMouse ? root.bg : root.color1
-										font.family: "JetBrainsMono Nerd Font"
-										font.pixelSize: 16
-									}
-									MouseArea {
-										id: pwrBtnMouse
-										anchors.fill: parent
-										hoverEnabled: true
-										onClicked: root.sysSubmenu = "power"
-									}
+									implicitWidth: 34; implicitHeight: 34; radius: 17; color: pwrBtnMouse.containsMouse ? root.color1 : root.color0
+									Text { anchors.centerIn: parent; text: "󰐥"; color: pwrBtnMouse.containsMouse ? root.bg : root.color1; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 16 }
+									MouseArea { id: pwrBtnMouse; anchors.fill: parent; hoverEnabled: true; onClicked: root.openSubmenu("power") }
 								}
 							}
 
+							// 2x2 QuickTiles without right-hand arrows
 							GridLayout {
-								Layout.fillWidth: true
-								columns: 2
-								uniformCellWidths: true
-								rowSpacing: 10
-								columnSpacing: 10
+								Layout.fillWidth: true; columns: 2; uniformCellWidths: true; rowSpacing: 10; columnSpacing: 10
 
-								Rectangle {
-									Layout.fillWidth: true
-									Layout.preferredWidth: 1
-									implicitHeight: 58
-									radius: 16
-									color: root.color0
-									property bool netActive: root.ethConnected || (root.wifiEnabled && root.netName !== "Offline")
-									RowLayout {
-										anchors.fill: parent
-										anchors.margins: 10
-										spacing: 8
-										Rectangle {
-											implicitWidth: 36
-											implicitHeight: 36
-											radius: 18
-											color: parent.parent.netActive ? root.color4 : Qt.rgba(1, 1, 1, 0.08)
-											Text {
-												anchors.centerIn: parent
-												text: root.ethConnected ? "󰈀" : (root.wifiEnabled ? "󰤨" : "󰤭")
-												color: parent.parent.parent.netActive ? root.bg : root.fg
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 17
-											}
-											MouseArea {
-												anchors.fill: parent
-												onClicked: root.togglePrimaryNetwork()
-											}
-										}
-										ColumnLayout {
-											Layout.fillWidth: true
-											spacing: 1
-											Text {
-												text: "Network"
-												color: root.fg
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 13
-												font.bold: true
-											}
-											Text {
-												text: root.netName
-												color: root.color8
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 11
-												elide: Text.ElideRight
-												Layout.fillWidth: true
-											}
-										}
-										Rectangle {
-											implicitWidth: 26
-											implicitHeight: 36
-											radius: 8
-											color: Qt.rgba(1, 1, 1, 0.05)
-											Text {
-												anchors.centerIn: parent
-												text: "󰅀"
-												color: root.fg
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 15
-											}
-											MouseArea {
-												anchors.fill: parent
-												onClicked: {
-													root.runCmd("nmcli dev wifi rescan 2>/dev/null || true")
-													subPoll.running = true
-													root.sysSubmenu = "net"
-												}
-											}
+								QuickTile {
+									iconTxt: root.ethConnected ? "󰈀" : (root.wifiEnabled ? "󰤨" : "󰤭")
+									titleTxt: "Network"; subTxt: root.netName
+									activeState: root.ethConnected || (root.wifiEnabled && root.netName !== "Offline")
+									onIconClicked: root.togglePrimaryNetwork()
+									onCardClicked: { root.runCmd("nmcli dev wifi rescan 2>/dev/null || true"); root.openSubmenu("net") }
+								}
+
+								QuickTile {
+									iconTxt: ""; titleTxt: "Bluetooth"; subTxt: root.btName
+									activeState: root.btEnabled
+									onIconClicked: {
+										if (root.hasBtAdapter) {
+											root.runCmd(root.btEnabled ? "bluetoothctl power off; rfkill block bluetooth" : "rfkill unblock bluetooth; bluetoothctl power on")
+											sysPoll.running = true
 										}
 									}
+									onCardClicked: root.openSubmenu("bt")
 								}
 
 								Rectangle {
-									Layout.fillWidth: true
-									Layout.preferredWidth: 1
-									implicitHeight: 58
-									radius: 16
-									color: root.color0
-									RowLayout {
-										anchors.fill: parent
-										anchors.margins: 10
-										spacing: 8
-										Rectangle {
-											implicitWidth: 36
-											implicitHeight: 36
-											radius: 18
-											color: root.btEnabled ? root.color4 : Qt.rgba(1, 1, 1, 0.08)
-											Text {
-												anchors.centerIn: parent
-												text: ""
-												color: root.btEnabled ? root.bg : root.fg
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 17
-											}
-											MouseArea {
-												anchors.fill: parent
-												onClicked: {
-													if (root.hasBtAdapter) {
-														root.runCmd(root.btEnabled ? "bluetoothctl power off; rfkill block bluetooth" : "rfkill unblock bluetooth; bluetoothctl power on")
-														sysPoll.running = true
-													}
-												}
-											}
-										}
-										ColumnLayout {
-											Layout.fillWidth: true
-											spacing: 1
-											Text {
-												text: "Bluetooth"
-												color: root.fg
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 13
-												font.bold: true
-											}
-											Text {
-												text: root.btName
-												color: root.color8
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 11
-												elide: Text.ElideRight
-												Layout.fillWidth: true
-											}
-										}
-										Rectangle {
-											implicitWidth: 26
-											implicitHeight: 36
-											radius: 8
-											color: Qt.rgba(1, 1, 1, 0.05)
-											Text {
-												anchors.centerIn: parent
-												text: "󰅀"
-												color: root.fg
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 15
-											}
-											MouseArea {
-												anchors.fill: parent
-												onClicked: {
-													subPoll.running = true
-													root.sysSubmenu = "bt"
-												}
-											}
-										}
-									}
-								}
-
-								Rectangle {
-									Layout.fillWidth: true
-									Layout.preferredWidth: 1
-									implicitHeight: 58
-									radius: 16
-									color: root.color0
+									id: trayTile
+									Layout.fillWidth: true; Layout.preferredWidth: 1; implicitHeight: 58; radius: 16
 									property int trayCount: SystemTray.items.values.length
-									RowLayout {
-										anchors.fill: parent
-										anchors.margins: 10
-										spacing: 8
-										Rectangle {
-											implicitWidth: 36
-											implicitHeight: 36
-											radius: 18
-											color: parent.parent.trayCount > 0 ? root.color4 : Qt.rgba(1, 1, 1, 0.08)
-											Text {
-												anchors.centerIn: parent
-												text: parent.parent.parent.trayCount.toString()
-												color: parent.parent.parent.trayCount > 0 ? root.bg : root.fg
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 14
-												font.bold: true
-											}
-											MouseArea {
-												anchors.fill: parent
-												onClicked: root.sysSubmenu = "tray"
-											}
-										}
-										ColumnLayout {
-											Layout.fillWidth: true
-											spacing: 2
-											Text {
-												text: "App Tray"
-												color: root.fg
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 13
-												font.bold: true
-											}
-											RowLayout {
-												spacing: 4
-												Repeater {
-													model: SystemTray.items.values.slice(0, 3)
-													Rectangle {
-														required property var modelData
-														implicitWidth: 18
-														implicitHeight: 18
-														radius: 4
-														color: Qt.rgba(1, 1, 1, 0.08)
-														IconImage {
-															anchors.centerIn: parent
-															implicitSize: 13
-															source: modelData.icon
-														}
-														MouseArea {
-															anchors.fill: parent
-															acceptedButtons: Qt.LeftButton | Qt.RightButton
-															onClicked: mouse => {
-																if (mouse.button === Qt.RightButton) modelData.secondaryActivate()
-																else modelData.activate()
-															}
-														}
+									color: trayTileMouse.containsMouse ? Qt.lighter(root.color0, 1.12) : root.color0
+									MouseArea { id: trayTileMouse; anchors.fill: parent; hoverEnabled: true; onClicked: root.openSubmenu("tray") }
+									Rectangle {
+										id: trayBadge
+										width: 36; height: 36; radius: 18
+										anchors.left: parent.left; anchors.leftMargin: 10; anchors.verticalCenter: parent.verticalCenter
+										color: trayTile.trayCount > 0 ? root.color4 : Qt.rgba(1, 1, 1, 0.08)
+										Text { anchors.centerIn: parent; text: trayTile.trayCount.toString(); color: trayTile.trayCount > 0 ? root.bg : root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 14; font.bold: true }
+									}
+									ColumnLayout {
+										anchors.left: trayBadge.right; anchors.leftMargin: 10
+										anchors.right: parent.right; anchors.rightMargin: 10
+										anchors.verticalCenter: parent.verticalCenter; spacing: 2
+										Text { text: "App Tray"; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 13; font.bold: true }
+										RowLayout {
+											spacing: 5
+											Repeater {
+												model: SystemTray.items.values.slice(0, 4)
+												Rectangle {
+													required property var modelData
+													implicitWidth: 20; implicitHeight: 20; radius: 5; color: Qt.rgba(1, 1, 1, 0.08)
+													IconImage { anchors.centerIn: parent; implicitSize: 14; source: modelData.icon }
+													MouseArea {
+														anchors.fill: parent; acceptedButtons: Qt.LeftButton | Qt.RightButton
+														onClicked: mouse => { if (mouse.button === Qt.RightButton) modelData.secondaryActivate(); else modelData.activate() }
 													}
 												}
-												Text {
-													visible: SystemTray.items.values.length === 0
-													text: "Empty"
-													color: root.color8
-													font.family: "JetBrainsMono Nerd Font"
-													font.pixelSize: 11
-												}
 											}
-										}
-										Rectangle {
-											implicitWidth: 26
-											implicitHeight: 36
-											radius: 8
-											color: Qt.rgba(1, 1, 1, 0.05)
-											Text {
-												anchors.centerIn: parent
-												text: "󰅀"
-												color: root.fg
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 15
-											}
-											MouseArea {
-												anchors.fill: parent
-												onClicked: root.sysSubmenu = "tray"
-											}
+											Text { visible: trayTile.trayCount === 0; text: "Empty"; color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11 }
 										}
 									}
 								}
 
-								Rectangle {
-									Layout.fillWidth: true
-									Layout.preferredWidth: 1
-									implicitHeight: 58
-									radius: 16
-									color: root.color0
-									RowLayout {
-										anchors.fill: parent
-										anchors.margins: 10
-										spacing: 8
-										Rectangle {
-											implicitWidth: 36
-											implicitHeight: 36
-											radius: 18
-											color: root.withAlpha(root.color2, 0.2)
-											Text {
-												anchors.centerIn: parent
-												text: root.batCharging ? "󰂄" : "󰁹"
-												color: root.color2
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 17
-											}
-										}
-										ColumnLayout {
-											Layout.fillWidth: true
-											spacing: 1
-											Text {
-												text: "Battery"
-												color: root.fg
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 13
-												font.bold: true
-											}
-											Text {
-												text: root.batPct + "% • " + (root.batCharging ? "Charging" : "Ready")
-												color: root.color2
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 11
-												elide: Text.ElideRight
-												Layout.fillWidth: true
-											}
-										}
-										Rectangle {
-											implicitWidth: 26
-											implicitHeight: 36
-											radius: 8
-											color: Qt.rgba(1, 1, 1, 0.05)
-											Text {
-												anchors.centerIn: parent
-												text: "󰅀"
-												color: root.fg
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 15
-											}
-											MouseArea {
-												anchors.fill: parent
-												onClicked: {
-													sysPoll.running = true
-													root.sysSubmenu = "battery"
-												}
-											}
-										}
-									}
+								QuickTile {
+									iconTxt: root.batCharging ? "󰂄" : "󰁹"
+									titleTxt: "Battery"; subTxt: root.batPct + "% • " + (root.batCharging ? "Charging" : "Ready")
+									activeState: true; activeCol: root.withAlpha(root.color2, 0.25); subCol: root.color2
+									onIconClicked: root.openSubmenu("battery")
+									onCardClicked: root.openSubmenu("battery")
 								}
 							}
 
 							Rectangle {
-								Layout.fillWidth: true
-								implicitHeight: 54
-								radius: 16
-								color: root.color0
+								Layout.fillWidth: true; implicitHeight: 54; radius: 16; color: root.color0
 								RowLayout {
-									anchors.fill: parent
-									anchors.margins: 9
-									spacing: 10
+									anchors.fill: parent; anchors.margins: 9; spacing: 10
 									Rectangle {
-										Layout.fillWidth: true
-										implicitHeight: 36
-										radius: 12
-										color: root.isRecording ? root.color1 : Qt.rgba(1, 1, 1, 0.08)
+										Layout.fillWidth: true; implicitHeight: 36; radius: 12; color: root.isRecording ? root.color1 : Qt.rgba(1, 1, 1, 0.08)
 										RowLayout {
-											anchors.centerIn: parent
-											spacing: 8
-											Text {
-												text: root.isRecording ? "󰓛" : "󰻂"
-												color: root.isRecording ? root.bg : root.color1
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 16
-											}
-											Text {
-												text: root.isRecording ? ("Stop • " + root.formatSec(root.recSeconds)) : "Record Screen"
-												color: root.isRecording ? root.bg : root.fg
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 12
-												font.bold: true
-											}
+											anchors.centerIn: parent; spacing: 8
+											Text { text: root.isRecording ? "󰓛" : "󰻂"; color: root.isRecording ? root.bg : root.color1; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 16 }
+											Text { text: root.isRecording ? ("Stop • " + root.formatSec(root.recSeconds)) : "Record Screen"; color: root.isRecording ? root.bg : root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12; font.bold: true }
 										}
-										MouseArea {
-											anchors.fill: parent
-											onClicked: root.toggleRecording()
-										}
+										MouseArea { anchors.fill: parent; onClicked: root.toggleRecording() }
 									}
 									Rectangle {
-										implicitWidth: 42
-										implicitHeight: 36
-										radius: 12
-										color: Qt.rgba(1, 1, 1, 0.08)
-										Text {
-											anchors.centerIn: parent
-											text: "󰄄"
-											color: root.fg
-											font.family: "JetBrainsMono Nerd Font"
-											font.pixelSize: 16
-										}
-										MouseArea {
-											anchors.fill: parent
-											onClicked: {
-												root.closeCenterPill()
-												root.runCmd("sleep 0.2; grim -g \"$(slurp)\" - | swappy -f -")
-											}
-										}
+										implicitWidth: 42; implicitHeight: 36; radius: 12; color: Qt.rgba(1, 1, 1, 0.08)
+										Text { anchors.centerIn: parent; text: "󰄄"; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 16 }
+										MouseArea { anchors.fill: parent; onClicked: { root.closeCenterPill(); root.runCmd("sleep 0.2; grim -g \"$(slurp)\" - | swappy -f -") } }
 									}
 									Rectangle {
-										implicitWidth: 28
-										implicitHeight: 36
-										radius: 10
-										color: Qt.rgba(1, 1, 1, 0.05)
-										Text {
-											anchors.centerIn: parent
-											text: "󰅀"
-											color: root.fg
-											font.family: "JetBrainsMono Nerd Font"
-											font.pixelSize: 15
-										}
-										MouseArea {
-											anchors.fill: parent
-											onClicked: root.sysSubmenu = "rec"
-										}
+										implicitWidth: 28; implicitHeight: 36; radius: 10; color: Qt.rgba(1, 1, 1, 0.05)
+										Text { anchors.centerIn: parent; text: "󰅀"; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 15 }
+										MouseArea { anchors.fill: parent; onClicked: root.openSubmenu("rec") }
 									}
 								}
 							}
@@ -2309,461 +1347,186 @@ ShellRoot {
 								Rectangle {
 									id: mainSliderCard
 									required property string modelData
-									Layout.fillWidth: true
-									implicitHeight: 46
-									radius: 14
-									color: root.color0
+									Layout.fillWidth: true; implicitHeight: 46; radius: 14; color: root.color0
 									property int valPct: modelData === "display" ? root.brightnessPct : (modelData === "sound" ? root.outVolPct : root.micVolPct)
 									property bool isMuted: modelData === "sound" ? root.outMuted : (modelData === "mic" ? root.micMuted : false)
 									property string iconTxt: modelData === "display" ? "󰃠" : (modelData === "sound" ? (isMuted ? "󰖁" : (root.isHeadphones ? "󰋋" : "󰕾")) : (isMuted ? "󰍭" : (root.isHeadsetMic ? "󰋎" : "󰍬")))
 
-									function setLevelFromRatio(r) {
-										let cl = Math.max(0, Math.min(1, r))
-										if (modelData === "display") {
-											let p = Math.max(5, Math.round(cl * 100))
-											root.brightnessPct = p
-											root.runCmd("brightnessctl s " + p + "%")
-										} else if (modelData === "sound") {
-											root.setSinkVolume(cl * 100)
-										} else if (modelData === "mic") {
-											root.setSourceVolume(cl * 100)
-										}
-									}
-
 									RowLayout {
-										anchors.fill: parent
-										anchors.leftMargin: 12
-										anchors.rightMargin: 10
-										spacing: 8
+										anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 10; spacing: 8
 										RowLayout {
-											Layout.preferredWidth: 124
-											Layout.fillWidth: false
-											spacing: 4
-											Text {
-												text: mainSliderCard.modelData === "display" ? "Display" : (mainSliderCard.modelData === "sound" ? "Sound" : "Mic")
-												color: root.fg
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 12
-												font.bold: true
-											}
-											Item {
-												Layout.fillWidth: true
-											}
-											Text {
-												text: mainSliderCard.isMuted ? "Mute" : (mainSliderCard.valPct + "%")
-												color: root.color8
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 11
-											}
+											Layout.preferredWidth: 124; Layout.fillWidth: false; spacing: 4
+											Text { text: mainSliderCard.modelData === "display" ? "Display" : (mainSliderCard.modelData === "sound" ? "Sound" : "Mic"); color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12; font.bold: true }
+											Item { Layout.fillWidth: true }
+											Text { text: mainSliderCard.isMuted ? "Mute" : (mainSliderCard.valPct + "%"); color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11 }
 										}
-										Text {
-											text: mainSliderCard.iconTxt
-											color: mainSliderCard.isMuted ? root.color1 : root.color4
-											font.family: "JetBrainsMono Nerd Font"
-											font.pixelSize: 16
+										Item {
+											implicitWidth: 20; implicitHeight: 20
+											Text { anchors.centerIn: parent; text: mainSliderCard.iconTxt; color: mainSliderCard.isMuted ? root.color1 : root.color4; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 16 }
 											MouseArea {
 												anchors.fill: parent
 												onClicked: {
-													if (mainSliderCard.modelData === "sound") {
-														root.outMuted = !root.outMuted
-														root.runCmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle")
-													} else if (mainSliderCard.modelData === "mic") {
-														root.micMuted = !root.micMuted
-														root.runCmd("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle")
-													}
+													if (mainSliderCard.modelData === "sound") { root.outMuted = !root.outMuted; root.runCmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle") }
+													else if (mainSliderCard.modelData === "mic") { root.micMuted = !root.micMuted; root.runCmd("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle") }
 												}
 											}
 										}
-										Rectangle {
-											Layout.fillWidth: true
-											implicitHeight: 14
-											radius: 7
-											color: Qt.rgba(1, 1, 1, 0.1)
-											Rectangle {
-												width: parent.width * Math.min(1, mainSliderCard.valPct / 100.0)
-												height: parent.height
-												radius: 7
-												color: mainSliderCard.isMuted ? root.color8 : root.color4
-											}
-											MouseArea {
-												anchors.fill: parent
-												onPressed: mouse => mainSliderCard.setLevelFromRatio(mouse.x / width)
-												onPositionChanged: mouse => {
-													if (pressed) mainSliderCard.setLevelFromRatio(mouse.x / width)
-												}
+										QsSlider {
+											ratio: mainSliderCard.valPct / 100.0
+											fillColor: mainSliderCard.isMuted ? root.color8 : root.color4
+											onMoved: newRatio => {
+												if (mainSliderCard.modelData === "display") {
+													let p = Math.max(5, Math.round(newRatio * 100))
+													root.brightnessPct = p; root.runCmd("brightnessctl s " + p + "%")
+												} else if (mainSliderCard.modelData === "sound") root.setSinkVolume(newRatio * 100)
+												else root.setSourceVolume(newRatio * 100)
 											}
 										}
 										Rectangle {
-											implicitWidth: 26
-											implicitHeight: 28
-											radius: 8
-											color: Qt.rgba(1, 1, 1, 0.05)
-											Text {
-												anchors.centerIn: parent
-												text: "󰅀"
-												color: root.fg
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 14
-											}
-											MouseArea {
-												anchors.fill: parent
-												onClicked: {
-													subPoll.running = true
-													root.sysSubmenu = mainSliderCard.modelData
-												}
-											}
+											implicitWidth: 26; implicitHeight: 28; radius: 8; color: Qt.rgba(1, 1, 1, 0.05)
+											Text { anchors.centerIn: parent; text: "󰅀"; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 14 }
+											MouseArea { anchors.fill: parent; onClicked: root.openSubmenu(mainSliderCard.modelData) }
 										}
 									}
 								}
 							}
 						}
 
+						// SUBMENUS VIEW
 						ColumnLayout {
 							id: sysSubCol
 							visible: root.sysSubmenu !== ""
 							opacity: sysContainer.viewOpacity
-							transform: Translate {
-								x: sysContainer.viewOffset
-							}
-							anchors {
-								left: parent.left
-								right: parent.right
-							}
+							transform: Translate { x: sysContainer.viewOffset }
+							anchors { left: parent.left; right: parent.right }
 							spacing: 12
 
 							RowLayout {
-								Layout.fillWidth: true
-								implicitHeight: 34
-								spacing: 10
+								Layout.fillWidth: true; implicitHeight: 34; spacing: 10
 								Rectangle {
-									implicitWidth: 32
-									implicitHeight: 32
-									radius: 16
-									color: Qt.rgba(1, 1, 1, 0.08)
-									Text {
-										anchors.centerIn: parent
-										text: "‹"
-										color: root.fg
-										font.family: "JetBrainsMono Nerd Font"
-										font.pixelSize: 18
-										font.bold: true
-									}
-									MouseArea {
-										anchors.fill: parent
-										onClicked: {
-											root.wifiPromptSsid = ""
-											root.expandedResMon = ""
-											root.sysSubmenu = ""
-										}
-									}
+									implicitWidth: 32; implicitHeight: 32; radius: 16; color: Qt.rgba(1, 1, 1, 0.08)
+									Text { anchors.centerIn: parent; text: "‹"; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 18; font.bold: true }
+									MouseArea { anchors.fill: parent; onClicked: { root.wifiPromptSsid = ""; root.expandedResMon = ""; root.sysSubmenu = "" } }
 								}
 								Text {
 									Layout.fillWidth: true
 									text: ({ "net": "Network", "bt": "Bluetooth", "tray": "System Tray Apps", "battery": "Battery Details", "sound": "Audio Output", "mic": "Audio Input", "display": "Display", "rec": "Screen Recorder", "cpu": "System Info", "power": "Power Menu" })[root.sysSubmenu] || ""
-									color: root.fg
-									font.family: "JetBrainsMono Nerd Font"
-									font.pixelSize: 16
-									font.bold: true
+									color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 16; font.bold: true
 								}
-
-								Rectangle {
+								QsSwitch {
 									visible: (root.sysSubmenu === "net" && root.ethIface !== "") || root.sysSubmenu === "bt" || root.sysSubmenu === "sound" || root.sysSubmenu === "mic"
-									implicitWidth: 46
-									implicitHeight: 24
-									radius: 12
-									property bool isOn: root.sysSubmenu === "net" ? root.ethConnected : (root.sysSubmenu === "bt" ? root.btEnabled : (root.sysSubmenu === "sound" ? !root.outMuted : !root.micMuted))
-									color: isOn ? root.color4 : Qt.rgba(1, 1, 1, 0.15)
-									Rectangle {
-										width: 18
-										height: 18
-										radius: 9
-										anchors.verticalCenter: parent.verticalCenter
-										x: parent.isOn ? 24 : 4
-										color: parent.isOn ? root.bg : root.fg
-										Behavior on x {
-											NumberAnimation {
-												duration: 120
-											}
-										}
-									}
-									MouseArea {
-										anchors.fill: parent
-										onClicked: {
-											if (root.sysSubmenu === "net" && root.ethIface !== "") {
-												root.runCmd("nmcli dev " + (root.ethConnected ? "disconnect " : "connect ") + root.ethIface)
-											} else if (root.sysSubmenu === "bt" && root.hasBtAdapter) {
-												root.runCmd(root.btEnabled ? "bluetoothctl power off; rfkill block bluetooth" : "rfkill unblock bluetooth; bluetoothctl power on")
-											} else if (root.sysSubmenu === "sound") {
-												root.outMuted = !root.outMuted
-												root.runCmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle")
-											} else if (root.sysSubmenu === "mic") {
-												root.micMuted = !root.micMuted
-												root.runCmd("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle")
-											}
-											sysPoll.running = true
-										}
+									checked: root.sysSubmenu === "net" ? root.ethConnected : (root.sysSubmenu === "bt" ? root.btEnabled : (root.sysSubmenu === "sound" ? !root.outMuted : !root.micMuted))
+									onToggled: {
+										if (root.sysSubmenu === "net" && root.ethIface !== "") root.runCmd("nmcli dev " + (root.ethConnected ? "disconnect " : "connect ") + root.ethIface)
+										else if (root.sysSubmenu === "bt" && root.hasBtAdapter) root.runCmd(root.btEnabled ? "bluetoothctl power off; rfkill block bluetooth" : "rfkill unblock bluetooth; bluetoothctl power on")
+										else if (root.sysSubmenu === "sound") { root.outMuted = !root.outMuted; root.runCmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle") }
+										else if (root.sysSubmenu === "mic") { root.micMuted = !root.micMuted; root.runCmd("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle") }
+										sysPoll.running = true
 									}
 								}
 								Rectangle {
-									visible: root.sysSubmenu === "rec"
-									implicitWidth: 88
-									implicitHeight: 28
-									radius: 10
-									color: root.isRecording ? root.color1 : root.color4
-									Text {
-										anchors.centerIn: parent
-										text: root.isRecording ? "󰓛 Stop" : "󰻂 Start"
-										color: root.bg
-										font.family: "JetBrainsMono Nerd Font"
-										font.pixelSize: 12
-										font.bold: true
-									}
-									MouseArea {
-										anchors.fill: parent
-										onClicked: root.toggleRecording()
-									}
+									visible: root.sysSubmenu === "rec"; implicitWidth: 88; implicitHeight: 28; radius: 10; color: root.isRecording ? root.color1 : root.color4
+									Text { anchors.centerIn: parent; text: root.isRecording ? "󰓛 Stop" : "󰻂 Start"; color: root.bg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12; font.bold: true }
+									MouseArea { anchors.fill: parent; onClicked: root.toggleRecording() }
 								}
 								Rectangle {
-									visible: root.sysSubmenu === "power"
-									implicitWidth: 110
-									implicitHeight: 30
-									radius: 10
-									color: root.color1
-									Text {
-										anchors.centerIn: parent
-										text: "󰐥 Poweroff"
-										color: root.bg
-										font.family: "JetBrainsMono Nerd Font"
-										font.pixelSize: 12
-										font.bold: true
-									}
-									MouseArea {
-										anchors.fill: parent
-										onClicked: root.runCmd("loginctl poweroff || poweroff")
-									}
+									visible: root.sysSubmenu === "power"; implicitWidth: 110; implicitHeight: 30; radius: 10; color: root.color1
+									Text { anchors.centerIn: parent; text: "󰐥 Poweroff"; color: root.bg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12; font.bold: true }
+									MouseArea { anchors.fill: parent; onClicked: root.runCmd("loginctl poweroff || poweroff") }
 								}
 							}
 
+							// AUDIO OUTPUT / INPUT SUBMENU
 							ColumnLayout {
-								visible: root.sysSubmenu === "sound" || root.sysSubmenu === "mic"
-								Layout.fillWidth: true
-								spacing: 8
+								visible: root.sysSubmenu === "sound" || root.sysSubmenu === "mic"; Layout.fillWidth: true; spacing: 8
 								Rectangle {
-									id: subAudioBox
-									Layout.fillWidth: true
-									implicitHeight: 54
-									radius: 14
-									color: root.color0
+									Layout.fillWidth: true; implicitHeight: 54; radius: 14; color: root.color0
 									property int subPct: root.sysSubmenu === "sound" ? root.outVolPct : root.micVolPct
-									function updateAudioRatio(r) {
-										let cl = Math.max(0, Math.min(1, r))
-										if (root.sysSubmenu === "sound") root.setSinkVolume(cl * 100)
-										else if (root.sysSubmenu === "mic") root.setSourceVolume(cl * 100)
-									}
 									ColumnLayout {
-										anchors.fill: parent
-										anchors.margins: 10
-										spacing: 6
+										anchors.fill: parent; anchors.margins: 10; spacing: 6
 										RowLayout {
 											Layout.fillWidth: true
-											Text {
-												text: root.sysSubmenu === "sound" ? "Output Volume" : "Input Volume"
-												color: root.color8
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 11
-												Layout.fillWidth: true
-											}
-											Text {
-												text: subAudioBox.subPct + "%"
-												color: root.fg
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 11
-												font.bold: true
-											}
+											Text { text: root.sysSubmenu === "sound" ? "Output Volume" : "Input Volume"; color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; Layout.fillWidth: true }
+											Text { text: parent.parent.parent.subPct + "%"; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; font.bold: true }
 										}
-										Rectangle {
-											Layout.fillWidth: true
-											implicitHeight: 12
-											radius: 6
-											color: Qt.rgba(1, 1, 1, 0.1)
-											Rectangle {
-												width: parent.width * Math.min(1, subAudioBox.subPct / 100.0)
-												height: parent.height
-												radius: 6
-												color: root.color4
-											}
-											MouseArea {
-												anchors.fill: parent
-												onPressed: mouse => subAudioBox.updateAudioRatio(mouse.x / width)
-												onPositionChanged: mouse => {
-													if (pressed) subAudioBox.updateAudioRatio(mouse.x / width)
-												}
+										QsSlider {
+											ratio: parent.parent.subPct / 100.0
+											onMoved: newRatio => {
+												if (root.sysSubmenu === "sound") root.setSinkVolume(newRatio * 100)
+												else root.setSourceVolume(newRatio * 100)
 											}
 										}
 									}
 								}
-
-								Text {
-									text: "Available Devices"
-									color: root.color8
-									font.family: "JetBrainsMono Nerd Font"
-									font.pixelSize: 11
-									font.bold: true
-								}
+								Text { text: "Available Devices"; color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; font.bold: true }
 								Repeater {
 									model: root.sysSubmenu === "sound" ? root.audioSinks : (root.sysSubmenu === "mic" ? root.audioSources : [])
 									Rectangle {
 										required property var modelData
-										Layout.fillWidth: true
-										implicitHeight: 42
-										radius: 12
+										Layout.fillWidth: true; implicitHeight: 42; radius: 12
 										color: modelData.active ? root.withAlpha(root.color4, 0.2) : root.color0
-										border.width: modelData.active ? 1 : 0
-										border.color: root.color4
+										border.width: modelData.active ? 1 : 0; border.color: root.color4
 										RowLayout {
-											anchors.fill: parent
-											anchors.margins: 10
-											spacing: 8
-											Text {
-												text: root.sysSubmenu === "sound" ? "󰕾" : "󰍬"
-												color: modelData.active ? root.color4 : root.fg
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 15
-											}
-											Text {
-												text: modelData.name
-												color: root.fg
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 12
-												font.bold: modelData.active
-												elide: Text.ElideRight
-												Layout.fillWidth: true
-											}
+											anchors.fill: parent; anchors.margins: 10; spacing: 8
+											Text { text: root.sysSubmenu === "sound" ? "󰕾" : "󰍬"; color: modelData.active ? root.color4 : root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 15 }
+											Text { text: modelData.name; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12; font.bold: modelData.active; elide: Text.ElideRight; Layout.fillWidth: true }
 										}
-										MouseArea {
-											anchors.fill: parent
-											onClicked: {
-												root.runCmd("wpctl set-default " + modelData.id)
-												subPoll.running = true
-											}
-										}
+										MouseArea { anchors.fill: parent; onClicked: { root.runCmd("wpctl set-default " + modelData.id); subPoll.running = true } }
 									}
 								}
 							}
 
+							// DISPLAY SUBMENU
 							ColumnLayout {
-								visible: root.sysSubmenu === "display"
-								Layout.fillWidth: true
-								spacing: 10
+								visible: root.sysSubmenu === "display"; Layout.fillWidth: true; spacing: 10
 								Repeater {
 									model: root.sysSubmenu === "display" ? root.monitorsList : []
 									Rectangle {
 										required property var modelData
-										Layout.fillWidth: true
-										implicitHeight: monCardCol.implicitHeight + 24
-										radius: 14
-										color: root.color0
+										required property int index
+										Layout.fillWidth: true; implicitHeight: monCardCol.implicitHeight + 24; radius: 14; color: root.color0
 
 										ColumnLayout {
 											id: monCardCol
-											anchors {
-												top: parent.top
-												left: parent.left
-												right: parent.right
-												margins: 12
-											}
+											anchors { top: parent.top; left: parent.left; right: parent.right; margins: 12 }
 											spacing: 10
 
 											RowLayout {
-												Layout.fillWidth: true
-												spacing: 10
+												Layout.fillWidth: true; spacing: 10
 												Rectangle {
-													implicitWidth: 34
-													implicitHeight: 34
-													radius: 17
-													color: root.withAlpha(root.color4, 0.2)
-													Text {
-														anchors.centerIn: parent
-														text: "󰍹"
-														color: root.color4
-														font.family: "JetBrainsMono Nerd Font"
-														font.pixelSize: 16
-													}
+													implicitWidth: 34; implicitHeight: 34; radius: 17; color: root.withAlpha(root.color4, 0.2)
+													Text { anchors.centerIn: parent; text: "󰍹"; color: root.color4; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 16 }
 												}
 												ColumnLayout {
-													Layout.fillWidth: true
-													spacing: 1
-													Text {
-														text: modelData.name
-														color: root.fg
-														font.family: "JetBrainsMono Nerd Font"
-														font.pixelSize: 14
-														font.bold: true
+													Layout.fillWidth: true; spacing: 1
+													RowLayout {
+														Layout.fillWidth: true; spacing: 6
+														Text { text: modelData.name; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 14; font.bold: true }
+														Text {
+															visible: root.monitorsList.length > 1
+															text: "•  Display #" + (index + 1)
+															color: root.color2; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; font.bold: true
+														}
 													}
-													Text {
-														text: modelData.curMode.replace("@", " · ") + " Hz · " + modelData.scale + "x"
-														color: root.color8
-														font.family: "JetBrainsMono Nerd Font"
-														font.pixelSize: 11
-													}
-												}
-												Text {
-													text: "focused"
-													color: root.color2
-													font.family: "JetBrainsMono Nerd Font"
-													font.pixelSize: 11
-													font.bold: true
+													Text { text: modelData.curMode.replace("@", " · ") + " Hz · " + modelData.scale + "x"; color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11 }
 												}
 											}
 
 											RowLayout {
-												Layout.fillWidth: true
-												spacing: 10
-												Rectangle {
-													Layout.fillWidth: true
-													implicitHeight: 20
-													radius: 10
-													color: Qt.rgba(1, 1, 1, 0.08)
-													Rectangle {
-														width: parent.width * (root.brightnessPct / 100.0)
-														height: parent.height
-														radius: 10
-														color: root.color2
-													}
-													Text {
-														anchors.left: parent.left
-														anchors.leftMargin: 8
-														anchors.verticalCenter: parent.verticalCenter
-														text: "󰃠"
-														color: root.bg
-														font.family: "JetBrainsMono Nerd Font"
-														font.pixelSize: 12
-													}
-													MouseArea {
-														anchors.fill: parent
-														function setBri(xPos) {
-															let p = Math.max(5, Math.min(100, Math.round((xPos / width) * 100)))
-															root.brightnessPct = p
-															root.runCmd("brightnessctl s " + p + "%")
-														}
-														onPressed: mouse => setBri(mouse.x)
-														onPositionChanged: mouse => {
-															if (pressed) setBri(mouse.x)
-														}
+												Layout.fillWidth: true; spacing: 10
+												QsSlider {
+													implicitHeight: 20; radius: 10
+													ratio: root.brightnessPct / 100.0; fillColor: root.color2
+													onMoved: newRatio => {
+														let p = Math.max(5, Math.round(newRatio * 100))
+														root.brightnessPct = p; root.runCmd("brightnessctl s " + p + "%")
 													}
 												}
-												Text {
-													text: root.brightnessPct + "%"
-													color: root.color8
-													font.family: "JetBrainsMono Nerd Font"
-													font.pixelSize: 12
-													font.bold: true
-												}
+												Text { text: root.brightnessPct + "%"; color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12; font.bold: true }
 											}
 
 											RowLayout {
-												Layout.fillWidth: true
-												spacing: 6
+												Layout.fillWidth: true; spacing: 6
 												Repeater {
 													model: ["1.0", "1.25", "1.5", "1.75", "2.0"]
 													Rectangle {
@@ -2772,18 +1535,9 @@ ShellRoot {
 														property string curScale: monCardCol.parent.modelData.scale
 														property string curMode: monCardCol.parent.modelData.curMode
 														property bool activeScale: parseFloat(curScale) === parseFloat(modelData)
-														Layout.fillWidth: true
-														implicitHeight: 28
-														radius: 14
+														Layout.fillWidth: true; implicitHeight: 28; radius: 14
 														color: activeScale ? root.color2 : Qt.rgba(1, 1, 1, 0.08)
-														Text {
-															anchors.centerIn: parent
-															text: modelData + "x"
-															color: parent.activeScale ? root.bg : root.fg
-															font.family: "JetBrainsMono Nerd Font"
-															font.pixelSize: 11
-															font.bold: true
-														}
+														Text { anchors.centerIn: parent; text: modelData + "x"; color: parent.activeScale ? root.bg : root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; font.bold: true }
 														MouseArea {
 															anchors.fill: parent
 															onClicked: {
@@ -2797,44 +1551,21 @@ ShellRoot {
 											}
 
 											Item {
-												Layout.fillWidth: true
-												implicitHeight: 26
+												Layout.fillWidth: true; implicitHeight: 26
 												RowLayout {
 													anchors.fill: parent
-													Text {
-														text: "Resolution"
-														color: root.color8
-														font.family: "JetBrainsMono Nerd Font"
-														font.pixelSize: 12
-														Layout.fillWidth: true
-													}
+													Text { text: "Resolution"; color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12; Layout.fillWidth: true }
 													RowLayout {
 														spacing: 6
-														Text {
-															text: modelData.curMode.replace("@", " @ ") + " Hz"
-															color: root.fg
-															font.family: "JetBrainsMono Nerd Font"
-															font.pixelSize: 12
-															font.bold: true
-														}
-														Text {
-															text: "󰅀"
-															color: root.color4
-															font.family: "JetBrainsMono Nerd Font"
-															font.pixelSize: 14
-														}
+														Text { text: modelData.curMode.replace("@", " @ ") + " Hz"; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12; font.bold: true }
+														Text { text: "󰅀"; color: root.color4; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 14 }
 													}
 												}
-												MouseArea {
-													anchors.fill: parent
-													onClicked: root.expandedResMon = (root.expandedResMon === modelData.name ? "" : modelData.name)
-												}
+												MouseArea { anchors.fill: parent; onClicked: root.expandedResMon = (root.expandedResMon === modelData.name ? "" : modelData.name) }
 											}
 
 											ColumnLayout {
-												visible: root.expandedResMon === modelData.name
-												Layout.fillWidth: true
-												spacing: 4
+												visible: root.expandedResMon === modelData.name; Layout.fillWidth: true; spacing: 4
 												Repeater {
 													model: (root.expandedResMon === modelData.name) ? modelData.modes : []
 													Rectangle {
@@ -2842,36 +1573,19 @@ ShellRoot {
 														property string monName: monCardCol.parent.modelData.name
 														property string curScale: monCardCol.parent.modelData.scale
 														property bool isCurrent: modelData === monCardCol.parent.modelData.curMode
-														Layout.fillWidth: true
-														implicitHeight: 32
-														radius: 8
+														Layout.fillWidth: true; implicitHeight: 32; radius: 8
 														color: isCurrent ? root.withAlpha(root.color4, 0.25) : Qt.rgba(1, 1, 1, 0.05)
 														RowLayout {
-															anchors.fill: parent
-															anchors.margins: 8
-															Text {
-																text: modelData.replace("@", " @ ") + " Hz"
-																color: parent.parent.isCurrent ? root.color4 : root.fg
-																font.family: "JetBrainsMono Nerd Font"
-																font.pixelSize: 11
-																font.bold: parent.parent.isCurrent
-																Layout.fillWidth: true
-															}
-															Text {
-																visible: parent.parent.isCurrent
-																text: "Active"
-																color: root.color2
-																font.family: "JetBrainsMono Nerd Font"
-																font.pixelSize: 10
-															}
+															anchors.fill: parent; anchors.margins: 8
+															Text { text: modelData.replace("@", " @ ") + " Hz"; color: parent.parent.isCurrent ? root.color4 : root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; font.bold: parent.parent.isCurrent; Layout.fillWidth: true }
+															Text { visible: parent.parent.isCurrent; text: "Active"; color: root.color2; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 10 }
 														}
 														MouseArea {
 															anchors.fill: parent
 															onClicked: {
 																if (root.isHyprland) root.runCmd("hyprctl keyword monitor " + parent.monName + "," + modelData + ",auto," + parent.curScale)
 																else root.runCmd("niri msg output \"" + parent.monName + "\" mode " + modelData)
-																root.expandedResMon = ""
-																subPoll.running = true
+																root.expandedResMon = ""; subPoll.running = true
 															}
 														}
 													}
@@ -2881,357 +1595,114 @@ ShellRoot {
 									}
 								}
 
+								// Night Light Card with Right-Locked QsSwitch
 								Rectangle {
-									Layout.fillWidth: true
-									implicitHeight: 88
-									radius: 14
-									color: root.color0
+									Layout.fillWidth: true; implicitHeight: 88; radius: 14; color: root.color0
 									ColumnLayout {
-										anchors.fill: parent
-										anchors.margins: 12
-										spacing: 8
-										RowLayout {
-											Layout.fillWidth: true
-											spacing: 10
+										anchors.fill: parent; anchors.margins: 12; spacing: 8
+										Item {
+											Layout.fillWidth: true; implicitHeight: 34
 											Rectangle {
-												implicitWidth: 32
-												implicitHeight: 32
-												radius: 16
+												id: nlIcon
+												width: 34; height: 34; radius: 17
+												anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
 												color: root.nightLightOn ? root.color2 : Qt.rgba(1, 1, 1, 0.08)
-												Text {
-													anchors.centerIn: parent
-													text: "󰖔"
-													color: root.nightLightOn ? root.bg : root.fg
-													font.family: "JetBrainsMono Nerd Font"
-													font.pixelSize: 15
-												}
+												Text { anchors.centerIn: parent; text: "󰖔"; color: root.nightLightOn ? root.bg : root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 16 }
+											}
+											QsSwitch {
+												id: nlSw
+												anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+												checked: root.nightLightOn; activeColor: root.color2
+												onToggled: { root.nightLightOn = !root.nightLightOn; root.applyNightLight() }
 											}
 											ColumnLayout {
-												Layout.fillWidth: true
-												spacing: 1
-												Text {
-													text: "Night Light"
-													color: root.fg
-													font.family: "JetBrainsMono Nerd Font"
-													font.pixelSize: 13
-													font.bold: true
-												}
-												Text {
-													text: root.nightLightTemp + " K"
-													color: root.color8
-													font.family: "JetBrainsMono Nerd Font"
-													font.pixelSize: 11
-												}
-											}
-											Rectangle {
-												implicitWidth: 44
-												implicitHeight: 22
-												radius: 11
-												color: root.nightLightOn ? root.color2 : Qt.rgba(1, 1, 1, 0.15)
-												Rectangle {
-													width: 16
-													height: 16
-													radius: 8
-													anchors.verticalCenter: parent.verticalCenter
-													x: root.nightLightOn ? 24 : 4
-													color: root.nightLightOn ? root.bg : root.fg
-													Behavior on x {
-														NumberAnimation {
-															duration: 120
-														}
-													}
-												}
-												MouseArea {
-													anchors.fill: parent
-													onClicked: {
-														root.nightLightOn = !root.nightLightOn
-														root.applyNightLight()
-													}
-												}
+												anchors.left: nlIcon.right; anchors.leftMargin: 10
+												anchors.right: nlSw.left; anchors.rightMargin: 10
+												anchors.verticalCenter: parent.verticalCenter; spacing: 1
+												Text { text: "Night Light"; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 13; font.bold: true }
+												Text { text: root.nightLightTemp + " K"; color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11 }
 											}
 										}
-										Rectangle {
-											Layout.fillWidth: true
-											implicitHeight: 18
-											radius: 9
-											color: Qt.rgba(1, 1, 1, 0.08)
-											Rectangle {
-												width: parent.width * ((root.nightLightTemp - 2500) / 3500.0)
-												height: parent.height
-												radius: 9
-												color: root.color2
-											}
-											MouseArea {
-												anchors.fill: parent
-												function setKelvin(xPos) {
-													let r = Math.max(0, Math.min(1, xPos / width))
-													root.nightLightTemp = Math.round((2500 + r * 3500) / 100) * 100
-													if (root.nightLightOn) root.applyNightLight()
-												}
-												onPressed: mouse => setKelvin(mouse.x)
-												onPositionChanged: mouse => {
-													if (pressed) setKelvin(mouse.x)
-												}
+										QsSlider {
+											implicitHeight: 18; radius: 9
+											ratio: (root.nightLightTemp - 2500) / 3500.0; fillColor: root.color2
+											onMoved: newRatio => {
+												root.nightLightTemp = Math.round((2500 + newRatio * 3500) / 100) * 100
+												if (root.nightLightOn) root.applyNightLight()
 											}
 										}
 									}
 								}
 							}
 
+							// SYSTEM TRAY SUBMENU
 							ColumnLayout {
-								visible: root.sysSubmenu === "tray"
-								Layout.fillWidth: true
-								spacing: 6
+								visible: root.sysSubmenu === "tray"; Layout.fillWidth: true; spacing: 6
 								Rectangle {
-									visible: SystemTray.items.values.length === 0
-									Layout.fillWidth: true
-									implicitHeight: 44
-									radius: 12
-									color: root.color0
-									Text {
-										anchors.centerIn: parent
-										text: "No applications in System Tray"
-										color: root.color8
-										font.family: "JetBrainsMono Nerd Font"
-										font.pixelSize: 12
-									}
+									visible: SystemTray.items.values.length === 0; Layout.fillWidth: true; implicitHeight: 44; radius: 12; color: root.color0
+									Text { anchors.centerIn: parent; text: "No applications in System Tray"; color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12 }
 								}
 								Repeater {
 									model: root.sysSubmenu === "tray" ? SystemTray.items.values : []
 									Rectangle {
 										required property var modelData
-										Layout.fillWidth: true
-										implicitHeight: 44
-										radius: 12
-										color: root.color0
+										Layout.fillWidth: true; implicitHeight: 44; radius: 12; color: root.color0
 										RowLayout {
-											anchors.fill: parent
-											anchors.margins: 10
-											spacing: 10
-											IconImage {
-												implicitSize: 22
-												source: modelData.icon
-											}
-											Text {
-												text: modelData.title || modelData.tooltipTitle || modelData.id || "Tray App"
-												color: root.fg
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 13
-												font.bold: true
-												elide: Text.ElideRight
-												Layout.fillWidth: true
-											}
-											Text {
-												text: "Open"
-												color: root.color4
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 11
-											}
+											anchors.fill: parent; anchors.margins: 10; spacing: 10
+											IconImage { implicitSize: 22; source: modelData.icon }
+											Text { text: modelData.title || modelData.tooltipTitle || modelData.id || "Tray App"; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 13; font.bold: true; elide: Text.ElideRight; Layout.fillWidth: true }
+											Text { text: "Open"; color: root.color4; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11 }
 										}
 										MouseArea {
-											anchors.fill: parent
-											acceptedButtons: Qt.LeftButton | Qt.RightButton
-											onClicked: mouse => {
-												if (mouse.button === Qt.RightButton) modelData.secondaryActivate()
-												else modelData.activate()
-											}
+											anchors.fill: parent; acceptedButtons: Qt.LeftButton | Qt.RightButton
+											onClicked: mouse => { if (mouse.button === Qt.RightButton) modelData.secondaryActivate(); else modelData.activate() }
 										}
 									}
 								}
 							}
 
+							// BATTERY & PERFORMANCE SUBMENU
 							ColumnLayout {
-								visible: root.sysSubmenu === "battery"
-								Layout.fillWidth: true
-								spacing: 8
+								visible: root.sysSubmenu === "battery"; Layout.fillWidth: true; spacing: 8
 								Rectangle {
-									Layout.fillWidth: true
-									implicitHeight: 62
-									radius: 12
-									color: root.color0
+									Layout.fillWidth: true; implicitHeight: 62; radius: 12; color: root.color0
 									ColumnLayout {
-										anchors.fill: parent
-										anchors.margins: 10
-										spacing: 6
+										anchors.fill: parent; anchors.margins: 10; spacing: 6
 										RowLayout {
 											Layout.fillWidth: true
-											Text {
-												text: root.batCharging ? "󰂄  Charging" : "󰁹  Charge Level"
-												color: root.color2
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 13
-												font.bold: true
-												Layout.fillWidth: true
-											}
-											Text {
-												text: root.batPct + "%"
-												color: root.fg
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 13
-												font.bold: true
-											}
+											Text { text: root.batCharging ? "󰂄  Charging" : "󰁹  Charge Level"; color: root.color2; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 13; font.bold: true; Layout.fillWidth: true }
+											Text { text: root.batPct + "%"; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 13; font.bold: true }
 										}
 										Rectangle {
-											Layout.fillWidth: true
-											implicitHeight: 10
-											radius: 5
-											color: Qt.rgba(1, 1, 1, 0.1)
-											Rectangle {
-												width: parent.width * (root.batPct / 100.0)
-												height: parent.height
-												radius: 5
-												color: root.color2
-											}
+											Layout.fillWidth: true; implicitHeight: 10; radius: 5; color: Qt.rgba(1, 1, 1, 0.1)
+											Rectangle { width: parent.width * (root.batPct / 100.0); height: parent.height; radius: 5; color: root.color2 }
 										}
 									}
 								}
 
-								Rectangle {
-									Layout.fillWidth: true
-									implicitHeight: 68
-									radius: 12
-									color: root.color0
-									RowLayout {
-										anchors.fill: parent
-										anchors.margins: 10
-										spacing: 10
-										Rectangle {
-											implicitWidth: 34
-											implicitHeight: 34
-											radius: 17
-											color: root.animWallpapers ? root.color4 : Qt.rgba(1, 1, 1, 0.08)
-											Text {
-												anchors.centerIn: parent
-												text: root.animWallpapers ? "󰕧" : "󰸉"
-												color: root.animWallpapers ? root.bg : root.fg
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 16
-											}
-										}
-										ColumnLayout {
-											Layout.fillWidth: true
-											spacing: 2
-											Text {
-												text: "Animated Wallpapers"
-												color: root.fg
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 12
-												font.bold: true
-											}
-											Text {
-												text: root.animWallpapers ? (root.shouldPlayAnimation ? "Playing (day_animated / night_animated)" : "Paused (Fullscreen / Standby)") : "Off • Static Power Saving (day / night)"
-												color: root.animWallpapers ? root.color4 : root.color2
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 10
-											}
-											Text {
-												text: "Loaded: " + root.wallpaperLabel
-												color: root.color8
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 10
-												elide: Text.ElideMiddle
-												Layout.fillWidth: true
-											}
-										}
-										Rectangle {
-											implicitWidth: 44
-											implicitHeight: 22
-											radius: 11
-											color: root.animWallpapers ? root.color4 : Qt.rgba(1, 1, 1, 0.15)
-											Rectangle {
-												width: 16
-												height: 16
-												radius: 8
-												anchors.verticalCenter: parent.verticalCenter
-												x: root.animWallpapers ? 24 : 4
-												color: root.animWallpapers ? root.bg : root.fg
-												Behavior on x {
-													NumberAnimation {
-														duration: 120
-													}
-												}
-											}
-										}
-									}
-									MouseArea {
-										anchors.fill: parent
-										onClicked: root.toggleWallpaperMode()
-									}
+								ToggleCard {
+									iconTxt: root.animWallpapers ? "󰕧" : "󰸉"
+									titleTxt: "Animated Wallpapers"
+									subTxt: root.animWallpapers ? (root.shouldPlayAnimation ? "Playing (day_animated / night_animated)" : "Paused (Fullscreen / Standby)") : "Off • Static Power Saving (day / night)"
+									extraTxt: "Loaded: " + root.wallpaperLabel
+									checked: root.animWallpapers
+									activeCol: root.color4
+									subCol: root.animWallpapers ? root.color4 : root.color2
+									onToggled: root.toggleWallpaperMode()
 								}
 
-								Rectangle {
-									Layout.fillWidth: true
-									implicitHeight: 54
-									radius: 12
-									color: root.color0
-									RowLayout {
-										anchors.fill: parent
-										anchors.margins: 10
-										spacing: 10
-										Rectangle {
-											implicitWidth: 34
-											implicitHeight: 34
-											radius: 17
-											color: root.fxActive ? root.color5 : Qt.rgba(1, 1, 1, 0.08)
-											Text {
-												anchors.centerIn: parent
-												text: "󰂵"
-												color: root.fxActive ? root.bg : root.fg
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 16
-											}
-										}
-										ColumnLayout {
-											Layout.fillWidth: true
-											spacing: 1
-											Text {
-												text: "UI Blur & Animations"
-												color: root.fg
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 12
-												font.bold: true
-											}
-											Text {
-												text: root.isVM ? "Disabled in VM Mode" : (root.fxActive ? "Active • Glass Blur & Smooth Transitions" : "Off • Solid Panels & Instant Transitions")
-												color: root.fxActive ? root.color5 : root.color8
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 10
-											}
-										}
-										Rectangle {
-											implicitWidth: 44
-											implicitHeight: 22
-											radius: 11
-											color: root.fxActive ? root.color5 : Qt.rgba(1, 1, 1, 0.15)
-											Rectangle {
-												width: 16
-												height: 16
-												radius: 8
-												anchors.verticalCenter: parent.verticalCenter
-												x: root.fxActive ? 24 : 4
-												color: root.fxActive ? root.bg : root.fg
-												Behavior on x {
-													NumberAnimation {
-														duration: 120
-													}
-												}
-											}
-										}
-									}
-									MouseArea {
-										anchors.fill: parent
-										onClicked: {
-											if (!root.isVM) root.toggleUiEffects()
-										}
-									}
+								ToggleCard {
+									iconTxt: "󰂵"
+									titleTxt: "UI Blur & Animations"
+									subTxt: root.isVM ? "Disabled in VM Mode" : (root.fxActive ? "Active • Glass Blur & Smooth Transitions" : "Off • Solid Panels & Instant Transitions")
+									checked: root.fxActive
+									activeCol: root.color5
+									subCol: root.fxActive ? root.color5 : root.color8
+									onToggled: { if (!root.isVM) root.toggleUiEffects() }
 								}
 
 								GridLayout {
-									Layout.fillWidth: true
-									columns: 2
-									uniformCellWidths: true
-									rowSpacing: 8
-									columnSpacing: 8
+									Layout.fillWidth: true; columns: 2; uniformCellWidths: true; rowSpacing: 8; columnSpacing: 8
 									Repeater {
 										model: [
 											{ "l": "Battery Health", "v": root.batHealth },
@@ -3241,222 +1712,70 @@ ShellRoot {
 										]
 										Rectangle {
 											required property var modelData
-											Layout.fillWidth: true
-											Layout.preferredWidth: 1
-											implicitHeight: 52
-											radius: 12
-											color: root.color0
+											Layout.fillWidth: true; Layout.preferredWidth: 1; implicitHeight: 52; radius: 12; color: root.color0
 											ColumnLayout {
-												anchors.fill: parent
-												anchors.margins: 10
-												spacing: 2
-												Text {
-													text: modelData.l
-													color: root.color8
-													font.family: "JetBrainsMono Nerd Font"
-													font.pixelSize: 11
-												}
-												Text {
-													text: modelData.v
-													color: root.fg
-													font.family: "JetBrainsMono Nerd Font"
-													font.pixelSize: 13
-													font.bold: true
-												}
+												anchors.fill: parent; anchors.margins: 10; spacing: 2
+												Text { text: modelData.l; color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11 }
+												Text { text: modelData.v; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 13; font.bold: true }
 											}
 										}
 									}
 								}
 							}
 
+							// NETWORK SUBMENU
 							ColumnLayout {
-								visible: root.sysSubmenu === "net"
-								Layout.fillWidth: true
-								spacing: 8
+								visible: root.sysSubmenu === "net"; Layout.fillWidth: true; spacing: 8
 								Rectangle {
-									Layout.fillWidth: true
-									implicitHeight: 50
-									radius: 12
-									color: root.color0
+									Layout.fillWidth: true; implicitHeight: 50; radius: 12; color: root.color0
 									RowLayout {
-										anchors.fill: parent
-										anchors.margins: 10
-										spacing: 10
-										Text {
-											text: "󰈀"
-											color: root.ethConnected ? root.color4 : root.color8
-											font.family: "JetBrainsMono Nerd Font"
-											font.pixelSize: 18
-										}
+										anchors.fill: parent; anchors.margins: 10; spacing: 10
+										Text { text: "󰈀"; color: root.ethConnected ? root.color4 : root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 18 }
 										ColumnLayout {
-											Layout.fillWidth: true
-											spacing: 1
-											Text {
-												text: "Ethernet (" + (root.ethIface !== "" ? root.ethIface : "No port") + ")"
-												color: root.fg
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 12
-												font.bold: true
-											}
-											Text {
-												text: root.ethIp
-												color: root.ethConnected ? root.color2 : root.color8
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 11
-											}
+											Layout.fillWidth: true; spacing: 1
+											Text { text: "Ethernet (" + (root.ethIface !== "" ? root.ethIface : "No port") + ")"; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12; font.bold: true }
+											Text { text: root.ethIp; color: root.ethConnected ? root.color2 : root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11 }
 										}
-										Text {
-											text: root.ethConnected ? "Connected" : "Offline"
-											color: root.ethConnected ? root.color4 : root.color8
-											font.family: "JetBrainsMono Nerd Font"
-											font.pixelSize: 11
-											font.bold: true
+										Text { text: root.ethConnected ? "Connected" : "Offline"; color: root.ethConnected ? root.color4 : root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; font.bold: true }
+									}
+								}
+								Rectangle {
+									Layout.fillWidth: true; implicitHeight: 50; radius: 12; color: root.color0
+									RowLayout {
+										anchors.fill: parent; anchors.margins: 10; spacing: 10
+										Text { text: root.wifiEnabled ? "󰤨" : "󰤭"; color: root.wifiEnabled ? root.color4 : root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 18 }
+										ColumnLayout {
+											Layout.fillWidth: true; spacing: 1
+											Text { text: "Wi-Fi"; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12; font.bold: true }
+											Text { text: !root.hasWifiHw ? "No Wi-Fi Adapter" : ("Available: " + root.netList.length + " • Saved: " + root.savedWifiList.length); color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 10 }
+										}
+										Rectangle {
+											visible: root.hasWifiHw && root.wifiEnabled; implicitWidth: 56; implicitHeight: 22; radius: 6; color: Qt.rgba(1, 1, 1, 0.08)
+											Text { anchors.centerIn: parent; text: "Rescan"; color: root.color4; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 10; font.bold: true }
+											MouseArea { anchors.fill: parent; onClicked: { root.runCmd("nmcli dev wifi rescan 2>/dev/null || true"); subPoll.running = true } }
+										}
+										QsSwitch {
+											visible: root.hasWifiHw; checked: root.wifiEnabled
+											onToggled: { root.runCmd("nmcli radio wifi " + (root.wifiEnabled ? "off" : "on")); sysPoll.running = true; subPoll.running = true }
 										}
 									}
 								}
 								Rectangle {
-									Layout.fillWidth: true
-									implicitHeight: 50
-									radius: 12
-									color: root.color0
-									RowLayout {
-										anchors.fill: parent
-										anchors.margins: 10
-										spacing: 10
-										Text {
-											text: root.wifiEnabled ? "󰤨" : "󰤭"
-											color: root.wifiEnabled ? root.color4 : root.color8
-											font.family: "JetBrainsMono Nerd Font"
-											font.pixelSize: 18
-										}
-										ColumnLayout {
-											Layout.fillWidth: true
-											spacing: 1
-											Text {
-												text: "Wi-Fi"
-												color: root.fg
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 12
-												font.bold: true
-											}
-											Text {
-												text: !root.hasWifiHw ? "No Wi-Fi Adapter" : ("Available: " + root.netList.length + " • Saved: " + root.savedWifiList.length)
-												color: root.color8
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 10
-											}
-										}
-										Rectangle {
-											visible: root.hasWifiHw && root.wifiEnabled
-											implicitWidth: 56
-											implicitHeight: 22
-											radius: 6
-											color: Qt.rgba(1, 1, 1, 0.08)
-											Text {
-												anchors.centerIn: parent
-												text: "Rescan"
-												color: root.color4
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 10
-												font.bold: true
-											}
-											MouseArea {
-												anchors.fill: parent
-												onClicked: {
-													root.runCmd("nmcli dev wifi rescan 2>/dev/null || true")
-													subPoll.running = true
-												}
-											}
-										}
-										Rectangle {
-											visible: root.hasWifiHw
-											implicitWidth: 42
-											implicitHeight: 22
-											radius: 11
-											color: root.wifiEnabled ? root.color4 : Qt.rgba(1, 1, 1, 0.15)
-											Rectangle {
-												width: 16
-												height: 16
-												radius: 8
-												anchors.verticalCenter: parent.verticalCenter
-												x: root.wifiEnabled ? 22 : 4
-												color: root.wifiEnabled ? root.bg : root.fg
-												Behavior on x {
-													NumberAnimation {
-														duration: 120
-													}
-												}
-											}
-											MouseArea {
-												anchors.fill: parent
-												onClicked: {
-													root.runCmd("nmcli radio wifi " + (root.wifiEnabled ? "off" : "on"))
-													sysPoll.running = true
-													subPoll.running = true
-												}
-											}
-										}
-									}
-								}
-								Rectangle {
-									visible: root.wifiPromptSsid !== ""
-									Layout.fillWidth: true
-									implicitHeight: 74
-									radius: 12
-									color: root.color0
-									border.width: 1
-									border.color: root.color4
+									visible: root.wifiPromptSsid !== ""; Layout.fillWidth: true; implicitHeight: 74; radius: 12; color: root.color0; border.width: 1; border.color: root.color4
 									ColumnLayout {
-										anchors.fill: parent
-										anchors.margins: 8
-										spacing: 4
-										Text {
-											text: "Password for " + root.wifiPromptSsid
-											color: root.color4
-											font.family: "JetBrainsMono Nerd Font"
-											font.pixelSize: 11
-											font.bold: true
-										}
+										anchors.fill: parent; anchors.margins: 8; spacing: 4
+										Text { text: "Password for " + root.wifiPromptSsid; color: root.color4; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; font.bold: true }
 										RowLayout {
 											Layout.fillWidth: true
 											TextInput {
-												id: wifiPwField
-												Layout.fillWidth: true
-												color: root.fg
-												echoMode: TextInput.Password
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 12
-												Keys.onEscapePressed: {
-													text = ""
-													root.wifiPromptSsid = ""
-												}
-												onAccepted: {
-													root.runCmd("nmcli dev wifi connect \"" + root.wifiPromptSsid + "\" password \"" + text + "\"")
-													text = ""
-													root.wifiPromptSsid = ""
-												}
+												id: wifiPwField; Layout.fillWidth: true; color: root.fg; echoMode: TextInput.Password; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12
+												Keys.onEscapePressed: { text = ""; root.wifiPromptSsid = "" }
+												onAccepted: { root.runCmd("nmcli dev wifi connect \"" + root.wifiPromptSsid + "\" password \"" + text + "\""); text = ""; root.wifiPromptSsid = "" }
 											}
 											Rectangle {
-												implicitWidth: 64
-												implicitHeight: 24
-												radius: 6
-												color: root.color4
-												Text {
-													anchors.centerIn: parent
-													text: "Join"
-													color: root.bg
-													font.family: "JetBrainsMono Nerd Font"
-													font.pixelSize: 11
-													font.bold: true
-												}
-												MouseArea {
-													anchors.fill: parent
-													onClicked: {
-														root.runCmd("nmcli dev wifi connect \"" + root.wifiPromptSsid + "\" password \"" + wifiPwField.text + "\"")
-														wifiPwField.text = ""
-														root.wifiPromptSsid = ""
-													}
-												}
+												implicitWidth: 64; implicitHeight: 24; radius: 6; color: root.color4
+												Text { anchors.centerIn: parent; text: "Join"; color: root.bg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; font.bold: true }
+												MouseArea { anchors.fill: parent; onClicked: { root.runCmd("nmcli dev wifi connect \"" + root.wifiPromptSsid + "\" password \"" + wifiPwField.text + "\""); wifiPwField.text = ""; root.wifiPromptSsid = "" } }
 											}
 										}
 									}
@@ -3465,35 +1784,12 @@ ShellRoot {
 									model: (root.sysSubmenu === "net" && root.wifiEnabled) ? root.netList : []
 									Rectangle {
 										required property var modelData
-										Layout.fillWidth: true
-										implicitHeight: 40
-										radius: 12
-										color: modelData.connected ? root.withAlpha(root.color4, 0.2) : root.color0
+										Layout.fillWidth: true; implicitHeight: 40; radius: 12; color: modelData.connected ? root.withAlpha(root.color4, 0.2) : root.color0
 										RowLayout {
-											anchors.fill: parent
-											anchors.margins: 10
-											spacing: 8
-											Text {
-												text: "󰤨"
-												color: modelData.connected ? root.color4 : root.fg
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 15
-											}
-											Text {
-												text: modelData.ssid
-												color: root.fg
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 12
-												font.bold: modelData.connected
-												elide: Text.ElideRight
-												Layout.fillWidth: true
-											}
-											Text {
-												text: modelData.connected ? "Disconnect" : (modelData.signal + "%")
-												color: modelData.connected ? root.color1 : root.color8
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 11
-											}
+											anchors.fill: parent; anchors.margins: 10; spacing: 8
+											Text { text: "󰤨"; color: modelData.connected ? root.color4 : root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 15 }
+											Text { text: modelData.ssid; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12; font.bold: modelData.connected; elide: Text.ElideRight; Layout.fillWidth: true }
+											Text { text: modelData.connected ? "Disconnect" : (modelData.signal + "%"); color: modelData.connected ? root.color1 : root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11 }
 										}
 										MouseArea {
 											anchors.fill: parent
@@ -3505,220 +1801,78 @@ ShellRoot {
 										}
 									}
 								}
-								Text {
-									visible: root.savedWifiList.length > 0
-									text: "Saved Wi-Fi Profiles"
-									color: root.color8
-									font.family: "JetBrainsMono Nerd Font"
-									font.pixelSize: 11
-									font.bold: true
-								}
+								Text { visible: root.savedWifiList.length > 0; text: "Saved Wi-Fi Profiles"; color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; font.bold: true }
 								Repeater {
 									model: root.sysSubmenu === "net" ? root.savedWifiList : []
 									Rectangle {
 										required property var modelData
-										Layout.fillWidth: true
-										implicitHeight: 38
-										radius: 10
-										color: root.color0
+										Layout.fillWidth: true; implicitHeight: 38; radius: 10; color: root.color0
 										RowLayout {
-											anchors.fill: parent
-											anchors.margins: 10
-											spacing: 8
-											Text {
-												text: "󰆼"
-												color: root.color6
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 14
-											}
-											Text {
-												text: modelData
-												color: root.fg
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 12
-												elide: Text.ElideRight
-												Layout.fillWidth: true
-											}
+											anchors.fill: parent; anchors.margins: 10; spacing: 8
+											Text { text: "󰆼"; color: root.color6; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 14 }
+											Text { text: modelData; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12; elide: Text.ElideRight; Layout.fillWidth: true }
 											Rectangle {
-												implicitWidth: 52
-												implicitHeight: 22
-												radius: 6
-												color: Qt.rgba(1, 1, 1, 0.08)
-												Text {
-													anchors.centerIn: parent
-													text: "Forget"
-													color: root.color1
-													font.family: "JetBrainsMono Nerd Font"
-													font.pixelSize: 10
-												}
-												MouseArea {
-													anchors.fill: parent
-													onClicked: {
-														root.runCmd("nmcli connection delete id \"" + modelData + "\"")
-														subPoll.running = true
-													}
-												}
+												implicitWidth: 52; implicitHeight: 22; radius: 6; color: Qt.rgba(1, 1, 1, 0.08)
+												Text { anchors.centerIn: parent; text: "Forget"; color: root.color1; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 10 }
+												MouseArea { anchors.fill: parent; onClicked: { root.runCmd("nmcli connection delete id \"" + modelData + "\""); subPoll.running = true } }
 											}
 										}
 									}
 								}
 							}
 
+							// BLUETOOTH SUBMENU
 							ColumnLayout {
-								visible: root.sysSubmenu === "bt"
-								Layout.fillWidth: true
-								spacing: 6
+								visible: root.sysSubmenu === "bt"; Layout.fillWidth: true; spacing: 6
 								RowLayout {
 									Layout.fillWidth: true
-									Text {
-										text: root.hasBtAdapter ? "Bluetooth Devices" : "No Bluetooth Controller Found"
-										color: root.color8
-										font.family: "JetBrainsMono Nerd Font"
-										font.pixelSize: 11
-										font.bold: true
-										Layout.fillWidth: true
-									}
+									Text { text: root.hasBtAdapter ? "Bluetooth Devices" : "No Bluetooth Controller Found"; color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; font.bold: true; Layout.fillWidth: true }
 									Rectangle {
-										visible: root.hasBtAdapter && root.btEnabled
-										implicitWidth: 64
-										implicitHeight: 22
-										radius: 6
-										color: Qt.rgba(1, 1, 1, 0.08)
-										Text {
-											anchors.centerIn: parent
-											text: "Scan"
-											color: root.color4
-											font.family: "JetBrainsMono Nerd Font"
-											font.pixelSize: 11
-											font.bold: true
-										}
-										MouseArea {
-											anchors.fill: parent
-											onClicked: {
-												root.runCmd("bluetoothctl --timeout 5 scan on")
-												subPoll.running = true
-											}
-										}
+										visible: root.hasBtAdapter && root.btEnabled; implicitWidth: 64; implicitHeight: 22; radius: 6; color: Qt.rgba(1, 1, 1, 0.08)
+										Text { anchors.centerIn: parent; text: "Scan"; color: root.color4; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; font.bold: true }
+										MouseArea { anchors.fill: parent; onClicked: { root.runCmd("bluetoothctl --timeout 5 scan on"); subPoll.running = true } }
 									}
 								}
 								Rectangle {
-									visible: !root.hasBtAdapter || root.btList.length === 0
-									Layout.fillWidth: true
-									implicitHeight: 42
-									radius: 12
-									color: root.color0
-									Text {
-										anchors.centerIn: parent
-										text: !root.hasBtAdapter ? "Hardware adapter not present" : "No paired or discovered devices"
-										color: root.color8
-										font.family: "JetBrainsMono Nerd Font"
-										font.pixelSize: 12
-									}
+									visible: !root.hasBtAdapter || root.btList.length === 0; Layout.fillWidth: true; implicitHeight: 42; radius: 12; color: root.color0
+									Text { anchors.centerIn: parent; text: !root.hasBtAdapter ? "Hardware adapter not present" : "No paired or discovered devices"; color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12 }
 								}
 								Repeater {
 									model: root.sysSubmenu === "bt" ? root.btList : []
 									Rectangle {
 										required property var modelData
-										Layout.fillWidth: true
-										implicitHeight: 42
-										radius: 12
-										color: modelData.connected ? root.withAlpha(root.color4, 0.2) : root.color0
+										Layout.fillWidth: true; implicitHeight: 42; radius: 12; color: modelData.connected ? root.withAlpha(root.color4, 0.2) : root.color0
 										RowLayout {
-											anchors.fill: parent
-											anchors.margins: 10
-											spacing: 8
-											Text {
-												text: ""
-												color: modelData.connected ? root.color4 : root.fg
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 15
-											}
-											Text {
-												text: modelData.name
-												color: root.fg
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 12
-												font.bold: modelData.connected
-												elide: Text.ElideRight
-												Layout.fillWidth: true
-											}
-											Text {
-												text: modelData.connected ? "Disconnect" : "Connect"
-												color: root.color4
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 11
-											}
+											anchors.fill: parent; anchors.margins: 10; spacing: 8
+											Text { text: ""; color: modelData.connected ? root.color4 : root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 15 }
+											Text { text: modelData.name; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12; font.bold: modelData.connected; elide: Text.ElideRight; Layout.fillWidth: true }
+											Text { text: modelData.connected ? "Disconnect" : "Connect"; color: root.color4; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11 }
 										}
-										MouseArea {
-											anchors.fill: parent
-											onClicked: {
-												root.runCmd("bluetoothctl " + (modelData.connected ? "disconnect " : "connect ") + modelData.mac)
-												subPoll.running = true
-											}
-										}
+										MouseArea { anchors.fill: parent; onClicked: { root.runCmd("bluetoothctl " + (modelData.connected ? "disconnect " : "connect ") + modelData.mac); subPoll.running = true } }
 									}
 								}
 							}
 
+							// SCREEN RECORDER SUBMENU
 							ColumnLayout {
-								visible: root.sysSubmenu === "rec"
-								Layout.fillWidth: true
-								spacing: 8
-								Repeater {
-									model: [
-										{ "title": "Record System Audio", "key": "sys" },
-										{ "title": "Record Microphone", "key": "mic" },
-										{ "title": "Select Screen Region (slurp)", "key": "area" }
-									]
-									Rectangle {
-										required property var modelData
-										Layout.fillWidth: true
-										implicitHeight: 44
-										radius: 12
-										color: root.color0
-										property bool activeOpt: modelData.key === "sys" ? root.recSysAudio : (modelData.key === "mic" ? root.recMicAudio : root.recAreaSelect)
-										RowLayout {
-											anchors.fill: parent
-											anchors.margins: 10
-											Text {
-												text: modelData.title
-												color: root.fg
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 12
-												font.bold: true
-												Layout.fillWidth: true
-											}
-											Rectangle {
-												implicitWidth: 40
-												implicitHeight: 22
-												radius: 11
-												color: parent.parent.activeOpt ? root.color4 : Qt.rgba(1, 1, 1, 0.15)
-												Rectangle {
-													width: 16
-													height: 16
-													radius: 8
-													anchors.verticalCenter: parent.verticalCenter
-													x: parent.parent.parent.activeOpt ? 20 : 4
-													color: parent.parent.parent.activeOpt ? root.bg : root.fg
-												}
-											}
-										}
-										MouseArea {
-											anchors.fill: parent
-											onClicked: {
-												if (modelData.key === "sys") root.recSysAudio = !root.recSysAudio
-												else if (modelData.key === "mic") root.recMicAudio = !root.recMicAudio
-												else root.recAreaSelect = !root.recAreaSelect
-											}
-										}
-									}
+								visible: root.sysSubmenu === "rec"; Layout.fillWidth: true; spacing: 8
+								ToggleCard {
+									titleTxt: "Record System Audio"; checked: root.recSysAudio
+									onToggled: root.recSysAudio = !root.recSysAudio
+								}
+								ToggleCard {
+									titleTxt: "Record Microphone"; checked: root.recMicAudio
+									onToggled: root.recMicAudio = !root.recMicAudio
+								}
+								ToggleCard {
+									titleTxt: "Select Screen Region (slurp)"; checked: root.recAreaSelect
+									onToggled: root.recAreaSelect = !root.recAreaSelect
 								}
 							}
 
+							// SYSTEM INFO SUBMENU
 							ColumnLayout {
-								visible: root.sysSubmenu === "cpu"
-								Layout.fillWidth: true
-								spacing: 8
+								visible: root.sysSubmenu === "cpu"; Layout.fillWidth: true; spacing: 8
 								Repeater {
 									model: [
 										{ "title": "󰻠  " + root.cpuModel, "right": root.cpuUsage + "% • " + root.cpuTemp + "°C", "pct": root.cpuUsage, "col": root.color4, "sub": "" },
@@ -3727,85 +1881,35 @@ ShellRoot {
 									]
 									Rectangle {
 										required property var modelData
-										Layout.fillWidth: true
-										implicitHeight: modelData.sub !== "" ? 72 : 58
-										radius: 12
-										color: root.color0
+										Layout.fillWidth: true; implicitHeight: modelData.sub !== "" ? 72 : 58; radius: 12; color: root.color0
 										ColumnLayout {
-											anchors.fill: parent
-											anchors.margins: 10
-											spacing: 4
+											anchors.fill: parent; anchors.margins: 10; spacing: 4
 											RowLayout {
 												Layout.fillWidth: true
-												Text {
-													text: modelData.title
-													color: modelData.col
-													font.family: "JetBrainsMono Nerd Font"
-													font.pixelSize: 12
-													font.bold: true
-													elide: Text.ElideRight
-													Layout.fillWidth: true
-												}
-												Text {
-													text: modelData.right
-													color: root.fg
-													font.family: "JetBrainsMono Nerd Font"
-													font.pixelSize: 11
-												}
+												Text { text: modelData.title; color: modelData.col; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12; font.bold: true; elide: Text.ElideRight; Layout.fillWidth: true }
+												Text { text: modelData.right; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11 }
 											}
 											Rectangle {
-												Layout.fillWidth: true
-												implicitHeight: 8
-												radius: 4
-												color: Qt.rgba(1, 1, 1, 0.1)
-												Rectangle {
-													width: parent.width * (modelData.pct / 100.0)
-													height: parent.height
-													radius: 4
-													color: modelData.col
-												}
+												Layout.fillWidth: true; implicitHeight: 8; radius: 4; color: Qt.rgba(1, 1, 1, 0.1)
+												Rectangle { width: parent.width * (modelData.pct / 100.0); height: parent.height; radius: 4; color: modelData.col }
 											}
-											Text {
-												visible: modelData.sub !== ""
-												text: modelData.sub
-												color: root.color8
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 11
-												elide: Text.ElideRight
-												Layout.fillWidth: true
-											}
+											Text { visible: modelData.sub !== ""; text: modelData.sub; color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; elide: Text.ElideRight; Layout.fillWidth: true }
 										}
 									}
 								}
 								Rectangle {
-									Layout.fillWidth: true
-									implicitHeight: 44
-									radius: 12
-									color: root.color0
+									Layout.fillWidth: true; implicitHeight: 44; radius: 12; color: root.color0
 									RowLayout {
-										anchors.fill: parent
-										anchors.margins: 10
-										Text {
-											text: "󰌽  Kernel: " + root.kernelVer
-											color: root.fg
-											font.family: "JetBrainsMono Nerd Font"
-											font.pixelSize: 11
-											Layout.fillWidth: true
-										}
-										Text {
-											text: "  Up: " + root.uptimeStr
-											color: root.color8
-											font.family: "JetBrainsMono Nerd Font"
-											font.pixelSize: 11
-										}
+										anchors.fill: parent; anchors.margins: 10
+										Text { text: "󰌽  Kernel: " + root.kernelVer; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; Layout.fillWidth: true }
+										Text { text: "  Up: " + root.uptimeStr; color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11 }
 									}
 								}
 							}
 
+							// POWER MENU SUBMENU
 							ColumnLayout {
-								visible: root.sysSubmenu === "power"
-								Layout.fillWidth: true
-								spacing: 8
+								visible: root.sysSubmenu === "power"; Layout.fillWidth: true; spacing: 8
 								Repeater {
 									model: [
 										{ "icon": "󰑐", "label": "Reboot System", "cmd": "loginctl reboot || reboot", "pause": false },
@@ -3816,38 +1920,16 @@ ShellRoot {
 									]
 									Rectangle {
 										required property var modelData
-										Layout.fillWidth: true
-										implicitHeight: 44
-										radius: 12
-										color: pwrItemMouse.containsMouse ? root.withAlpha(root.color4, 0.25) : root.color0
+										Layout.fillWidth: true; implicitHeight: 44; radius: 12; color: pwrItemMouse.containsMouse ? root.withAlpha(root.color4, 0.25) : root.color0
 										RowLayout {
-											anchors.fill: parent
-											anchors.margins: 12
-											spacing: 12
-											Text {
-												text: modelData.icon
-												color: root.color4
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 16
-											}
-											Text {
-												text: modelData.label
-												color: root.fg
-												font.family: "JetBrainsMono Nerd Font"
-												font.pixelSize: 13
-												font.bold: true
-												Layout.fillWidth: true
-											}
+											anchors.fill: parent; anchors.margins: 12; spacing: 12
+											Text { text: modelData.icon; color: root.color4; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 16 }
+											Text { text: modelData.label; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 13; font.bold: true; Layout.fillWidth: true }
 										}
 										MouseArea {
-											id: pwrItemMouse
-											anchors.fill: parent
-											hoverEnabled: true
+											id: pwrItemMouse; anchors.fill: parent; hoverEnabled: true
 											onClicked: {
-												if (modelData.pause) {
-													root.isMonitorDpmsOff = true
-													root.triggerLock()
-												}
+												if (modelData.pause) { root.isMonitorDpmsOff = true; root.triggerLock() }
 												if (modelData.cmd === "LOCK") root.triggerLock()
 												else root.runCmd(modelData.cmd)
 											}
@@ -3861,10 +1943,7 @@ ShellRoot {
 
 				Rectangle {
 					id: rightOsdPill
-					Layout.alignment: Qt.AlignTop
-					implicitWidth: 38
-					implicitHeight: 38
-					radius: 19
+					Layout.alignment: Qt.AlignTop; implicitWidth: 38; implicitHeight: 38; radius: 19
 					color: root.withAlpha(root.bg, root.panelAlpha)
 					property real arcPct: root.osdMode === "brightness" ? (root.brightnessPct / 100.0) : (root.osdMode === "mic" ? (root.micMuted ? 0 : root.micVolPct / 100.0) : (root.outMuted ? 0 : root.outVolPct / 100.0))
 					property string centerIcon: root.osdMode === "brightness" ? "󰃠" : (root.osdMode === "mic" ? (root.micMuted ? (root.isHeadsetMic ? "󰋐" : "󰍭") : (root.isHeadsetMic ? "󰋎" : "󰍬")) : (root.outMuted ? (root.isHeadphones ? "󰟎" : "󰖁") : (root.isHeadphones ? "󰋋" : "󰕾")))
@@ -3879,48 +1958,27 @@ ShellRoot {
 					}
 
 					Canvas {
-						id: osdCanvas
-						anchors.fill: parent
+						id: osdCanvas; anchors.fill: parent
 						onPaint: {
-							var ctx = getContext("2d")
-							ctx.reset()
+							var ctx = getContext("2d"); ctx.reset()
 							var cx = width / 2, cy = height / 2, r = (width / 2) - 3
-							ctx.lineWidth = 2.6
-							ctx.lineCap = "round"
-							ctx.beginPath()
-							ctx.arc(cx, cy, r, 0, Math.PI * 2, false)
-							ctx.strokeStyle = Qt.rgba(1, 1, 1, 0.14)
-							ctx.stroke()
+							ctx.lineWidth = 2.6; ctx.lineCap = "round"
+							ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2, false); ctx.strokeStyle = Qt.rgba(1, 1, 1, 0.14); ctx.stroke()
 							if (rightOsdPill.arcPct > 0.005) {
 								var s = -Math.PI / 2, e = s + (Math.PI * 2 * Math.min(1, rightOsdPill.arcPct))
-								ctx.beginPath()
-								ctx.arc(cx, cy, r, s, e, false)
+								ctx.beginPath(); ctx.arc(cx, cy, r, s, e, false)
 								ctx.strokeStyle = root.osdMode === "mic" ? root.color2.toString() : (root.osdMode === "brightness" ? root.color3.toString() : root.color4.toString())
 								ctx.stroke()
 							}
 						}
 					}
-					Text {
-						anchors.centerIn: parent
-						text: rightOsdPill.centerIcon
-						color: ((root.osdMode === "volume" && root.outMuted) || (root.osdMode === "mic" && root.micMuted)) ? root.color1 : root.fg
-						font.family: "JetBrainsMono Nerd Font"
-						font.pixelSize: 15
-						font.bold: true
-					}
+					Text { anchors.centerIn: parent; text: rightOsdPill.centerIcon; color: ((root.osdMode === "volume" && root.outMuted) || (root.osdMode === "mic" && root.micMuted)) ? root.color1 : root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 15; font.bold: true }
 					MouseArea {
-						anchors.fill: parent
-						acceptedButtons: Qt.LeftButton | Qt.RightButton
+						anchors.fill: parent; acceptedButtons: Qt.LeftButton | Qt.RightButton
 						onClicked: mouse => {
-							if (mouse.button === Qt.RightButton) {
-								root.runCmd("pavucontrol")
-							} else if (root.osdMode === "mic") {
-								root.micMuted = !root.micMuted
-								root.runCmd("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle")
-							} else {
-								root.outMuted = !root.outMuted
-								root.runCmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle")
-							}
+							if (mouse.button === Qt.RightButton) root.runCmd("pavucontrol")
+							else if (root.osdMode === "mic") { root.micMuted = !root.micMuted; root.runCmd("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle") }
+							else { root.outMuted = !root.outMuted; root.runCmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle") }
 						}
 						onWheel: wheel => {
 							let up = wheel.angleDelta.y > 0
@@ -3939,54 +1997,23 @@ ShellRoot {
 		model: Quickshell.screens
 		PanelWindow {
 			required property var modelData
-			screen: modelData
-			visible: root.popupNotifications.length > 0 && root.centerMode === "none"
-			WlrLayershell.layer: WlrLayer.Overlay
-			WlrLayershell.namespace: "swaync-notification-window"
+			screen: modelData; visible: root.popupNotifications.length > 0 && root.centerMode === "none"
+			WlrLayershell.layer: WlrLayer.Overlay; WlrLayershell.namespace: "swaync-notification-window"
 			WlrLayershell.exclusionMode: ExclusionMode.Ignore
-			anchors {
-				top: true
-			}
+			anchors { top: true }
 			margins.top: 56
-			implicitWidth: 360
-			implicitHeight: notifPopupCol.implicitHeight + 16
-			color: "transparent"
+			implicitWidth: 360; implicitHeight: notifPopupCol.implicitHeight + 16; color: "transparent"
 			ColumnLayout {
-				id: notifPopupCol
-				anchors.fill: parent
-				anchors.margins: 8
-				spacing: 8
+				id: notifPopupCol; anchors.fill: parent; anchors.margins: 8; spacing: 8
 				Repeater {
 					model: root.popupNotifications
 					Rectangle {
 						required property var modelData
-						Layout.fillWidth: true
-						implicitHeight: 68
-						radius: 16
-						color: root.withAlpha(root.color0, root.panelAlpha)
-						border.width: 2
-						border.color: root.color4
+						Layout.fillWidth: true; implicitHeight: 68; radius: 16; color: root.withAlpha(root.color0, root.panelAlpha); border.width: 2; border.color: root.color4
 						ColumnLayout {
-							anchors.fill: parent
-							anchors.margins: 12
-							spacing: 3
-							Text {
-								text: modelData.summary || "Notification"
-								color: root.color4
-								font.family: "JetBrainsMono Nerd Font"
-								font.pixelSize: 13
-								font.bold: true
-								elide: Text.ElideRight
-								Layout.fillWidth: true
-							}
-							Text {
-								text: modelData.body || ""
-								color: root.fg
-								font.family: "JetBrainsMono Nerd Font"
-								font.pixelSize: 11
-								elide: Text.ElideRight
-								Layout.fillWidth: true
-							}
+							anchors.fill: parent; anchors.margins: 12; spacing: 3
+							Text { text: modelData.summary || "Notification"; color: root.color4; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 13; font.bold: true; elide: Text.ElideRight; Layout.fillWidth: true }
+							Text { text: modelData.body || ""; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; elide: Text.ElideRight; Layout.fillWidth: true }
 						}
 					}
 				}
@@ -4014,20 +2041,14 @@ ShellRoot {
 	}
 
 	PamContext {
-		id: pamLock
-		config: "quickshell"
-		onResponseRequiredChanged: {
-			if (responseRequired && root.authBusy) respond(root.pendingPassword)
-		}
+		id: pamLock; config: "quickshell"
+		onResponseRequiredChanged: { if (responseRequired && root.authBusy) respond(root.pendingPassword) }
 		onCompleted: result => {
 			root.authBusy = false
 			if (result === PamResult.Success) {
-				root.screenLocked = false
-				root.authError = false
-				root.lockPromptActive = false
+				root.screenLocked = false; root.authError = false; root.lockPromptActive = false
 			} else {
-				root.authError = true
-				root.lockPromptActive = true
+				root.authError = true; root.lockPromptActive = true
 			}
 		}
 	}
@@ -4037,25 +2058,16 @@ ShellRoot {
 		PanelWindow {
 			id: lockWin
 			required property var modelData
-			screen: modelData
-			visible: root.screenLocked
-			WlrLayershell.layer: WlrLayer.Overlay
-			WlrLayershell.namespace: "lockscreen"
+			screen: modelData; visible: root.screenLocked
+			WlrLayershell.layer: WlrLayer.Overlay; WlrLayershell.namespace: "lockscreen"
 			WlrLayershell.exclusionMode: ExclusionMode.Ignore
 			WlrLayershell.keyboardFocus: root.screenLocked ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
-			anchors {
-				top: true
-				bottom: true
-				left: true
-				right: true
-			}
+			anchors { top: true; bottom: true; left: true; right: true }
 			color: root.showLiveLockWall ? "transparent" : root.bg
 
 			onVisibleChanged: {
 				if (visible) {
-					root.isMonitorDpmsOff = false
-					root.lockPromptActive = false
-					root.authError = false
+					root.isMonitorDpmsOff = false; root.lockPromptActive = false; root.authError = false
 					root.lockDateFormatted = Qt.formatDateTime(new Date(), "dddd, MMMM d").toUpperCase()
 					pwLockInput.text = ""
 					if (!pwLockInput.activeFocus) pwLockInput.forceActiveFocus()
@@ -4063,330 +2075,137 @@ ShellRoot {
 			}
 
 			Image {
-				id: lockWall
-				anchors.fill: parent
+				id: lockWall; anchors.fill: parent
 				source: (!root.showLiveLockWall && root.wallpaperPath !== "") ? (root.isVideoFile ? "file:///tmp/wall_frame.jpg" : "file://" + root.wallpaperPath) : ""
 				fillMode: Image.PreserveAspectCrop
 				visible: !root.showLiveLockWall && (!root.fxActive || root.cfgLockBlurMax <= 0)
 			}
 
 			MultiEffect {
-				anchors.fill: parent
-				source: lockWall
+				anchors.fill: parent; source: lockWall
 				visible: !root.showLiveLockWall && root.fxActive && root.cfgLockBlurMax > 0 && root.wallpaperPath !== ""
-				blurEnabled: visible
-				blurMax: root.cfgLockBlurMax
-				blur: 1.0
+				blurEnabled: visible; blurMax: root.cfgLockBlurMax; blur: 1.0
 			}
 
-			Rectangle {
-				anchors.fill: parent
-				color: Qt.rgba(0, 0, 0, 0.38)
-			}
+			Rectangle { anchors.fill: parent; color: Qt.rgba(0, 0, 0, 0.38) }
 
 			// TOP SECTION: Large Clock, Spaced Date & 2x Detailed Weather
 			ColumnLayout {
 				anchors.horizontalCenter: parent.horizontalCenter
-				anchors.top: parent.top
-				anchors.topMargin: Math.round(parent.height * 0.13)
-				spacing: 10
+				anchors.top: parent.top; anchors.topMargin: Math.round(parent.height * 0.13); spacing: 10
 
-				Text {
-					Layout.alignment: Qt.AlignHCenter
-					text: root.timeStr
-					color: root.fg
-					font.family: "JetBrainsMono Nerd Font"
-					font.pixelSize: 84
-					font.weight: Font.Light
-				}
-				Text {
-					Layout.alignment: Qt.AlignHCenter
-					text: root.lockDateFormatted
-					color: root.withAlpha(root.fg, 0.85)
-					font.family: "JetBrainsMono Nerd Font"
-					font.pixelSize: 14
-					font.bold: true
-					font.letterSpacing: 6
-				}
-				Text {
-					Layout.alignment: Qt.AlignHCenter
-					Layout.topMargin: 8
-					text: root.lockWeatherMain
-					color: root.color4
-					font.family: "JetBrainsMono Nerd Font"
-					font.pixelSize: 24
-					font.bold: true
-					font.letterSpacing: 2
-				}
-				Text {
-					Layout.alignment: Qt.AlignHCenter
-					visible: root.lockWeatherSub !== ""
-					text: root.lockWeatherSub
-					color: root.withAlpha(root.fg, 0.78)
-					font.family: "JetBrainsMono Nerd Font"
-					font.pixelSize: 14
-					font.letterSpacing: 1.5
-				}
+				Text { Layout.alignment: Qt.AlignHCenter; text: root.timeStr; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 84; font.weight: Font.Light }
+				Text { Layout.alignment: Qt.AlignHCenter; text: root.lockDateFormatted; color: root.withAlpha(root.fg, 0.85); font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 14; font.bold: true; font.letterSpacing: 6 }
+				Text { Layout.alignment: Qt.AlignHCenter; Layout.topMargin: 8; text: root.lockWeatherMain; color: root.color4; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 24; font.bold: true; font.letterSpacing: 2 }
+				Text { Layout.alignment: Qt.AlignHCenter; visible: root.lockWeatherSub !== ""; text: root.lockWeatherSub; color: root.withAlpha(root.fg, 0.78); font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 14; font.letterSpacing: 1.5 }
 			}
 
 			// CENTER-LOWER SECTION: Clickable Username & Auto-Revealing Password Input
 			ColumnLayout {
 				anchors.horizontalCenter: parent.horizontalCenter
-				anchors.verticalCenter: parent.verticalCenter
-				anchors.verticalCenterOffset: Math.round(parent.height * 0.14)
-				spacing: 6
+				anchors.verticalCenter: parent.verticalCenter; anchors.verticalCenterOffset: Math.round(parent.height * 0.14); spacing: 6
 
 				Item {
 					Layout.alignment: Qt.AlignHCenter
-					implicitWidth: Math.max(userLbl.implicitWidth, userNameTxt.implicitWidth) + 24
-					implicitHeight: userCol.implicitHeight + 8
+					implicitWidth: Math.max(userLbl.implicitWidth, userNameTxt.implicitWidth) + 24; implicitHeight: userCol.implicitHeight + 8
 
 					ColumnLayout {
-						id: userCol
-						anchors.centerIn: parent
-						spacing: 4
+						id: userCol; anchors.centerIn: parent; spacing: 4
+						Text { id: userLbl; Layout.alignment: Qt.AlignHCenter; text: "USER"; color: root.withAlpha(root.fg, 0.55); font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 10; font.letterSpacing: 4 }
 						Text {
-							id: userLbl
-							Layout.alignment: Qt.AlignHCenter
-							text: "USER"
-							color: root.withAlpha(root.fg, 0.55)
-							font.family: "JetBrainsMono Nerd Font"
-							font.pixelSize: 10
-							font.letterSpacing: 4
-						}
-						Text {
-							id: userNameTxt
-							Layout.alignment: Qt.AlignHCenter
-							text: root.currentUserName
+							id: userNameTxt; Layout.alignment: Qt.AlignHCenter; text: root.currentUserName
 							color: userClickArea.containsMouse ? root.color4 : root.fg
-							font.family: "JetBrainsMono Nerd Font"
-							font.pixelSize: 16
-							font.bold: true
-							font.letterSpacing: 3
-							Behavior on color {
-								ColorAnimation {
-									duration: 120
-								}
-							}
+							font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 16; font.bold: true; font.letterSpacing: 3
+							Behavior on color { ColorAnimation { duration: 120 } }
 						}
 					}
 					MouseArea {
-						id: userClickArea
-						anchors.fill: parent
-						hoverEnabled: true
-						onClicked: {
-							root.lockPromptActive = !root.lockPromptActive
-							if (!pwLockInput.activeFocus) pwLockInput.forceActiveFocus()
-						}
+						id: userClickArea; anchors.fill: parent; hoverEnabled: true
+						onClicked: { root.lockPromptActive = !root.lockPromptActive; if (!pwLockInput.activeFocus) pwLockInput.forceActiveFocus() }
 					}
 				}
 
 				Item {
 					id: pwBoxContainer
-					Layout.alignment: Qt.AlignHCenter
-					Layout.topMargin: 10
-					implicitWidth: 230
-					implicitHeight: 34
+					Layout.alignment: Qt.AlignHCenter; Layout.topMargin: 10; implicitWidth: 230; implicitHeight: 34
 					property bool showBar: root.lockPromptActive || pwLockInput.text.length > 0 || root.authError
 					opacity: showBar ? 1.0 : 0.0
-					Behavior on opacity {
-						NumberAnimation {
-							duration: 150
-							easing.type: Easing.OutCubic
-						}
-					}
+					Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
 
 					TextInput {
 						id: pwLockInput
-						anchors.fill: parent
-						anchors.bottomMargin: 6
-						verticalAlignment: TextInput.AlignVCenter
-						horizontalAlignment: TextInput.AlignHCenter
-						echoMode: TextInput.Password
-						passwordCharacter: "•"
-						color: root.fg
-						font.family: "JetBrainsMono Nerd Font"
-						font.pixelSize: 18
-						font.letterSpacing: 6
+						anchors.fill: parent; anchors.bottomMargin: 6
+						verticalAlignment: TextInput.AlignVCenter; horizontalAlignment: TextInput.AlignHCenter
+						echoMode: TextInput.Password; passwordCharacter: "•"; color: root.fg
+						font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 18; font.letterSpacing: 6
 						onTextChanged: {
-							if (text.length > 0) {
-								root.authError = false
-								root.lockPromptActive = true
-							} else if (!root.authError) {
-								root.lockPromptActive = false
-							}
+							if (text.length > 0) { root.authError = false; root.lockPromptActive = true }
+							else if (!root.authError) root.lockPromptActive = false
 						}
-						Keys.onEscapePressed: {
-							text = ""
-							root.authError = false
-							root.lockPromptActive = false
-						}
+						Keys.onEscapePressed: { text = ""; root.authError = false; root.lockPromptActive = false }
 						Keys.onReturnPressed: {
 							if (root.authBusy || text === "") return
-							root.authError = false
-							root.authBusy = true
-							root.pendingPassword = text
-							text = ""
-							pamLock.start()
+							root.authError = false; root.authBusy = true; root.pendingPassword = text; text = ""; pamLock.start()
 						}
 					}
 
 					Text {
-						anchors.centerIn: parent
-						anchors.verticalCenterOffset: -3
+						anchors.centerIn: parent; anchors.verticalCenterOffset: -3
 						visible: pwLockInput.text.length === 0 && root.authError
-						text: "WRONG PASSWORD"
-						color: root.color1
-						font.family: "JetBrainsMono Nerd Font"
-						font.pixelSize: 11
-						font.bold: true
-						font.letterSpacing: 3
+						text: "WRONG PASSWORD"; color: root.color1; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; font.bold: true; font.letterSpacing: 3
 					}
 
 					Rectangle {
-						anchors.left: parent.left
-						anchors.right: parent.right
-						anchors.bottom: parent.bottom
-						height: 1.5
+						anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom; height: 1.5
 						color: root.authError ? root.color1 : (pwLockInput.text.length > 0 ? root.color4 : root.withAlpha(root.fg, 0.6))
-						Behavior on color {
-							ColorAnimation {
-								duration: 150
-							}
-						}
+						Behavior on color { ColorAnimation { duration: 150 } }
 					}
 				}
 			}
 
 			// BOTTOM-LEFT: Session / Window Manager Indicator
 			RowLayout {
-				anchors.left: parent.left
-				anchors.bottom: parent.bottom
-				anchors.leftMargin: 32
-				anchors.bottomMargin: 26
-				spacing: 8
-				Text {
-					text: "SESSION"
-					color: root.withAlpha(root.fg, 0.6)
-					font.family: "JetBrainsMono Nerd Font"
-					font.pixelSize: 11
-					font.letterSpacing: 2
-				}
-				Text {
-					text: "|"
-					color: root.color4
-					font.family: "JetBrainsMono Nerd Font"
-					font.pixelSize: 11
-					font.bold: true
-				}
-				Text {
-					text: root.isHyprland ? "HYPRLAND" : "NIRI"
-					color: root.fg
-					font.family: "JetBrainsMono Nerd Font"
-					font.pixelSize: 11
-					font.bold: true
-					font.letterSpacing: 2
-				}
+				anchors.left: parent.left; anchors.bottom: parent.bottom; anchors.leftMargin: 32; anchors.bottomMargin: 26; spacing: 8
+				Text { text: "SESSION"; color: root.withAlpha(root.fg, 0.6); font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; font.letterSpacing: 2 }
+				Text { text: "|"; color: root.color4; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; font.bold: true }
+				Text { text: root.isHyprland ? "HYPRLAND" : "NIRI"; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; font.bold: true; font.letterSpacing: 2 }
 			}
 
 			// BOTTOM-CENTER: Minimal Media Controls
 			Rectangle {
 				visible: root.activePlayer !== null
-				anchors.horizontalCenter: parent.horizontalCenter
-				anchors.bottom: parent.bottom
-				anchors.bottomMargin: 20
-				implicitWidth: lockMediaRow.implicitWidth + 24
-				implicitHeight: 38
-				radius: 19
-				color: root.withAlpha(root.bg, 0.55)
-				border.width: 1
-				border.color: root.withAlpha(root.color4, 0.4)
+				anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; anchors.bottomMargin: 20
+				implicitWidth: lockMediaRow.implicitWidth + 24; implicitHeight: 38; radius: 19
+				color: root.withAlpha(root.bg, 0.55); border.width: 1; border.color: root.withAlpha(root.color4, 0.4)
 
 				RowLayout {
-					id: lockMediaRow
-					anchors.centerIn: parent
-					spacing: 12
+					id: lockMediaRow; anchors.centerIn: parent; spacing: 12
 					Rectangle {
-						implicitWidth: 24
-						implicitHeight: 24
-						radius: 6
-						color: root.color0
-						clip: true
-						Image {
-							anchors.fill: parent
-							source: (root.activePlayer && root.activePlayer.trackArtUrl) ? root.activePlayer.trackArtUrl : ""
-							fillMode: Image.PreserveAspectCrop
-							visible: source != ""
-						}
-						Text {
-							anchors.centerIn: parent
-							visible: !root.activePlayer || !root.activePlayer.trackArtUrl
-							text: "󰝚"
-							color: root.color4
-							font.family: "JetBrainsMono Nerd Font"
-							font.pixelSize: 13
-						}
+						implicitWidth: 24; implicitHeight: 24; radius: 6; color: root.color0; clip: true
+						Image { anchors.fill: parent; source: (root.activePlayer && root.activePlayer.trackArtUrl) ? root.activePlayer.trackArtUrl : ""; fillMode: Image.PreserveAspectCrop; visible: source != "" }
+						Text { anchors.centerIn: parent; visible: !root.activePlayer || !root.activePlayer.trackArtUrl; text: "󰝚"; color: root.color4; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 13 }
 					}
 					Text {
 						Layout.maximumWidth: 200
 						text: (root.activePlayer && root.activePlayer.trackTitle) ? (root.activePlayer.trackTitle + (root.activePlayer.trackArtist ? " — " + root.activePlayer.trackArtist : "")) : "Media Playing"
-						color: root.fg
-						font.family: "JetBrainsMono Nerd Font"
-						font.pixelSize: 11
-						elide: Text.ElideRight
+						color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; elide: Text.ElideRight
 					}
 					RowLayout {
 						spacing: 10
 						Item {
-							implicitWidth: 20
-							implicitHeight: 20
-							Text {
-								anchors.centerIn: parent
-								text: "󰒮"
-								color: root.fg
-								font.family: "JetBrainsMono Nerd Font"
-								font.pixelSize: 14
-							}
-							MouseArea {
-								anchors.fill: parent
-								onClicked: {
-									if (root.activePlayer) root.activePlayer.previous()
-								}
-							}
+							implicitWidth: 20; implicitHeight: 20
+							Text { anchors.centerIn: parent; text: "󰒮"; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 14 }
+							MouseArea { anchors.fill: parent; onClicked: { if (root.activePlayer) root.activePlayer.previous() } }
 						}
 						Item {
-							implicitWidth: 22
-							implicitHeight: 22
-							Text {
-								anchors.centerIn: parent
-								text: (root.activePlayer && root.activePlayer.playbackState === MprisPlaybackState.Playing) ? "󰏤" : "󰐊"
-								color: root.color4
-								font.family: "JetBrainsMono Nerd Font"
-								font.pixelSize: 15
-							}
-							MouseArea {
-								anchors.fill: parent
-								onClicked: {
-									if (root.activePlayer) root.activePlayer.togglePlaying()
-								}
-							}
+							implicitWidth: 22; implicitHeight: 22
+							Text { anchors.centerIn: parent; text: (root.activePlayer && root.activePlayer.playbackState === MprisPlaybackState.Playing) ? "󰏤" : "󰐊"; color: root.color4; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 15 }
+							MouseArea { anchors.fill: parent; onClicked: { if (root.activePlayer) root.activePlayer.togglePlaying() } }
 						}
 						Item {
-							implicitWidth: 20
-							implicitHeight: 20
-							Text {
-								anchors.centerIn: parent
-								text: "󰒭"
-								color: root.fg
-								font.family: "JetBrainsMono Nerd Font"
-								font.pixelSize: 14
-							}
-							MouseArea {
-								anchors.fill: parent
-								onClicked: {
-									if (root.activePlayer) root.activePlayer.next()
-								}
-							}
+							implicitWidth: 20; implicitHeight: 20
+							Text { anchors.centerIn: parent; text: "󰒭"; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 14 }
+							MouseArea { anchors.fill: parent; onClicked: { if (root.activePlayer) root.activePlayer.next() } }
 						}
 					}
 				}
@@ -4395,21 +2214,12 @@ ShellRoot {
 			// BOTTOM-RIGHT: Collapsible Hover Power Menu above SHUTDOWN
 			Item {
 				id: lockPowerZone
-				anchors.right: parent.right
-				anchors.bottom: parent.bottom
-				anchors.rightMargin: 32
-				anchors.bottomMargin: 26
-				implicitWidth: 110
-				implicitHeight: lockPowerHover.hovered ? lockPowerCol.implicitHeight : 22
-				HoverHandler {
-					id: lockPowerHover
-				}
+				anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.rightMargin: 32; anchors.bottomMargin: 26
+				implicitWidth: 110; implicitHeight: lockPowerHover.hovered ? lockPowerCol.implicitHeight : 22
+				HoverHandler { id: lockPowerHover }
 
 				ColumnLayout {
-					id: lockPowerCol
-					anchors.right: parent.right
-					anchors.bottom: parent.bottom
-					spacing: 10
+					id: lockPowerCol; anchors.right: parent.right; anchors.bottom: parent.bottom; spacing: 10
 					Repeater {
 						model: [
 							{ "label": "HIBERNATE", "cmd": "loginctl hibernate || ZZZ", "pause": true },
@@ -4418,53 +2228,27 @@ ShellRoot {
 						]
 						Item {
 							required property var modelData
-							visible: lockPowerHover.hovered
-							Layout.alignment: Qt.AlignRight
-							implicitWidth: pwrOptTxt.implicitWidth + 8
-							implicitHeight: 20
+							visible: lockPowerHover.hovered; Layout.alignment: Qt.AlignRight
+							implicitWidth: pwrOptTxt.implicitWidth + 8; implicitHeight: 20
 							Text {
-								id: pwrOptTxt
-								anchors.right: parent.right
-								anchors.verticalCenter: parent.verticalCenter
-								text: modelData.label
+								id: pwrOptTxt; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; text: modelData.label
 								color: pwrOptMouse.containsMouse ? root.color4 : root.withAlpha(root.fg, 0.75)
-								font.family: "JetBrainsMono Nerd Font"
-								font.pixelSize: 11
-								font.bold: pwrOptMouse.containsMouse
-								font.letterSpacing: 2
+								font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; font.bold: pwrOptMouse.containsMouse; font.letterSpacing: 2
 							}
 							MouseArea {
-								id: pwrOptMouse
-								anchors.fill: parent
-								hoverEnabled: true
-								onClicked: {
-									if (modelData.pause) root.isMonitorDpmsOff = true
-									root.runCmd(modelData.cmd)
-								}
+								id: pwrOptMouse; anchors.fill: parent; hoverEnabled: true
+								onClicked: { if (modelData.pause) root.isMonitorDpmsOff = true; root.runCmd(modelData.cmd) }
 							}
 						}
 					}
 					Item {
-						Layout.alignment: Qt.AlignRight
-						implicitWidth: shutdownTxt.implicitWidth + 8
-						implicitHeight: 20
+						Layout.alignment: Qt.AlignRight; implicitWidth: shutdownTxt.implicitWidth + 8; implicitHeight: 20
 						Text {
-							id: shutdownTxt
-							anchors.right: parent.right
-							anchors.verticalCenter: parent.verticalCenter
-							text: "SHUTDOWN"
+							id: shutdownTxt; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; text: "SHUTDOWN"
 							color: shutdownMouse.containsMouse ? root.color1 : root.withAlpha(root.fg, 0.8)
-							font.family: "JetBrainsMono Nerd Font"
-							font.pixelSize: 11
-							font.bold: true
-							font.letterSpacing: 2
+							font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; font.bold: true; font.letterSpacing: 2
 						}
-						MouseArea {
-							id: shutdownMouse
-							anchors.fill: parent
-							hoverEnabled: true
-							onClicked: root.runCmd("loginctl poweroff || poweroff")
-						}
+						MouseArea { id: shutdownMouse; anchors.fill: parent; hoverEnabled: true; onClicked: root.runCmd("loginctl poweroff || poweroff") }
 					}
 				}
 			}
