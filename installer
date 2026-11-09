@@ -146,7 +146,7 @@ FileSystemFormat() {
 }
 BaseSystemInstall () {
 	if [[ "${OSsel,,}" == "void" ]]; then
-		if [[ "${VImethod}" == "XBPS" ]]; then mkdir -p /mnt/var/db/xbps/keys ; cp -r /var/db/xbps/keys/* /mnt/var/db/xbps/keys/ 2>/dev/null || true ; $PKGstrap base-system
+		if [[ "${VImethod}" == "XBPS" ]]; then mkdir -p /mnt/var/db/xbps/keys ; cp -r /var/db/xbps/keys/* /mnt/var/db/xbps/keys/ 2>/dev/null || true ; $PKGstrap base-system </dev/tty >/dev/tty 2>&1
 		elif [[ "${VImethod}" == "ROOTFS" ]]; then
 			local tb="void-x86_64" ; if [[ "${LIBsel}" == "MUSL" ]]; then tb+="-musl" ; fi ; tb+="-ROOTFS.tar.xz"
 			if [[ -f "${SCRIPT_DIR}/Conf_files/${tb}" ]]; then tar -xJf "${SCRIPT_DIR}/Conf_files/${tb}" -C /mnt
@@ -164,7 +164,7 @@ BaseSystemInstall () {
 		local BasePKG=( "${kernel[@]}" "${baselinux[@]}" "${logind[@]}" )
 		if [[ -n "$UCODEsel" ]]; then BasePKG+=( "$UCODEsel" ) ; fi
 		if [[ "$FSsel" == "btrfs" ]]; then BasePKG+=( "${btrfsutility[@]}" ) ; fi
-		$PKGstrap "${BasePKG[@]}"
+		$PKGstrap "${BasePKG[@]}" </dev/tty >/dev/tty 2>&1
 	fi
 }
 FStabGen () {
@@ -301,7 +301,7 @@ PackageInstall () {
 		if [[ ${#nvidiadrivers[@]} -gt 0 ]]; then FinalPKGs+=( "${nvidiadrivers[@]}" ) ; fi
 		if [[ -v amddrivers && ${#amddrivers[@]} -gt 0 ]]; then FinalPKGs+=( "${amddrivers[@]}" ) ; fi
 	fi
-	CR $PKGmanager$PKGinst$PKGupd$PKGupg "${PKGskp[@]}" "${FinalPKGs[@]}"
+	CR $PKGmanager$PKGinst$PKGupd$PKGupg "${PKGskp[@]}" "${FinalPKGs[@]}" </dev/tty >/dev/tty 2>&1
 }
 KernelSetup () {
 	if [[ "$CPU_TYPE" == "Intel" ]]; then modules+=(vmd) ; fi
