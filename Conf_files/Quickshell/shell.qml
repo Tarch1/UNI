@@ -19,7 +19,6 @@ ShellRoot {
 	// =========================================================================
 	// USER CONFIGURATION & TUNING VARIABLES (EFFECTS, ANIMATIONS, BLUR & PAUSE)
 	// =========================================================================
-
 	// 1. Master UI Effects & Blur Switch (can also be toggled in the Battery menu)
 	//    Options: true (Enabled on bare-metal PC) | false (Power-saving / VM mode)
 	property bool cfgEnableEffects: !isVM
@@ -35,49 +34,38 @@ ShellRoot {
 	// 4. Control Center Submenu Transition Style
 	//    Options: "slide" (Horizontal Slide + Fade) | "fade" (Fade only) | "none" (Instant)
 	property string cfgSubmenuAnimStyle: "slide"
-
-	// 5. Submenu Animation Duration (ms) & Horizontal Slide Offset (px)
-	//    Duration options: 100 - 250 | Offset options: 10 - 30
 	property int cfgSubmenuAnimMs: 160
 	property int cfgSubmenuSlidePx: 18
 
-	// 6. Wallpaper Switch Transition Style (Static & Animated)
+	// 5. Wallpaper Switch Transition Style (Static & Animated)
 	//    Options: "crossfade" (Smooth opacity fade) | "zoom" (Fade + subtle zoom-in) | "none" (Instant)
 	property string cfgWallpaperTransition: "crossfade"
 	property int cfgWallpaperTransitionMs: 420
 
-	// 7. Bar & Panel Opacity (allows real-time compositor blur to show through)
-	//    Options: 0.65 (Ultra glass) | 0.76 (Balanced blur) | 0.88 (Dark glass) | 0.96 (Solid / Power-saving)
+	// 6. Bar & Panel Opacity (allows real-time compositor blur to show through)
+	//    Options: 0.65 (Ultra glass) | 0.76 (Balanced blur) | 0.88 (Dark glass) | 0.96 (Solid)
 	property real cfgGlassOpacity: 0.76
 	property real cfgSolidOpacity: 0.96
 
-	// 8. Lockscreen Behavior with Animated & Static Wallpapers
-	//    cfgLockKeepAnimated: true = keeps animated wallpaper playing on the lockscreen
-	//                         false = pauses video and displays a blurred static frame
-	//    cfgLockBlurMax: Gaussian blur radius for static lockscreen (0 = off, 32 = medium, 48 = high, 64 = max)
+	// 7. Lockscreen Behavior with Animated & Static Wallpapers
+	//    cfgLockKeepAnimated: true = keeps animated wallpaper playing on lockscreen
+	//    cfgLockBlurMax: Gaussian blur radius for static lockscreen (0 = off, 48 = high)
 	property bool cfgLockKeepAnimated: true
 	property int cfgLockBlurMax: 48
 
-	// 9. Smart Auto-Pause Rules for Animated Wallpapers (.webm / .mp4 / .gif)
-	//    cfgPauseOnFullscreen: true = pauses animated wallpaper when a window is fullscreen
-	//    cfgPauseOnScreenOff:  true = pauses animated wallpaper when monitor enters DPMS standby
+	// 8. Smart Auto-Pause Rules for Animated Wallpapers (.webm / .mp4 / .gif)
 	property bool cfgPauseOnFullscreen: true
 	property bool cfgPauseOnScreenOff: true
-
-	// =========================================================================
-	// END OF USER CONFIGURATION SECTION
 	// =========================================================================
 
 	property string homeDir: Quickshell.env("HOME")
 	property bool isVM: Quickshell.env("QSG_RENDER_LOOP") === "basic"
 	property bool isHyprland: Quickshell.env("XDG_CURRENT_DESKTOP") === "Hyprland"
 
-	// Effective runtime values computed from cfgEnableEffects
 	property bool fxActive: cfgEnableEffects && !isVM
 	property int animMs: fxActive ? cfgIslandAnimMs : 0
 	property real panelAlpha: fxActive ? cfgGlassOpacity : cfgSolidOpacity
 
-	// Wallpaper State & Smart Auto-Pause Detection
 	property string wallpaperPath: ""
 	property bool animWallpapers: false
 	property bool isVideoFile: wallpaperPath.toLowerCase().endsWith(".webm") || wallpaperPath.toLowerCase().endsWith(".mp4")
@@ -85,9 +73,9 @@ ShellRoot {
 	property bool hasActiveFullWindow: false
 	property bool isMonitorDpmsOff: false
 	property bool shouldPlayAnimation: {
-		if (!isVideoFile && !isAnimatedGif) return false
+		if (!animWallpapers || (!isVideoFile && !isAnimatedGif)) return false
 		if (cfgPauseOnScreenOff && isMonitorDpmsOff) return false
-		if (screenLocked) return cfgLockKeepAnimated && animWallpapers
+		if (screenLocked) return cfgLockKeepAnimated
 		if (cfgPauseOnFullscreen && hasActiveFullWindow) return false
 		return true
 	}
@@ -108,7 +96,6 @@ ShellRoot {
 	property color color6: "#94e2d5"
 	property color color8: "#585b70"
 
-	// UI Modes: "none" | "calendar" | "system" | "launcher" | "overview"
 	property bool barVisible: true
 	property string centerMode: "none"
 	property string sysSubmenu: ""
@@ -208,90 +195,54 @@ ShellRoot {
 		return m + ":" + (r < 10 ? "0" + r : r)
 	}
 	function closeCenterPill() {
-		root.centerMode = "none"
-		root.sysSubmenu = ""
-		root.wifiPromptSsid = ""
-		root.expandedResMon = ""
+		root.centerMode = "none"; root.sysSubmenu = ""; root.wifiPromptSsid = ""; root.expandedResMon = ""
 	}
 	function openLauncher() {
 		if (root.centerMode === "launcher") root.closeCenterPill()
-		else {
-			root.searchQuery = ""
-			root.selectedAppIndex = 0
-			root.sysSubmenu = ""
-			root.wifiPromptSsid = ""
-			root.centerMode = "launcher"
-		}
+		else { root.searchQuery = ""; root.selectedAppIndex = 0; root.sysSubmenu = ""; root.wifiPromptSsid = ""; root.centerMode = "launcher" }
 	}
 	function openOverview() {
 		if (root.centerMode === "overview") root.closeCenterPill()
-		else {
-			root.sysSubmenu = ""
-			root.wifiPromptSsid = ""
-			overviewPoll.running = true
-			root.centerMode = "overview"
-		}
+		else { root.sysSubmenu = ""; root.wifiPromptSsid = ""; overviewPoll.running = true; root.centerMode = "overview" }
 	}
 	function openCalendar() {
-		root.calMonth = (new Date()).getMonth()
-		root.calYear = (new Date()).getFullYear()
-		root.updateCalendar()
-		root.sysSubmenu = ""
-		root.wifiPromptSsid = ""
-		root.centerMode = "calendar"
+		root.calMonth = (new Date()).getMonth(); root.calYear = (new Date()).getFullYear(); root.updateCalendar()
+		root.sysSubmenu = ""; root.wifiPromptSsid = ""; root.centerMode = "calendar"
 	}
 	function openSystemPanel() {
-		root.sysSubmenu = ""
-		root.wifiPromptSsid = ""
-		root.centerMode = "system"
-		sysPoll.running = true
-		subPoll.running = true
+		root.sysSubmenu = ""; root.wifiPromptSsid = ""; root.centerMode = "system"; sysPoll.running = true; subPoll.running = true
 	}
 	function triggerOsd(mode) { root.osdMode = mode; osdTimer.restart() }
 	function triggerLock() { root.closeCenterPill(); root.screenLocked = true }
 
 	function setSinkVolume(pct) {
 		let p = Math.max(0, Math.min(100, Math.round(pct)))
-		root.outVolPct = p
-		runCmd("wpctl set-volume -l 1 @DEFAULT_AUDIO_SINK@ " + p + "%")
+		root.outVolPct = p; runCmd("wpctl set-volume -l 1 @DEFAULT_AUDIO_SINK@ " + p + "%")
 	}
-
 	function setSourceVolume(pct) {
 		let p = Math.max(0, Math.min(100, Math.round(pct)))
-		root.micVolPct = p
-		runCmd("wpctl set-volume -l 1 @DEFAULT_AUDIO_SOURCE@ " + p + "%")
+		root.micVolPct = p; runCmd("wpctl set-volume -l 1 @DEFAULT_AUDIO_SOURCE@ " + p + "%")
 	}
-
 	function toggleWallpaperMode() {
 		root.animWallpapers = !root.animWallpapers
 		let m = root.animWallpapers ? "animated" : "static"
 		runCmd("\"" + root.homeDir + "/.config/wallpapers/theme-switcher.sh\" " + m + " &")
 	}
-
 	function toggleUiEffects() {
 		root.cfgEnableEffects = !root.cfgEnableEffects
 		let fxStr = root.cfgEnableEffects ? "true" : "false"
 		let hyprCmd = root.isHyprland ? ("hyprctl keyword decoration:blur:enabled " + fxStr + " >/dev/null 2>&1; ") : ""
 		runCmd(hyprCmd + "sed -i 's/\"uiEffects\": *[a-z]*/\"uiEffects\": " + fxStr + "/' \"" + root.homeDir + "/.config/quickshell/colors.json\" 2>/dev/null || true")
 	}
-
 	function togglePrimaryNetwork() {
-		if (root.ethIface !== "" && (!root.hasWifiHw || root.ethConnected)) {
-			runCmd("nmcli dev " + (root.ethConnected ? "disconnect " : "connect ") + root.ethIface)
-		} else if (root.hasWifiHw) {
-			runCmd("nmcli radio wifi " + (root.wifiEnabled ? "off" : "on"))
-		}
+		if (root.ethIface !== "" && (!root.hasWifiHw || root.ethConnected)) runCmd("nmcli dev " + (root.ethConnected ? "disconnect " : "connect ") + root.ethIface)
+		else if (root.hasWifiHw) runCmd("nmcli radio wifi " + (root.wifiEnabled ? "off" : "on"))
 		sysPoll.running = true
 	}
-
 	function applyNightLight() {
-		if (root.nightLightOn) {
-			runCmd("pkill -x wlsunset 2>/dev/null; wlsunset -t " + root.nightLightTemp + " -T " + (root.nightLightTemp + 1) + " &")
-		} else {
-			runCmd("pkill -x wlsunset 2>/dev/null")
-		}
+		if (root.nightLightOn) runCmd("pkill -x wlsunset 2>/dev/null; wlsunset -t " + root.nightLightTemp + " -T " + (root.nightLightTemp + 1) + " &")
+		else runCmd("pkill -x wlsunset 2>/dev/null")
 	}
-
 	function toggleRecording() {
 		if (root.isRecording) {
 			runCmd("pkill -INT -x wf-recorder; notify-send 'Screen Recorder' 'Saved in ~/Videos/Recordings'")
@@ -305,7 +256,6 @@ ShellRoot {
 			root.isRecording = true; root.recSeconds = 0
 		}
 	}
-
 	function updateCalendar() {
 		let startDow = (new Date(root.calYear, root.calMonth, 1).getDay() + 6) % 7
 		let daysInMonth = new Date(root.calYear, root.calMonth + 1, 0).getDate()
@@ -361,7 +311,7 @@ ShellRoot {
 	}
 
 	IpcHandler { target: "launcher"; function toggle(): void { root.openLauncher() } }
-	IpcHandler { target: "overview"; function toggle(): void { root.openOverview() }; function close(): void { if (root.centerMode === "overview") root.closeCenterPill() } }
+	IpcHandler { target: "overview"; function toggle(): void { root.openOverview() } function close(): void { if (root.centerMode === "overview") root.closeCenterPill() } }
 	IpcHandler { target: "controlcenter"; function toggle(): void { if (root.centerMode === "system") root.closeCenterPill(); else root.openSystemPanel() } }
 	IpcHandler { target: "lock"; function lock(): void { root.triggerLock() } }
 	IpcHandler { target: "theme"; function reload(): void { colorFile.reload() } }
@@ -371,25 +321,9 @@ ShellRoot {
 		id: overviewPoll
 		command: ["bash", "-c", "
 			if [[ -n \"$HYPRLAND_INSTANCE_SIGNATURE\" ]]; then
-				hyprctl clients -j 2>/dev/null | awk '
-				BEGIN{RS=\"}\"}
-				/\"address\":/{
-					match($0,/\"address\": *\"[^\"]*\"/); addr=substr($0,RSTART+11,RLENGTH-12); gsub(/^\"|\"$/,\"\",addr)
-					match($0,/\"id\": *[0-9-]+/); ws=substr($0,RSTART+5,RLENGTH-5); gsub(/[^0-9-]/,\"\",ws)
-					match($0,/\"class\": *\"[^\"]*\"/); cls=substr($0,RSTART+9,RLENGTH-10); gsub(/^\"|\"$/,\"\",cls)
-					match($0,/\"title\": *\"[^\"]*\"/); ttl=substr($0,RSTART+9,RLENGTH-10); gsub(/^\"|\"$/,\"\",ttl)
-					if (ws > 0 && addr != \"\") printf \"%s^%s^%s^%s;\", ws, cls, ttl, addr
-				}'
+				hyprctl clients -j 2>/dev/null | awk 'BEGIN{RS=\"}\"}/\"address\":/{match($0,/\"address\": *\"[^\"]*\"/); addr=substr($0,RSTART+11,RLENGTH-12); gsub(/^\"|\"$/,\"\",addr); match($0,/\"id\": *[0-9-]+/); ws=substr($0,RSTART+5,RLENGTH-5); gsub(/[^0-9-]/,\"\",ws); match($0,/\"class\": *\"[^\"]*\"/); cls=substr($0,RSTART+9,RLENGTH-10); gsub(/^\"|\"$/,\"\",cls); match($0,/\"title\": *\"[^\"]*\"/); ttl=substr($0,RSTART+9,RLENGTH-10); gsub(/^\"|\"$/,\"\",ttl); if (ws > 0 && addr != \"\") printf \"%s^%s^%s^%s;\", ws, cls, ttl, addr}'
 			elif [[ -n \"$NIRI_SOCKET\" ]]; then
-				niri msg -j windows 2>/dev/null | awk '
-				BEGIN{RS=\"}\"}
-				/\"id\":/{
-					match($0,/\"id\": *[0-9]+/); id=substr($0,RSTART+5,RLENGTH-5); gsub(/[^0-9]/,\"\",id)
-					match($0,/\"workspace_id\": *[0-9]+/); ws=substr($0,RSTART+15,RLENGTH-15); gsub(/[^0-9]/,\"\",ws)
-					match($0,/\"app_id\": *\"[^\"]*\"/); cls=substr($0,RSTART+10,RLENGTH-11); gsub(/^\"|\"$/,\"\",cls)
-					match($0,/\"title\": *\"[^\"]*\"/); ttl=substr($0,RSTART+9,RLENGTH-10); gsub(/^\"|\"$/,\"\",ttl)
-					if (id != \"\") printf \"%s^%s^%s^%s;\", ws, cls, ttl, id
-				}'
+				niri msg -j windows 2>/dev/null | awk 'BEGIN{RS=\"}\"}/\"id\":/{match($0,/\"id\": *[0-9]+/); id=substr($0,RSTART+5,RLENGTH-5); gsub(/[^0-9]/,\"\",id); match($0,/\"workspace_id\": *[0-9]+/); ws=substr($0,RSTART+15,RLENGTH-15); gsub(/[^0-9]/,\"\",ws); match($0,/\"app_id\": *\"[^\"]*\"/); cls=substr($0,RSTART+10,RLENGTH-11); gsub(/^\"|\"$/,\"\",cls); match($0,/\"title\": *\"[^\"]*\"/); ttl=substr($0,RSTART+9,RLENGTH-10); gsub(/^\"|\"$/,\"\",ttl); if (id != \"\") printf \"%s^%s^%s^%s;\", ws, cls, ttl, id}'
 			fi
 		"]
 		stdout: SplitParser {
@@ -443,28 +377,21 @@ ShellRoot {
 					list.sort((a, b) => a.idx - b.idx); root.workspacesList = list
 					if (cur !== root.lastActiveWs) { root.lastActiveWs = cur; root.wsExpanded = true; wsCollapseTimer.restart() }
 				}
-
 				if (p.length >= 3 && p[2].includes("Volume:")) {
-					let m = p[2].includes("MUTED")
-					let num = parseFloat(p[2].replace(/[^0-9.]/g, ""))
+					let m = p[2].includes("MUTED"), num = parseFloat(p[2].replace(/[^0-9.]/g, ""))
 					if (!isNaN(num)) root.outVolPct = Math.round(num * 100)
 					root.outMuted = m
 				}
 				if (p.length >= 4 && p[3].includes("Volume:")) {
-					let mm = p[3].includes("MUTED")
-					let mnum = parseFloat(p[3].replace(/[^0-9.]/g, ""))
+					let mm = p[3].includes("MUTED"), mnum = parseFloat(p[3].replace(/[^0-9.]/g, ""))
 					if (!isNaN(mnum)) {
 						let mvPct = Math.round(mnum * 100)
 						if (root.lastMicVol !== -1 && (mvPct !== root.lastMicVol || mm !== root.lastMicMuted)) root.triggerOsd("mic")
-						root.micVolPct = mvPct
-						root.lastMicVol = mvPct
+						root.micVolPct = mvPct; root.lastMicVol = mvPct
 					}
-					root.micMuted = mm
-					root.lastMicMuted = mm
+					root.micMuted = mm; root.lastMicMuted = mm
 				}
-				if (p.length >= 5) {
-					root.hasActiveFullWindow = (p[4] === "1")
-				}
+				if (p.length >= 5) root.hasActiveFullWindow = (p[4] === "1")
 			}
 		}
 	}
@@ -477,28 +404,18 @@ ShellRoot {
 			IFS=':' read -r e_dev _ e_st e_con <<< \"$eth_line\"
 			e_on=0; e_ip=\"Disconnected\"
 			if [[ \"$e_st\" == \"connected\" ]]; then
-				e_on=1
-				e_ip=$(ip -4 -o addr show dev \"$e_dev\" 2>/dev/null | awk '{print $4}' | head -n1)
-				[[ -z \"$e_ip\" ]] && e_ip=\"Connected\"
+				e_on=1; e_ip=$(ip -4 -o addr show dev \"$e_dev\" 2>/dev/null | awk '{print $4}' | head -n1); [[ -z \"$e_ip\" ]] && e_ip=\"Connected\"
 			fi
 			w_hw=0; nmcli -t -f TYPE dev 2>/dev/null | grep -qx 'wifi' && w_hw=1
 			w_rad=$(nmcli radio wifi 2>/dev/null)
 			w_con=$(nmcli -t -f TYPE,STATE,CONNECTION dev 2>/dev/null | awk -F: '$1==\"wifi\" && $2==\"connected\"{print $3; exit}')
-			if [[ -n \"$w_con\" ]]; then net=\"$w_con\"
-			elif [[ \"$e_on\" -eq 1 ]]; then net=\"Ethernet\"
-			else net=\"Offline\"; fi
+			if [[ -n \"$w_con\" ]]; then net=\"$w_con\"; elif [[ \"$e_on\" -eq 1 ]]; then net=\"Ethernet\"; else net=\"Offline\"; fi
 			bt_line=$(bluetoothctl list 2>/dev/null | grep '^Controller' | head -n1)
-			if [[ -z \"$bt_line\" ]]; then
-				bt_hw=0; bt_en=0; bt_name=\"No Adapter\"
+			if [[ -z \"$bt_line\" ]]; then bt_hw=0; bt_en=0; bt_name=\"No Adapter\"
 			else
 				bt_hw=1
-				if rfkill list bluetooth 2>/dev/null | grep -q 'Soft blocked: yes' || ! bluetoothctl show 2>/dev/null | grep -q 'Powered: yes'; then
-					bt_en=0; bt_name=\"Off\"
-				else
-					bt_en=1
-					bt_c=$(bluetoothctl info 2>/dev/null | awk -F': ' '/Name:/{print $2; exit}')
-					bt_name=\"${bt_c:-On}\"
-				fi
+				if rfkill list bluetooth 2>/dev/null | grep -q 'Soft blocked: yes' || ! bluetoothctl show 2>/dev/null | grep -q 'Powered: yes'; then bt_en=0; bt_name=\"Off\"
+				else bt_en=1; bt_c=$(bluetoothctl info 2>/dev/null | awk -F': ' '/Name:/{print $2; exit}'); bt_name=\"${bt_c:-On}\"; fi
 			fi
 			hp=0; hmic=0
 			[[ \"$(wpctl inspect @DEFAULT_AUDIO_SINK@ 2>/dev/null | tr '[:upper:]' '[:lower:]')\" =~ (headphone|headset|bluez|earphone|buds) ]] && hp=1
@@ -516,39 +433,19 @@ ShellRoot {
 				b_p=$(awk -v p=\"$(cat \"$bat_d/power_now\" 2>/dev/null || echo 0)\" 'BEGIN{printf \"%.1f W\", p/1000000}')
 				b_c=$(cat \"$bat_d/cycle_count\" 2>/dev/null || echo 0); b_t=$(cat \"$bat_d/technology\" 2>/dev/null || echo \"Li-ion\")
 			else b_h=\"AC Power\"; b_p=\"0.0 W\"; b_c=\"N/A\"; b_t=\"Virtual / AC\"; fi
-			dpms_off=0
-			grep -q '^Off$' /sys/class/drm/*/dpms 2>/dev/null && dpms_off=1
+			dpms_off=0; grep -q '^Off$' /sys/class/drm/*/dpms 2>/dev/null && dpms_off=1
 			printf '%d|%s|%d|%s|%d|%s|%s|%d|%d|%s|%d|%d|%s|%d|%s|%s|%s|%s|%s|%s|%s|%s|%s|%d\n' \"$((t/1000))\" \"${e_dev:-}\" \"$e_on\" \"$e_ip\" \"$w_hw\" \"${w_rad:-disabled}\" \"$net\" \"$bt_hw\" \"$bt_en\" \"$bt_name\" \"$hp\" \"$hmic\" \"${cpu_m:-CPU}\" \"${cpu_u:-10}\" \"$ram_s\" \"$d_root\" \"${d_sec:-No secondary drive}\" \"$(uname -r)\" \"$(uptime -p 2>/dev/null | sed 's/^up //')\" \"$b_h\" \"$b_p\" \"$b_c\" \"$b_t\" \"$dpms_off\"
 		"]
 		stdout: SplitParser {
 			onRead: data => {
 				let p = data.trim().split("|")
 				if (p.length >= 25) {
-					root.cpuTemp = parseInt(p[0]) || 40
-					root.ethIface = p[1]
-					root.ethConnected = (p[2] === "1")
-					root.ethIp = p[3]
-					root.hasWifiHw = (p[4] === "1")
-					root.wifiEnabled = (p[5] === "enabled") && root.hasWifiHw
-					root.netName = p[6]
-					root.hasBtAdapter = (p[7] === "1")
-					root.btEnabled = (p[8] === "1")
-					root.btName = p[9]
-					root.isHeadphones = (p[10] === "1")
-					root.isHeadsetMic = (p[11] === "1")
-					root.cpuModel = p[12]
-					root.cpuUsage = parseInt(p[13]) || 0
-					root.ramInfo = p[14] + " (" + p[15] + "%)"
-					root.ramPct = parseInt(p[15]) || 0
-					root.diskRootInfo = p[16]
-					root.diskRootPct = parseInt(p[17]) || 0
-					root.diskSecInfo = p[18]
-					root.kernelVer = p[19]
-					root.uptimeStr = p[20]
-					root.batHealth = p[21]
-					root.batPowerDraw = p[22]
-					root.batCycles = p[23]
-					root.batTech = p[24]
+					root.cpuTemp = parseInt(p[0]) || 40; root.ethIface = p[1]; root.ethConnected = (p[2] === "1"); root.ethIp = p[3]
+					root.hasWifiHw = (p[4] === "1"); root.wifiEnabled = (p[5] === "enabled") && root.hasWifiHw; root.netName = p[6]
+					root.hasBtAdapter = (p[7] === "1"); root.btEnabled = (p[8] === "1"); root.btName = p[9]
+					root.isHeadphones = (p[10] === "1"); root.isHeadsetMic = (p[11] === "1"); root.cpuModel = p[12]; root.cpuUsage = parseInt(p[13]) || 0
+					root.ramInfo = p[14] + " (" + p[15] + "%)"; root.ramPct = parseInt(p[15]) || 0; root.diskRootInfo = p[16]; root.diskRootPct = parseInt(p[17]) || 0
+					root.diskSecInfo = p[18]; root.kernelVer = p[19]; root.uptimeStr = p[20]; root.batHealth = p[21]; root.batPowerDraw = p[22]; root.batCycles = p[23]; root.batTech = p[24]
 					if (p.length >= 26) root.isMonitorDpmsOff = (p[25] === "1")
 				}
 			}
@@ -567,56 +464,12 @@ ShellRoot {
 					printf '%s^%s^%d;' \"$mac\" \"$name\" \"$con\"
 				done)
 			fi
-			sinks=$(wpctl status 2>/dev/null | awk '/Sinks:/,/Sources:/' | grep -E '[0-9]+\\.' | while read -r l; do
-				act=0; [[ \"$l\" == *\"*\"* ]] && act=1
-				c=$(echo \"$l\" | sed 's/^[^0-9]*//')
-				id=${c%%.*}; r=${c#*. }
-				printf '%s^%s^%d;' \"$id\" \"${r%% \\[vol*}\" \"$act\"
-			done)
-			srcs=$(wpctl status 2>/dev/null | awk '/Sources:/,/Filters:|Streams:/' | grep -E '[0-9]+\\.' | while read -r l; do
-				act=0; [[ \"$l\" == *\"*\"* ]] && act=1
-				c=$(echo \"$l\" | sed 's/^[^0-9]*//')
-				id=${c%%.*}; r=${c#*. }
-				printf '%s^%s^%d;' \"$id\" \"${r%% \\[vol*}\" \"$act\"
-			done)
+			sinks=$(wpctl status 2>/dev/null | awk '/Sinks:/,/Sources:/' | grep -E '[0-9]+\\.' | while read -r l; do act=0; [[ \"$l\" == *\"*\"* ]] && act=1; c=$(echo \"$l\" | sed 's/^[^0-9]*//'); id=${c%%.*}; r=${c#*. }; printf '%s^%s^%d;' \"$id\" \"${r%% \\[vol*}\" \"$act\"; done)
+			srcs=$(wpctl status 2>/dev/null | awk '/Sources:/,/Filters:|Streams:/' | grep -E '[0-9]+\\.' | while read -r l; do act=0; [[ \"$l\" == *\"*\"* ]] && act=1; c=$(echo \"$l\" | sed 's/^[^0-9]*//'); id=${c%%.*}; r=${c#*. }; printf '%s^%s^%d;' \"$id\" \"${r%% \\[vol*}\" \"$act\"; done)
 			if [[ -n \"$NIRI_SOCKET\" ]]; then
-				disp=$(niri msg outputs 2>/dev/null | awk '
-				/^Output / {
-					if (name != \"\") printf \"%s^%s^%s^%s;\", name, cur, scale, modes
-					match($0, /\\([^)]+\\)/)
-					name = substr($0, RSTART+1, RLENGTH-2)
-					cur = \"1920x1080@60\"; scale = \"1.0\"; modes = \"\"; mcount = 0
-				}
-				/\\(current\\)/ {
-					m = $1; sub(/\\..*@/, \"@\", m)
-					cur = m
-					if (mcount < 8) { modes = modes (modes==\"\"?\"\":\",\") m; mcount++ }
-				}
-				/^[[:space:]]+[0-9]+x[0-9]+@/ && !/\\(current\\)/ {
-					if (mcount < 8) {
-						m = $1; sub(/\\..*@/, \"@\", m)
-						if (index(modes, m) == 0) { modes = modes (modes==\"\"?\"\":\",\") m; mcount++ }
-					}
-				}
-				/Scale:/ { scale = $2 }
-				END { if (name != \"\") printf \"%s^%s^%s^%s;\", name, cur, scale, modes }')
+				disp=$(niri msg outputs 2>/dev/null | awk '/^Output /{if(name!=\"\")printf \"%s^%s^%s^%s;\",name,cur,scale,modes; match($0,/\\([^)]+\\)/); name=substr($0,RSTART+1,RLENGTH-2); cur=\"1920x1080@60\"; scale=\"1.0\"; modes=\"\"; mcount=0} /\\(current\\)/{m=$1; sub(/\\..*@/,\"@\",m); cur=m; if(mcount<8){modes=modes (modes==\"\"?\"\":\",\") m; mcount++}} /^[[:space:]]+[0-9]+x[0-9]+@/ && !/\\(current\\)/{if(mcount<8){m=$1; sub(/\\..*@/,\"@\",m); if(index(modes,m)==0){modes=modes (modes==\"\"?\"\":\",\") m; mcount++}}} /Scale:/{scale=$2} END{if(name!=\"\")printf \"%s^%s^%s^%s;\",name,cur,scale,modes}')
 			elif [[ -n \"$HYPRLAND_INSTANCE_SIGNATURE\" ]]; then
-				disp=$(hyprctl monitors 2>/dev/null | awk '
-				/^Monitor / {
-					if (name != \"\") printf \"%s^%s^%s^%s;\", name, cur, scale, modes
-					name = $2; cur = \"1920x1080@60\"; scale = \"1.0\"; modes = \"\"
-				}
-				/^[[:space:]]+[0-9]+x[0-9]+@/ {
-					m = $1; sub(/\\..*$/, \"\", m); cur = m
-				}
-				/^[[:space:]]+scale:/ { scale = $2 }
-				/availableModes:/ {
-					for (i=2; i<=NF && i<=9; i++) {
-						m = $i; sub(/\\..*Hz/, \"\", m); sub(/Hz/, \"\", m)
-						modes = modes (modes==\"\"?\"\":\",\") m
-					}
-				}
-				END { if (name != \"\") printf \"%s^%s^%s^%s;\", name, cur, scale, modes }')
+				disp=$(hyprctl monitors 2>/dev/null | awk '/^Monitor /{if(name!=\"\")printf \"%s^%s^%s^%s;\",name,cur,scale,modes; name=$2; cur=\"1920x1080@60\"; scale=\"1.0\"; modes=\"\"} /^[[:space:]]+[0-9]+x[0-9]+@/{m=$1; sub(/\\..*$/,\"\",m); cur=m} /^[[:space:]]+scale:/{scale=$2} /availableModes:/{for(i=2;i<=NF&&i<=9;i++){m=$i; sub(/\\..*Hz/,\"\",m); sub(/Hz/,\"\",m); modes=modes (modes==\"\"?\"\":\",\") m}} END{if(name!=\"\")printf \"%s^%s^%s^%s;\",name,cur,scale,modes}')
 			fi
 			printf 'NET:%s\nSAVED:%s\nBT:%s\nSINK:%s\nSRC:%s\nDISP:%s\n' \"$nets\" \"$saved\" \"$bts\" \"$sinks\" \"$srcs\" \"$disp\"
 		"]
@@ -627,9 +480,8 @@ ShellRoot {
 					let r = l.substring(4).split(";"), a = []
 					for (let i = 0; i < r.length; i++) { let f = r[i].split("^"); if (f.length >= 4) a.push({ "connected": f[0] === "1", "signal": f[1], "sec": f[2], "ssid": f[3] }) }
 					root.netList = a
-				} else if (l.startsWith("SAVED:")) {
-					root.savedWifiList = l.substring(6).split(";").filter(x => x.trim() !== "")
-				} else if (l.startsWith("BT:")) {
+				} else if (l.startsWith("SAVED:")) root.savedWifiList = l.substring(6).split(";").filter(x => x.trim() !== "")
+				else if (l.startsWith("BT:")) {
 					let r = l.substring(3).split(";"), a = []
 					for (let i = 0; i < r.length; i++) { let f = r[i].split("^"); if (f.length >= 3) a.push({ "mac": f[0], "name": f[1], "connected": f[2] === "1" }) }
 					root.btList = a
@@ -699,7 +551,6 @@ ShellRoot {
 	Variants {
 		model: Quickshell.screens
 		PanelWindow {
-			id: wallWin
 			required property var modelData
 			screen: modelData
 			WlrLayershell.layer: WlrLayer.Background
@@ -713,21 +564,12 @@ ShellRoot {
 				anchors.fill: parent
 
 				NumberAnimation {
-					id: wallFadeAnim
-					target: wallContainer
-					property: "opacity"
-					from: 0.2
-					to: 1.0
+					id: wallFadeAnim; target: wallContainer; property: "opacity"; from: 0.2; to: 1.0
 					duration: root.fxActive && root.cfgWallpaperTransition !== "none" ? root.cfgWallpaperTransitionMs : 0
 					easing.type: Easing.OutCubic
 				}
-
 				NumberAnimation {
-					id: wallZoomAnim
-					target: wallContainer
-					property: "scale"
-					from: root.cfgWallpaperTransition === "zoom" ? 1.04 : 1.0
-					to: 1.0
+					id: wallZoomAnim; target: wallContainer; property: "scale"; from: root.cfgWallpaperTransition === "zoom" ? 1.04 : 1.0; to: 1.0
 					duration: root.fxActive && root.cfgWallpaperTransition === "zoom" ? root.cfgWallpaperTransitionMs : 0
 					easing.type: Easing.OutCubic
 				}
@@ -741,7 +583,7 @@ ShellRoot {
 						}
 					}
 					function onShouldPlayAnimationChanged() {
-						if (!root.isVideoFile) return
+						if (!root.isVideoFile) { wallVideoPlayer.stop(); return }
 						if (root.shouldPlayAnimation) wallVideoPlayer.play()
 						else wallVideoPlayer.pause()
 					}
@@ -750,10 +592,8 @@ ShellRoot {
 				Image {
 					anchors.fill: parent
 					visible: !root.isVideoFile && !root.isAnimatedGif
-					source: (visible && root.wallpaperPath !== "") ? "file://" + root.wallpaperPath : ""
-					fillMode: Image.PreserveAspectCrop
-					asynchronous: true
-					smooth: true
+					source: (!root.isVideoFile && !root.isAnimatedGif && root.wallpaperPath !== "") ? "file://" + root.wallpaperPath : ""
+					fillMode: Image.PreserveAspectCrop; asynchronous: true; smooth: true
 				}
 
 				AnimatedImage {
@@ -761,9 +601,7 @@ ShellRoot {
 					visible: root.isAnimatedGif
 					source: (root.isAnimatedGif && root.wallpaperPath !== "") ? "file://" + root.wallpaperPath : ""
 					playing: visible && root.shouldPlayAnimation
-					fillMode: Image.PreserveAspectCrop
-					asynchronous: true
-					smooth: true
+					fillMode: Image.PreserveAspectCrop; asynchronous: true; smooth: true
 				}
 
 				MediaPlayer {
@@ -778,29 +616,22 @@ ShellRoot {
 				}
 
 				VideoOutput {
-					id: wallVideoOut
-					anchors.fill: parent
-					visible: root.isVideoFile
-					fillMode: VideoOutput.PreserveAspectCrop
+					id: wallVideoOut; anchors.fill: parent; visible: root.isVideoFile; fillMode: VideoOutput.PreserveAspectCrop
 				}
 			}
 		}
 	}
 
-	// 2. INVISIBLE 46px TOP SPACER (Reserves top bar zone without shifting windows on hover)
+	// 2. INVISIBLE 46px TOP SPACER
 	Variants {
 		model: Quickshell.screens
 		PanelWindow {
 			required property var modelData
-			screen: modelData
-			visible: root.barVisible
-			WlrLayershell.layer: WlrLayer.Top
-			WlrLayershell.namespace: "waybar-spacer"
-			WlrLayershell.exclusionMode: ExclusionMode.Normal
-			exclusiveZone: 46
+			screen: modelData; visible: root.barVisible
+			WlrLayershell.layer: WlrLayer.Top; WlrLayershell.namespace: "waybar-spacer"
+			WlrLayershell.exclusionMode: ExclusionMode.Normal; exclusiveZone: 46
 			anchors { top: true; left: true; right: true }
-			implicitHeight: 46
-			color: "transparent"
+			implicitHeight: 46; color: "transparent"
 		}
 	}
 
@@ -809,10 +640,8 @@ ShellRoot {
 		model: Quickshell.screens
 		PanelWindow {
 			required property var modelData
-			screen: modelData
-			visible: root.centerMode !== "none"
-			WlrLayershell.layer: WlrLayer.Top
-			WlrLayershell.namespace: "qs-backdrop"
+			screen: modelData; visible: root.centerMode !== "none"
+			WlrLayershell.layer: WlrLayer.Top; WlrLayershell.namespace: "qs-backdrop"
 			WlrLayershell.exclusionMode: ExclusionMode.Ignore
 			anchors { top: true; bottom: true; left: true; right: true }
 			color: "transparent"
@@ -826,66 +655,37 @@ ShellRoot {
 		PanelWindow {
 			id: islandWin
 			required property var modelData
-			screen: modelData
-			visible: root.barVisible
+			screen: modelData; visible: root.barVisible
 			WlrLayershell.layer: (root.centerMode === "none" && !centerPill.isHoverPreview && !mediaPill.expanded) ? WlrLayer.Top : WlrLayer.Overlay
-			WlrLayershell.namespace: "waybar"
-			WlrLayershell.exclusionMode: ExclusionMode.Ignore
+			WlrLayershell.namespace: "waybar"; WlrLayershell.exclusionMode: ExclusionMode.Ignore
 			WlrLayershell.keyboardFocus: (root.centerMode === "launcher" || root.wifiPromptSsid !== "") ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
-			anchors { top: true }
-			margins.top: 8
-			implicitWidth: islandRow.implicitWidth + 16
-			implicitHeight: islandRow.implicitHeight + 8
-			color: "transparent"
+			anchors { top: true }; margins.top: 8
+			implicitWidth: islandRow.implicitWidth + 16; implicitHeight: islandRow.implicitHeight + 8; color: "transparent"
 
 			function grabKeyboardNow() {
-				if (root.centerMode === "launcher") {
-					islandWin.requestActivate()
-					launcherSearchInput.forceActiveFocus()
-				} else if (root.wifiPromptSsid !== "") {
-					islandWin.requestActivate()
-					wifiPwField.forceActiveFocus()
-				}
+				if (root.centerMode === "launcher" && !launcherSearchInput.activeFocus) launcherSearchInput.forceActiveFocus()
+				else if (root.wifiPromptSsid !== "" && !wifiPwField.activeFocus) wifiPwField.forceActiveFocus()
 			}
 
-			Timer { id: focusTimer1; interval: 20; repeat: false; onTriggered: islandWin.grabKeyboardNow() }
-			Timer { id: focusTimer2; interval: 90; repeat: false; onTriggered: islandWin.grabKeyboardNow() }
+			Timer { id: focusTimer1; interval: 30; repeat: false; onTriggered: islandWin.grabKeyboardNow() }
 
 			Connections {
 				target: root
-				function onCenterModeChanged() {
-					if (root.centerMode === "launcher") {
-						launcherSearchInput.text = ""
-						focusTimer1.restart()
-						focusTimer2.restart()
-					}
-				}
-				function onWifiPromptSsidChanged() {
-					if (root.wifiPromptSsid !== "") {
-						focusTimer1.restart()
-						focusTimer2.restart()
-					}
-				}
+				function onCenterModeChanged() { if (root.centerMode === "launcher") { launcherSearchInput.text = ""; focusTimer1.restart() } }
+				function onWifiPromptSsidChanged() { if (root.wifiPromptSsid !== "") focusTimer1.restart() }
 			}
 
 			RowLayout {
 				id: islandRow
-				anchors.top: parent.top
-				anchors.horizontalCenter: parent.horizontalCenter
-				spacing: 10
+				anchors.top: parent.top; anchors.horizontalCenter: parent.horizontalCenter; spacing: 10
 
 				Rectangle {
 					id: mediaPill
-					visible: root.activePlayer !== null
-					Layout.alignment: Qt.AlignTop
+					visible: root.activePlayer !== null; Layout.alignment: Qt.AlignTop
 					property bool expanded: mediaHover.hovered
-					implicitWidth: expanded ? 330 : 38
-					implicitHeight: expanded ? 150 : 38
-					radius: expanded ? 22 : 19
+					implicitWidth: expanded ? 330 : 38; implicitHeight: expanded ? 150 : 38; radius: expanded ? 22 : 19
 					color: root.withAlpha(root.bg, root.panelAlpha)
-					border.width: expanded ? 2 : 1
-					border.color: expanded ? root.color4 : root.withAlpha(root.color4, 0.6)
-					clip: true
+					border.width: expanded ? 2 : 1; border.color: expanded ? root.color4 : root.withAlpha(root.color4, 0.6); clip: true
 					Behavior on implicitWidth { NumberAnimation { duration: root.animMs; easing.type: root.cfgIslandEasing } }
 					Behavior on implicitHeight { NumberAnimation { duration: root.animMs; easing.type: root.cfgIslandEasing } }
 					HoverHandler { id: mediaHover }
@@ -943,8 +743,7 @@ ShellRoot {
 					id: wsPill
 					Layout.alignment: Qt.AlignTop
 					property bool showAll: root.wsExpanded || wsHover.hovered
-					implicitWidth: showAll ? (wsRow.implicitWidth + 16) : 38
-					implicitHeight: 38; radius: 19
+					implicitWidth: showAll ? (wsRow.implicitWidth + 16) : 38; implicitHeight: 38; radius: 19
 					color: root.withAlpha(root.bg, root.panelAlpha)
 					border.width: 1; border.color: root.withAlpha(root.color4, 0.6); clip: true
 					Behavior on implicitWidth { NumberAnimation { duration: root.animMs; easing.type: root.cfgIslandEasing } }
@@ -996,17 +795,14 @@ ShellRoot {
 					}
 
 					MouseArea {
-						anchors.fill: parent
-						visible: centerPill.isCalOpen || centerPill.isHoverPreview
-						acceptedButtons: Qt.RightButton
-						onClicked: root.openSystemPanel()
+						anchors.fill: parent; visible: centerPill.isCalOpen || centerPill.isHoverPreview
+						acceptedButtons: Qt.RightButton; onClicked: root.openSystemPanel()
 					}
 
 					Item {
 						id: topPillBar
 						visible: !centerPill.isSysOpen && !centerPill.isLauncherOpen && !centerPill.isOverviewOpen
-						anchors { top: parent.top; left: parent.left; right: parent.right }
-						height: 38
+						anchors { top: parent.top; left: parent.left; right: parent.right }; height: 38
 						RowLayout {
 							id: compactClockRow; anchors.centerIn: parent; spacing: 8
 							Rectangle { visible: notifServer.trackedNotifications.values.length > 0; implicitWidth: 7; implicitHeight: 7; radius: 4; color: root.color2 }
@@ -1028,15 +824,12 @@ ShellRoot {
 					ColumnLayout {
 						id: calCardCol
 						visible: centerPill.isHoverPreview || centerPill.isCalOpen
-						anchors { top: topPillBar.bottom; left: parent.left; right: parent.right; margins: 14 }
-						spacing: 10
+						anchors { top: topPillBar.bottom; left: parent.left; right: parent.right; margins: 14 }; spacing: 10
 
 						Item {
 							id: calPreviewBox; Layout.fillWidth: true; implicitHeight: calInnerCol.implicitHeight
 							ColumnLayout {
-								id: calInnerCol
-								anchors { left: parent.left; right: parent.right }
-								spacing: 6
+								id: calInnerCol; anchors { left: parent.left; right: parent.right }; spacing: 6
 								RowLayout {
 									Layout.fillWidth: true
 									Rectangle {
@@ -1136,7 +929,7 @@ ShellRoot {
 						}
 					}
 
-					// WORKSPACE WINDOWS OVERVIEW (Super + Tab / 3-Finger Swipe Up on Hyprland)
+					// WORKSPACE WINDOWS OVERVIEW
 					ColumnLayout {
 						visible: centerPill.isOverviewOpen; anchors.fill: parent; anchors.margins: 16; spacing: 10
 						RowLayout {
@@ -1145,8 +938,7 @@ ShellRoot {
 							Text { text: root.overviewWindows.length + " open"; color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11 }
 						}
 						ListView {
-							Layout.fillWidth: true; Layout.fillHeight: true; clip: true; spacing: 6
-							model: root.overviewWindows
+							Layout.fillWidth: true; Layout.fillHeight: true; clip: true; spacing: 6; model: root.overviewWindows
 							Text { anchors.centerIn: parent; visible: root.overviewWindows.length === 0; text: "No open windows in workspaces"; color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12 }
 							delegate: Rectangle {
 								required property var modelData
@@ -1186,7 +978,6 @@ ShellRoot {
 								Text { text: "󰍉 "; color: root.color4; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 15 }
 								TextInput {
 									id: launcherSearchInput; Layout.fillWidth: true; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 14; font.bold: true; clip: true
-									focus: true
 									onTextChanged: { root.searchQuery = text; root.selectedAppIndex = 0 }
 									Keys.onDownPressed: { if (root.selectedAppIndex < root.filteredApps.length - 1) root.selectedAppIndex++ }
 									Keys.onUpPressed: { if (root.selectedAppIndex > 0) root.selectedAppIndex-- }
@@ -1213,7 +1004,7 @@ ShellRoot {
 						}
 					}
 
-					// SYSTEM CONTROL CENTER WITH CONFIGURABLE SLIDE + FADE TRANSITION
+					// SYSTEM CONTROL CENTER
 					Item {
 						id: sysContainer
 						visible: centerPill.isSysOpen
@@ -1224,32 +1015,18 @@ ShellRoot {
 						property real viewOpacity: 1.0
 
 						NumberAnimation {
-							id: subSlideAnim
-							target: sysContainer
-							property: "viewOffset"
-							to: 0
-							duration: root.fxActive && root.cfgSubmenuAnimStyle === "slide" ? root.cfgSubmenuAnimMs : 0
-							easing.type: Easing.OutCubic
+							id: subSlideAnim; target: sysContainer; property: "viewOffset"; to: 0
+							duration: root.fxActive && root.cfgSubmenuAnimStyle === "slide" ? root.cfgSubmenuAnimMs : 0; easing.type: Easing.OutCubic
 						}
-
 						NumberAnimation {
-							id: subFadeAnim
-							target: sysContainer
-							property: "viewOpacity"
-							from: 0.15
-							to: 1.0
-							duration: root.fxActive && root.cfgSubmenuAnimStyle !== "none" ? root.cfgSubmenuAnimMs : 0
-							easing.type: Easing.OutCubic
+							id: subFadeAnim; target: sysContainer; property: "viewOpacity"; from: 0.15; to: 1.0
+							duration: root.fxActive && root.cfgSubmenuAnimStyle !== "none" ? root.cfgSubmenuAnimMs : 0; easing.type: Easing.OutCubic
 						}
 
 						Connections {
 							target: root
 							function onSysSubmenuChanged() {
-								if (!root.fxActive || root.cfgSubmenuAnimStyle === "none") {
-									sysContainer.viewOffset = 0
-									sysContainer.viewOpacity = 1.0
-									return
-								}
+								if (!root.fxActive || root.cfgSubmenuAnimStyle === "none") { sysContainer.viewOffset = 0; sysContainer.viewOpacity = 1.0; return }
 								subFadeAnim.restart()
 								if (root.cfgSubmenuAnimStyle === "slide") {
 									subSlideAnim.from = root.sysSubmenu !== "" ? root.cfgSubmenuSlidePx : -root.cfgSubmenuSlidePx
@@ -1261,10 +1038,8 @@ ShellRoot {
 						ColumnLayout {
 							id: sysMainCol
 							visible: root.sysSubmenu === ""
-							opacity: sysContainer.viewOpacity
-							transform: Translate { x: sysContainer.viewOffset }
-							anchors { left: parent.left; right: parent.right }
-							spacing: 10
+							opacity: sysContainer.viewOpacity; transform: Translate { x: sysContainer.viewOffset }
+							anchors { left: parent.left; right: parent.right }; spacing: 10
 
 							RowLayout {
 								Layout.fillWidth: true; spacing: 8
@@ -1295,11 +1070,7 @@ ShellRoot {
 							}
 
 							GridLayout {
-								Layout.fillWidth: true
-								columns: 2
-								uniformCellWidths: true
-								rowSpacing: 10
-								columnSpacing: 10
+								Layout.fillWidth: true; columns: 2; uniformCellWidths: true; rowSpacing: 10; columnSpacing: 10
 
 								Rectangle {
 									Layout.fillWidth: true; Layout.preferredWidth: 1; implicitHeight: 58; radius: 16; color: root.color0
@@ -1362,12 +1133,7 @@ ShellRoot {
 										Rectangle {
 											implicitWidth: 36; implicitHeight: 36; radius: 18
 											color: parent.parent.trayCount > 0 ? root.color4 : Qt.rgba(1, 1, 1, 0.08)
-											Text {
-												anchors.centerIn: parent
-												text: parent.parent.parent.trayCount.toString()
-												color: parent.parent.parent.trayCount > 0 ? root.bg : root.fg
-												font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 14; font.bold: true
-											}
+											Text { anchors.centerIn: parent; text: parent.parent.parent.trayCount.toString(); color: parent.parent.parent.trayCount > 0 ? root.bg : root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 14; font.bold: true }
 											MouseArea { anchors.fill: parent; onClicked: root.sysSubmenu = "tray" }
 										}
 										ColumnLayout {
@@ -1457,37 +1223,21 @@ ShellRoot {
 										let cl = Math.max(0, Math.min(1, r))
 										if (modelData === "display") {
 											let p = Math.max(5, Math.round(cl * 100))
-											root.brightnessPct = p
-											root.runCmd("brightnessctl s " + p + "%")
-										} else if (modelData === "sound") {
-											root.setSinkVolume(cl * 100)
-										} else if (modelData === "mic") {
-											root.setSourceVolume(cl * 100)
-										}
+											root.brightnessPct = p; root.runCmd("brightnessctl s " + p + "%")
+										} else if (modelData === "sound") root.setSinkVolume(cl * 100)
+										else if (modelData === "mic") root.setSourceVolume(cl * 100)
 									}
 
 									RowLayout {
 										anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 10; spacing: 8
-
 										RowLayout {
-											Layout.preferredWidth: 124
-											Layout.fillWidth: false
-											spacing: 4
-											Text {
-												text: mainSliderCard.modelData === "display" ? "Display" : (mainSliderCard.modelData === "sound" ? "Sound" : "Mic")
-												color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12; font.bold: true
-											}
+											Layout.preferredWidth: 124; Layout.fillWidth: false; spacing: 4
+											Text { text: mainSliderCard.modelData === "display" ? "Display" : (mainSliderCard.modelData === "sound" ? "Sound" : "Mic"); color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12; font.bold: true }
 											Item { Layout.fillWidth: true }
-											Text {
-												text: mainSliderCard.isMuted ? "Mute" : (mainSliderCard.valPct + "%")
-												color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11
-											}
+											Text { text: mainSliderCard.isMuted ? "Mute" : (mainSliderCard.valPct + "%"); color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11 }
 										}
-
 										Text {
-											text: mainSliderCard.iconTxt
-											color: mainSliderCard.isMuted ? root.color1 : root.color4
-											font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 16
+											text: mainSliderCard.iconTxt; color: mainSliderCard.isMuted ? root.color1 : root.color4; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 16
 											MouseArea {
 												anchors.fill: parent
 												onClicked: {
@@ -1496,21 +1246,15 @@ ShellRoot {
 												}
 											}
 										}
-
 										Rectangle {
 											Layout.fillWidth: true; implicitHeight: 14; radius: 7; color: Qt.rgba(1, 1, 1, 0.1)
-											Rectangle {
-												width: parent.width * Math.min(1, mainSliderCard.valPct / 100.0)
-												height: parent.height; radius: 7
-												color: mainSliderCard.isMuted ? root.color8 : root.color4
-											}
+											Rectangle { width: parent.width * Math.min(1, mainSliderCard.valPct / 100.0); height: parent.height; radius: 7; color: mainSliderCard.isMuted ? root.color8 : root.color4 }
 											MouseArea {
 												anchors.fill: parent
 												onPressed: mouse => mainSliderCard.setLevelFromRatio(mouse.x / width)
 												onPositionChanged: mouse => { if (pressed) mainSliderCard.setLevelFromRatio(mouse.x / width) }
 											}
 										}
-
 										Rectangle {
 											implicitWidth: 26; implicitHeight: 28; radius: 8; color: Qt.rgba(1, 1, 1, 0.05)
 											Text { anchors.centerIn: parent; text: "󰅀"; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 14 }
@@ -1524,10 +1268,8 @@ ShellRoot {
 						ColumnLayout {
 							id: sysSubCol
 							visible: root.sysSubmenu !== ""
-							opacity: sysContainer.viewOpacity
-							transform: Translate { x: sysContainer.viewOffset }
-							anchors { left: parent.left; right: parent.right }
-							spacing: 12
+							opacity: sysContainer.viewOpacity; transform: Translate { x: sysContainer.viewOffset }
+							anchors { left: parent.left; right: parent.right }; spacing: 12
 
 							RowLayout {
 								Layout.fillWidth: true; implicitHeight: 34; spacing: 10
@@ -1551,17 +1293,10 @@ ShellRoot {
 									MouseArea {
 										anchors.fill: parent
 										onClicked: {
-											if (root.sysSubmenu === "net" && root.ethIface !== "") {
-												root.runCmd("nmcli dev " + (root.ethConnected ? "disconnect " : "connect ") + root.ethIface)
-											} else if (root.sysSubmenu === "bt" && root.hasBtAdapter) {
-												root.runCmd(root.btEnabled ? "bluetoothctl power off; rfkill block bluetooth" : "rfkill unblock bluetooth; bluetoothctl power on")
-											} else if (root.sysSubmenu === "sound") {
-												root.outMuted = !root.outMuted
-												root.runCmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle")
-											} else if (root.sysSubmenu === "mic") {
-												root.micMuted = !root.micMuted
-												root.runCmd("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle")
-											}
+											if (root.sysSubmenu === "net" && root.ethIface !== "") root.runCmd("nmcli dev " + (root.ethConnected ? "disconnect " : "connect ") + root.ethIface)
+											else if (root.sysSubmenu === "bt" && root.hasBtAdapter) root.runCmd(root.btEnabled ? "bluetoothctl power off; rfkill block bluetooth" : "rfkill unblock bluetooth; bluetoothctl power on")
+											else if (root.sysSubmenu === "sound") { root.outMuted = !root.outMuted; root.runCmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle") }
+											else if (root.sysSubmenu === "mic") { root.micMuted = !root.micMuted; root.runCmd("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle") }
 											sysPoll.running = true
 										}
 									}
@@ -1579,9 +1314,7 @@ ShellRoot {
 							}
 
 							ColumnLayout {
-								visible: root.sysSubmenu === "sound" || root.sysSubmenu === "mic"
-								Layout.fillWidth: true; spacing: 8
-
+								visible: root.sysSubmenu === "sound" || root.sysSubmenu === "mic"; Layout.fillWidth: true; spacing: 8
 								Rectangle {
 									id: subAudioBox
 									Layout.fillWidth: true; implicitHeight: 54; radius: 14; color: root.color0
@@ -1629,21 +1362,16 @@ ShellRoot {
 							}
 
 							ColumnLayout {
-								visible: root.sysSubmenu === "display"
-								Layout.fillWidth: true; spacing: 10
-
+								visible: root.sysSubmenu === "display"; Layout.fillWidth: true; spacing: 10
 								Repeater {
 									model: root.sysSubmenu === "display" ? root.monitorsList : []
 									Rectangle {
 										required property var modelData
-										Layout.fillWidth: true
-										implicitHeight: monCardCol.implicitHeight + 24
-										radius: 14; color: root.color0
+										Layout.fillWidth: true; implicitHeight: monCardCol.implicitHeight + 24; radius: 14; color: root.color0
 
 										ColumnLayout {
 											id: monCardCol
-											anchors { top: parent.top; left: parent.left; right: parent.right; margins: 12 }
-											spacing: 10
+											anchors { top: parent.top; left: parent.left; right: parent.right; margins: 12 }; spacing: 10
 
 											RowLayout {
 												Layout.fillWidth: true; spacing: 10
@@ -1669,8 +1397,7 @@ ShellRoot {
 														anchors.fill: parent
 														function setBri(xPos) {
 															let p = Math.max(5, Math.min(100, Math.round((xPos / width) * 100)))
-															root.brightnessPct = p
-															root.runCmd("brightnessctl s " + p + "%")
+															root.brightnessPct = p; root.runCmd("brightnessctl s " + p + "%")
 														}
 														onPressed: mouse => setBri(mouse.x)
 														onPositionChanged: mouse => { if (pressed) setBri(mouse.x) }
@@ -1704,13 +1431,17 @@ ShellRoot {
 												}
 											}
 
-											RowLayout {
-												Layout.fillWidth: true
-												Text { text: "Resolution"; color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12; Layout.fillWidth: true }
+											// Resolution Selector wrapped in Item to prevent Layout anchor warnings
+											Item {
+												Layout.fillWidth: true; implicitHeight: 26
 												RowLayout {
-													spacing: 6
-													Text { text: modelData.curMode.replace("@", " @ ") + " Hz"; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12; font.bold: true }
-													Text { text: "󰅀"; color: root.color4; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 14 }
+													anchors.fill: parent
+													Text { text: "Resolution"; color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12; Layout.fillWidth: true }
+													RowLayout {
+														spacing: 6
+														Text { text: modelData.curMode.replace("@", " @ ") + " Hz"; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12; font.bold: true }
+														Text { text: "󰅀"; color: root.color4; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 14 }
+													}
 												}
 												MouseArea {
 													anchors.fill: parent
@@ -1719,8 +1450,7 @@ ShellRoot {
 											}
 
 											ColumnLayout {
-												visible: root.expandedResMon === modelData.name
-												Layout.fillWidth: true; spacing: 4
+												visible: root.expandedResMon === modelData.name; Layout.fillWidth: true; spacing: 4
 												Repeater {
 													model: (root.expandedResMon === modelData.name) ? modelData.modes : []
 													Rectangle {
@@ -1740,8 +1470,7 @@ ShellRoot {
 															onClicked: {
 																if (root.isHyprland) root.runCmd("hyprctl keyword monitor " + parent.monName + "," + modelData + ",auto," + parent.curScale)
 																else root.runCmd("niri msg output \"" + parent.monName + "\" mode " + modelData)
-																root.expandedResMon = ""
-																subPoll.running = true
+																root.expandedResMon = ""; subPoll.running = true
 															}
 														}
 													}
@@ -1812,7 +1541,6 @@ ShellRoot {
 								}
 							}
 
-							// BATTERY SUBMENU + ANIMATED WALLPAPERS TOGGLE + UI BLUR & ANIMATIONS TOGGLE
 							ColumnLayout {
 								visible: root.sysSubmenu === "battery"; Layout.fillWidth: true; spacing: 8
 								Rectangle {
@@ -1828,85 +1556,50 @@ ShellRoot {
 									}
 								}
 
-								// 1. Animated Wallpapers Switch + Loaded Folder/File Indicator
 								Rectangle {
 									Layout.fillWidth: true; implicitHeight: 68; radius: 12; color: root.color0
 									RowLayout {
 										anchors.fill: parent; anchors.margins: 10; spacing: 10
 										Rectangle {
-											implicitWidth: 34; implicitHeight: 34; radius: 17
-											color: root.animWallpapers ? root.color4 : Qt.rgba(1, 1, 1, 0.08)
-											Text {
-												anchors.centerIn: parent
-												text: root.animWallpapers ? "󰕧" : "󰸉"
-												color: root.animWallpapers ? root.bg : root.fg
-												font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 16
-											}
+											implicitWidth: 34; implicitHeight: 34; radius: 17; color: root.animWallpapers ? root.color4 : Qt.rgba(1, 1, 1, 0.08)
+											Text { anchors.centerIn: parent; text: root.animWallpapers ? "󰕧" : "󰸉"; color: root.animWallpapers ? root.bg : root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 16 }
 										}
 										ColumnLayout {
 											Layout.fillWidth: true; spacing: 2
 											Text { text: "Animated Wallpapers"; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12; font.bold: true }
 											Text {
 												text: root.animWallpapers ? (root.shouldPlayAnimation ? "Playing (day_animated / night_animated)" : "Paused (Fullscreen / Standby)") : "Off • Static Power Saving (day / night)"
-												color: root.animWallpapers ? root.color4 : root.color2
-												font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 10
+												color: root.animWallpapers ? root.color4 : root.color2; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 10
 											}
-											Text {
-												text: "Loaded: " + root.wallpaperLabel
-												color: root.color8
-												font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 10
-												elide: Text.ElideMiddle; Layout.fillWidth: true
-											}
+											Text { text: "Loaded: " + root.wallpaperLabel; color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 10; elide: Text.ElideMiddle; Layout.fillWidth: true }
 										}
 										Rectangle {
-											implicitWidth: 44; implicitHeight: 22; radius: 11
-											color: root.animWallpapers ? root.color4 : Qt.rgba(1, 1, 1, 0.15)
-											Rectangle {
-												width: 16; height: 16; radius: 8
-												anchors.verticalCenter: parent.verticalCenter
-												x: root.animWallpapers ? 24 : 4
-												color: root.animWallpapers ? root.bg : root.fg
-												Behavior on x { NumberAnimation { duration: 120 } }
-											}
+											implicitWidth: 44; implicitHeight: 22; radius: 11; color: root.animWallpapers ? root.color4 : Qt.rgba(1, 1, 1, 0.15)
+											Rectangle { width: 16; height: 16; radius: 8; anchors.verticalCenter: parent.verticalCenter; x: root.animWallpapers ? 24 : 4; color: root.animWallpapers ? root.bg : root.fg; Behavior on x { NumberAnimation { duration: 120 } } }
 										}
 									}
 									MouseArea { anchors.fill: parent; onClicked: root.toggleWallpaperMode() }
 								}
 
-								// 2. UI Blur & Animations Switch (Power-Saving vs Real Glass Blur)
 								Rectangle {
 									Layout.fillWidth: true; implicitHeight: 54; radius: 12; color: root.color0
 									RowLayout {
 										anchors.fill: parent; anchors.margins: 10; spacing: 10
 										Rectangle {
-											implicitWidth: 34; implicitHeight: 34; radius: 17
-											color: root.fxActive ? root.color5 : Qt.rgba(1, 1, 1, 0.08)
-											Text {
-												anchors.centerIn: parent
-												text: "󰂵"
-												color: root.fxActive ? root.bg : root.fg
-												font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 16
-											}
+											implicitWidth: 34; implicitHeight: 34; radius: 17; color: root.fxActive ? root.color5 : Qt.rgba(1, 1, 1, 0.08)
+											Text { anchors.centerIn: parent; text: "󰂵"; color: root.fxActive ? root.bg : root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 16 }
 										}
 										ColumnLayout {
 											Layout.fillWidth: true; spacing: 1
 											Text { text: "UI Blur & Animations"; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12; font.bold: true }
 											Text {
 												text: root.isVM ? "Disabled in VM Mode" : (root.fxActive ? "Active • Glass Blur & Smooth Transitions" : "Off • Solid Panels & Instant Transitions")
-												color: root.fxActive ? root.color5 : root.color8
-												font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 10
+												color: root.fxActive ? root.color5 : root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 10
 											}
 										}
 										Rectangle {
-											implicitWidth: 44; implicitHeight: 22; radius: 11
-											color: root.fxActive ? root.color5 : Qt.rgba(1, 1, 1, 0.15)
-											Rectangle {
-												width: 16; height: 16; radius: 8
-												anchors.verticalCenter: parent.verticalCenter
-												x: root.fxActive ? 24 : 4
-												color: root.fxActive ? root.bg : root.fg
-												Behavior on x { NumberAnimation { duration: 120 } }
-											}
+											implicitWidth: 44; implicitHeight: 22; radius: 11; color: root.fxActive ? root.color5 : Qt.rgba(1, 1, 1, 0.15)
+											Rectangle { width: 16; height: 16; radius: 8; anchors.verticalCenter: parent.verticalCenter; x: root.fxActive ? 24 : 4; color: root.fxActive ? root.bg : root.fg; Behavior on x { NumberAnimation { duration: 120 } } }
 										}
 									}
 									MouseArea { anchors.fill: parent; onClicked: { if (!root.isVM) root.toggleUiEffects() } }
@@ -1931,7 +1624,6 @@ ShellRoot {
 
 							ColumnLayout {
 								visible: root.sysSubmenu === "net"; Layout.fillWidth: true; spacing: 8
-
 								Rectangle {
 									Layout.fillWidth: true; implicitHeight: 50; radius: 12; color: root.color0
 									RowLayout {
@@ -1945,7 +1637,6 @@ ShellRoot {
 										Text { text: root.ethConnected ? "Connected" : "Offline"; color: root.ethConnected ? root.color4 : root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; font.bold: true }
 									}
 								}
-
 								Rectangle {
 									Layout.fillWidth: true; implicitHeight: 50; radius: 12; color: root.color0
 									RowLayout {
@@ -1954,26 +1645,20 @@ ShellRoot {
 										ColumnLayout {
 											Layout.fillWidth: true; spacing: 1
 											Text { text: "Wi-Fi"; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12; font.bold: true }
-											Text {
-												text: !root.hasWifiHw ? "No Wi-Fi Adapter" : ("Available: " + root.netList.length + " • Saved: " + root.savedWifiList.length)
-												color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 10
-											}
+											Text { text: !root.hasWifiHw ? "No Wi-Fi Adapter" : ("Available: " + root.netList.length + " • Saved: " + root.savedWifiList.length); color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 10 }
 										}
 										Rectangle {
-											visible: root.hasWifiHw && root.wifiEnabled
-											implicitWidth: 56; implicitHeight: 22; radius: 6; color: Qt.rgba(1, 1, 1, 0.08)
+											visible: root.hasWifiHw && root.wifiEnabled; implicitWidth: 56; implicitHeight: 22; radius: 6; color: Qt.rgba(1, 1, 1, 0.08)
 											Text { anchors.centerIn: parent; text: "Rescan"; color: root.color4; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 10; font.bold: true }
 											MouseArea { anchors.fill: parent; onClicked: { root.runCmd("nmcli dev wifi rescan 2>/dev/null || true"); subPoll.running = true } }
 										}
 										Rectangle {
-											visible: root.hasWifiHw
-											implicitWidth: 42; implicitHeight: 22; radius: 11; color: root.wifiEnabled ? root.color4 : Qt.rgba(1, 1, 1, 0.15)
+											visible: root.hasWifiHw; implicitWidth: 42; implicitHeight: 22; radius: 11; color: root.wifiEnabled ? root.color4 : Qt.rgba(1, 1, 1, 0.15)
 											Rectangle { width: 16; height: 16; radius: 8; anchors.verticalCenter: parent.verticalCenter; x: root.wifiEnabled ? 22 : 4; color: root.wifiEnabled ? root.bg : root.fg; Behavior on x { NumberAnimation { duration: 120 } } }
 											MouseArea { anchors.fill: parent; onClicked: { root.runCmd("nmcli radio wifi " + (root.wifiEnabled ? "off" : "on")); sysPoll.running = true; subPoll.running = true } }
 										}
 									}
 								}
-
 								Rectangle {
 									visible: root.wifiPromptSsid !== ""; Layout.fillWidth: true; implicitHeight: 74; radius: 12; color: root.color0; border.width: 1; border.color: root.color4
 									ColumnLayout {
@@ -1994,7 +1679,6 @@ ShellRoot {
 										}
 									}
 								}
-
 								Repeater {
 									model: (root.sysSubmenu === "net" && root.wifiEnabled) ? root.netList : []
 									Rectangle {
@@ -2016,7 +1700,6 @@ ShellRoot {
 										}
 									}
 								}
-
 								Text { visible: root.savedWifiList.length > 0; text: "Saved Wi-Fi Profiles"; color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; font.bold: true }
 								Repeater {
 									model: root.sysSubmenu === "net" ? root.savedWifiList : []
@@ -2043,15 +1726,13 @@ ShellRoot {
 									Layout.fillWidth: true
 									Text { text: root.hasBtAdapter ? "Bluetooth Devices" : "No Bluetooth Controller Found"; color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; font.bold: true; Layout.fillWidth: true }
 									Rectangle {
-										visible: root.hasBtAdapter && root.btEnabled
-										implicitWidth: 64; implicitHeight: 22; radius: 6; color: Qt.rgba(1, 1, 1, 0.08)
+										visible: root.hasBtAdapter && root.btEnabled; implicitWidth: 64; implicitHeight: 22; radius: 6; color: Qt.rgba(1, 1, 1, 0.08)
 										Text { anchors.centerIn: parent; text: "Scan"; color: root.color4; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; font.bold: true }
 										MouseArea { anchors.fill: parent; onClicked: { root.runCmd("bluetoothctl --timeout 5 scan on"); subPoll.running = true } }
 									}
 								}
 								Rectangle {
-									visible: !root.hasBtAdapter || root.btList.length === 0
-									Layout.fillWidth: true; implicitHeight: 42; radius: 12; color: root.color0
+									visible: !root.hasBtAdapter || root.btList.length === 0; Layout.fillWidth: true; implicitHeight: 42; radius: 12; color: root.color0
 									Text { anchors.centerIn: parent; text: !root.hasBtAdapter ? "Hardware adapter not present" : "No paired or discovered devices"; color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12 }
 								}
 								Repeater {
@@ -2124,7 +1805,6 @@ ShellRoot {
 								}
 							}
 
-							// POWER SUBMENU (Immediate Video Pause on Suspend/Hibernate)
 							ColumnLayout {
 								visible: root.sysSubmenu === "power"; Layout.fillWidth: true; spacing: 8
 								Repeater {
@@ -2146,10 +1826,7 @@ ShellRoot {
 										MouseArea {
 											id: pwrItemMouse; anchors.fill: parent; hoverEnabled: true
 											onClicked: {
-												if (modelData.pause) {
-													root.isMonitorDpmsOff = true
-													root.triggerLock()
-												}
+												if (modelData.pause) { root.isMonitorDpmsOff = true; root.triggerLock() }
 												if (modelData.cmd === "LOCK") root.triggerLock()
 												else root.runCmd(modelData.cmd)
 											}
@@ -2163,8 +1840,7 @@ ShellRoot {
 
 				Rectangle {
 					id: rightOsdPill
-					Layout.alignment: Qt.AlignTop
-					implicitWidth: 38; implicitHeight: 38; radius: 19
+					Layout.alignment: Qt.AlignTop; implicitWidth: 38; implicitHeight: 38; radius: 19
 					color: root.withAlpha(root.bg, root.panelAlpha)
 					property real arcPct: root.osdMode === "brightness" ? (root.brightnessPct / 100.0) : (root.osdMode === "mic" ? (root.micMuted ? 0 : root.micVolPct / 100.0) : (root.outMuted ? 0 : root.outVolPct / 100.0))
 					property string centerIcon: root.osdMode === "brightness" ? "󰃠" : (root.osdMode === "mic" ? (root.micMuted ? (root.isHeadsetMic ? "󰋐" : "󰍭") : (root.isHeadsetMic ? "󰋎" : "󰍬")) : (root.outMuted ? (root.isHeadphones ? "󰟎" : "󰖁") : (root.isHeadphones ? "󰋋" : "󰕾")))
@@ -2218,13 +1894,10 @@ ShellRoot {
 		model: Quickshell.screens
 		PanelWindow {
 			required property var modelData
-			screen: modelData
-			visible: root.popupNotifications.length > 0 && root.centerMode === "none"
-			WlrLayershell.layer: WlrLayer.Overlay
-			WlrLayershell.namespace: "swaync-notification-window"
+			screen: modelData; visible: root.popupNotifications.length > 0 && root.centerMode === "none"
+			WlrLayershell.layer: WlrLayer.Overlay; WlrLayershell.namespace: "swaync-notification-window"
 			WlrLayershell.exclusionMode: ExclusionMode.Ignore
-			anchors { top: true }
-			margins.top: 56
+			anchors { top: true }; margins.top: 56
 			implicitWidth: 360; implicitHeight: notifPopupCol.implicitHeight + 16; color: "transparent"
 			ColumnLayout {
 				id: notifPopupCol; anchors.fill: parent; anchors.margins: 8; spacing: 8
@@ -2244,24 +1917,42 @@ ShellRoot {
 		}
 	}
 
-	// 6. INTEGRATED LOCKSCREEN (Animated when Animated Wallpapers is ON, Blurred Static otherwise)
+	// 6. INTEGRATED MINIMALIST LOCKSCREEN (2x Detailed Weather & Auto-Revealing Password Input)
 	property bool authError: false
 	property bool authBusy: false
+	property bool lockPromptActive: false
 	property string pendingPassword: ""
+	property string currentUserName: (Quickshell.env("USER") || Quickshell.env("LOGNAME") || "USER").toUpperCase()
+	property string lockDateFormatted: Qt.formatDateTime(new Date(), "dddd, MMMM d").toUpperCase()
 	property bool showLiveLockWall: root.animWallpapers && root.cfgLockKeepAnimated && (root.isVideoFile || root.isAnimatedGif)
+
+	property string lockWeatherMain: {
+		let cond = (root.weatherDetail.split("•")[0] || "").trim()
+		return root.weatherShort + (cond !== "" && !cond.includes("Fetching") ? ("   •   " + cond) : "")
+	}
+	property string lockWeatherSub: {
+		let parts = root.weatherDetail.split("•")
+		if (parts.length < 4) return ""
+		return parts[1].trim() + "   •   󰖝 " + parts[2].replace("Wind:", "").trim() + "   •   󰖎 " + parts[3].replace("Hum:", "").trim()
+	}
 
 	PamContext {
 		id: pamLock; config: "quickshell"
 		onResponseRequiredChanged: { if (responseRequired && root.authBusy) respond(root.pendingPassword) }
 		onCompleted: result => {
 			root.authBusy = false
-			if (result === PamResult.Success) { root.screenLocked = false; root.authError = false } else root.authError = true
+			if (result === PamResult.Success) {
+				root.screenLocked = false; root.authError = false; root.lockPromptActive = false
+			} else {
+				root.authError = true; root.lockPromptActive = true
+			}
 		}
 	}
 
 	Variants {
 		model: Quickshell.screens
 		PanelWindow {
+			id: lockWin
 			required property var modelData
 			screen: modelData; visible: root.screenLocked
 			WlrLayershell.layer: WlrLayer.Overlay; WlrLayershell.namespace: "lockscreen"
@@ -2269,39 +1960,185 @@ ShellRoot {
 			WlrLayershell.keyboardFocus: root.screenLocked ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 			anchors { top: true; bottom: true; left: true; right: true }
 			color: root.showLiveLockWall ? "transparent" : root.bg
+
 			onVisibleChanged: {
 				if (visible) {
-					root.isMonitorDpmsOff = false
+					root.isMonitorDpmsOff = false; root.lockPromptActive = false; root.authError = false
+					root.lockDateFormatted = Qt.formatDateTime(new Date(), "dddd, MMMM d").toUpperCase()
 					pwLockInput.text = ""
-					pwLockInput.forceActiveFocus()
+					if (!pwLockInput.activeFocus) pwLockInput.forceActiveFocus()
 				}
 			}
+
 			Image {
 				id: lockWall; anchors.fill: parent
 				source: (!root.showLiveLockWall && root.wallpaperPath !== "") ? (root.isVideoFile ? "file:///tmp/wall_frame.jpg" : "file://" + root.wallpaperPath) : ""
 				fillMode: Image.PreserveAspectCrop
 				visible: !root.showLiveLockWall && (!root.fxActive || root.cfgLockBlurMax <= 0)
 			}
+
 			MultiEffect {
-				anchors.fill: parent
-				source: lockWall
+				anchors.fill: parent; source: lockWall
 				visible: !root.showLiveLockWall && root.fxActive && root.cfgLockBlurMax > 0 && root.wallpaperPath !== ""
-				blurEnabled: visible
-				blurMax: root.cfgLockBlurMax
-				blur: 1.0
+				blurEnabled: visible; blurMax: root.cfgLockBlurMax; blur: 1.0
 			}
-			Rectangle { anchors.fill: parent; color: Qt.rgba(0, 0, 0, 0.35) }
-			Text { anchors.horizontalCenter: parent.horizontalCenter; anchors.verticalCenter: parent.verticalCenter; anchors.verticalCenterOffset: -80; text: root.timeStr; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 64; font.bold: true }
-			Rectangle {
-				width: 260; height: 50; radius: 25; anchors.horizontalCenter: parent.horizontalCenter; anchors.verticalCenter: parent.verticalCenter; anchors.verticalCenterOffset: 20
-				color: root.bg; border.width: 3; border.color: root.authError ? root.color1 : root.color4
-				TextInput {
-					id: pwLockInput; anchors.fill: parent; anchors.leftMargin: 20; anchors.rightMargin: 20; verticalAlignment: TextInput.AlignVCenter; horizontalAlignment: TextInput.AlignHCenter
-					echoMode: TextInput.Password; passwordCharacter: "●"; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 18; focus: true
-					onTextChanged: root.authError = false
-					Keys.onReturnPressed: { if (root.authBusy || text === "") return; root.authError = false; root.authBusy = true; root.pendingPassword = text; text = ""; pamLock.start() }
+
+			Rectangle { anchors.fill: parent; color: Qt.rgba(0, 0, 0, 0.38) }
+
+			// TOP SECTION: Large Clock, Spaced Date & 2x Detailed Weather
+			ColumnLayout {
+				anchors.horizontalCenter: parent.horizontalCenter
+				anchors.top: parent.top; anchors.topMargin: Math.round(parent.height * 0.13); spacing: 10
+
+				Text { Layout.alignment: Qt.AlignHCenter; text: root.timeStr; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 84; font.weight: Font.Light }
+				Text { Layout.alignment: Qt.AlignHCenter; text: root.lockDateFormatted; color: root.withAlpha(root.fg, 0.85); font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 14; font.bold: true; font.letterSpacing: 6 }
+				Text { Layout.alignment: Qt.AlignHCenter; Layout.topMargin: 8; text: root.lockWeatherMain; color: root.color4; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 24; font.bold: true; font.letterSpacing: 2 }
+				Text { Layout.alignment: Qt.AlignHCenter; visible: root.lockWeatherSub !== ""; text: root.lockWeatherSub; color: root.withAlpha(root.fg, 0.78); font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 14; font.letterSpacing: 1.5 }
+			}
+
+			// CENTER-LOWER SECTION: Clickable Username & Auto-Revealing Password Input
+			ColumnLayout {
+				anchors.horizontalCenter: parent.horizontalCenter
+				anchors.verticalCenter: parent.verticalCenter; anchors.verticalCenterOffset: Math.round(parent.height * 0.14); spacing: 6
+
+				Item {
+					Layout.alignment: Qt.AlignHCenter
+					implicitWidth: Math.max(userLbl.implicitWidth, userNameTxt.implicitWidth) + 24; implicitHeight: userCol.implicitHeight + 8
+
+					ColumnLayout {
+						id: userCol; anchors.centerIn: parent; spacing: 4
+						Text { id: userLbl; Layout.alignment: Qt.AlignHCenter; text: "USER"; color: root.withAlpha(root.fg, 0.55); font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 10; font.letterSpacing: 4 }
+						Text {
+							id: userNameTxt; Layout.alignment: Qt.AlignHCenter; text: root.currentUserName
+							color: userClickArea.containsMouse ? root.color4 : root.fg
+							font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 16; font.bold: true; font.letterSpacing: 3
+							Behavior on color { ColorAnimation { duration: 120 } }
+						}
+					}
+					MouseArea {
+						id: userClickArea; anchors.fill: parent; hoverEnabled: true
+						onClicked: { root.lockPromptActive = !root.lockPromptActive; if (!pwLockInput.activeFocus) pwLockInput.forceActiveFocus() }
+					}
 				}
-				Text { anchors.centerIn: parent; visible: pwLockInput.text.length === 0; text: root.authError ? "Wrong password..." : "Password..."; color: root.authError ? root.color1 : Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.5); font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 15; font.italic: true }
+
+				Item {
+					id: pwBoxContainer
+					Layout.alignment: Qt.AlignHCenter; Layout.topMargin: 10; implicitWidth: 230; implicitHeight: 34
+					property bool showBar: root.lockPromptActive || pwLockInput.text.length > 0 || root.authError
+					opacity: showBar ? 1.0 : 0.0
+					Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+
+					TextInput {
+						id: pwLockInput
+						anchors.fill: parent; anchors.bottomMargin: 6
+						verticalAlignment: TextInput.AlignVCenter; horizontalAlignment: TextInput.AlignHCenter
+						echoMode: TextInput.Password; passwordCharacter: "•"; color: root.fg
+						font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 18; font.letterSpacing: 6
+						onTextChanged: {
+							if (text.length > 0) { root.authError = false; root.lockPromptActive = true }
+							else if (!root.authError) root.lockPromptActive = false
+						}
+						Keys.onEscapePressed: { text = ""; root.authError = false; root.lockPromptActive = false }
+						Keys.onReturnPressed: {
+							if (root.authBusy || text === "") return
+							root.authError = false; root.authBusy = true; root.pendingPassword = text; text = ""; pamLock.start()
+						}
+					}
+
+					Text {
+						anchors.centerIn: parent; anchors.verticalCenterOffset: -3
+						visible: pwLockInput.text.length === 0 && root.authError
+						text: "WRONG PASSWORD"; color: root.color1; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; font.bold: true; font.letterSpacing: 3
+					}
+
+					Rectangle {
+						anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom; height: 1.5
+						color: root.authError ? root.color1 : (pwLockInput.text.length > 0 ? root.color4 : root.withAlpha(root.fg, 0.6))
+						Behavior on color { ColorAnimation { duration: 150 } }
+					}
+				}
+			}
+
+			// BOTTOM-LEFT: Session / Window Manager Indicator
+			RowLayout {
+				anchors.left: parent.left; anchors.bottom: parent.bottom; anchors.leftMargin: 32; anchors.bottomMargin: 26; spacing: 8
+				Text { text: "SESSION"; color: root.withAlpha(root.fg, 0.6); font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; font.letterSpacing: 2 }
+				Text { text: "|"; color: root.color4; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; font.bold: true }
+				Text { text: root.isHyprland ? "HYPRLAND" : "NIRI"; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; font.bold: true; font.letterSpacing: 2 }
+			}
+
+			// BOTTOM-CENTER: Minimal Media Controls
+			Rectangle {
+				visible: root.activePlayer !== null
+				anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; anchors.bottomMargin: 20
+				implicitWidth: lockMediaRow.implicitWidth + 24; implicitHeight: 38; radius: 19
+				color: root.withAlpha(root.bg, 0.55); border.width: 1; border.color: root.withAlpha(root.color4, 0.4)
+
+				RowLayout {
+					id: lockMediaRow; anchors.centerIn: parent; spacing: 12
+					Rectangle {
+						implicitWidth: 24; implicitHeight: 24; radius: 6; color: root.color0; clip: true
+						Image { anchors.fill: parent; source: (root.activePlayer && root.activePlayer.trackArtUrl) ? root.activePlayer.trackArtUrl : ""; fillMode: Image.PreserveAspectCrop; visible: source != "" }
+						Text { anchors.centerIn: parent; visible: !root.activePlayer || !root.activePlayer.trackArtUrl; text: "󰝚"; color: root.color4; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 13 }
+					}
+					Text {
+						Layout.maximumWidth: 200
+						text: (root.activePlayer && root.activePlayer.trackTitle) ? (root.activePlayer.trackTitle + (root.activePlayer.trackArtist ? " — " + root.activePlayer.trackArtist : "")) : "Media Playing"
+						color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; elide: Text.ElideRight
+					}
+					RowLayout {
+						spacing: 10
+						Item { implicitWidth: 20; implicitHeight: 20; Text { anchors.centerIn: parent; text: "󰒮"; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 14 } MouseArea { anchors.fill: parent; onClicked: { if (root.activePlayer) root.activePlayer.previous() } } }
+						Item {
+							implicitWidth: 22; implicitHeight: 22
+							Text { anchors.centerIn: parent; text: (root.activePlayer && root.activePlayer.playbackState === MprisPlaybackState.Playing) ? "󰏤" : "󰐊"; color: root.color4; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 15 }
+							MouseArea { anchors.fill: parent; onClicked: { if (root.activePlayer) root.activePlayer.togglePlaying() } }
+						}
+						Item { implicitWidth: 20; implicitHeight: 20; Text { anchors.centerIn: parent; text: "󰒭"; color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 14 } MouseArea { anchors.fill: parent; onClicked: { if (root.activePlayer) root.activePlayer.next() } } }
+					}
+				}
+			}
+
+			// BOTTOM-RIGHT: Collapsible Hover Power Menu above SHUTDOWN
+			Item {
+				id: lockPowerZone
+				anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.rightMargin: 32; anchors.bottomMargin: 26
+				implicitWidth: 110; implicitHeight: lockPowerHover.hovered ? lockPowerCol.implicitHeight : 22
+				HoverHandler { id: lockPowerHover }
+
+				ColumnLayout {
+					id: lockPowerCol; anchors.right: parent.right; anchors.bottom: parent.bottom; spacing: 10
+					Repeater {
+						model: [
+							{ "label": "HIBERNATE", "cmd": "loginctl hibernate || ZZZ", "pause": true },
+							{ "label": "SUSPEND", "cmd": "loginctl suspend || zzz", "pause": true },
+							{ "label": "REBOOT", "cmd": "loginctl reboot || reboot", "pause": false }
+						]
+						Item {
+							required property var modelData
+							visible: lockPowerHover.hovered; Layout.alignment: Qt.AlignRight
+							implicitWidth: pwrOptTxt.implicitWidth + 8; implicitHeight: 20
+							Text {
+								id: pwrOptTxt; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; text: modelData.label
+								color: pwrOptMouse.containsMouse ? root.color4 : root.withAlpha(root.fg, 0.75)
+								font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; font.bold: pwrOptMouse.containsMouse; font.letterSpacing: 2
+							}
+							MouseArea {
+								id: pwrOptMouse; anchors.fill: parent; hoverEnabled: true
+								onClicked: { if (modelData.pause) root.isMonitorDpmsOff = true; root.runCmd(modelData.cmd) }
+							}
+						}
+					}
+					Item {
+						Layout.alignment: Qt.AlignRight; implicitWidth: shutdownTxt.implicitWidth + 8; implicitHeight: 20
+						Text {
+							id: shutdownTxt; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; text: "SHUTDOWN"
+							color: shutdownMouse.containsMouse ? root.color1 : root.withAlpha(root.fg, 0.8)
+							font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; font.bold: true; font.letterSpacing: 2
+						}
+						MouseArea { id: shutdownMouse; anchors.fill: parent; hoverEnabled: true; onClicked: root.runCmd("loginctl poweroff || poweroff") }
+					}
+				}
 			}
 		}
 	}
