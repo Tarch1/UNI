@@ -42,6 +42,7 @@ NIGHT_DIR="$WALL_DIR/night"
 DAY_ANIM_DIR="$WALL_DIR/day_animated"
 NIGHT_ANIM_DIR="$WALL_DIR/night_animated"
 QS_DIR="$HOME/.config/quickshell"
+QT6_DIR="$HOME/.config/qt6ct/colors"
 FRAME_CACHE="/tmp/wall_frame.jpg"
 FORCED_MODE="${1:-}"
 CURRENT_WALL=""
@@ -63,6 +64,24 @@ get_ui_effects() {
 	local fx
 	fx=$(grep -o '"uiEffects": *[a-z]*' "$QS_DIR/colors.json" 2>/dev/null | awk -F: '{gsub(/[[:space:]]/,"",$2); print $2}')
 	[[ "$fx" == "false" ]] && echo "false" || echo "true"
+}
+
+update_qt6ct_colors() {
+	mkdir -p "$QT6_DIR"
+	[[ ! -f "$QS_DIR/colors.json" ]] && return 0
+	awk -F'"' '
+	BEGIN { bg="1e1e2e"; fg="cdd6f4"; c0="1e1e2e"; c4="89b4fa"; c8="585b70" }
+	/"background":/ { sub(/^#/,"",$4); bg=$4 }
+	/"foreground":/ { sub(/^#/,"",$4); fg=$4 }
+	/"color0":/     { sub(/^#/,"",$4); c0=$4 }
+	/"color4":/     { sub(/^#/,"",$4); c4=$4 }
+	/"color8":/     { sub(/^#/,"",$4); c8=$4 }
+	END {
+		printf "[ColorScheme]\n"
+		printf "active_colors=#ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ffffffff, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #80%s\n", fg, bg, c8, c8, c0, c8, fg, fg, c0, bg, c0, c4, bg, c4, c4, c0, fg, c0, fg, fg
+		printf "disabled_colors=#ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ffffffff, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #80%s\n", c8, bg, c8, c8, c0, c8, c8, c8, c0, bg, c0, c8, bg, c4, c4, c0, c8, c0, c8, c8
+		printf "inactive_colors=#ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ffffffff, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #80%s\n", fg, bg, c8, c8, c0, c8, fg, fg, c0, bg, c0, c4, bg, c4, c4, c0, fg, c0, fg, fg
+	}' "$QS_DIR/colors.json" > "$QT6_DIR/wallust.conf"
 }
 
 update_quickshell_json() {
@@ -88,6 +107,7 @@ update_quickshell_json() {
 			w, m, fx, c["background"], c["foreground"], c["color0"], c["color1"], c["color2"], c["color3"], c["color4"], c["color5"], c["color6"], c["color7"], c["color8"]
 		}' "$HOME/.config/kitty/colors.conf" > "$QS_DIR/colors.json"
 	fi
+	update_qt6ct_colors
 	quickshell ipc call theme reload >/dev/null 2>&1 || true
 }
 
@@ -112,8 +132,7 @@ apply_theme() {
 	local wall_img="$wall"
 	if [[ "${wall,,}" =~ \.(webm|mp4)$ ]]; then
 		wall_img="$FRAME_CACHE"
-		ffmpeg -y -loglevel quiet -ss 00:00:00.300 -i "$wall" -frames:v 1 -q:v 2 "$wall_img" 2>/dev/null || \
-			ffmpeg -y -loglevel quiet -i "$wall" -frames:v 1 -q:v 2 "$wall_img" 2>/dev/null
+		ffmpeg -y -loglevel quiet -i "$wall" -frames:v 1 -vf "scale=320:-1" -q:v 4 "$wall_img" 2>/dev/null
 	fi
 
 	if ! command -v quickshell >/dev/null 2>&1; then
