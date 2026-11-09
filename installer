@@ -544,7 +544,12 @@ BootloaderSetup () {
 	if [[ ${#nvidiadrivers[@]} -gt 0 ]]; then nvdrm="nvidia-drm.modeset=1 nvidia-drm.fbdev=1" ; fi
 	if [[ "${GPUMANAGERsel,,}" == "cardwire" ]]; then nvosi="lsm=lockdown,capability,landlock,bpf" ; fi
 	if [[ -n "$UCODEsel" && -f "/mnt/boot/${UCODEsel}.img" ]]; then initrd_flags="initrd=\\${UCODEsel}.img initrd=\\${irfs}" ; else initrd_flags="initrd=\\${irfs}" ; fi
-	if [[ "$LUKS_ENC" -eq 1 ]]; then luks_flags="cryptdevice=UUID=${CRYPT_ROOT_UUID}:cryptroot rd.luks.uuid=${CRYPT_ROOT_UUID} rd.luks.name=${CRYPT_ROOT_UUID}=cryptroot root=/dev/mapper/cryptroot" ; else luks_flags="root=${EFF_PID}=$ROOTID" ; fi
+	if [[ "$LUKS_ENC" -eq 1 ]]; then
+		luks_flags="cryptdevice=UUID=${CRYPT_ROOT_UUID}:cryptroot rd.luks.uuid=${CRYPT_ROOT_UUID} rd.luks.name=${CRYPT_ROOT_UUID}=cryptroot root=/dev/mapper/cryptroot"
+		if [[ "${HIBsel:-0}" -eq 1 && -n "$CRYPT_SWAP_UUID" ]]; then luks_flags+=" rd.luks.uuid=${CRYPT_SWAP_UUID} rd.luks.name=${CRYPT_SWAP_UUID}=cryptswap" ; fi
+	else
+		luks_flags="root=${EFF_PID}=$ROOTID"
+	fi
 	if [[ "${HIBsel:-0}" -eq 1 && -n "$SWAPID" ]]; then res_flag="resume=${EFF_PID}=$SWAPID" ; fi
 	local c_flags="rw $luks_flags ${res_flag:+$res_flag }rootfstype=$FSsel $rootflags $nvdrm $nvosi"
 	local e_dev="$DRIVE" ; local e_num="${BOOT_PART##*[a-z]}"
