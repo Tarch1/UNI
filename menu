@@ -150,7 +150,7 @@ GPUsel () {
 		else
 			MenuSel "NVsel" "NVIDIA gpu found, choose driver" "OPEN" "NOUVEAU" "PROPRIETARY" "MESA"
 		fi
-		if [[ "$NVsel" =~ ^(OPEN\vert{}PROPRIETARY)$ ]]; then
+		if [[ "$NVsel" =~ ^(OPEN|PROPRIETARY)$ ]]; then
 			MenuSel "GPUMANAGERsel" "Select NVIDIA Optimus Manager" "Native" "Envycontrol" "Cardwire"
 		fi
 	fi
@@ -166,6 +166,53 @@ LUKSSel () {
 			if [[ "$LUKS_PASS" == "$LUKS_PASS2" && -n "$LUKS_PASS" ]]; then echo "Passphrase confirmed." ; break ; else echo "Passphrases do not match or empty. Try again." ; fi
 		done
 	else LUKS_ENC=0 ; LUKS_PASS="" ; fi
+}
+HibernationSel () {
+	local total_ram_gb=$(( ($(free -m | awk '/^Mem:/{print $2}') + 1023) / 1024 ))
+	local auto_swap_gb
+	if [[ "$total_ram_gb" -le 8 ]]; then auto_swap_gb=$(( total_ram_gb + 1 ))
+	elif [[ "$total_ram_gb" -le 32 ]]; then auto_swap_gb="$total_ram_gb"
+	else auto_swap_gb=32 ; fi
+
+	local disk_bytes ; disk_bytes=$(lsblk -bdnpo SIZE "$DRIVE" 2>/dev/null || echo 25769803776)
+	local disk_gb=$(( disk_bytes / 1073741824 ))
+	local os_no_swap_gb=$(( disk_gb - 1 ))
+	[[ "$os_no_swap_gb" -lt 1 ]] && os_no_swap_gb=1
+	local os_after_auto_gb=$(( os_no_swap_gb - auto_swap_gb ))
+	[[ "$os_after_auto_gb" -lt 1 ]] && os_after_auto_gb=1
+
+	local hib_choice=""
+	local prompt_hdr="Hibernation Setup | RAM: ${total_ram_gb} GiB | Target Drive ($DRIVE): ~${disk_gb} GiB"
+	MenuSel "hib_choice" "$prompt_hdr" \
+		"Enable Hibernation - Auto (${auto_swap_gb} GiB Swap -> ~${os_after_auto_gb} GiB left for OS)" \
+		"Enable Hibernation - Custom Size (Specify Swap GiB for another PC)" \
+		"Disable Hibernation (No Swap Partition -> ~${os_no_swap_gb} GiB for OS)"
+
+	case "$hib_choice" in
+		"Enable Hibernation - Auto"*)
+			HIBsel=1
+			SWAP_GIB="$auto_swap_gb"
+			;;
+		"Enable Hibernation - Custom"*)
+			local max_custom=$(( os_no_swap_gb - 5 ))
+			[[ "$max_custom" -lt 1 ]] && max_custom=1
+			local custom_val=""
+			while true; do
+				TextPromptSel "custom_val" "Enter Swap size in GiB (1-${max_custom}, default ${auto_swap_gb})" "$auto_swap_gb"
+				if [[ "$custom_val" =~ ^[0-9]+$ ]] && (( custom_val >= 1 && custom_val <= max_custom )); then
+					HIBsel=1
+					SWAP_GIB="$custom_val"
+					break
+				else
+					echo "Invalid size: must be a number between 1 and ${max_custom} GiB."
+				fi
+			done
+			;;
+		*)
+			HIBsel=0
+			SWAP_GIB=0
+			;;
+	esac
 }
 Pacman_Locked() {
 	if [[ -f /var/lib/pacman/db.lck || -f /mnt/var/lib/pacman/db.lck ]]; then echo -e "Pacman is blocked. Removing lockfiles..." ; rm -f /var/lib/pacman/db.lck /mnt/var/lib/pacman/db.lck ; else echo "No locked database" ; fi
