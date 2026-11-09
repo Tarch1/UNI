@@ -174,19 +174,24 @@ HibernationSel () {
 	elif [[ "$total_ram_gb" -le 32 ]]; then auto_swap_gb="$total_ram_gb"
 	else auto_swap_gb=32 ; fi
 
+	local std_swap_gb=4
 	local disk_bytes ; disk_bytes=$(lsblk -bdnpo SIZE "$DRIVE" 2>/dev/null || echo 25769803776)
 	local disk_gb=$(( disk_bytes / 1073741824 ))
-	local os_no_swap_gb=$(( disk_gb - 1 ))
-	[[ "$os_no_swap_gb" -lt 1 ]] && os_no_swap_gb=1
-	local os_after_auto_gb=$(( os_no_swap_gb - auto_swap_gb ))
+	if (( disk_gb <= 15 )); then std_swap_gb=2 ; fi
+
+	local os_base_gb=$(( disk_gb - 1 ))
+	[[ "$os_base_gb" -lt 1 ]] && os_base_gb=1
+	local os_after_auto_gb=$(( os_base_gb - auto_swap_gb ))
 	[[ "$os_after_auto_gb" -lt 1 ]] && os_after_auto_gb=1
+	local os_after_std_gb=$(( os_base_gb - std_swap_gb ))
+	[[ "$os_after_std_gb" -lt 1 ]] && os_after_std_gb=1
 
 	local hib_choice=""
 	local prompt_hdr="Hibernation Setup | RAM: ${total_ram_gb} GiB | Target Drive ($DRIVE): ~${disk_gb} GiB"
 	MenuSel "hib_choice" "$prompt_hdr" \
 		"Enable Hibernation - Auto (${auto_swap_gb} GiB Swap -> ~${os_after_auto_gb} GiB left for OS)" \
 		"Enable Hibernation - Custom Size (Specify Swap GiB for another PC)" \
-		"Disable Hibernation (No Swap Partition -> ~${os_no_swap_gb} GiB for OS)"
+		"Disable Hibernation (Keep standard ${std_swap_gb} GiB Swap -> ~${os_after_std_gb} GiB left for OS)"
 
 	case "$hib_choice" in
 		"Enable Hibernation - Auto"*)
@@ -194,7 +199,7 @@ HibernationSel () {
 			SWAP_GIB="$auto_swap_gb"
 			;;
 		"Enable Hibernation - Custom"*)
-			local max_custom=$(( os_no_swap_gb - 5 ))
+			local max_custom=$(( os_base_gb - 5 ))
 			[[ "$max_custom" -lt 1 ]] && max_custom=1
 			local custom_val=""
 			while true; do
@@ -210,7 +215,7 @@ HibernationSel () {
 			;;
 		*)
 			HIBsel=0
-			SWAP_GIB=0
+			SWAP_GIB="$std_swap_gb"
 			;;
 	esac
 }
