@@ -13,6 +13,8 @@
 //    window-open: duration-ms 150, curve "ease-out-expo" | "ease-out-cubic" | "linear"
 // ============================================================================
 
+prefer-no-csd
+
 input {
     keyboard {
         xkb {
@@ -55,8 +57,8 @@ layout {
 
     focus-ring {
         width 2
-        active-color "#89b4fa"
-        inactive-color "#585b70"
+        active-color "{{color4}}"
+        inactive-color "{{color8}}"
     }
 
     border {
@@ -94,13 +96,17 @@ window-rule {
     clip-to-geometry true
 }
 
-// Firefox always opens at 100% width
+window-rule {
+    match app-id="^(kitty|pcmanfm-qt|featherpad)$"
+    opacity 0.88
+    draw-border-with-background false
+}
+
 window-rule {
     match app-id="^firefox$"
     default-column-width { proportion 1.0; }
 }
 
-// Floating Calculator (Super + C)
 window-rule {
     match app-id="^floating-calc$"
     open-floating true
