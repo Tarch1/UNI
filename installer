@@ -252,8 +252,16 @@ PKGcheck () {
 			[[ "${OSsel,,}" != "void" ]] && desktop+=(qt6-multimedia-ffmpeg)
 		else desktop+=(fuzzel waybar swaync hyprlock) ; fi
 	else desktop=() ; fi
-	if [[ "${DMsel,,}" == "gdm" ]]; then displaymanager=(gdm) ; elif [[ "${DMsel,,}" == "greetd" ]]; then displaymanager=(greetd greetd-tuigreet) ; elif [[ "${DMsel,,}" == "lightdm" ]]; then displaymanager=(lightdm lightdm-gtk-greeter lightdm-gtk-greeter-settings) ; elif [[ "${DMsel,,}" == "ly" ]]; then displaymanager=(ly) ; elif [[ "${DMsel,,}" == "sddm" ]]; then displaymanager=(sddm) ; else displaymanager=() ; fi
-	if [[ "${OSsel,,}" == "artix" ]]; then if [[ "${DMsel,,}" != "none" ]]; then displaymanager+=("${DMsel,,}-${init_sys,,}") ; fi ; fi
+	local dm_pkg="${DMsel,,}"
+	if [[ "$dm_pkg" == "quickshell" ]]; then displaymanager=(greetd) ; dm_pkg="greetd"
+	elif [[ "$dm_pkg" == "gdm" ]]; then displaymanager=(gdm)
+	elif [[ "$dm_pkg" == "greetd" ]]; then
+		displaymanager=(greetd) ; [[ "$SHELLsel" != "Quickshell" ]] && displaymanager+=(greetd-tuigreet)
+	elif [[ "$dm_pkg" == "lightdm" ]]; then displaymanager=(lightdm lightdm-gtk-greeter lightdm-gtk-greeter-settings)
+	elif [[ "$dm_pkg" == "ly" ]]; then displaymanager=(ly)
+	elif [[ "$dm_pkg" == "sddm" ]]; then displaymanager=(sddm)
+	else displaymanager=() ; fi
+	if [[ "${OSsel,,}" == "artix" && "$dm_pkg" != "none" ]]; then displaymanager+=("${dm_pkg}-${init_sys,,}") ; fi
 	filemanager=(yazi pcmanfm-qt tumbler file-roller android-tools qt6ct papirus-icon-theme librsvg adwaita-icon-theme) ; if [[ "${OSsel,,}" != "void" ]]; then filemanager+=(gvfs-mtp) ; fi
 	if [[ "${OSsel,,}" == "void" ]]; then fonts=(nerd-fonts) ; else fonts=(ttf-jetbrains-mono-nerd) ; fi
 	fs=(dialog mtools parted gptfdisk dosfstools ntfs-3g) ; if [[ "${OSsel,,}" != "void" ]]; then fs+=(ntfsprogs) ; fi
@@ -283,6 +291,7 @@ PKGcheck () {
 	for group in $y; do local -n current_group="$group" ; if [[ ${#current_group[@]} -eq 0 ]]; then continue ; fi ; local valid_pkgs=() ; for pkg in "${current_group[@]}"; do if [[ -n "${repo_map[$pkg]:-}" ]]; then valid_pkgs+=("$pkg") ; else miss+=("$pkg") ; fi ; done ; current_group=("${valid_pkgs[@]}") ; done
 	if [[ ${#miss[@]} -gt 0 ]]; then echo -e "\n[!] WARNING: Unavailable packages:\n$(printf ' - %s\n' "${miss[@]}" | sort -u)\n" ; printf '%s\n' "${miss[@]}" | sort -u > pkg_missed ; YesNoSel "Are these packages CRITICAL for installation? (Yes = Abort / No = Skip and continue)" ; if [[ "$CC" -eq 1 ]]; then echo "[-] Installation aborted by user." ; exit 0 ; else echo "[*] Missing packages removed." ; fi ; fi
 }
+
 PackageInstall () {
 	if [[ "${OSsel,,}" == "void" ]]; then
 		local v_repos=(void-repo-nonfree) ; if [[ "$LIBsel" == "GLIBC" ]]; then v_repos+=(void-repo-multilib void-repo-multilib-nonfree) ; fi
@@ -344,29 +353,30 @@ KernelSetup () {
 ServiceSetup () {
 	Services=()
 	case "${OSsel,,}" in
-		artix)	Services+=( iwd NetworkManager chrony dbus elogind cupsd avahi-daemon bluetoothd ) ; if [[ "$LUKS_ENC" -eq 1 ]]; then Services+=( dmcrypt ); fi ; if [[ "$init_sys" == "openrc" ]]; then Services+=( openrc-settingsd ); fi ;;
-		arch)	Services+=( iwd NetworkManager chronyd cups avahi-daemon bluetooth paccache.timer ) ; if [[ -v nvidiadrivers && ${#nvidiadrivers[@]} -gt 0 ]]; then Services+=( nvidia-suspend nvidia-hibernate nvidia-resume nvidia-powerd ); fi ;;
-		void)	Services+=( iwd NetworkManager chronyd cupsd dbus elogind avahi-daemon bluetoothd seatd ) ;;
+		artix) Services+=( iwd NetworkManager chrony dbus elogind cupsd avahi-daemon bluetoothd ) ; if [[ "$LUKS_ENC" -eq 1 ]]; then Services+=( dmcrypt ); fi ; if [[ "$init_sys" == "openrc" ]]; then Services+=( openrc-settingsd ); fi ;;
+		arch)  Services+=( iwd NetworkManager chronyd cups avahi-daemon bluetooth paccache.timer ) ; if [[ -v nvidiadrivers && ${#nvidiadrivers[@]} -gt 0 ]]; then Services+=( nvidia-suspend nvidia-hibernate nvidia-resume nvidia-powerd ); fi ;;
+		void)  Services+=( iwd NetworkManager chronyd cupsd dbus elogind avahi-daemon bluetoothd seatd ) ;;
 	esac
 	if compgen -G "/sys/class/power_supply/BAT*" >/dev/null; then if [[ "${OSsel,,}" == "arch" && "$DEsel" =~ ^(KDE|GNOME|COSMIC)$ ]]; then Services+=( power-profiles-daemon ) ; else Services+=( tlp ) ; fi ; if [[ "$CPU_TYPE" == "Intel" ]]; then Services+=( thermald ) ; fi ; fi
 	if [[ "$VBTsel" -eq 1 && "$VM_TYPE" == "vbox" && "${OSsel,,}" != "artix" ]]; then Services+=( vboxservice ) ; fi
-	if [[ "${DMsel,,}" =~ ^(ly|greetd|lightdm|sddm|gdm)$ ]]; then Services+=("${DMsel,,}") ; fi
+	if [[ "${DMsel,,}" == "quickshell" ]]; then Services+=( greetd )
+	elif [[ "${DMsel,,}" =~ ^(ly|greetd|lightdm|sddm|gdm)$ ]]; then Services+=("${DMsel,,}") ; fi
 	if [[ "${GPUMANAGERsel,,}" == "cardwire" ]]; then
 		Services+=( cardwire )
 		case "${OSsel,,}:$init_sys" in
-			artix:openrc)	echo -e '#!/sbin/openrc-run\nname="Cardwire GPU Manager"\ncommand="/usr/bin/cardwire"\ncommand_background="yes"\npidfile="/run/${RC_SVCNAME}.pid"\ndepend() {\n\tneed localmount devfs\n\tafter bootmisc\n}' > /mnt/etc/init.d/cardwire ; chmod +x /mnt/etc/init.d/cardwire ;;
-			artix:*)		mkdir -p /mnt/etc/runit/sv/cardwire ; echo -e '#!/bin/sh\nexec /usr/bin/cardwire' > /mnt/etc/runit/sv/cardwire/run ; chmod +x /mnt/etc/runit/sv/cardwire/run ;;
-			void:*)			mkdir -p /mnt/etc/sv/cardwire ; echo -e '#!/bin/sh\nexec /usr/bin/cardwire' > /mnt/etc/sv/cardwire/run ; chmod +x /mnt/etc/sv/cardwire/run ;;
+			artix:openrc) echo -e '#!/sbin/openrc-run\nname="Cardwire GPU Manager"\ncommand="/usr/bin/cardwire"\ncommand_background="yes"\npidfile="/run/${RC_SVCNAME}.pid"\ndepend() {\n\tneed localmount devfs\n\tafter bootmisc\n}' > /mnt/etc/init.d/cardwire ; chmod +x /mnt/etc/init.d/cardwire ;;
+			artix:*)      mkdir -p /mnt/etc/runit/sv/cardwire ; echo -e '#!/bin/sh\nexec /usr/bin/cardwire' > /mnt/etc/runit/sv/cardwire/run ; chmod +x /mnt/etc/runit/sv/cardwire/run ;;
+			void:*)       mkdir -p /mnt/etc/sv/cardwire ; echo -e '#!/bin/sh\nexec /usr/bin/cardwire' > /mnt/etc/sv/cardwire/run ; chmod +x /mnt/etc/sv/cardwire/run ;;
 		esac
 	fi
 	for s in "${Services[@]}"; do
 		case "${OSsel,,}:$init_sys" in
-			void:*)			CR ln -sf /etc/sv/"$s" /etc/runit/runsvdir/default/ ;;
-			arch:*)			CR systemctl enable "$s" ;;
-			artix:runit)	CR ln -sf /etc/runit/sv/"$s" /etc/runit/runsvdir/default/ ;;
-			artix:s6)		CR touch /etc/s6/adminsv/default/contents.d/"$s" ;;
-			artix:dinit)	CR ln -sf ../"$s" /etc/dinit.d/boot.d/ ;;
-			artix:*)		if [[ "$s" == "dmcrypt" ]]; then CR rc-update add "$s" boot ; else CR rc-update add "$s" default ; fi ;;
+			void:*)       CR ln -sf /etc/sv/"$s" /etc/runit/runsvdir/default/ ;;
+			arch:*)       CR systemctl enable "$s" ;;
+			artix:runit)  CR ln -sf /etc/runit/sv/"$s" /etc/runit/runsvdir/default/ ;;
+			artix:s6)     CR touch /etc/s6/adminsv/default/contents.d/"$s" ;;
+			artix:dinit)  CR ln -sf ../"$s" /etc/dinit.d/boot.d/ ;;
+			artix:*)      if [[ "$s" == "dmcrypt" ]]; then CR rc-update add "$s" boot ; else CR rc-update add "$s" default ; fi ;;
 		esac
 	done
 	mkdir -p /mnt/etc/NetworkManager/conf.d /mnt/etc/pipewire/pipewire.conf.d /mnt/etc/wireplumber/wireplumber.conf.d /mnt/etc/udev/rules.d/
@@ -376,15 +386,74 @@ ServiceSetup () {
 	if [[ -f /mnt/etc/bluetooth/main.conf ]]; then sed -i 's/#AutoEnable=false/AutoEnable=true/g' /mnt/etc/bluetooth/main.conf ; fi
 	if [[ "$init_sys" == "systemd" || "${OSsel,,}" == "arch" ]]; then CR systemctl --global enable pipewire.socket pipewire-pulse.socket wireplumber.service ; fi
 	if [[ -f "${SCRIPT_DIR}/Conf_files/51-android.rules" ]]; then cp "${SCRIPT_DIR}/Conf_files/51-android.rules" /mnt/etc/udev/rules.d/ ; fi
-	if [[ "${DMsel,,}" == "greetd" ]]; then
-		local t_cmd="tuigreet --time --cmd " ; if [[ "$DEsel" == "Hyprland" ]]; then t_cmd+="Hyprland" ; fi ; if [[ "$DEsel" == "Niri" ]]; then if [[ "$init_sys" =~ ^(systemd|dinit)$ ]]; then t_cmd+="niri-session" ; else t_cmd+="'niri --session'" ; fi ; fi
-		sed -i -e "s|^command = .*|command = \"$t_cmd\"|" -e 's/^vt = .*/vt = 7/' /mnt/etc/greetd/config.toml
+
+	# Create universal session wrapper & multi-user switcher (prevents duplicate PipeWire/daemons across all init systems)
+	local wm_exec="Hyprland"
+	if [[ "$DEsel" == "Niri" ]]; then
+		if [[ "$init_sys" =~ ^(systemd|dinit)$ ]]; then wm_exec="niri-session" ; else wm_exec="niri --session" ; fi
 	fi
-	if [[ "$init_sys" != "systemd" && "$init_sys" != "dinit" ]]; then
-		if [[ "$DEsel" =~ ^(Niri|Hyprland)$ ]]; then
-			local x_cmd="Hyprland" ; if [[ "$DEsel" == "Niri" ]]; then x_cmd="niri --session" ; fi
-			if [[ -f /mnt/usr/share/wayland-sessions/${DEsel,,}.desktop ]]; then sed -i "s/^Exec=.*/Exec=dbus-run-session $x_cmd/" /mnt/usr/share/wayland-sessions/${DEsel,,}.desktop ; fi
+	local dbus_wrap="" ; [[ ! "$init_sys" =~ ^(systemd|dinit)$ ]] && dbus_wrap="dbus-run-session "
+
+	cat << EOF > /mnt/usr/bin/qs-session
+#!/bin/bash
+cleanup_session() {
+	pkill -u "\$UID" -x "quickshell" 2>/dev/null || true
+	pkill -u "\$UID" -x "hypridle" 2>/dev/null || true
+	pkill -u "\$UID" -x "wlsunset" 2>/dev/null || true
+	pkill -u "\$UID" -x "vm-clipboard" 2>/dev/null || true
+	pkill -u "\$UID" -f "theme-switcher.sh" 2>/dev/null || true
+	if ! command -v systemctl >/dev/null 2>&1; then
+		pkill -u "\$UID" -x "wireplumber" 2>/dev/null || true
+		pkill -u "\$UID" -x "pipewire-pulse" 2>/dev/null || true
+		pkill -u "\$UID" -x "pipewire" 2>/dev/null || true
+	fi
+}
+cleanup_session
+trap cleanup_session EXIT INT TERM
+
+if [[ -f "/tmp/qs_unlocked_\$USER" ]]; then
+	rm -f "/tmp/qs_unlocked_\$USER"
+	export QS_START_LOCKED=0
+elif [[ "\${1:-}" == "--locked" ]]; then
+	export QS_START_LOCKED=1
+	touch "/tmp/qs_lock_active_\$UID"
+else
+	export QS_START_LOCKED=0
+fi
+
+exec ${dbus_wrap}${wm_exec}
+EOF
+	chmod +x /mnt/usr/bin/qs-session
+
+	cat << 'EOF' > /mnt/usr/bin/qs-switch-apply
+#!/bin/bash
+target_user="${1,,}"
+[[ -z "$target_user" ]] && exit 1
+id "$target_user" >/dev/null 2>&1 || exit 1
+if [[ -f /etc/greetd/config.toml ]]; then
+	sed -i "s/^user = .*/user = \"$target_user\"/" /etc/greetd/config.toml
+fi
+touch "/tmp/qs_unlocked_$target_user"
+chown "$target_user":users "/tmp/qs_unlocked_$target_user" 2>/dev/null || true
+EOF
+	chmod 755 /mnt/usr/bin/qs-switch-apply
+	echo "%wheel ALL=(root) NOPASSWD: /usr/bin/qs-switch-apply *" > /mnt/etc/sudoers.d/90-qs-switch
+	chmod 440 /mnt/etc/sudoers.d/90-qs-switch
+
+	if [[ "${DMsel,,}" == "quickshell" ]]; then
+		mkdir -p /mnt/etc/greetd
+		printf '[terminal]\nvt = 7\n\n[default_session]\ncommand = "/usr/bin/qs-session --locked"\nuser = "%s"\n' "$UNsel" > /mnt/etc/greetd/config.toml
+	elif [[ "${DMsel,,}" == "greetd" ]]; then
+		mkdir -p /mnt/etc/greetd
+		if [[ "$SHELLsel" == "Quickshell" ]]; then
+			printf '[terminal]\nvt = 7\n\n[initial_session]\ncommand = "/usr/bin/qs-session --locked"\nuser = "%s"\n\n[default_session]\ncommand = "/usr/bin/qs-session --locked"\nuser = "%s"\n' "$UNsel" "$UNsel" > /mnt/etc/greetd/config.toml
+		else
+			local t_cmd="tuigreet --time --cmd ${wm_exec}"
+			sed -i -e "s|^command = .*|command = \"$t_cmd\"|" -e 's/^vt = .*/vt = 7/' /mnt/etc/greetd/config.toml
 		fi
+	fi
+	if [[ "$DEsel" =~ ^(Niri|Hyprland)$ && -f /mnt/usr/share/wayland-sessions/${DEsel,,}.desktop ]]; then
+		sed -i "s|^Exec=.*|Exec=/usr/bin/qs-session|" /mnt/usr/share/wayland-sessions/${DEsel,,}.desktop
 	fi
 }
 UserSetup () {
@@ -453,6 +522,9 @@ UserSetup () {
 			cp -rT "${SCRIPT_DIR}/Conf_files/Hyprland" /mnt/home/"$UNsel"/.config/hypr
 			cfg="/mnt/home/$UNsel/.config/hypr/hyprland.conf"
 		fi
+		if [[ "$DEsel" == "Niri" ]] && ! grep -q "wallpaper-backdrop" "$cfg"; then
+			printf '\nlayer-rule {\n    match namespace="^wallpaper-backdrop$"\n    place-within-backdrop true\n}\n' >> "$cfg"
+		fi
 		local va_drv="iHD" ; [[ "$CPU_TYPE" == "AMD" ]] && va_drv="radeonsi"
 		if [[ "$SHELLsel" == "Quickshell" ]]; then
 			echo "auth required pam_unix.so nullok" > /mnt/etc/pam.d/quickshell
@@ -467,11 +539,12 @@ UserSetup () {
 			init_wall="${init_wall#/mnt}"
 			local init_fx="true" ; [[ "$VBTsel" -eq 1 ]] && init_fx="false"
 			printf '{\n\t"wallpaper": "%s",\n\t"wallMode": "static",\n\t"uiEffects": %s,\n\t"background": "#1e1e2e",\n\t"foreground": "#cdd6f4",\n\t"color0": "#1e1e2e",\n\t"color1": "#f38ba8",\n\t"color2": "#a6e3a1",\n\t"color3": "#f9e2af",\n\t"color4": "#89b4fa",\n\t"color5": "#cba6f7",\n\t"color6": "#94e2d5",\n\t"color7": "#bac2de",\n\t"color8": "#585b70"\n}\n' "$init_wall" "$init_fx" > /mnt/home/"$UNsel"/.config/quickshell/colors.json
-			local qs_run="env DRI_PRIME=0 __NV_PRIME_RENDER_OFFLOAD=0 __GLX_VENDOR_LIBRARY_NAME=mesa VDPAU_DRIVER=null LIBVA_DRIVER_NAME=$va_drv QT_FFMPEG_DECODING_HW_DEVICE_TYPES=vaapi QSG_RHI_BACKEND=opengl quickshell"
-			local qs_niri="\"env\" \"DRI_PRIME=0\" \"__NV_PRIME_RENDER_OFFLOAD=0\" \"__GLX_VENDOR_LIBRARY_NAME=mesa\" \"VDPAU_DRIVER=null\" \"LIBVA_DRIVER_NAME=$va_drv\" \"QT_FFMPEG_DECODING_HW_DEVICE_TYPES=vaapi\" \"QSG_RHI_BACKEND=opengl\" \"quickshell\""
+			local qs_guard='; [[ -f /tmp/qs_lock_active_$UID ]] && (niri msg action quit -s 2>/dev/null || hyprctl dispatch exit 2>/dev/null || pkill -u $UID -x "niri|Hyprland")'
+			local qs_run="bash -c 'env DRI_PRIME=0 __NV_PRIME_RENDER_OFFLOAD=0 __GLX_VENDOR_LIBRARY_NAME=mesa VDPAU_DRIVER=null LIBVA_DRIVER_NAME=$va_drv QT_FFMPEG_DECODING_HW_DEVICE_TYPES=vaapi QSG_RHI_BACKEND=opengl quickshell$qs_guard'"
+			local qs_niri="\"bash\" \"-c\" \"env DRI_PRIME=0 __NV_PRIME_RENDER_OFFLOAD=0 __GLX_VENDOR_LIBRARY_NAME=mesa VDPAU_DRIVER=null LIBVA_DRIVER_NAME=$va_drv QT_FFMPEG_DECODING_HW_DEVICE_TYPES=vaapi QSG_RHI_BACKEND=opengl quickshell$qs_guard\""
 			if [[ "$VBTsel" -eq 1 ]]; then
-				qs_run="env VDPAU_DRIVER=null QSG_RHI_BACKEND=opengl QSG_RENDER_LOOP=basic quickshell"
-				qs_niri='"env" "VDPAU_DRIVER=null" "QSG_RHI_BACKEND=opengl" "QSG_RENDER_LOOP=basic" "quickshell"'
+				qs_run="bash -c 'env VDPAU_DRIVER=null QSG_RHI_BACKEND=opengl QSG_RENDER_LOOP=basic quickshell$qs_guard'"
+				qs_niri="\"bash\" \"-c\" \"env VDPAU_DRIVER=null QSG_RHI_BACKEND=opengl QSG_RENDER_LOOP=basic quickshell$qs_guard\""
 			fi
 			sed -i "s|lock_cmd = .*|lock_cmd = quickshell ipc call lock lock|" /mnt/home/"$UNsel"/.config/hypr/hypridle.conf
 			if [[ "$DEsel" == "Niri" ]]; then
