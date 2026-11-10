@@ -416,10 +416,8 @@ UserSetup () {
 	CR useradd -m -g users -G wheel,video,audio,storage,input,lp,scanner,power,kvm "$UNsel"
 	if [[ "${OSsel,,}" == "void" ]]; then CR usermod -aG _seatd "$UNsel" ; fi
 	sed -i 's/^#\s*\(%wheel ALL=(ALL:ALL) ALL\)/\1/' /mnt/etc/sudoers
-	echo "Choose password for user: $UNsel"
-	while ! CR passwd "$UNsel"; do echo "Error: Try again..." ; done
-	echo "Choose password for root"
-	while ! CR passwd; do echo "Error: Try again..." ; done
+	echo "Choose password for user: $UNsel" ; while ! CR passwd "$UNsel"; do echo "Error: Try again..." ; done
+	echo "Choose password for root" ; while ! CR passwd; do echo "Error: Try again..." ; done
 	echo "Copying configuration files..."
 	mkdir -p /mnt/home/"$UNsel"/{.config/kitty,.config/swappy,.config/pcmanfm-qt/default,.config/featherpad,.config/qt6ct/colors,Pictures/Screenshots,Videos/Recordings}
 	if [[ "${OSsel,,}" == "void" ]]; then
@@ -433,7 +431,7 @@ UserSetup () {
 	fi
 	if [[ -f "${SCRIPT_DIR}/Conf_files/kitty.conf" ]]; then
 		cp "${SCRIPT_DIR}/Conf_files/kitty.conf" /mnt/home/"$UNsel"/.config/kitty/
-		grep -q "^hide_window_decorations" /mnt/home/"$UNsel"/.config/kitty/kitty.conf || printf '\nhide_window_decorations yes\nbackground_opacity 0.85\n' >> /mnt/home/"$UNsel"/.config/kitty/kitty.conf
+		if ! grep -q "^hide_window_decorations" /mnt/home/"$UNsel"/.config/kitty/kitty.conf; then printf '\nhide_window_decorations yes\nbackground_opacity 0.85\n' >> /mnt/home/"$UNsel"/.config/kitty/kitty.conf ; fi
 		touch /mnt/home/"$UNsel"/.config/kitty/colors.conf
 	fi
 	printf '[System]\nIconThemeName=Papirus-Dark\nFallbackIconThemeName=AdwaitaLegacy\nUseFallbackIconTheme=true\n\n[Window]\nSidePaneMode=places\nAlwaysShowTabs=true\n' > /mnt/home/"$UNsel"/.config/pcmanfm-qt/default/settings.conf
@@ -448,7 +446,7 @@ UserSetup () {
 		if [[ -n "$API_URL" ]] && curl -sA "Mozilla/5.0" -L -o /tmp/wallust_dl.tar.gz "$API_URL" && tar -tf /tmp/wallust_dl.tar.gz &>/dev/null; then
 			tar -xzf /tmp/wallust_dl.tar.gz -C /tmp/
 			local w_bin ; w_bin=$(find /tmp -maxdepth 3 -type f -name "wallust" -print -quit || true)
-			if [[ -n "$w_bin" ]]; then mv -f "$w_bin" /mnt/usr/bin/wallust && chmod +x /mnt/usr/bin/wallust && w_ok=1 ; fi
+			if [[ -n "$w_bin" ]]; then mv -f "$w_bin" /mnt/usr/bin/wallust ; chmod +x /mnt/usr/bin/wallust ; w_ok=1 ; fi
 			rm -rf /tmp/wallust*
 		fi
 		if [[ "$w_ok" -eq 0 && -f "${SCRIPT_DIR}/Conf_files/wallust" ]]; then echo "Codeberg failed. Using local fallback..." ; cp "${SCRIPT_DIR}/Conf_files/wallust" /mnt/usr/bin/wallust ; chmod +x /mnt/usr/bin/wallust ; w_ok=1 ; fi
@@ -478,12 +476,9 @@ UserSetup () {
 			cp -rT "${SCRIPT_DIR}/Conf_files/Hyprland" /mnt/home/"$UNsel"/.config/hypr
 			cfg="/mnt/home/$UNsel/.config/hypr/hyprland.conf"
 		fi
-		if [[ "$DEsel" == "Niri" ]] && ! grep -q "wallpaper-backdrop" "$cfg"; then
-			printf '\nlayer-rule {\n    match namespace="^wallpaper-backdrop$"\n    place-within-backdrop true\n}\n' >> "$cfg"
-		fi
-		local va_drv="iHD" ; [[ "$CPU_TYPE" == "AMD" ]] && va_drv="radeonsi"
+		local va_drv="iHD" ; if [[ "$CPU_TYPE" == "AMD" ]]; then va_drv="radeonsi" ; fi
 		if [[ "$SHELLsel" == "Quickshell" ]]; then
-			echo "auth required pam_unix.so nullok" > /mnt/etc/pam.d/quickshell
+			echo -e "auth required pam_unix.so nullok\naccount required pam_unix.so\npassword required pam_unix.so\nsession required pam_unix.so" > /mnt/etc/pam.d/quickshell
 			mkdir -p /mnt/home/"$UNsel"/.config/{quickshell,wallust/templates}
 			sed -i -e '/\[templates\.fuzzel\]/,/^$/d' -e '/\[templates\.waybar\]/,/^$/d' -e '/\[templates\.quickshell\]/,/^$/d' -e '/\[templates\.niri\]/,/^$/d' /mnt/home/"$UNsel"/.config/wallust/wallust.toml
 			printf '{\n\t"background": "{{background}}",\n\t"foreground": "{{foreground}}",\n\t"color0": "{{color0}}",\n\t"color1": "{{color1}}",\n\t"color2": "{{color2}}",\n\t"color3": "{{color3}}",\n\t"color4": "{{color4}}",\n\t"color5": "{{color5}}",\n\t"color6": "{{color6}}",\n\t"color7": "{{color7}}",\n\t"color8": "{{color8}}"\n}\n' > /mnt/home/"$UNsel"/.config/wallust/templates/colors-quickshell.json
@@ -493,25 +488,22 @@ UserSetup () {
 			fi
 			local init_wall="" ; init_wall=$(find /mnt/home/"$UNsel"/.config/wallpapers/day -type f -print -quit 2>/dev/null || true)
 			init_wall="${init_wall#/mnt}"
-			local init_fx="true" ; [[ "$VBTsel" -eq 1 ]] && init_fx="false"
+			local init_fx="true" ; if [[ "$VBTsel" -eq 1 ]]; then init_fx="false" ; fi
 			printf '{\n\t"wallpaper": "%s",\n\t"wallMode": "static",\n\t"uiEffects": %s,\n\t"background": "#1e1e2e",\n\t"foreground": "#cdd6f4",\n\t"color0": "#1e1e2e",\n\t"color1": "#f38ba8",\n\t"color2": "#a6e3a1",\n\t"color3": "#f9e2af",\n\t"color4": "#89b4fa",\n\t"color5": "#cba6f7",\n\t"color6": "#94e2d5",\n\t"color7": "#bac2de",\n\t"color8": "#585b70"\n}\n' "$init_wall" "$init_fx" > /mnt/home/"$UNsel"/.config/quickshell/colors.json
-			local qs_guard='; [[ -f /tmp/qs_lock_active_$UID ]] && (niri msg action quit -s 2>/dev/null || hyprctl dispatch exit 2>/dev/null || pkill -u $UID -x "niri|Hyprland")'
-			local qs_run="bash -c 'env DRI_PRIME=0 __NV_PRIME_RENDER_OFFLOAD=0 __GLX_VENDOR_LIBRARY_NAME=mesa VDPAU_DRIVER=null LIBVA_DRIVER_NAME=$va_drv QT_FFMPEG_DECODING_HW_DEVICE_TYPES=vaapi QSG_RHI_BACKEND=opengl quickshell$qs_guard'"
-			local qs_niri="\"bash\" \"-c\" \"env DRI_PRIME=0 __NV_PRIME_RENDER_OFFLOAD=0 __GLX_VENDOR_LIBRARY_NAME=mesa VDPAU_DRIVER=null LIBVA_DRIVER_NAME=$va_drv QT_FFMPEG_DECODING_HW_DEVICE_TYPES=vaapi QSG_RHI_BACKEND=opengl quickshell$qs_guard\""
-			if [[ "$VBTsel" -eq 1 ]]; then
-				qs_run="bash -c 'env VDPAU_DRIVER=null QSG_RHI_BACKEND=opengl QSG_RENDER_LOOP=basic quickshell$qs_guard'"
-				qs_niri="\"bash\" \"-c\" \"env VDPAU_DRIVER=null QSG_RHI_BACKEND=opengl QSG_RENDER_LOOP=basic quickshell$qs_guard\""
-			fi
+			local qs_env="DRI_PRIME=0 __NV_PRIME_RENDER_OFFLOAD=0 __GLX_VENDOR_LIBRARY_NAME=mesa VDPAU_DRIVER=null LIBVA_DRIVER_NAME=$va_drv QT_FFMPEG_DECODING_HW_DEVICE_TYPES=vaapi QSG_RHI_BACKEND=opengl"
+			if [[ "$VBTsel" -eq 1 ]]; then qs_env="VDPAU_DRIVER=null QSG_RHI_BACKEND=opengl QSG_RENDER_LOOP=basic" ; fi
+			local qs_run="bash -c 'env $qs_env quickshell; [[ ! -f /tmp/qs_lock_active_\$UID ]] || (hyprctl dispatch exit || loginctl terminate-session \"\$XDG_SESSION_ID\")'"
+			local qs_niri="\"bash\" \"-c\" \"env $qs_env quickshell; [[ ! -f /tmp/qs_lock_active_\$UID ]] || (niri msg action quit -s || loginctl terminate-session \\\"\$XDG_SESSION_ID\\\")\""
 			sed -i "s|lock_cmd = .*|lock_cmd = quickshell ipc call lock lock|" /mnt/home/"$UNsel"/.config/hypr/hypridle.conf
 			if [[ "$DEsel" == "Niri" ]]; then
-				sed -i -e "s|spawn-at-startup \"waybar\"|spawn-at-startup $qs_niri|" \
+				sed -i -e "s#spawn-at-startup \"waybar\"#spawn-at-startup $qs_niri#" \
 					-e '/spawn-at-startup "swaync"/d' \
 					-e '/spawn-at-startup "awww-daemon"/d' \
 					-e 's|spawn "fuzzel"|spawn "quickshell" "ipc" "call" "launcher" "toggle"|g' \
 					-e 's|spawn "hyprlock"|spawn "quickshell" "ipc" "call" "lock" "lock"|g' \
 					-e 's|spawn "swaync-client" "-t" "-sw"|spawn "quickshell" "ipc" "call" "controlcenter" "toggle"|g' "$cfg"
 			else
-				sed -i -e "s|exec-once = waybar|exec-once = $qs_run|" \
+				sed -i -e "s#exec-once = waybar#exec-once = $qs_run#" \
 					-e '/exec-once = swaync/d' \
 					-e 's|exec-once = hyprpaper & |exec-once = |' \
 					-e 's|\$menu = fuzzel|\$menu = quickshell ipc call launcher toggle|' \
@@ -558,7 +550,7 @@ UserSetup () {
 	if [[ "$VBTsel" -eq 1 ]]; then
 		printf 'WLR_NO_HARDWARE_CURSORS=1\nWLR_RENDERER_ALLOW_SOFTWARE=1\nLIBGL_ALWAYS_SOFTWARE=1\nKITTY_DISABLE_WAYLAND=1\nVDPAU_DRIVER=null\nQT_QPA_PLATFORMTHEME=qt6ct\n' >> /mnt/etc/environment
 	else
-		local va_env="iHD" ; [[ "$CPU_TYPE" == "AMD" ]] && va_env="radeonsi"
+		local va_env="iHD" ; if [[ "$CPU_TYPE" == "AMD" ]]; then va_env="radeonsi" ; fi
 		printf 'MOZ_ENABLE_WAYLAND=1\nQT_QPA_PLATFORM="wayland;xcb"\nQT_QPA_PLATFORMTHEME=qt6ct\nGDK_BACKEND="wayland,x11"\nSDL_VIDEODRIVER=wayland\nELECTRON_OZONE_PLATFORM_HINT=auto\nDRI_PRIME=0\n__NV_PRIME_RENDER_OFFLOAD=0\n__GLX_VENDOR_LIBRARY_NAME=mesa\n__EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/50_mesa.json\nVDPAU_DRIVER=null\nLIBVA_DRIVER_NAME=%s\nQT_FFMPEG_DECODING_HW_DEVICE_TYPES=vaapi\n' "$va_env" >> /mnt/etc/environment
 	fi
 	CR chown -hR "$UNsel":users /home/"$UNsel"
