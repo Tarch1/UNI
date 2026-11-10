@@ -353,15 +353,15 @@ KernelSetup () {
 ServiceSetup () {
 	Services=( iwd NetworkManager avahi-daemon )
 	case "${OSsel,,}" in
-		artix) Services+=( chrony dbus elogind cupsd bluetoothd ) ; [[ "$LUKS_ENC" -eq 1 ]] && Services+=( dmcrypt ) ; [[ "$init_sys" == "openrc" ]] && Services+=( openrc-settingsd ) ;;
-		arch)  Services+=( chronyd cups bluetooth paccache.timer ) ; [[ -v nvidiadrivers && ${#nvidiadrivers[@]} -gt 0 ]] && Services+=( nvidia-suspend nvidia-hibernate nvidia-resume nvidia-powerd ) ;;
+		artix) Services+=( chrony dbus elogind cupsd bluetoothd ) ; if [[ "$LUKS_ENC" -eq 1 ]]; then Services+=( dmcrypt ); fi ; if [[ "$init_sys" == "openrc" ]]; then Services+=( openrc-settingsd ); fi ;;
+		arch)  Services+=( chronyd cups bluetooth paccache.timer ) ; if [[ -v nvidiadrivers && ${#nvidiadrivers[@]} -gt 0 ]]; then Services+=( nvidia-suspend nvidia-hibernate nvidia-resume nvidia-powerd ); fi ;;
 		void)  Services+=( chronyd cupsd dbus elogind bluetoothd seatd ) ;;
 	esac
 	if compgen -G "/sys/class/power_supply/BAT*" >/dev/null; then
 		if [[ "${OSsel,,}" == "arch" && "$DEsel" =~ ^(KDE|GNOME|COSMIC)$ ]]; then Services+=( power-profiles-daemon ) ; else Services+=( tlp ) ; fi
-		[[ "$CPU_TYPE" == "Intel" ]] && Services+=( thermald )
+		if [[ "$CPU_TYPE" == "Intel" ]]; then Services+=( thermald ) ; fi
 	fi
-	[[ "$VBTsel" -eq 1 && "$VM_TYPE" == "vbox" && "${OSsel,,}" != "artix" ]] && Services+=( vboxservice )
+	if [[ "$VBTsel" -eq 1 && "$VM_TYPE" == "vbox" && "${OSsel,,}" != "artix" ]]; then Services+=( vboxservice ) ; fi
 	if [[ "${DMsel,,}" == "quickshell" ]]; then Services+=( greetd )
 	elif [[ "${DMsel,,}" =~ ^(ly|greetd|lightdm|sddm|gdm)$ ]]; then Services+=( "${DMsel,,}" ) ; fi
 	if [[ "${GPUMANAGERsel,,}" == "cardwire" ]]; then
@@ -369,7 +369,7 @@ ServiceSetup () {
 		if [[ "${OSsel,,}:$init_sys" == "artix:openrc" ]]; then
 			printf '#!/sbin/openrc-run\nname="Cardwire GPU Manager"\ncommand="/usr/bin/cardwire"\ncommand_background="yes"\npidfile="/run/${RC_SVCNAME}.pid"\ndepend() {\n\tneed localmount devfs\n\tafter bootmisc\n}\n' > /mnt/etc/init.d/cardwire ; chmod +x /mnt/etc/init.d/cardwire
 		elif [[ "${OSsel,,}" =~ ^(artix|void)$ ]]; then
-			local sv_dir="/mnt/etc/sv/cardwire" ; [[ "${OSsel,,}" == "artix" ]] && sv_dir="/mnt/etc/runit/sv/cardwire"
+			local sv_dir="/mnt/etc/sv/cardwire" ; if [[ "${OSsel,,}" == "artix" ]]; then sv_dir="/mnt/etc/runit/sv/cardwire" ; fi
 			mkdir -p "$sv_dir" ; printf '#!/bin/sh\nexec /usr/bin/cardwire\n' > "$sv_dir/run" ; chmod +x "$sv_dir/run"
 		fi
 	fi
@@ -387,13 +387,13 @@ ServiceSetup () {
 	printf '[device]\nwifi.backend=iwd\n' > /mnt/etc/NetworkManager/conf.d/wifi_backend.conf
 	printf 'monitor.bluez.properties = { bluez5.enable-sbc-xq = true, bluez5.enable-msbc = true, bluez5.enable-hw-volume = true, bluez5.codecs = [ sbc_xq aac aptx aptx_hd ldac ] }\n' > /mnt/etc/wireplumber/wireplumber.conf.d/10-bluetooth-policy.conf
 	printf 'context.properties = { default.clock.rate = 48000, default.clock.quantum = 1024, default.clock.min-quantum = 32, default.clock.max-quantum = 2048 }\n' > /mnt/etc/pipewire/pipewire.conf.d/99-input-denoise.conf
-	[[ -f /mnt/etc/bluetooth/main.conf ]] && sed -i 's/#AutoEnable=false/AutoEnable=true/g' /mnt/etc/bluetooth/main.conf
-	[[ "$init_sys" == "systemd" || "${OSsel,,}" == "arch" ]] && CR systemctl --global enable pipewire.socket pipewire-pulse.socket wireplumber.service
-	[[ -f "${SCRIPT_DIR}/Conf_files/51-android.rules" ]] && cp "${SCRIPT_DIR}/Conf_files/51-android.rules" /mnt/etc/udev/rules.d/
+	if [[ -f /mnt/etc/bluetooth/main.conf ]]; then sed -i 's/#AutoEnable=false/AutoEnable=true/g' /mnt/etc/bluetooth/main.conf ; fi
+	if [[ "$init_sys" == "systemd" || "${OSsel,,}" == "arch" ]]; then CR systemctl --global enable pipewire.socket pipewire-pulse.socket wireplumber.service ; fi
+	if [[ -f "${SCRIPT_DIR}/Conf_files/51-android.rules" ]]; then cp "${SCRIPT_DIR}/Conf_files/51-android.rules" /mnt/etc/udev/rules.d/ ; fi
 
 	local wm_exec="Hyprland" dbus_wrap=""
-	[[ "$DEsel" == "Niri" ]] && { [[ "$init_sys" =~ ^(systemd|dinit)$ ]] && wm_exec="niri-session" || wm_exec="niri --session"; }
-	[[ ! "$init_sys" =~ ^(systemd|dinit)$ ]] && dbus_wrap="dbus-run-session "
+	if [[ "$DEsel" == "Niri" ]]; then if [[ "$init_sys" =~ ^(systemd|dinit)$ ]]; then wm_exec="niri-session" ; else wm_exec="niri --session" ; fi ; fi
+	if [[ ! "$init_sys" =~ ^(systemd|dinit)$ ]]; then dbus_wrap="dbus-run-session " ; fi
 
 	printf '#!/bin/bash\ncleanup_session() {\n\tpkill -u "$UID" -x "quickshell|hypridle|wlsunset|vm-clipboard|wf-recorder" 2>/dev/null || true\n\tpkill -u "$UID" -f "theme-switcher.sh" 2>/dev/null || true\n\tcommand -v systemctl >/dev/null 2>&1 || pkill -u "$UID" -x "wireplumber|pipewire-pulse|pipewire" 2>/dev/null || true\n}\ncleanup_session\ntrap cleanup_session EXIT INT TERM\nif [[ -f "/tmp/qs_unlocked_$USER" ]]; then rm -f "/tmp/qs_unlocked_$USER"; export QS_START_LOCKED=0\nelif [[ "${1:-}" == "--locked" ]]; then export QS_START_LOCKED=1; touch "/tmp/qs_lock_active_$UID"\nelse export QS_START_LOCKED=0; fi\nexec %s%s\n' "$dbus_wrap" "$wm_exec" > /mnt/usr/bin/qs-session
 	printf '#!/bin/bash\ntarget_user="${1,,}"\n[[ -n "$target_user" ]] && id "$target_user" >/dev/null 2>&1 || exit 1\n[[ -f /etc/greetd/config.toml ]] && sed -i "s/^user = .*/user = \\"$target_user\\"/" /etc/greetd/config.toml\ntouch "/tmp/qs_unlocked_$target_user"\nchown "$target_user":users "/tmp/qs_unlocked_$target_user" 2>/dev/null || true\n' > /mnt/usr/bin/qs-switch-apply
@@ -402,15 +402,12 @@ ServiceSetup () {
 
 	if [[ "${DMsel,,}" =~ ^(quickshell|greetd)$ ]]; then
 		mkdir -p /mnt/etc/greetd
-		if [[ "${DMsel,,}" == "quickshell" ]]; then
-			printf '[terminal]\nvt = 7\n\n[default_session]\ncommand = "/usr/bin/qs-session --locked"\nuser = "%s"\n' "$UNsel" > /mnt/etc/greetd/config.toml
-		elif [[ "$SHELLsel" == "Quickshell" ]]; then
-			printf '[terminal]\nvt = 7\n\n[initial_session]\ncommand = "/usr/bin/qs-session --locked"\nuser = "%s"\n\n[default_session]\ncommand = "/usr/bin/qs-session --locked"\nuser = "%s"\n' "$UNsel" "$UNsel" > /mnt/etc/greetd/config.toml
-		else
-			sed -i -e "s|^command = .*|command = \"tuigreet --time --cmd ${wm_exec}\"|" -e 's/^vt = .*/vt = 7/' /mnt/etc/greetd/config.toml
+		if [[ "${DMsel,,}" == "quickshell" ]]; then	printf '[terminal]\nvt = 7\n\n[default_session]\ncommand = "/usr/bin/qs-session --locked"\nuser = "%s"\n' "$UNsel" > /mnt/etc/greetd/config.toml
+		elif [[ "$SHELLsel" == "Quickshell" ]]; then	printf '[terminal]\nvt = 7\n\n[initial_session]\ncommand = "/usr/bin/qs-session --locked"\nuser = "%s"\n\n[default_session]\ncommand = "/usr/bin/qs-session --locked"\nuser = "%s"\n' "$UNsel" "$UNsel" > /mnt/etc/greetd/config.toml
+		else	sed -i -e "s|^command = .*|command = \"tuigreet --time --cmd ${wm_exec}\"|" -e 's/^vt = .*/vt = 7/' /mnt/etc/greetd/config.toml
 		fi
 	fi
-	[[ "$DEsel" =~ ^(Niri|Hyprland)$ && -f /mnt/usr/share/wayland-sessions/${DEsel,,}.desktop ]] && sed -i 's|^Exec=.*|Exec=/usr/bin/qs-session|' /mnt/usr/share/wayland-sessions/${DEsel,,}.desktop
+	if [[ "$DEsel" =~ ^(Niri|Hyprland)$ && -f /mnt/usr/share/wayland-sessions/${DEsel,,}.desktop ]]; then	sed -i 's|^Exec=.*|Exec=/usr/bin/qs-session|' /mnt/usr/share/wayland-sessions/${DEsel,,}.desktop ; fi
 }
 UserSetup () {
 	CR useradd -m -g users -G wheel,video,audio,storage,input,lp,scanner,power,kvm "$UNsel"
