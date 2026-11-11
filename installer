@@ -489,8 +489,8 @@ UserSetup () {
 			printf '{\n\t"wallpaper": "%s",\n\t"wallMode": "static",\n\t"uiEffects": %s,\n\t"background": "#1e1e2e",\n\t"foreground": "#cdd6f4",\n\t"color0": "#1e1e2e",\n\t"color1": "#f38ba8",\n\t"color2": "#a6e3a1",\n\t"color3": "#f9e2af",\n\t"color4": "#89b4fa",\n\t"color5": "#cba6f7",\n\t"color6": "#94e2d5",\n\t"color7": "#bac2de",\n\t"color8": "#585b70"\n}\n' "$init_wall" "$init_fx" > /mnt/home/"$UNsel"/.config/quickshell/colors.json
 			local qs_env="DRI_PRIME=0 __NV_PRIME_RENDER_OFFLOAD=0 __GLX_VENDOR_LIBRARY_NAME=mesa VDPAU_DRIVER=null LIBVA_DRIVER_NAME=$va_drv QT_FFMPEG_DECODING_HW_DEVICE_TYPES=vaapi QSG_RHI_BACKEND=opengl"
 			if [[ "$VBTsel" -eq 1 ]]; then qs_env="VDPAU_DRIVER=null QSG_RHI_BACKEND=opengl QSG_RENDER_LOOP=basic" ; fi
-			local qs_run="bash -c 'env $qs_env quickshell; [[ ! -f /tmp/qs_lock_active_\$UID ]] || (hyprctl dispatch exit || loginctl terminate-session \"\$XDG_SESSION_ID\")'"
-			local qs_niri="\"bash\" \"-c\" \"env $qs_env quickshell; [[ ! -f /tmp/qs_lock_active_\$UID ]] || (niri msg action quit -s || loginctl terminate-session \\\"\$XDG_SESSION_ID\\\")\""
+			local qs_run="bash -c 'env $qs_env quickshell; [[ ! -f /tmp/qs_lock_active_\$UID ]] || (hyprctl dispatch exit || loginctl terminate-session \$XDG_SESSION_ID)'"
+			local qs_niri="\"bash\" \"-c\" \"env $qs_env quickshell; [[ ! -f /tmp/qs_lock_active_\$UID ]] || (niri msg action quit -s || loginctl terminate-session \$XDG_SESSION_ID)\""
 			sed -i "s|lock_cmd = .*|lock_cmd = quickshell ipc call lock lock|" /mnt/home/"$UNsel"/.config/hypr/hypridle.conf
 			if [[ "$DEsel" == "Niri" ]]; then
 				sed -i -e "s#spawn-at-startup \"waybar\"#spawn-at-startup $qs_niri#" \
