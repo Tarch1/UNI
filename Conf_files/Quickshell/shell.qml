@@ -2711,7 +2711,7 @@ ShellRoot {
 								Text {
 									anchors.centerIn: parent
 									text: modelData === "prev" ? "󰒮" : (modelData === "next" ? "󰒭" : ((root.activePlayer && root.activePlayer.playbackState === MprisPlaybackState.Playing) ? "󰏤" : "󰐊"))
-									color: modelData === "play" ? root.color4 : root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 15 : 14
+									color: modelData === "play" ? root.color4 : root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: modelData === "play" ? 15 : 14
 								}
 								MouseArea {
 									anchors.fill: parent
