@@ -170,16 +170,18 @@ BaseSystemInstall () {
 FStabGen () {
 	if [[ "$LUKS_ENC" -eq 1 && ( -n "$SWAP_PART" || ${#CRYPT_ADD_MAP[@]} -gt 0 ) ]]; then
 		echo -n "$LUKS_PASS" > /mnt/etc/crypt_key.bin ; chmod 600 /mnt/etc/crypt_key.bin
+		: > /mnt/etc/crypttab
+		if [[ "${OSsel,,}" == "artix" && "$init_sys" == "openrc" ]]; then : > /mnt/etc/conf.d/dmcrypt ; fi
 		if [[ -n "$SWAP_PART" && -n "$CRYPT_SWAP_UUID" ]]; then
 			echo -n "$LUKS_PASS" | cryptsetup luksAddKey -q "$SWAP_PART" /mnt/etc/crypt_key.bin -d -
-			if [[ "${OSsel,,}" == "artix" && "$init_sys" == "openrc" ]]; then echo -e "target='cryptswap'\nsource='/dev/disk/by-uuid/$CRYPT_SWAP_UUID'\nkey='/etc/crypt_key.bin'" > /mnt/etc/conf.d/dmcrypt
-			else echo "cryptswap UUID=$CRYPT_SWAP_UUID /etc/crypt_key.bin luks" > /mnt/etc/crypttab ; fi
+			echo "cryptswap UUID=$CRYPT_SWAP_UUID /etc/crypt_key.bin luks" >> /mnt/etc/crypttab
+			if [[ "${OSsel,,}" == "artix" && "$init_sys" == "openrc" ]]; then echo -e "target='cryptswap'\nsource='/dev/disk/by-uuid/$CRYPT_SWAP_UUID'\nkey='/etc/crypt_key.bin'" >> /mnt/etc/conf.d/dmcrypt ; fi
 		fi
 		for c_entry in "${CRYPT_ADD_MAP[@]}"; do
 			local c_name="${c_entry%%:*}" c_uuid="${c_entry#*:}"
 			echo -n "$LUKS_PASS" | cryptsetup luksAddKey -q "/dev/disk/by-uuid/$c_uuid" /mnt/etc/crypt_key.bin -d -
-			if [[ "${OSsel,,}" == "artix" && "$init_sys" == "openrc" ]]; then echo -e "\ntarget='$c_name'\nsource='/dev/disk/by-uuid/$c_uuid'\nkey='/etc/crypt_key.bin'" >> /mnt/etc/conf.d/dmcrypt
-			else echo "$c_name UUID=$c_uuid /etc/crypt_key.bin luks,nofail" >> /mnt/etc/crypttab ; fi
+			echo "$c_name UUID=$c_uuid /etc/crypt_key.bin luks,nofail" >> /mnt/etc/crypttab
+			if [[ "${OSsel,,}" == "artix" && "$init_sys" == "openrc" ]]; then echo -e "\ntarget='$c_name'\nsource='/dev/disk/by-uuid/$c_uuid'\nkey='/etc/crypt_key.bin'" >> /mnt/etc/conf.d/dmcrypt ; fi
 		done
 	fi
 	if [[ -f /mnt/etc/fstab ]]; then mv -f /mnt/etc/fstab /mnt/etc/old-fstab ; fi
@@ -411,7 +413,6 @@ ServiceSetup () {
 		sed -i 's|^Exec=.*|Exec=/usr/bin/qs-session|' /mnt/usr/share/wayland-sessions/${DEsel,,}.desktop
 	fi
 }
-
 UserSetup () {
 	CR useradd -m -g users -G wheel,video,audio,storage,input,lp,scanner,power,kvm "$UNsel"
 	if [[ "${OSsel,,}" == "void" ]]; then CR usermod -aG _seatd "$UNsel" ; fi
@@ -500,7 +501,8 @@ UserSetup () {
 			if [[ "$VBTsel" -eq 1 ]]; then qs_env="VDPAU_DRIVER=null QSG_RHI_BACKEND=opengl QSG_RENDER_LOOP=basic" ; fi
 			local qs_run="bash -c 'while :; do env $qs_env quickshell; [[ -f /tmp/qs_lock_active_\$UID ]] || break; sleep 1; done'"
 			local qs_niri="\"bash\" \"-c\" \"while :; do env $qs_env quickshell; [[ -f /tmp/qs_lock_active_\$UID ]] || break; sleep 1; done\""
-			sed -i "s|lock_cmd = .*|lock_cmd = quickshell ipc call lock lock|" /mnt/home/"$UNsel"/.config/hypr/hypridle.conf
+			sed -i -e "s|lock_cmd = .*|lock_cmd = quickshell ipc call lock lock|" \
+				-e "s|loginctl lock-session|quickshell ipc call lock lock|g" /mnt/home/"$UNsel"/.config/hypr/hypridle.conf
 			if [[ "$DEsel" == "Niri" ]]; then
 				if ! grep -q "wallpaper-backdrop" "$cfg"; then
 					printf '\nlayer-rule {\n\tmatch namespace="^wallpaper-backdrop$"\n\tplace-within-backdrop true\n}\n' >> "$cfg"
@@ -524,6 +526,7 @@ UserSetup () {
 			fi
 		else
 			echo -e "auth required pam_unix.so nullok\naccount required pam_unix.so\npassword required pam_unix.so\nsession required pam_unix.so" > /mnt/etc/pam.d/hyprlock
+			sed -i "s|loginctl lock-session|pidof hyprlock \|\| hyprlock|g" /mnt/home/"$UNsel"/.config/hypr/hypridle.conf
 			sed -i -e '/\[templates\.quickshell\]/,/^$/d' -e '/\[templates\.niri\]/,/^$/d' /mnt/home/"$UNsel"/.config/wallust/wallust.toml
 			if [[ "$DEsel" == "Niri" && -f "/mnt/home/$UNsel/.config/wallust/templates/colors-niri.conf" ]]; then
 				printf '\n[templates.niri]\ntemplate = "colors-niri.conf"\ntarget = "~/.config/niri/config.kdl"\n' >> /mnt/home/"$UNsel"/.config/wallust/wallust.toml
@@ -538,7 +541,7 @@ UserSetup () {
 			chmod +x /mnt/usr/bin/vm-clipboard
 			if [[ "$SHELLsel" != "Quickshell" ]]; then
 				sed -i 's/blur_passes = 3/blur_passes = 0/' /mnt/home/"$UNsel"/.config/hypr/hyprlock.conf
-				sed -i 's/&& hyprlock/\&\& env -u LIBGL_ALWAYS_SOFTWARE hyprlock/g; s/; hyprlock/; env -u LIBGL_ALWAYS_SOFTWARE hyprlock/g; s/) hyprlock/) env -u LIBGL_ALWAYS_SOFTWARE hyprlock/g' /mnt/home/"$UNsel"/.config/waybar/config.jsonc /mnt/home/"$UNsel"/.config/swaync/config.json /mnt/home/"$UNsel"/.config/hypr/hypridle.conf
+				sed -i 's/&& hyprlock/\&\& env -u LIBGL_ALWAYS_SOFTWARE hyprlock/g; s/; hyprlock/; env -u LIBGL_ALWAYS_SOFTWARE hyprlock/g; s/|| hyprlock/|| env -u LIBGL_ALWAYS_SOFTWARE hyprlock/g; s/) hyprlock/) env -u LIBGL_ALWAYS_SOFTWARE hyprlock/g' /mnt/home/"$UNsel"/.config/waybar/config.jsonc /mnt/home/"$UNsel"/.config/swaync/config.json /mnt/home/"$UNsel"/.config/hypr/hypridle.conf
 				sed -i 's/spawn "hyprlock"/spawn "env" "-u" "LIBGL_ALWAYS_SOFTWARE" "hyprlock"/g; s/exec, hyprlock/exec, env -u LIBGL_ALWAYS_SOFTWARE hyprlock/g' "$cfg"
 			fi
 			if [[ "$DEsel" == "Niri" ]]; then
@@ -557,6 +560,7 @@ UserSetup () {
 		fi
 		if [[ "$DEsel" == "Niri" && "$cfg" != */config.kdl ]]; then mkdir -p /mnt/home/"$UNsel"/.config/niri ; sed -e 's/{{color4}}/#8be9fd/g' -e 's/{{[^}]*}}/#282a36/g' "$cfg" > /mnt/home/"$UNsel"/.config/niri/config.kdl ; fi
 
+		# Pre-generate Wallust theme & Quickshell colors.json at install time (Zero lag on first boot)
 		CR chown -hR "$UNsel":users /home/"$UNsel"
 		local cur_hr ; printf -v cur_hr '%(%k)T' -1
 		local init_sub="night" ; if (( cur_hr >= 7 && cur_hr < 19 )); then init_sub="day" ; fi
