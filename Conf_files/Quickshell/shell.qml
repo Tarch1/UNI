@@ -2452,7 +2452,7 @@ ShellRoot {
 			root.authBusy = false; root.pendingPassword = ""
 			if (result === PamResult.Success) {
 				root.runCmd("rm -f /tmp/qs_lock_active_$UID 2>/dev/null || true")
-				root.screenLocked = false; root.isInitialLogin = false; root.authError = false; root.lockPromptActive = false
+				root.isMonitorDpmsOff = false; root.screenLocked = false; root.isInitialLogin = false; root.authError = false; root.lockPromptActive = false
 				root.checkFirstRunNiri()
 			} else {
 				root.authError = true; root.lockPromptActive = true
