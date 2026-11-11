@@ -476,7 +476,7 @@ UserSetup () {
 			fi
 		done
 		mkdir -p /mnt/home/"$UNsel"/.config/wallpapers/{day,night,day_animated,night_animated}
-		sed -i -e 's/^[[:space:]]*backend *=.*/backend = "resized"/' -e 's/^[[:space:]]*threshold *=.*/threshold = 2/' /mnt/home/"$UNsel"/.config/wallust/wallust.toml 2>/dev/null || true
+		sed -i -e 's/^[[:space:]]*backend *=.*/backend = "resized"/' -e '/^[[:space:]]*threshold *=/d' /mnt/home/"$UNsel"/.config/wallust/wallust.toml 2>/dev/null || true
 		echo -e '$background = rgb(1e1e2e)\n$foreground = rgb(cdd6f4)\n$color4 = rgb(89b4fa)\n$color6 = rgb(94e2d5)' > /mnt/home/"$UNsel"/.config/hypr/colors.conf
 		if [[ -f "${SCRIPT_DIR}/Conf_files/Hyprlock/hypridle.conf" ]]; then cp "${SCRIPT_DIR}/Conf_files/Hyprlock/hypridle.conf" /mnt/home/"$UNsel"/.config/hypr/ ; fi
 		chmod +x /mnt/home/"$UNsel"/.config/wallpapers/theme-switcher.sh
@@ -569,7 +569,7 @@ UserSetup () {
 		init_wall="${init_wall#/mnt}"
 		local init_fx="true" ; if [[ "$VBTsel" -eq 1 ]]; then init_fx="false" ; fi
 		if [[ -n "$init_wall" && -x /mnt/usr/bin/wallust ]]; then
-			CR_USER "wallust run -s --backend resized -t 2 \"$init_wall\" $( [[ \"$init_sub\" == \"night\" ]] && echo \"--palette dark16\" )" || true
+			CR_USER "wallust run -s --backend resized \"$init_wall\" $( [[ \"$init_sub\" == \"night\" ]] && echo \"--palette dark16\" )" || true
 		fi
 		if [[ "$SHELLsel" == "Quickshell" ]]; then
 			if [[ -f /mnt/home/"$UNsel"/.config/quickshell/colors-wallust.json ]] && grep -q '"color4": *"#' /mnt/home/"$UNsel"/.config/quickshell/colors-wallust.json 2>/dev/null; then
