@@ -240,10 +240,15 @@ ShellRoot {
 		root.authError = false; root.lockPromptActive = true
 	}
 	function cleanExitSession(targetUser) {
-		let sw = targetUser !== "" ? ("sudo /usr/bin/qs-switch-apply '" + targetUser + "' 2>/dev/null || true; ") : "rm -f /tmp/qs_lock_active_$UID 2>/dev/null || true; "
+		let sw = targetUser !== "" ? ("sudo -n /usr/bin/qs-switch-apply '" + targetUser + "' 2>/dev/null || true; ") : "rm -f /tmp/qs_lock_active_$UID 2>/dev/null || true; "
 		let clean = "pkill -u \"$UID\" -f '[t]heme-switcher.sh' 2>/dev/null || true; pkill -u \"$UID\" -x 'hypridle|wlsunset|vm-clipboard|wf-recorder' 2>/dev/null || true; command -v systemctl >/dev/null 2>&1 || pkill -u \"$UID\" -x 'wireplumber|pipewire-pulse|pipewire' 2>/dev/null || true; "
 		let wmExit = "niri msg action quit -s 2>/dev/null || hyprctl dispatch exit 2>/dev/null || loginctl terminate-session $XDG_SESSION_ID 2>/dev/null || pkill -TERM -u \"$UID\" -x 'niri|Hyprland'"
 		runCmd(sw + clean + wmExit)
+	}
+	function checkFirstRunNiri() {
+		if (!root.isHyprland && !root.screenLocked) {
+			runCmd("[[ -f \"$HOME/.config/niri/.first_run_done\" ]] || { mkdir -p \"$HOME/.config/niri\" && touch \"$HOME/.config/niri/.first_run_done\" && sleep 0.6 && niri msg action show-hotkey-overlay >/dev/null 2>&1; }")
+		}
 	}
 	function closeCenterPill() {
 		root.centerMode = "none"; root.sysSubmenu = ""; root.calSubmenu = ""; root.wifiPromptSsid = ""; root.expandedResMon = ""; root.showSavedList = false; root.expandedDevInfo = ""
@@ -340,13 +345,13 @@ ShellRoot {
 	Component.onCompleted: {
 		updateCalendar()
 		initPoll.running = true
-		sysPoll.running = true
+		checkFirstRunNiri()
 	}
 
 	FileView {
 		id: colorFile
 		path: root.homeDir + "/.config/quickshell/colors.json"
-		blockLoading: true; watchChanges: true
+		blockLoading: false; watchChanges: true
 		onFileChanged: reload()
 		onLoaded: {
 			try {
@@ -675,8 +680,8 @@ ShellRoot {
 		}
 	}
 
-	Timer { interval: root.isVM ? 800 : 350; running: !root.screenLocked; repeat: true; onTriggered: fastPoll.running = true }
-	Timer { interval: 1800000; running: true; repeat: true; triggeredOnStart: true; onTriggered: weatherProc.running = true }
+	Timer { interval: root.isVM ? 800 : 350; running: !root.screenLocked && !root.isMonitorDpmsOff; repeat: true; onTriggered: fastPoll.running = true }
+	Timer { interval: 1800000; running: true; repeat: true; onTriggered: weatherProc.running = true }
 	Timer {
 		interval: 1000; running: true; repeat: true; triggeredOnStart: true
 		property int tick: 0
@@ -685,12 +690,13 @@ ShellRoot {
 			root.timeStr = Qt.formatDateTime(now, "HH:mm")
 			root.dateStr = Qt.formatDateTime(now, "dd MMM")
 			if (root.isRecording) root.recSeconds++
+			if (tick === 2) { weatherProc.running = true; sysPoll.running = true }
 			if (tick % 2 === 0 && root.activePlayer && !root.screenLocked && !root.isMonitorDpmsOff) {
 				root.mediaProg = (root.activePlayer.length > 0) ? Math.min(1, Math.max(0, root.activePlayer.position / root.activePlayer.length)) : 0.25
 			}
 			if (root.centerMode === "system" && tick % 3 === 0) sysPoll.running = true
 			else if (root.animWallpapers && tick % 12 === 0) sysPoll.running = true
-			if (tick % 10 === 0 && root.weatherShort.includes("--")) weatherProc.running = true
+			if (tick > 2 && tick % 15 === 0 && root.weatherShort.includes("--")) weatherProc.running = true
 			if (tick % 4 === 0 && root.centerMode === "system" && root.sysSubmenu !== "") subPoll.running = true
 			tick = (tick + 1) % 3600
 		}
@@ -1563,7 +1569,7 @@ ShellRoot {
 								Rectangle {
 									id: mainSliderCard
 									required property string modelData
-									visible: root.sysSubmenu === "" || root.sysSubmenu === modelData
+									visible: root.sysSubmenu === "" || (modelData !== "display" && root.sysSubmenu === modelData)
 									Layout.fillWidth: true; implicitHeight: 48; radius: 14
 									color: sliderCardMouse.containsMouse && root.sysSubmenu === "" ? Qt.lighter(root.color0, 1.12) : root.color0
 									property int valPct: modelData === "display" ? root.brightnessPct : (modelData === "sound" ? root.outVolPct : root.micVolPct)
@@ -2447,6 +2453,7 @@ ShellRoot {
 			if (result === PamResult.Success) {
 				root.runCmd("rm -f /tmp/qs_lock_active_$UID 2>/dev/null || true")
 				root.screenLocked = false; root.isInitialLogin = false; root.authError = false; root.lockPromptActive = false
+				root.checkFirstRunNiri()
 			} else {
 				root.authError = true; root.lockPromptActive = true
 			}
@@ -2480,12 +2487,17 @@ ShellRoot {
 			anchors { top: true; bottom: true; left: true; right: true }
 			color: root.showLiveLockWall ? "transparent" : root.bg
 
+			Timer {
+				interval: 250; running: lockWin.visible && !pwLockInput.activeFocus; repeat: true
+				onTriggered: pwLockInput.forceActiveFocus()
+			}
+
 			onVisibleChanged: {
 				if (visible) {
 					root.isMonitorDpmsOff = false; root.lockPromptActive = false; root.authError = false
 					root.lockDateFormatted = Qt.formatDateTime(new Date(), "dddd, MMMM d").toUpperCase()
 					pwLockInput.text = ""
-					if (!pwLockInput.activeFocus) pwLockInput.forceActiveFocus()
+					pwLockInput.forceActiveFocus()
 				}
 			}
 
@@ -2503,6 +2515,15 @@ ShellRoot {
 			}
 
 			Rectangle { anchors.fill: parent; color: Qt.rgba(0, 0, 0, 0.38) }
+
+			// Background click catcher to always keep keyboard focus on password input
+			MouseArea {
+				anchors.fill: parent
+				onClicked: {
+					root.lockPromptActive = true
+					pwLockInput.forceActiveFocus()
+				}
+			}
 
 			ColumnLayout {
 				anchors.horizontalCenter: parent.horizontalCenter
@@ -2596,7 +2617,7 @@ ShellRoot {
 								else root.lockPromptActive = !root.lockPromptActive
 							}
 							snapAnim.restart()
-							if (!pwLockInput.activeFocus) pwLockInput.forceActiveFocus()
+							pwLockInput.forceActiveFocus()
 						}
 						onWheel: wheel => {
 							if (root.usersList.length > 1) root.cycleUser(wheel.angleDelta.y > 0 ? -1 : 1)
@@ -2607,7 +2628,7 @@ ShellRoot {
 				Item {
 					id: pwBoxContainer
 					Layout.alignment: Qt.AlignHCenter; Layout.topMargin: 8; implicitWidth: 230; implicitHeight: 34
-					property bool showBar: root.lockPromptActive || pwLockInput.text.length > 0 || root.authError
+					property bool showBar: root.lockPromptActive || pwLockInput.text.length > 0 || root.authError || root.authBusy
 					opacity: showBar ? 1.0 : 0.0
 					Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
 
@@ -2619,7 +2640,7 @@ ShellRoot {
 						font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 18; font.letterSpacing: 6
 						onTextChanged: {
 							if (text.length > 0) { root.authError = false; root.lockPromptActive = true }
-							else if (!root.authError) root.lockPromptActive = false
+							else if (!root.authError && !root.authBusy) root.lockPromptActive = false
 						}
 						Keys.onLeftPressed: event => { if (text.length === 0 && root.usersList.length > 1) { root.cycleUser(-1); event.accepted = true } }
 						Keys.onRightPressed: event => { if (text.length === 0 && root.usersList.length > 1) { root.cycleUser(1); event.accepted = true } }
@@ -2634,13 +2655,15 @@ ShellRoot {
 
 					Text {
 						anchors.centerIn: parent; anchors.verticalCenterOffset: -3
-						visible: pwLockInput.text.length === 0 && root.authError
-						text: "WRONG PASSWORD"; color: root.color1; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; font.bold: true; font.letterSpacing: 3
+						visible: pwLockInput.text.length === 0 && (root.authError || root.authBusy)
+						text: root.authBusy ? "VERIFYING..." : "WRONG PASSWORD"
+						color: root.authBusy ? root.color4 : root.color1
+						font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; font.bold: true; font.letterSpacing: 3
 					}
 
 					Rectangle {
 						anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom; height: 1.5
-						color: root.authError ? root.color1 : (pwLockInput.text.length > 0 ? root.color4 : root.withAlpha(root.fg, 0.6))
+						color: root.authError ? root.color1 : ((pwLockInput.text.length > 0 || root.authBusy) ? root.color4 : root.withAlpha(root.fg, 0.6))
 						Behavior on color { ColorAnimation { duration: 150 } }
 					}
 				}
@@ -2688,7 +2711,7 @@ ShellRoot {
 								Text {
 									anchors.centerIn: parent
 									text: modelData === "prev" ? "󰒮" : (modelData === "next" ? "󰒭" : ((root.activePlayer && root.activePlayer.playbackState === MprisPlaybackState.Playing) ? "󰏤" : "󰐊"))
-									color: modelData === "play" ? root.color4 : root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: modelData === "play" ? 15 : 14
+									color: modelData === "play" ? root.color4 : root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 15 : 14
 								}
 								MouseArea {
 									anchors.fill: parent
@@ -2715,9 +2738,9 @@ ShellRoot {
 					id: lockPowerCol; anchors.right: parent.right; anchors.bottom: parent.bottom; spacing: 10
 					Repeater {
 						model: [
-							{ "label": "HIBERNATE", "cmd": "loginctl hibernate || ZZZ", "pause": true },
-							{ "label": "SUSPEND", "cmd": "loginctl suspend || zzz", "pause": true },
-							{ "label": "REBOOT", "cmd": "loginctl reboot || reboot", "pause": false }
+							{ "label": "HIBERNATE", "cmd": "loginctl hibernate || sudo -n ZZZ || ZZZ", "pause": true },
+							{ "label": "SUSPEND", "cmd": "loginctl suspend || sudo -n zzz || zzz", "pause": true },
+							{ "label": "REBOOT", "cmd": "loginctl reboot || sudo -n reboot || reboot", "pause": false }
 						]
 						Item {
 							required property var modelData
@@ -2741,7 +2764,7 @@ ShellRoot {
 							color: shutdownMouse.containsMouse ? root.color1 : root.withAlpha(root.fg, 0.8)
 							font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; font.bold: true; font.letterSpacing: 2
 						}
-						MouseArea { id: shutdownMouse; anchors.fill: parent; hoverEnabled: true; onClicked: root.runCmd("loginctl poweroff || poweroff") }
+						MouseArea { id: shutdownMouse; anchors.fill: parent; hoverEnabled: true; onClicked: root.runCmd("loginctl poweroff || sudo -n poweroff || poweroff") }
 					}
 				}
 			}
