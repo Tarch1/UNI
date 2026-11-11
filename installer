@@ -253,16 +253,12 @@ PKGcheck () {
 		else desktop+=(fuzzel waybar swaync hyprlock) ; fi
 	else desktop=() ; fi
 	if [[ "${DMsel,,}" == "gdm" ]]; then displaymanager=(gdm)
-	elif [[ "${DMsel,,}" == "greetd" ]]; then
-		if [[ "$SHELLsel" == "Quickshell" ]]; then displaymanager=(greetd) ; else displaymanager=(greetd greetd-tuigreet) ; fi
-	elif [[ "${DMsel,,}" == "quickshell" ]]; then displaymanager=(greetd)
+	elif [[ "${DMsel,,}" == "greetd" ]]; then if [[ "$SHELLsel" == "Quickshell" ]]; then displaymanager=(greetd) ; else displaymanager=(greetd greetd-tuigreet) ; fi
 	elif [[ "${DMsel,,}" == "lightdm" ]]; then displaymanager=(lightdm lightdm-gtk-greeter lightdm-gtk-greeter-settings)
 	elif [[ "${DMsel,,}" == "ly" ]]; then displaymanager=(ly)
 	elif [[ "${DMsel,,}" == "sddm" ]]; then displaymanager=(sddm)
 	else displaymanager=() ; fi
-	if [[ "${OSsel,,}" == "artix" ]]; then
-		if [[ "${DMsel,,}" == "quickshell" ]]; then displaymanager+=("greetd-${init_sys,,}")
-		elif [[ "${DMsel,,}" != "none" ]]; then displaymanager+=("${DMsel,,}-${init_sys,,}") ; fi ; fi
+	if [[ "${OSsel,,}" == "artix" && ! "${DMsel,,}" =~ ^(none|quickshell)$ ]]; then	displaymanager+=("${DMsel,,}-${init_sys,,}") ; fi
 	filemanager=(yazi pcmanfm-qt tumbler file-roller android-tools qt6ct papirus-icon-theme librsvg adwaita-icon-theme) ; if [[ "${OSsel,,}" != "void" ]]; then filemanager+=(gvfs-mtp) ; fi
 	if [[ "${OSsel,,}" == "void" ]]; then fonts=(nerd-fonts) ; else fonts=(ttf-jetbrains-mono-nerd) ; fi
 	fs=(dialog mtools parted gptfdisk dosfstools ntfs-3g) ; if [[ "${OSsel,,}" != "void" ]]; then fs+=(ntfsprogs) ; fi
@@ -362,8 +358,7 @@ ServiceSetup () {
 		if [[ "$CPU_TYPE" == "Intel" ]]; then Services+=( thermald ) ; fi
 	fi
 	if [[ "$VBTsel" -eq 1 && "$VM_TYPE" == "vbox" && "${OSsel,,}" != "artix" ]]; then Services+=( vboxservice ) ; fi
-	if [[ "${DMsel,,}" == "quickshell" ]]; then Services+=( greetd )
-	elif [[ "${DMsel,,}" =~ ^(ly|greetd|lightdm|sddm|gdm)$ ]]; then Services+=( "${DMsel,,}" ) ; fi
+	if [[ "${DMsel,,}" =~ ^(ly|greetd|lightdm|sddm|gdm)$ ]]; then Services+=( "${DMsel,,}" ) ; fi
 	if [[ "${GPUMANAGERsel,,}" == "cardwire" ]]; then
 		Services+=( cardwire )
 		if [[ "${OSsel,,}:$init_sys" == "artix:openrc" ]]; then
@@ -383,7 +378,7 @@ ServiceSetup () {
 			artix:*)     if [[ "$s" == "dmcrypt" ]]; then CR rc-update add "$s" boot ; else CR rc-update add "$s" default ; fi ;;
 		esac
 	done
-	mkdir -p /mnt/etc/NetworkManager/conf.d /mnt/etc/pipewire/pipewire.conf.d /mnt/etc/wireplumber/wireplumber.conf.d /mnt/etc/udev/rules.d /mnt/etc/sudoers.d
+	mkdir -p /mnt/etc/NetworkManager/conf.d /mnt/etc/pipewire/pipewire.conf.d /mnt/etc/wireplumber/wireplumber.conf.d /mnt/etc/udev/rules.d /mnt/etc/sudoers.d /mnt/etc/profile.d
 	printf '[device]\nwifi.backend=iwd\n' > /mnt/etc/NetworkManager/conf.d/wifi_backend.conf
 	printf 'monitor.bluez.properties = { bluez5.enable-sbc-xq = true, bluez5.enable-msbc = true, bluez5.enable-hw-volume = true, bluez5.codecs = [ sbc_xq aac aptx aptx_hd ldac ] }\n' > /mnt/etc/wireplumber/wireplumber.conf.d/10-bluetooth-policy.conf
 	printf 'context.properties = { default.clock.rate = 48000, default.clock.quantum = 1024, default.clock.min-quantum = 32, default.clock.max-quantum = 2048 }\n' > /mnt/etc/pipewire/pipewire.conf.d/99-input-denoise.conf
@@ -395,17 +390,20 @@ ServiceSetup () {
 	if [[ "$DEsel" == "Niri" ]]; then if [[ "$init_sys" =~ ^(systemd|dinit)$ ]]; then wm_exec="niri-session" ; else wm_exec="niri --session" ; fi ; fi
 	if [[ ! "$init_sys" =~ ^(systemd|dinit)$ ]]; then dbus_wrap="dbus-run-session " ; fi
 
-	printf '#!/bin/bash\ncleanup_session() {\n\tpkill -u "$UID" -x "quickshell|waybar|swaync|hyprpaper|awww-daemon|fuzzel|hypridle|wlsunset|vm-clipboard|wf-recorder" 2>/dev/null || true\n\tpkill -u "$UID" -f "[t]heme-switcher.sh" 2>/dev/null || true\n\tcommand -v systemctl >/dev/null 2>&1 || pkill -u "$UID" -x "wireplumber|pipewire-pulse|pipewire" 2>/dev/null || true\n}\ncleanup_session\ntrap cleanup_session EXIT INT TERM\nif [[ -f "/tmp/qs_unlocked_$USER" ]]; then rm -f "/tmp/qs_unlocked_$USER"; export QS_START_LOCKED=0\nelif [[ "${1:-}" == "--locked" ]]; then export QS_START_LOCKED=1; touch "/tmp/qs_lock_active_$UID"\nelse export QS_START_LOCKED=0; fi\n%s%s\n' "$dbus_wrap" "$wm_exec" > /mnt/usr/bin/qs-session
+	printf '#!/bin/bash\ncleanup_session() {\n\trm -f "/tmp/qs_lock_active_$UID" 2>/dev/null || true\n\tpkill -u "$UID" -x "quickshell|waybar|swaync|hyprpaper|awww-daemon|fuzzel|hypridle|wlsunset|vm-clipboard|wf-recorder" 2>/dev/null || true\n\tpkill -u "$UID" -f "[t]heme-switcher.sh" 2>/dev/null || true\n\tcommand -v systemctl >/dev/null 2>&1 || pkill -u "$UID" -x "wireplumber|pipewire-pulse|pipewire" 2>/dev/null || true\n}\ncleanup_session\ntrap cleanup_session EXIT INT TERM\nif [[ -f "/tmp/qs_unlocked_$USER" ]]; then rm -f "/tmp/qs_unlocked_$USER"; export QS_START_LOCKED=0\nelif [[ "${1:-}" == "--locked" ]]; then export QS_START_LOCKED=1; touch "/tmp/qs_lock_active_$UID"\nelse export QS_START_LOCKED=0; fi\n%s%s\n' "$dbus_wrap" "$wm_exec" > /mnt/usr/bin/qs-session
 	printf '#!/bin/bash\ndbus-update-activation-environment --all 2>/dev/null || true\ncommand -v systemctl >/dev/null 2>&1 && exit 0\nexec 9>"/tmp/pw_start_$UID.lock"\nflock -n 9 || exit 0\nif ! pgrep -u "$UID" -x pipewire >/dev/null; then\n\tpipewire &\n\tfor _ in {1..30}; do [[ -S "/run/user/$UID/pipewire-0" ]] && break; sleep 0.1; done\nfi\npgrep -u "$UID" -x wireplumber >/dev/null || wireplumber &\npgrep -u "$UID" -x pipewire-pulse >/dev/null || pipewire-pulse &\n' > /mnt/usr/bin/qs-pipewire
-	printf '#!/bin/bash\ntarget_user="${1,,}"\n[[ -n "$target_user" ]] && id "$target_user" >/dev/null 2>&1 || exit 1\n[[ -f /etc/greetd/config.toml ]] && sed -i "s/^user = .*/user = \\"$target_user\\"/" /etc/greetd/config.toml\ntouch "/tmp/qs_unlocked_$target_user"\nchown "$target_user":users "/tmp/qs_unlocked_$target_user" 2>/dev/null || true\n' > /mnt/usr/bin/qs-switch-apply
+	printf '#!/bin/bash\ntarget_user="${1,,}"\n[[ -n "$target_user" ]] && id "$target_user" >/dev/null 2>&1 || exit 1\nif [[ -f /etc/greetd/config.toml ]]; then sed -i "s/^user = .*/user = \\"$target_user\\"/" /etc/greetd/config.toml ; fi\nif [[ -f /etc/inittab ]]; then sed -i "s|^c1:.*|c1:12345:respawn:/sbin/agetty --autologin $target_user --noclear 38400 tty1 linux|" /etc/inittab ; kill -HUP 1 2>/dev/null || true ; fi\nfor rconf in /etc/runit/sv/agetty-tty1/conf /etc/sv/agetty-tty1/conf; do\n\tif [[ -d "${rconf%%/conf}" ]]; then printf '\''GETTY_ARGS="--autologin %s --noclear"\nBAUD_RATE=38400\nTERM_NAME=linux\n'\'' "$target_user" > "$rconf" ; fi\ndone\nif [[ -d /etc/dinit.d ]]; then\n\t[[ ! -f /etc/dinit.d/tty1 && -f /usr/lib/dinit.d/tty1 ]] && cp /usr/lib/dinit.d/tty1 /etc/dinit.d/tty1\n\tif [[ -f /etc/dinit.d/tty1 ]]; then sed -i -E "s|(agetty )(--autologin [^ ]+ )?|\1--autologin $target_user |" /etc/dinit.d/tty1 ; fi\nfi\nfor s6f in /etc/s6/sv/tty1-srv/conf /etc/s6/adminsv/default/contents.d/tty1; do\n\tif [[ -f "$s6f" ]]; then sed -i -E "s|(--autologin [^ \"]+)|--autologin $target_user|g" "$s6f" ; fi\ndone\nif command -v systemctl >/dev/null 2>&1; then\n\tmkdir -p /etc/systemd/system/getty@tty1.service.d\n\tprintf "[Service]\nExecStart=\nExecStart=-/sbin/agetty -o '\''-p -f -- \\\\u'\'' --noclear --autologin %s %%I \$TERM\n" "$target_user" > /etc/systemd/system/getty@tty1.service.d/autologin.conf\nfi\ntouch "/tmp/qs_unlocked_$target_user"\nchown "$target_user":users "/tmp/qs_unlocked_$target_user" 2>/dev/null || true\n' > /mnt/usr/bin/qs-switch-apply
 	chmod 755 /mnt/usr/bin/qs-session /mnt/usr/bin/qs-pipewire /mnt/usr/bin/qs-switch-apply
 	printf '%%wheel ALL=(root) NOPASSWD: /usr/bin/qs-switch-apply *, /usr/bin/poweroff, /usr/bin/reboot, /sbin/poweroff, /sbin/reboot\n' > /mnt/etc/sudoers.d/90-qs-switch ; chmod 440 /mnt/etc/sudoers.d/90-qs-switch
 
-	if [[ "${DMsel,,}" =~ ^(quickshell|greetd)$ ]]; then
+	if [[ "${DMsel,,}" == "quickshell" ]]; then
+		printf 'if [[ -z "$DISPLAY" && -z "$WAYLAND_DISPLAY" && "$(tty)" == "/dev/tty1" ]]; then\n\texec /usr/bin/qs-session --locked\nfi\n' > /mnt/etc/profile.d/qs-autostart.sh
+		chmod 644 /mnt/etc/profile.d/qs-autostart.sh
+		CR /usr/bin/qs-switch-apply "$UNsel" || true
+		rm -f "/mnt/tmp/qs_unlocked_$UNsel"
+	elif [[ "${DMsel,,}" == "greetd" ]]; then
 		mkdir -p /mnt/etc/greetd
-		if [[ "${DMsel,,}" == "quickshell" ]]; then
-			printf '[terminal]\nvt = 7\n\n[default_session]\ncommand = "/usr/bin/qs-session --locked"\nuser = "%s"\n' "$UNsel" > /mnt/etc/greetd/config.toml
-		elif [[ "$SHELLsel" == "Quickshell" ]]; then
+		if [[ "$SHELLsel" == "Quickshell" ]]; then
 			printf '[terminal]\nvt = 7\n\n[initial_session]\ncommand = "/usr/bin/qs-session --locked"\nuser = "%s"\n\n[default_session]\ncommand = "/usr/bin/qs-session --locked"\nuser = "%s"\n' "$UNsel" "$UNsel" > /mnt/etc/greetd/config.toml
 		else
 			sed -i -e "s|^command = .*|command = \"tuigreet --time --cmd ${wm_exec}\"|" -e 's/^vt = .*/vt = 7/' /mnt/etc/greetd/config.toml
@@ -415,7 +413,6 @@ ServiceSetup () {
 		sed -i 's|^Exec=.*|Exec=/usr/bin/qs-session|' /mnt/usr/share/wayland-sessions/${DEsel,,}.desktop
 	fi
 }
-
 UserSetup () {
 	CR useradd -m -g users -G wheel,video,audio,storage,input,lp,scanner,power,kvm "$UNsel"
 	if [[ "${OSsel,,}" == "void" ]]; then CR usermod -aG _seatd "$UNsel" ; fi
@@ -502,8 +499,8 @@ UserSetup () {
 			printf '{\n\t"wallpaper": "%s",\n\t"wallMode": "static",\n\t"uiEffects": %s,\n\t"background": "#1e1e2e",\n\t"foreground": "#cdd6f4",\n\t"color0": "#1e1e2e",\n\t"color1": "#f38ba8",\n\t"color2": "#a6e3a1",\n\t"color3": "#f9e2af",\n\t"color4": "#89b4fa",\n\t"color5": "#cba6f7",\n\t"color6": "#94e2d5",\n\t"color7": "#bac2de",\n\t"color8": "#585b70"\n}\n' "$init_wall" "$init_fx" > /mnt/home/"$UNsel"/.config/quickshell/colors.json
 			local qs_env="DRI_PRIME=0 __NV_PRIME_RENDER_OFFLOAD=0 __GLX_VENDOR_LIBRARY_NAME=mesa VDPAU_DRIVER=null LIBVA_DRIVER_NAME=$va_drv QT_FFMPEG_DECODING_HW_DEVICE_TYPES=vaapi QSG_RHI_BACKEND=opengl"
 			if [[ "$VBTsel" -eq 1 ]]; then qs_env="VDPAU_DRIVER=null QSG_RHI_BACKEND=opengl QSG_RENDER_LOOP=basic" ; fi
-			local qs_run="bash -c 'env $qs_env quickshell; [[ ! -f /tmp/qs_lock_active_\$UID ]] || (hyprctl dispatch exit || loginctl terminate-session \$XDG_SESSION_ID)'"
-			local qs_niri="\"bash\" \"-c\" \"env $qs_env quickshell; [[ ! -f /tmp/qs_lock_active_\$UID ]] || (niri msg action quit -s || loginctl terminate-session \$XDG_SESSION_ID)\""
+			local qs_run="bash -c 'while :; do env $qs_env quickshell; [[ -f /tmp/qs_lock_active_\$UID ]] || break; sleep 1; done'"
+			local qs_niri="\"bash\" \"-c\" \"while :; do env $qs_env quickshell; [[ -f /tmp/qs_lock_active_\$UID ]] || break; sleep 1; done\""
 			sed -i "s|lock_cmd = .*|lock_cmd = quickshell ipc call lock lock|" /mnt/home/"$UNsel"/.config/hypr/hypridle.conf
 			if [[ "$DEsel" == "Niri" ]]; then
 				if ! grep -q "wallpaper-backdrop" "$cfg"; then
