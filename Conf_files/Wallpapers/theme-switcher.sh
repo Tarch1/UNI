@@ -22,7 +22,7 @@ WALLUST_BACKEND="resized"
 
 # Wallust color difference threshold (1-20)
 # Options: 2 = Best for flat illustrations | 11 = Balanced | 20 = Photographs
-WALLUST_THRESHOLD=2
+WALLUST_THRESHOLD=0
 
 # Wallust palette for Night mode
 # Options: "dark16" | "harddark16" | "softdark16"
