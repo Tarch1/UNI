@@ -1,7 +1,6 @@
-backend = "kmeans"
+backend = "resized"
 color_space = "lab"
 palette = "dark16"
-threshold = 20
 check_contrast = true
 
 [templates.hyprland]
