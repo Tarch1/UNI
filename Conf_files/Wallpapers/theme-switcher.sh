@@ -45,9 +45,16 @@ QS_DIR="$HOME/.config/quickshell"
 QT6_DIR="$HOME/.config/qt6ct/colors"
 FRAME_CACHE="/tmp/wall_frame.jpg"
 FORCED_MODE="${1:-}"
-CURRENT_WALL=""
+CURRENT_WALL=$(grep -o '"wallpaper": *"[^"]*"' "$QS_DIR/colors.json" 2>/dev/null | cut -d'"' -f4)
 CURRENT_THEME=""
-LAST_MODE=""
+LAST_MODE=$(grep -o '"wallMode": *"[^"]*"' "$QS_DIR/colors.json" 2>/dev/null | cut -d'"' -f4)
+[[ -z "$LAST_MODE" ]] && LAST_MODE="static"
+if [[ -n "$CURRENT_WALL" && -f "$CURRENT_WALL" && -f "$QS_DIR/colors-wallust.json" ]]; then
+	[[ "$CURRENT_WALL" == *"/day"* ]] && CURRENT_THEME="day"
+	[[ "$CURRENT_WALL" == *"/night"* ]] && CURRENT_THEME="night"
+else
+	CURRENT_WALL=""
+fi
 LAST_ROTATE_TS=$SECONDS
 
 get_wall_mode() {
