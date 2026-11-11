@@ -351,7 +351,7 @@ ShellRoot {
 	FileView {
 		id: colorFile
 		path: root.homeDir + "/.config/quickshell/colors.json"
-		blockLoading: false; watchChanges: true
+		blockLoading: true; watchChanges: true
 		onFileChanged: reload()
 		onLoaded: {
 			try {
