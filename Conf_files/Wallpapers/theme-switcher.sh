@@ -8,8 +8,8 @@ DAY_START_HOUR=7
 # Night theme start hour (0-23, default: 19 -> 07:00 PM)
 NIGHT_START_HOUR=19
 
-# Time check interval in seconds (default: 5)
-CHECK_INTERVAL=5
+# Time check interval in seconds (default: 60)
+CHECK_INTERVAL=60
 
 # Automatic wallpaper rotation interval within the same time period (in seconds)
 # Options: 0 = Disabled (changes only at 07:00, 19:00, or manual toggle)
@@ -21,11 +21,11 @@ ROTATE_INTERVAL=0
 WALLUST_BACKEND="resized"
 
 # Wallust color difference threshold (1-20)
-# Options: 0 = Auto heuristic | 2 = Best for flat illustrations | 11 = Balanced | 20 = Photographs
-WALLUST_THRESHOLD=0
+# Options: 0 = Auto heuristic | 2 = Best for flat illustrations | 12 = Balanced | 20 = Photographs
+WALLUST_THRESHOLD=12
 
-# Wallust palette for Night mode
-# Options: "dark16" | "harddark16" | "softdark16"
+# Wallust palettes for Day and Night modes
+# Options: "softdark16" | "dark16" | "harddark16" | "light16"
 WALLUST_DAY_PALETTE="softdark16"
 WALLUST_NIGHT_PALETTE="dark16"
 # ==============================================================================
@@ -189,7 +189,9 @@ apply_theme() {
 	sync_quickshell_state "$wall" "$mode" "$fx" "$fr"
 	local pal="$WALLUST_DAY_PALETTE"
 	[[ "$theme" == "night" ]] && pal="$WALLUST_NIGHT_PALETTE"
-	wallust run -s --backend "$WALLUST_BACKEND" -t "$WALLUST_THRESHOLD" "$wall_img" --palette "$pal" 2>/dev/null
+	local t_flag=()
+	(( WALLUST_THRESHOLD > 0 )) && t_flag=(-t "$WALLUST_THRESHOLD")
+	wallust run -s --backend "$WALLUST_BACKEND" "${t_flag[@]}" "$wall_img" --palette "$pal" 2>/dev/null
 
 	if [[ -f "$QS_DIR/colors.json" ]]; then
 		sed -i -e "s|\"wallpaper\": *\"[^\"]*\"|\"wallpaper\": \"$wall\"|" \
