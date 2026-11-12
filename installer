@@ -380,7 +380,7 @@ ServiceSetup () {
 			artix:*)     if [[ "$s" == "dmcrypt" ]]; then CR rc-update add "$s" boot ; else CR rc-update add "$s" default ; fi ;;
 		esac
 	done
-	mkdir -p /mnt/etc/NetworkManager/conf.d /mnt/etc/pipewire/pipewire.conf.d /mnt/etc/wireplumber/wireplumber.conf.d /mnt/etc/udev/rules.d /mnt/etc/sudoers.d /mnt/etc/profile.d
+	mkdir -p /mnt/etc/NetworkManager/conf.d /mnt/etc/pipewire/pipewire.conf.d /mnt/etc/wireplumber/wireplumber.conf.d /mnt/etc/udev/rules.d /mnt/etc/sudoers.d
 	printf '[device]\nwifi.backend=iwd\n' > /mnt/etc/NetworkManager/conf.d/wifi_backend.conf
 	printf 'monitor.bluez.properties = { bluez5.enable-sbc-xq = true, bluez5.enable-msbc = true, bluez5.enable-hw-volume = true, bluez5.codecs = [ sbc_xq aac aptx aptx_hd ldac ] }\n' > /mnt/etc/wireplumber/wireplumber.conf.d/10-bluetooth-policy.conf
 	printf 'context.properties = { default.clock.rate = 48000, default.clock.quantum = 1024, default.clock.min-quantum = 32, default.clock.max-quantum = 2048 }\n' > /mnt/etc/pipewire/pipewire.conf.d/99-input-denoise.conf
@@ -392,15 +392,14 @@ ServiceSetup () {
 	if [[ "$DEsel" == "Niri" ]]; then if [[ "$init_sys" =~ ^(systemd|dinit)$ ]]; then wm_exec="niri-session" ; else wm_exec="niri --session" ; fi ; fi
 	if [[ ! "$init_sys" =~ ^(systemd|dinit)$ ]]; then dbus_wrap="dbus-run-session " ; fi
 
-	printf '#!/bin/bash\ncleanup_session() {\n\trm -f "/tmp/qs_lock_active_$UID" 2>/dev/null || true\n\tpkill -u "$UID" -x "quickshell|waybar|swaync|hyprpaper|awww-daemon|fuzzel|hypridle|wlsunset|vm-clipboard|wf-recorder" 2>/dev/null || true\n\tpkill -u "$UID" -f "[t]heme-switcher.sh" 2>/dev/null || true\n\tcommand -v systemctl >/dev/null 2>&1 || pkill -u "$UID" -x "wireplumber|pipewire-pulse|pipewire" 2>/dev/null || true\n\tif [[ -f /tmp/qs_switched_tty1 ]] && command -v rc-service >/dev/null 2>&1; then\n\t\trm -f /tmp/qs_switched_tty1\n\t\tnohup sh -c "sleep 0.2; sudo -n /usr/bin/rc-service agetty.tty1 restart" >/dev/null 2>&1 &\n\tfi\n}\ncleanup_session\ntrap cleanup_session EXIT INT TERM\nif [[ -f "/tmp/qs_unlocked_$USER" ]]; then rm -f "/tmp/qs_unlocked_$USER"; export QS_START_LOCKED=0\nelif [[ "${1:-}" == "--locked" ]]; then export QS_START_LOCKED=1; touch "/tmp/qs_lock_active_$UID"\nelse export QS_START_LOCKED=0; fi\n%s%s\n' "$dbus_wrap" "$wm_exec" > /mnt/usr/bin/qs-session
-	printf '#!/bin/bash\ndbus-update-activation-environment --all 2>/dev/null || true\ncommand -v systemctl >/dev/null 2>&1 && exit 0\nexec 9>"/tmp/pw_start_$UID.lock"\nflock -n 9 || exit 0\nif ! pgrep -u "$UID" -x pipewire >/dev/null; then\n\tpipewire &\n\tfor _ in {1..30}; do [[ -S "/run/user/$UID/pipewire-0" ]] && break; sleep 0.1; done\nfi\npgrep -u "$UID" -x wireplumber >/dev/null || wireplumber &\npgrep -u "$UID" -x pipewire-pulse >/dev/null || pipewire-pulse &\n' > /mnt/usr/bin/qs-pipewire
-	printf '#!/bin/bash\ntarget_user="${1,,}"\n[[ -n "$target_user" ]] && id "$target_user" >/dev/null 2>&1 || exit 1\nif [[ -f /etc/greetd/config.toml ]]; then sed -i "s|^user = .*|user = \\\"$target_user\\\"|" /etc/greetd/config.toml ; fi\nif [[ -f /etc/inittab ]]; then\n\tsed -i -E "/tty1/ s|^([^#].*agetty[[:space:]]+)(--autologin[[:space:]]+[^[:space:]]+[[:space:]]+)?|\\1--autologin $target_user |" /etc/inittab\n\tkill -HUP 1 2>/dev/null || true\nfi\nif [[ -f /etc/conf.d/agetty.tty1 ]]; then\n\tsed -i "/^#*agetty_options=/d; /^#*respawn_delay=/d" /etc/conf.d/agetty.tty1\n\tprintf "agetty_options=\\\"--autologin %%s --noclear\\\"\\nrespawn_delay=0\\n" "$target_user" >> /etc/conf.d/agetty.tty1\n\ttouch /tmp/qs_switched_tty1 ; chmod 666 /tmp/qs_switched_tty1 2>/dev/null || true\nfi\nfor rconf in /etc/runit/sv/agetty-tty1/conf /etc/sv/agetty-tty1/conf; do\n\tif [[ -d "${rconf%%/conf}" ]]; then printf "GETTY_ARGS=\\\"--autologin %%s --noclear\\\"\\nBAUD_RATE=38400\\nTERM_NAME=linux\\n" "$target_user" > "$rconf" ; fi\ndone\nfor dfile in /etc/dinit.d/tty1 /usr/lib/dinit.d/tty1 /etc/dinit.d/agetty-tty1 /usr/lib/dinit.d/agetty-tty1; do\n\tif [[ -f "$dfile" ]]; then sed -i -E "s|(agetty[[:space:]]+)(--autologin[[:space:]]+[^[:space:]]+[[:space:]]+)?|\\1--autologin $target_user |" "$dfile" ; fi\ndone\nfor s6f in /etc/s6/sv/tty1-srv/conf /etc/s6/current/service/tty1-srv/run; do\n\tif [[ -f "$s6f" ]]; then\n\t\tif grep -q -- "--autologin" "$s6f"; then sed -i -E "s|--autologin[[:space:]]+[^[:space:]\\\"]+|--autologin $target_user|g" "$s6f"\n\t\telse sed -i -E "s|^(ARGS=[\\\"]?)|\\1--autologin $target_user |; s|(agetty[[:space:]]+)|\\1--autologin $target_user |" "$s6f" ; fi\n\tfi\ndone\nif command -v systemctl >/dev/null 2>&1; then\n\tmkdir -p /etc/systemd/system/getty@tty1.service.d\n\tprintf "[Service]\\nExecStart=\\nExecStart=-/sbin/agetty -o \\\"-p -f -- \\\\\\\\u\\\" --noclear --autologin %%s %%%%I \\$TERM\\n" "$target_user" > /etc/systemd/system/getty@tty1.service.d/autologin.conf\nfi\ntouch "/tmp/qs_unlocked_$target_user"\nchown "$target_user":users "/tmp/qs_unlocked_$target_user" 2>/dev/null || true\n' > /mnt/usr/bin/qs-switch-apply
-	chmod 755 /mnt/usr/bin/qs-session /mnt/usr/bin/qs-pipewire /mnt/usr/bin/qs-switch-apply
-	printf '%%wheel ALL=(root) NOPASSWD: /usr/bin/qs-switch-apply *, /usr/bin/rc-service agetty.tty1 restart, /usr/bin/poweroff, /usr/bin/reboot, /sbin/poweroff, /sbin/reboot\n' > /mnt/etc/sudoers.d/90-qs-switch ; chmod 440 /mnt/etc/sudoers.d/90-qs-switch
+	printf '#!/bin/bash\nAUTOLOGIN_USER="%s"\nif [[ "${1:-}" == "--autologin" || ( "$EUID" -eq 0 && "${1:-}" != "--switch" ) ]]; then\n\tid "$AUTOLOGIN_USER" >/dev/null 2>&1 || AUTOLOGIN_USER="%s"\n\texec /bin/login -f "$AUTOLOGIN_USER"\nelif [[ "${1:-}" == "--switch" ]]; then\n\ttarget_user="${2,,}"\n\t[[ -n "$target_user" ]] && id "$target_user" >/dev/null 2>&1 || exit 1\n\tif [[ ! -f "/home/$target_user/.config/quickshell/shell.qml" && -d /etc/skel/.config ]]; then\n\t\tmkdir -p "/home/$target_user/.config" "/home/$target_user/Pictures/Screenshots" "/home/$target_user/Videos/Recordings"\n\t\tcp -r /etc/skel/.config/* "/home/$target_user/.config/" 2>/dev/null || true\n\t\tsed -i "s|/home/[^/\\\"]*|/home/$target_user|g" "/home/$target_user/.config/quickshell/colors.json" "/home/$target_user/.config/qt6ct/qt6ct.conf" "/home/$target_user/.config/swappy/config" 2>/dev/null || true\n\t\tchown -hR "$target_user":users "/home/$target_user" 2>/dev/null || chown -hR "$target_user":"$target_user" "/home/$target_user" 2>/dev/null || true\n\tfi\n\tsed -i "s|^AUTOLOGIN_USER=.*|AUTOLOGIN_USER=\\\"$target_user\\\"|" /usr/bin/qs-session\n\tif [[ -f /etc/greetd/config.toml ]]; then sed -i "s|^user = .*|user = \\\"$target_user\\\"|" /etc/greetd/config.toml ; fi\n\tif [[ -f /etc/inittab ]]; then sed -i -E "/tty1/ s|^([^#].*agetty[[:space:]]+).*|\\1-n -l /usr/bin/qs-session --noclear 38400 tty1 linux|" /etc/inittab ; kill -HUP 1 2>/dev/null || true ; fi\n\tif [[ -f /etc/conf.d/agetty.tty1 ]]; then sed -i "/^#*agetty_options=/d; /^#*respawn_delay=/d" /etc/conf.d/agetty.tty1 ; printf "agetty_options=\\\"-n -l /usr/bin/qs-session --noclear\\\"\\nrespawn_delay=0\\n" >> /etc/conf.d/agetty.tty1 ; fi\n\tfor rconf in /etc/runit/sv/agetty-tty1/conf /etc/sv/agetty-tty1/conf; do\n\t\tif [[ -d "${rconf%%/conf}" ]]; then printf "GETTY_ARGS=\\\"-n -l /usr/bin/qs-session --noclear\\\"\\nBAUD_RATE=38400\\nTERM_NAME=linux\\n" > "$rconf" ; fi\n\tdone\n\tfor dfile in /etc/dinit.d/tty1 /usr/lib/dinit.d/tty1 /etc/dinit.d/agetty-tty1 /usr/lib/dinit.d/agetty-tty1; do\n\t\tif [[ -f "$dfile" ]] && ! grep -q "qs-session" "$dfile"; then sed -i -E "s|(agetty[[:space:]]+)|\\1-n -l /usr/bin/qs-session |" "$dfile" ; fi\n\tdone\n\tfor s6f in /etc/s6/sv/tty1-srv/conf /etc/s6/current/service/tty1-srv/run; do\n\t\tif [[ -f "$s6f" ]] && ! grep -q "qs-session" "$s6f"; then sed -i -E "s|^(ARGS=[\\\"]?)|\\1-n -l /usr/bin/qs-session |; s|(agetty[[:space:]]+)|\\1-n -l /usr/bin/qs-session |" "$s6f" ; fi\n\tdone\n\tif command -v systemctl >/dev/null 2>&1; then\n\t\tmkdir -p /etc/systemd/system/getty@tty1.service.d\n\t\tprintf "[Service]\\nExecStart=\\nExecStart=-/sbin/agetty -n -l /usr/bin/qs-session --noclear %%%%I \\$TERM\\n" > /etc/systemd/system/getty@tty1.service.d/autologin.conf\n\tfi\n\ttouch "/tmp/qs_unlocked_$target_user"\n\tchown "$target_user":users "/tmp/qs_unlocked_$target_user" 2>/dev/null || chown "$target_user":"$target_user" "/tmp/qs_unlocked_$target_user" 2>/dev/null || true\n\texit 0\nelif [[ "${1:-}" == "--pipewire" ]]; then\n\tdbus-update-activation-environment --all 2>/dev/null || true\n\tcommand -v systemctl >/dev/null 2>&1 && exit 0\n\texec 9>"/tmp/pw_start_$UID.lock"\n\tflock -n 9 || exit 0\n\tif ! pgrep -u "$UID" -x pipewire >/dev/null; then\n\t\tpipewire >/dev/null 2>&1 &\n\t\tfor _ in {1..40}; do [[ -S "/run/user/$UID/pipewire-0" ]] && break; sleep 0.05; done\n\tfi\n\tpgrep -u "$UID" -x wireplumber >/dev/null || wireplumber >/dev/null 2>&1 &\n\tpgrep -u "$UID" -x pipewire-pulse >/dev/null || pipewire-pulse >/dev/null 2>&1 &\n\tfor _ in {1..40}; do [[ -S "/run/user/$UID/pulse/native" ]] && break; sleep 0.05; done\n\texit 0\nelif [[ "${1:-}" == "--clipboard" ]]; then\n\tif command -v spice-vdagent >/dev/null 2>&1 && lspci 2>/dev/null | grep -qiE "Virtio|QXL"; then\n\t\tpkill -x spice-vdagent 2>/dev/null; exec spice-vdagent\n\telse\n\t\tpkill -x VBoxClient 2>/dev/null; sleep 1; VBoxClient --clipboard\n\t\told_x=""; old_w=""\n\t\twhile sleep 0.5; do\n\t\t\tpgrep -u "$UID" -x "niri|Hyprland" >/dev/null || exit 0\n\t\t\tx=$(xclip -o -selection clipboard -t UTF8_STRING 2>/dev/null || true)\n\t\t\tw=$(wl-paste -n 2>/dev/null || true)\n\t\t\tif [[ -n "$x" && "$x" != "$old_x" ]]; then old_x="$x"; old_w="$x"; printf "%%s" "$x" | wl-copy\n\t\t\telif [[ -n "$w" && "$w" != "$old_w" ]]; then old_w="$w"; old_x="$w"; printf "%%s" "$w" | xclip -selection clipboard -t UTF8_STRING; fi\n\t\tdone\n\tfi\n\texit 0\nfi\ncleanup_session() {\n\trm -f "/tmp/qs_lock_active_$UID" 2>/dev/null || true\n\tpkill -u "$UID" -x "quickshell|waybar|swaync|hyprpaper|awww-daemon|fuzzel|hypridle|wlsunset|wf-recorder" 2>/dev/null || true\n\tpkill -u "$UID" -f "[t]heme-switcher.sh|[q]s-session --clipboard" 2>/dev/null || true\n\tcommand -v systemctl >/dev/null 2>&1 || pkill -u "$UID" -x "wireplumber|pipewire-pulse|pipewire" 2>/dev/null || true\n}\ncleanup_session\ntrap cleanup_session EXIT INT TERM\nif [[ ! -f "$HOME/.config/niri/config.kdl" && ! -f "$HOME/.config/hypr/hyprland.conf" && -d /etc/skel/.config ]]; then\n\tmkdir -p "$HOME/.config" "$HOME/Pictures/Screenshots" "$HOME/Videos/Recordings"\n\tcp -rn /etc/skel/.config/* "$HOME/.config/" 2>/dev/null || true\n\tsed -i "s|/home/[^/\\\"]*|/home/$USER|g" "$HOME/.config/quickshell/colors.json" "$HOME/.config/qt6ct/qt6ct.conf" "$HOME/.config/swappy/config" 2>/dev/null || true\nfi\nif [[ -f "/tmp/qs_unlocked_$USER" ]]; then rm -f "/tmp/qs_unlocked_$USER"; export QS_START_LOCKED=0\nelif [[ "${1:-}" == "--locked" ]]; then export QS_START_LOCKED=1; touch "/tmp/qs_lock_active_$UID"\nelse export QS_START_LOCKED=0; fi\n%s%s\n' "$UNsel" "$UNsel" "$dbus_wrap" "$wm_exec" > /mnt/usr/bin/qs-session
+	chmod 755 /mnt/usr/bin/qs-session
+	printf 'ALL ALL=(root) NOPASSWD: /usr/bin/qs-session --switch *, /usr/bin/poweroff, /usr/bin/reboot, /sbin/poweroff, /sbin/reboot\n' > /mnt/etc/sudoers.d/90-qs-switch ; chmod 440 /mnt/etc/sudoers.d/90-qs-switch
 
 	if [[ "${DMsel,,}" == "quickshell" ]]; then
-		printf 'if [[ -z "$DISPLAY" && -z "$WAYLAND_DISPLAY" && ( "$(tty)" == "/dev/tty1" || "${XDG_VTNR:-0}" == "1" ) ]]; then\n\texec /usr/bin/qs-session --locked\nfi\n' > /mnt/etc/profile.d/qs-autostart.sh
-		chmod 644 /mnt/etc/profile.d/qs-autostart.sh
+		if ! grep -q "qs-session --locked" /mnt/etc/profile 2>/dev/null; then
+			printf '\nif [ -z "${DISPLAY:-}" ] && [ -z "${WAYLAND_DISPLAY:-}" ] && [ "$(tty 2>/dev/null)" = "/dev/tty1" ]; then exec /usr/bin/qs-session --locked; fi\n' >> /mnt/etc/profile
+		fi
 	elif [[ "${DMsel,,}" == "greetd" ]]; then
 		mkdir -p /mnt/etc/greetd
 		if [[ "$SHELLsel" == "Quickshell" ]]; then
@@ -416,9 +415,9 @@ ServiceSetup () {
 UserSetup () {
 	CR useradd -m -g users -G wheel,video,audio,storage,input,lp,scanner,power,kvm "$UNsel"
 	if [[ "${OSsel,,}" == "void" ]]; then CR usermod -aG _seatd "$UNsel" ; fi
-	if [[ "${DMsel,,}" == "quickshell" && -x /mnt/usr/bin/qs-switch-apply ]]; then
-		CR /usr/bin/qs-switch-apply "$UNsel"
-		rm -f "/mnt/tmp/qs_unlocked_$UNsel" /mnt/tmp/qs_switched_tty1
+	if [[ "${DMsel,,}" == "quickshell" && -x /mnt/usr/bin/qs-session ]]; then
+		CR /usr/bin/qs-session --switch "$UNsel"
+		rm -f "/mnt/tmp/qs_unlocked_$UNsel"
 	fi
 	sed -i 's/^#\s*\(%wheel ALL=(ALL:ALL) ALL\)/\1/' /mnt/etc/sudoers
 	echo "Choose password for user: $UNsel" ; while ! CR passwd "$UNsel"; do echo "Error: Try again..." ; done
@@ -488,15 +487,16 @@ UserSetup () {
 			cp -rT "${SCRIPT_DIR}/Conf_files/Hyprland" /mnt/home/"$UNsel"/.config/hypr
 			cfg="/mnt/home/$UNsel/.config/hypr/hyprland.conf"
 		fi
+		if ! compgen -G "/sys/class/power_supply/BAT*" >/dev/null; then
+			if [[ "$DEsel" == "Niri" ]]; then sed -i '/repeat-delay/i \        numlock' "$cfg"
+			elif [[ "$DEsel" == "Hyprland" ]]; then sed -i '/kb_layout/a \    numlock_by_default = true' "$cfg" ; fi
+		fi
 		if [[ "$SHELLsel" == "Quickshell" ]]; then
-			echo -e "auth required pam_unix.so nullok\naccount required pam_unix.so\npassword required pam_unix.so\nsession required pam_unix.so" > /mnt/etc/pam.d/quickshell
 			mkdir -p /mnt/home/"$UNsel"/.config/{quickshell,wallust/templates}
 			sed -i -e '/\[templates\.fuzzel\]/,/^$/d' -e '/\[templates\.waybar\]/,/^$/d' -e '/\[templates\.quickshell\]/,/^$/d' -e '/\[templates\.niri\]/,/^$/d' /mnt/home/"$UNsel"/.config/wallust/wallust.toml
-			printf '{\n\t"background": "{{background}}",\n\t"foreground": "{{foreground}}",\n\t"color0": "{{color0}}",\n\t"color1": "{{color1}}",\n\t"color2": "{{color2}}",\n\t"color3": "{{color3}}",\n\t"color4": "{{color4}}",\n\t"color5": "{{color5}}",\n\t"color6": "{{color6}}",\n\t"color7": "{{color7}}",\n\t"color8": "{{color8}}"\n}\n' > /mnt/home/"$UNsel"/.config/wallust/templates/colors-quickshell.json
-			printf '\n[templates.quickshell]\ntemplate = "colors-quickshell.json"\ntarget = "~/.config/quickshell/colors-wallust.json"\n' >> /mnt/home/"$UNsel"/.config/wallust/wallust.toml
-			if [[ "$DEsel" == "Niri" && -f "/mnt/home/$UNsel/.config/wallust/templates/colors-niri.conf" ]]; then
-				printf '\n[templates.niri]\ntemplate = "colors-niri.conf"\ntarget = "~/.config/niri/config.kdl"\n' >> /mnt/home/"$UNsel"/.config/wallust/wallust.toml
-			fi
+			printf '{\n\t"wallpaper": "{{wallpaper}}",\n\t"wallMode": "static",\n\t"uiEffects": true,\n\t"firstRunDone": false,\n\t"background": "{{background}}",\n\t"foreground": "{{foreground}}",\n\t"color0": "{{color0}}",\n\t"color1": "{{color1}}",\n\t"color2": "{{color2}}",\n\t"color3": "{{color3}}",\n\t"color4": "{{color4}}",\n\t"color5": "{{color5}}",\n\t"color6": "{{color6}}",\n\t"color7": "{{color7}}",\n\t"color8": "{{color8}}"\n}\n' > /mnt/home/"$UNsel"/.config/wallust/templates/colors-quickshell.json
+			printf '\n[templates.quickshell]\ntemplate = "colors-quickshell.json"\ntarget = "~/.config/quickshell/colors.json"\n' >> /mnt/home/"$UNsel"/.config/wallust/wallust.toml
+			if [[ "$DEsel" == "Niri" && -f "/mnt/home/$UNsel/.config/wallust/templates/colors-niri.conf" ]]; then printf '\n[templates.niri]\ntemplate = "colors-niri.conf"\ntarget = "~/.config/niri/config.kdl"\n' >> /mnt/home/"$UNsel"/.config/wallust/wallust.toml ; fi
 			local qs_env="DRI_PRIME=0 __NV_PRIME_RENDER_OFFLOAD=0 __GLX_VENDOR_LIBRARY_NAME=mesa VDPAU_DRIVER=null LIBVA_DRIVER_NAME=$va_drv QT_FFMPEG_DECODING_HW_DEVICE_TYPES=vaapi QSG_RHI_BACKEND=opengl"
 			if [[ "$VBTsel" -eq 1 ]]; then qs_env="VDPAU_DRIVER=null QSG_RHI_BACKEND=opengl QSG_RENDER_LOOP=basic" ; fi
 			local qs_run="bash -c 'while :; do env $qs_env quickshell; [[ -f /tmp/qs_lock_active_\$UID ]] || break; sleep 1; done'"
@@ -504,12 +504,8 @@ UserSetup () {
 			sed -i -e "s|lock_cmd = .*|lock_cmd = quickshell ipc call lock lock|" \
 				-e "s|loginctl lock-session|quickshell ipc call lock lock|g" /mnt/home/"$UNsel"/.config/hypr/hypridle.conf
 			if [[ "$DEsel" == "Niri" ]]; then
-				if ! grep -q "wallpaper-backdrop" "$cfg"; then
-					printf '\nlayer-rule {\n\tmatch namespace="^wallpaper-backdrop$"\n\tplace-within-backdrop true\n}\n' >> "$cfg"
-				fi
-				if ! grep -q "skip-at-startup" "$cfg"; then
-					printf '\nhotkey-overlay {\n\tskip-at-startup\n}\n' >> "$cfg"
-				fi
+				if ! grep -q "wallpaper-backdrop" "$cfg"; then printf '\nlayer-rule {\n\tmatch namespace="^wallpaper-backdrop$"\n\tplace-within-backdrop true\n}\n' >> "$cfg" ; fi
+				if ! grep -q "skip-at-startup" "$cfg"; then printf '\nhotkey-overlay {\n\tskip-at-startup\n}\n' >> "$cfg" ; fi
 				sed -i -e "s#spawn-at-startup \"waybar\"#spawn-at-startup $qs_niri#" \
 					-e '/spawn-at-startup "swaync"/d' \
 					-e '/spawn-at-startup "awww-daemon"/d' \
@@ -528,17 +524,12 @@ UserSetup () {
 			echo -e "auth required pam_unix.so nullok\naccount required pam_unix.so\npassword required pam_unix.so\nsession required pam_unix.so" > /mnt/etc/pam.d/hyprlock
 			sed -i "s|loginctl lock-session|pidof hyprlock \|\| hyprlock|g" /mnt/home/"$UNsel"/.config/hypr/hypridle.conf
 			sed -i -e '/\[templates\.quickshell\]/,/^$/d' -e '/\[templates\.niri\]/,/^$/d' /mnt/home/"$UNsel"/.config/wallust/wallust.toml
-			if [[ "$DEsel" == "Niri" && -f "/mnt/home/$UNsel/.config/wallust/templates/colors-niri.conf" ]]; then
-				printf '\n[templates.niri]\ntemplate = "colors-niri.conf"\ntarget = "~/.config/niri/config.kdl"\n' >> /mnt/home/"$UNsel"/.config/wallust/wallust.toml
-			fi
+			if [[ "$DEsel" == "Niri" && -f "/mnt/home/$UNsel/.config/wallust/templates/colors-niri.conf" ]]; then printf '\n[templates.niri]\ntemplate = "colors-niri.conf"\ntarget = "~/.config/niri/config.kdl"\n' >> /mnt/home/"$UNsel"/.config/wallust/wallust.toml ; fi
 			touch /mnt/home/"$UNsel"/.config/fuzzel/colors.ini /mnt/home/"$UNsel"/.config/wallust/colors-waybar.css
 			if [[ "$DEsel" == "Hyprland" ]]; then touch /mnt/home/"$UNsel"/.config/hypr/hyprpaper.conf ; fi
 			if [[ -f "${SCRIPT_DIR}/Conf_files/Hyprlock/hyprlock.conf" ]]; then cp "${SCRIPT_DIR}/Conf_files/Hyprlock/hyprlock.conf" /mnt/home/"$UNsel"/.config/hypr/ ; fi
 		fi
 		if [[ "$VBTsel" -eq 1 ]]; then
-			if [[ "$VM_TYPE" == "qemu" ]]; then printf '#!/bin/bash\npkill -x spice-vdagent 2>/dev/null\nexec spice-vdagent\n' > /mnt/usr/bin/vm-clipboard
-			else printf '#!/bin/bash\nfor pid in $(pgrep -u "$UID" -x vm-clipboard); do [[ "$pid" != "$$" && "$pid" != "$PPID" ]] && kill "$pid" 2>/dev/null; done\npkill -x VBoxClient 2>/dev/null\nsleep 1\nVBoxClient --clipboard\nold_x="" ; old_w=""\nwhile sleep 0.5; do\n\tpgrep -u "$UID" -x "niri|Hyprland" >/dev/null || exit 0\n\tx=$(xclip -o -selection clipboard -t UTF8_STRING 2>/dev/null || true)\n\tw=$(wl-paste -n 2>/dev/null || true)\n\tif [[ -n "$x" && "$x" != "$old_x" ]]; then old_x="$x"; old_w="$x"; printf "%%s" "$x" | wl-copy\n\telif [[ -n "$w" && "$w" != "$old_w" ]]; then old_w="$w"; old_x="$w"; printf "%%s" "$w" | xclip -selection clipboard -t UTF8_STRING; fi\ndone\n' > /mnt/usr/bin/vm-clipboard ; fi
-			chmod +x /mnt/usr/bin/vm-clipboard
 			if [[ "$SHELLsel" != "Quickshell" ]]; then
 				sed -i 's/blur_passes = 3/blur_passes = 0/' /mnt/home/"$UNsel"/.config/hypr/hyprlock.conf
 				sed -i 's/&& hyprlock/\&\& env -u LIBGL_ALWAYS_SOFTWARE hyprlock/g; s/; hyprlock/; env -u LIBGL_ALWAYS_SOFTWARE hyprlock/g; s/|| hyprlock/|| env -u LIBGL_ALWAYS_SOFTWARE hyprlock/g; s/) hyprlock/) env -u LIBGL_ALWAYS_SOFTWARE hyprlock/g' /mnt/home/"$UNsel"/.config/waybar/config.jsonc /mnt/home/"$UNsel"/.config/swaync/config.json /mnt/home/"$UNsel"/.config/hypr/hypridle.conf
@@ -548,19 +539,18 @@ UserSetup () {
 				if grep -q "environment *{" "$cfg"; then sed -i '/environment *{/a\	LIBGL_ALWAYS_SOFTWARE "1"' "$cfg" ; else echo -e '\nenvironment {\n	LIBGL_ALWAYS_SOFTWARE "1"\n}' >> "$cfg" ; fi
 				echo -e '\noutput "Virtual-1" {\n	mode "1440x900"\n}' >> "$cfg"
 				sed -i 's/blur true/blur false/g' "$cfg"
-				sed -i -e '/spawn-at-startup/{i\spawn-at-startup "vm-clipboard"' -e ':a;n;ba}' "$cfg"
+				sed -i -e '/spawn-at-startup/{i\spawn-at-startup "/usr/bin/qs-session" "--clipboard"' -e ':a;n;ba}' "$cfg"
 			else
 				sed -i '1i monitor=,1440x900@60,auto,1' "$cfg"
-				sed -i -e '/exec-once/{i\exec-once = vm-clipboard' -e ':a;n;ba}' "$cfg"
+				sed -i -e '/exec-once/{i\exec-once = /usr/bin/qs-session --clipboard' -e ':a;n;ba}' "$cfg"
 			fi
 		fi
 		if [[ "${OSsel,,}" != "arch" && "$init_sys" != "systemd" ]]; then
-			if [[ "$DEsel" == "Niri" ]]; then sed -i -e '/spawn-at-startup/{i\spawn-at-startup "/usr/bin/qs-pipewire"' -e ':a;n;ba}' "$cfg"
-			else sed -i -e '/exec-once/{i\exec-once = /usr/bin/qs-pipewire' -e ':a;n;ba}' "$cfg" ; fi
+			if [[ "$DEsel" == "Niri" ]]; then sed -i -e '/spawn-at-startup/{i\spawn-at-startup "/usr/bin/qs-session" "--pipewire"' -e ':a;n;ba}' "$cfg"
+			else sed -i -e '/exec-once/{i\exec-once = /usr/bin/qs-session --pipewire' -e ':a;n;ba}' "$cfg" ; fi
 		fi
 		if [[ "$DEsel" == "Niri" && "$cfg" != */config.kdl ]]; then mkdir -p /mnt/home/"$UNsel"/.config/niri ; sed -e 's/{{color4}}/#8be9fd/g' -e 's/{{[^}]*}}/#282a36/g' "$cfg" > /mnt/home/"$UNsel"/.config/niri/config.kdl ; fi
 
-		# Pre-generate Wallust theme & Quickshell colors.json at install time (Zero lag on first boot)
 		CR chown -hR "$UNsel":users /home/"$UNsel"
 		local cur_hr ; printf -v cur_hr '%(%k)T' -1
 		local init_sub="night" ; if (( cur_hr >= 7 && cur_hr < 19 )); then init_sub="day" ; fi
@@ -568,23 +558,18 @@ UserSetup () {
 		if [[ -z "$init_wall" ]]; then init_wall=$(find /mnt/home/"$UNsel"/.config/wallpapers -type f \( -iname "*.jpg" -o -iname "*.png" -o -iname "*.webp" \) -print -quit 2>/dev/null || true) ; fi
 		init_wall="${init_wall#/mnt}"
 		local init_fx="true" ; if [[ "$VBTsel" -eq 1 ]]; then init_fx="false" ; fi
-		if [[ -n "$init_wall" && -x /mnt/usr/bin/wallust ]]; then
-			CR_USER "wallust run -s --backend resized \"$init_wall\" $( [[ \"$init_sub\" == \"night\" ]] && echo \"--palette dark16\" )" || true
-		fi
-		if [[ "$SHELLsel" == "Quickshell" ]]; then
-			if [[ -f /mnt/home/"$UNsel"/.config/quickshell/colors-wallust.json ]] && grep -q '"color4": *"#' /mnt/home/"$UNsel"/.config/quickshell/colors-wallust.json 2>/dev/null; then
-				sed "s|{|{\n\t\"wallpaper\": \"$init_wall\",\n\t\"wallMode\": \"static\",\n\t\"uiEffects\": $init_fx,|" /mnt/home/"$UNsel"/.config/quickshell/colors-wallust.json > /mnt/home/"$UNsel"/.config/quickshell/colors.json
-			else
-				printf '{\n\t"wallpaper": "%s",\n\t"wallMode": "static",\n\t"uiEffects": %s,\n\t"background": "#1e1e2e",\n\t"foreground": "#cdd6f4",\n\t"color0": "#1e1e2e",\n\t"color1": "#f38ba8",\n\t"color2": "#a6e3a1",\n\t"color3": "#f9e2af",\n\t"color4": "#89b4fa",\n\t"color5": "#cba6f7",\n\t"color6": "#94e2d5",\n\t"color7": "#bac2de",\n\t"color8": "#585b70"\n}\n' "$init_wall" "$init_fx" > /mnt/home/"$UNsel"/.config/quickshell/colors.json
-			fi
+		if [[ -f /mnt/home/"$UNsel"/.config/wallust/templates/colors-quickshell.json ]]; then sed -i "s|\"uiEffects\": *[a-z]*|\"uiEffects\": $init_fx|" /mnt/home/"$UNsel"/.config/wallust/templates/colors-quickshell.json ; fi
+		if [[ -n "$init_wall" && -x /mnt/usr/bin/wallust ]]; then CR_USER "wallust run -s --backend resized \"$init_wall\" $( [[ \"$init_sub\" == \"night\" ]] && echo \"--palette dark16\" )" || true ; fi
+		if [[ "$SHELLsel" == "Quickshell" && ! -f /mnt/home/"$UNsel"/.config/quickshell/colors.json ]]; then
+			printf '{\n\t"wallpaper": "%s",\n\t"wallMode": "static",\n\t"uiEffects": %s,\n\t"firstRunDone": false,\n\t"background": "#1e1e2e",\n\t"foreground": "#cdd6f4",\n\t"color0": "#1e1e2e",\n\t"color1": "#f38ba8",\n\t"color2": "#a6e3a1",\n\t"color3": "#f9e2af",\n\t"color4": "#89b4fa",\n\t"color5": "#cba6f7",\n\t"color6": "#94e2d5",\n\t"color7": "#bac2de",\n\t"color8": "#585b70"\n}\n' "$init_wall" "$init_fx" > /mnt/home/"$UNsel"/.config/quickshell/colors.json
 		fi
 	fi
 	rm -f /mnt/etc/sudoers.d/99-installer-temp
-	if [[ "$VBTsel" -eq 1 ]]; then
-		printf 'WLR_NO_HARDWARE_CURSORS=1\nWLR_RENDERER_ALLOW_SOFTWARE=1\nLIBGL_ALWAYS_SOFTWARE=1\nKITTY_DISABLE_WAYLAND=1\nVDPAU_DRIVER=null\nQT_QPA_PLATFORMTHEME=qt6ct\n' >> /mnt/etc/environment
-	else
-		printf 'MOZ_ENABLE_WAYLAND=1\nQT_QPA_PLATFORM="wayland;xcb"\nQT_QPA_PLATFORMTHEME=qt6ct\nGDK_BACKEND="wayland,x11"\nSDL_VIDEODRIVER=wayland\nELECTRON_OZONE_PLATFORM_HINT=auto\nDRI_PRIME=0\n__NV_PRIME_RENDER_OFFLOAD=0\n__GLX_VENDOR_LIBRARY_NAME=mesa\n__EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/50_mesa.json\nVDPAU_DRIVER=null\nLIBVA_DRIVER_NAME=%s\nQT_FFMPEG_DECODING_HW_DEVICE_TYPES=vaapi\n' "$va_drv" >> /mnt/etc/environment
+	if [[ "$VBTsel" -eq 1 ]]; then printf 'WLR_NO_HARDWARE_CURSORS=1\nWLR_RENDERER_ALLOW_SOFTWARE=1\nLIBGL_ALWAYS_SOFTWARE=1\nKITTY_DISABLE_WAYLAND=1\nVDPAU_DRIVER=null\nQT_QPA_PLATFORMTHEME=qt6ct\n' >> /mnt/etc/environment
+	else printf 'MOZ_ENABLE_WAYLAND=1\nQT_QPA_PLATFORM="wayland;xcb"\nQT_QPA_PLATFORMTHEME=qt6ct\nGDK_BACKEND="wayland,x11"\nSDL_VIDEODRIVER=wayland\nELECTRON_OZONE_PLATFORM_HINT=auto\nDRI_PRIME=0\n__NV_PRIME_RENDER_OFFLOAD=0\n__GLX_VENDOR_LIBRARY_NAME=mesa\n__EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/50_mesa.json\nVDPAU_DRIVER=null\nLIBVA_DRIVER_NAME=%s\nQT_FFMPEG_DECODING_HW_DEVICE_TYPES=vaapi\n' "$va_drv" >> /mnt/etc/environment
 	fi
+	mkdir -p /mnt/etc/skel/.config
+	cp -r /mnt/home/"$UNsel"/.config/* /mnt/etc/skel/.config/ 2>/dev/null || true
 	CR chown -hR "$UNsel":users /home/"$UNsel"
 }
 BootloaderSetup () {
