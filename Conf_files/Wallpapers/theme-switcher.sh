@@ -26,6 +26,7 @@ WALLUST_THRESHOLD=0
 
 # Wallust palette for Night mode
 # Options: "dark16" | "harddark16" | "softdark16"
+WALLUST_DAY_PALETTE="softdark16"
 WALLUST_NIGHT_PALETTE="dark16"
 # ==============================================================================
 
@@ -74,11 +75,55 @@ get_json_bool() {
 	[[ "$val" =~ ^(true|false)$ ]] && echo "$val" || echo "$def"
 }
 
+# Ensures background is never pitch-black (#000000) and color0 (card surface) is visibly elevated above background
+ensure_surface_contrast() {
+	[[ ! -f "$QS_DIR/colors.json" ]] && return 0
+	awk '
+	function hex2dec(h,  i, c, v) {
+		v = 0; h = tolower(h)
+		for (i = 1; i <= length(h); i++) {
+			c = substr(h, i, 1)
+			v = v * 16 + index("0123456789abcdef", c) - 1
+		}
+		return v
+	}
+	function lift_hex(hex, min_luma, add_rgb,  r, g, b, luma, d) {
+		gsub(/[^0-9a-fA-F]/, "", hex)
+		if (length(hex) != 6) return "#1e1e2e"
+		r = hex2dec(substr(hex, 1, 2)) + add_rgb
+		g = hex2dec(substr(hex, 3, 2)) + add_rgb
+		b = hex2dec(substr(hex, 5, 2)) + add_rgb
+		luma = int(0.299 * r + 0.587 * g + 0.114 * b)
+		if (luma < min_luma) {
+			d = min_luma - luma
+			r += d; g += d; b += d
+		}
+		if (r > 255) r = 255; if (g > 255) g = 255; if (b > 255) b = 255
+		return sprintf("#%02x%02x%02x", r, g, b)
+	}
+	{
+		lines[NR] = $0
+		if ($0 ~ /"background":/) {
+			match($0, /#[0-9a-fA-F]{6}/)
+			bg_hex = substr($0, RSTART + 1, 6)
+		}
+	}
+	END {
+		new_bg = lift_hex(bg_hex, 26, 0)
+		new_c0 = lift_hex(new_bg, 42, 16)
+		for (i = 1; i <= NR; i++) {
+			if (lines[i] ~ /"background":/) sub(/#[0-9a-fA-F]{6}/, new_bg, lines[i])
+			else if (lines[i] ~ /"color0":/) sub(/#[0-9a-fA-F]{6}/, new_c0, lines[i])
+			print lines[i]
+		}
+	}' "$QS_DIR/colors.json" > "$QS_DIR/colors.json.tmp" && mv -f "$QS_DIR/colors.json.tmp" "$QS_DIR/colors.json"
+}
+
 update_qt6ct_colors() {
 	mkdir -p "$QT6_DIR"
 	[[ ! -f "$QS_DIR/colors.json" ]] && return 0
 	awk -F'"' '
-	BEGIN { bg="1e1e2e"; fg="cdd6f4"; c0="1e1e2e"; c4="89b4fa"; c8="585b70" }
+	BEGIN { bg="1e1e2e"; fg="cdd6f4"; c0="282a36"; c4="89b4fa"; c8="585b70" }
 	/"background":/ { sub(/^#/,"",$4); bg=$4 }
 	/"foreground":/ { sub(/^#/,"",$4); fg=$4 }
 	/"color0":/     { sub(/^#/,"",$4); c0=$4 }
@@ -86,9 +131,9 @@ update_qt6ct_colors() {
 	/"color8":/     { sub(/^#/,"",$4); c8=$4 }
 	END {
 		printf "[ColorScheme]\n"
-		printf "active_colors=#ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ffffffff, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #80%s\n", fg, bg, c8, c8, c0, c8, fg, fg, c0, bg, c0, c4, bg, c4, c4, c0, fg, c0, fg, fg
-		printf "disabled_colors=#ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ffffffff, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #80%s\n", c8, bg, c8, c8, c0, c8, c8, c8, c0, bg, c0, c8, bg, c4, c4, c0, c8, c0, c8, c8
-		printf "inactive_colors=#ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ffffffff, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #80%s\n", fg, bg, c8, c8, c0, c8, fg, fg, c0, bg, c0, c4, bg, c4, c4, c0, fg, c0, fg, fg
+		printf "active_colors=#ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ffffffff, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #80%s\n", fg, c0, c8, c8, bg, c8, fg, fg, c0, bg, bg, c4, bg, c4, c4, c0, fg, bg, fg, fg
+		printf "disabled_colors=#ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ffffffff, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #80%s\n", c8, c0, c8, c8, bg, c8, c8, c8, c0, bg, bg, c8, bg, c4, c4, c0, c8, bg, c8, c8
+		printf "inactive_colors=#ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ffffffff, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #80%s\n", fg, c0, c8, c8, bg, c8, fg, fg, c0, bg, bg, c4, bg, c4, c4, c0, fg, bg, fg, fg
 	}' "$QS_DIR/colors.json" > "$QT6_DIR/wallust.conf"
 }
 
@@ -142,18 +187,16 @@ apply_theme() {
 	fi
 
 	sync_quickshell_state "$wall" "$mode" "$fx" "$fr"
-	local t_flag=()
-	(( WALLUST_THRESHOLD > 0 )) && t_flag=(-t "$WALLUST_THRESHOLD")
-	if [[ "$theme" == "night" ]]; then
-		wallust run -s --backend "$WALLUST_BACKEND" "${t_flag[@]}" "$wall_img" --palette "$WALLUST_NIGHT_PALETTE" 2>/dev/null
-	else
-		wallust run -s --backend "$WALLUST_BACKEND" "${t_flag[@]}" "$wall_img" 2>/dev/null
-	fi
+	local pal="$WALLUST_DAY_PALETTE"
+	[[ "$theme" == "night" ]] && pal="$WALLUST_NIGHT_PALETTE"
+	wallust run -s --backend "$WALLUST_BACKEND" -t "$WALLUST_THRESHOLD" "$wall_img" --palette "$pal" 2>/dev/null
+
 	if [[ -f "$QS_DIR/colors.json" ]]; then
 		sed -i -e "s|\"wallpaper\": *\"[^\"]*\"|\"wallpaper\": \"$wall\"|" \
 			-e "s|\"wallMode\": *\"[^\"]*\"|\"wallMode\": \"$mode\"|" \
 			-e "s|\"uiEffects\": *[a-z]*|\"uiEffects\": $fx|" \
 			-e "s|\"firstRunDone\": *[a-z]*|\"firstRunDone\": $fr|" "$QS_DIR/colors.json"
+		ensure_surface_contrast
 	fi
 	killall -SIGUSR1 kitty 2>/dev/null || true
 	if command -v quickshell >/dev/null 2>&1; then
@@ -171,24 +214,20 @@ apply_theme() {
 
 [[ -z "$FORCED_MODE" ]] && sleep 1
 while true; do
-	if ! pgrep -u "$UID" -x niri >/dev/null && ! pgrep -u "$UID" -x Hyprland >/dev/null; then exit 0 ; fi
-	NOW_MODE=$(get_wall_mode)
+	if [[ -n "${WAYLAND_DISPLAY:-}" && ! -S "${XDG_RUNTIME_DIR:-/run/user/$UID}/$WAYLAND_DISPLAY" ]]; then exit 0 ; fi
 	FORCE_ROTATE=0
 	if (( ROTATE_INTERVAL > 0 && (SECONDS - LAST_ROTATE_TS) >= ROTATE_INTERVAL )); then
 		FORCE_ROTATE=1
 	fi
 	printf -v HOUR '%(%k)T' -1
 	if (( HOUR >= DAY_START_HOUR && HOUR < NIGHT_START_HOUR )); then
-		if [[ "$CURRENT_THEME" != "day" || "$LAST_MODE" != "$NOW_MODE" || "$FORCE_ROTATE" -eq 1 ]]; then
+		if [[ "$CURRENT_THEME" != "day" || -n "$FORCED_MODE" || "$FORCE_ROTATE" -eq 1 ]]; then
 			apply_theme "day" "$DAY_DIR" "$DAY_ANIM_DIR"
 		fi
 	else
-		if [[ "$CURRENT_THEME" != "night" || "$LAST_MODE" != "$NOW_MODE" || "$FORCE_ROTATE" -eq 1 ]]; then
+		if [[ "$CURRENT_THEME" != "night" || -n "$FORCED_MODE" || "$FORCE_ROTATE" -eq 1 ]]; then
 			apply_theme "night" "$NIGHT_DIR" "$NIGHT_ANIM_DIR"
 		fi
 	fi
-	if ! command -v quickshell >/dev/null 2>&1; then
-		if ! pgrep -u "$UID" -x waybar >/dev/null; then waybar & fi
-	fi
-	if [[ -z "$CURRENT_THEME" ]]; then sleep 2 ; else sleep "$CHECK_INTERVAL" ; fi
+	sleep "$CHECK_INTERVAL"
 done
