@@ -843,7 +843,7 @@ ShellRoot {
     }
   }
 
-  // 4. DYNAMIC ISLAND TOP BAR (Discrete targetW / targetH -> Zero Per-Frame Wayland Surface Reallocation)
+  // 4. DYNAMIC ISLAND TOP BAR (Constant 1080px Wayland Width -> Zero Coordinate Shift & Instant Hover)
   Variants {
     model: Quickshell.screens
     PanelWindow {
@@ -856,8 +856,8 @@ ShellRoot {
       WlrLayershell.keyboardFocus: (root.centerMode === "launcher" || root.wifiPromptSsid !== "") ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
       anchors { top: true }
       margins.top: 8
-      implicitWidth: centerPill.targetW + (Math.max(leftPill.targetW, rightOsdPill.width) * 2) + 32
-      implicitHeight: Math.max(leftPill.targetH, centerPill.targetH, rightOsdPill.height) + 8
+      implicitWidth: 1080
+      implicitHeight: panelExpanded ? 460 : 48
       color: "transparent"
 
       function grabKeyboardNow() {
@@ -866,6 +866,7 @@ ShellRoot {
       }
 
       Timer { id: focusTimer1; interval: 30; repeat: false; onTriggered: islandWin.grabKeyboardNow() }
+      Timer { id: hoverPreviewTimer; interval: 90; repeat: false; onTriggered: centerPill.hoverPreviewReady = true }
 
       Connections {
         target: root
@@ -873,7 +874,7 @@ ShellRoot {
         function onWifiPromptSsidChanged() { if (root.wifiPromptSsid !== "") focusTimer1.restart() }
       }
 
-      // UNIFIED LEFT PILL (Anchored to left of centerPill -> expands strictly leftward)
+      // UNIFIED LEFT PILL (Anchored to left of centerPill -> expands strictly leftward with zero window shift)
       Rectangle {
         id: leftPill
         anchors.top: parent.top
@@ -895,7 +896,12 @@ ShellRoot {
         clip: true
         Behavior on width { NumberAnimation { duration: root.animMs; easing.type: root.cfgIslandEasing } }
         Behavior on height { NumberAnimation { duration: root.animMs; easing.type: root.cfgIslandEasing } }
-        HoverHandler { id: leftHover }
+        HoverHandler {
+          id: leftHover
+          onHoveredChanged: {
+            if (hovered) { hoverPreviewTimer.stop(); centerPill.hoverPreviewReady = false }
+          }
+        }
 
         Connections {
           target: root
@@ -1012,13 +1018,14 @@ ShellRoot {
         }
       }
 
-      // CENTER DYNAMIC ISLAND PILL
+     // CENTER DYNAMIC ISLAND PILL
       Rectangle {
         id: centerPill
         anchors.top: parent.top
         anchors.horizontalCenter: parent.horizontalCenter
 
-        property bool isHoverPreview: centerHover.hovered && root.centerMode === "none"
+        property bool hoverPreviewReady: false
+        property bool isHoverPreview: hoverPreviewReady && centerHover.hovered && !leftHover.hovered && root.centerMode === "none"
         property bool isCalOpen: root.centerMode === "calendar"
         property bool isSysOpen: root.centerMode === "system"
         property bool isLauncherOpen: root.centerMode === "launcher"
@@ -1039,8 +1046,14 @@ ShellRoot {
         HoverHandler {
           id: centerHover
           onHoveredChanged: {
-            if (hovered) autoCloseTimer.stop()
-            else if (root.centerMode === "calendar" || root.centerMode === "system") autoCloseTimer.restart()
+            if (hovered) {
+              autoCloseTimer.stop()
+              if (root.centerMode === "none" && !leftHover.hovered) hoverPreviewTimer.restart()
+            } else {
+              hoverPreviewTimer.stop()
+              centerPill.hoverPreviewReady = false
+              if (root.centerMode === "calendar" || root.centerMode === "system") autoCloseTimer.restart()
+            }
           }
         }
 
