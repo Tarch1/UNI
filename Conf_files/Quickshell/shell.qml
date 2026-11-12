@@ -65,9 +65,14 @@ ShellRoot {
 		return p.length >= 2 ? (p[p.length - 2] + " / " + p[p.length - 1]) : wallpaperPath
 	}
 
-	property color bg: "#1e1e2e"
+	property color rawBg: "#1e1e2e"
+	property color rawColor0: "#282a36"
+	property color bg: Qt.rgba(Math.max(0.10, rawBg.r), Math.max(0.11, rawBg.g), Math.max(0.13, rawBg.b), 1.0)
+	property color color0: {
+		let minR = bg.r + 0.055, minG = bg.g + 0.055, minB = bg.b + 0.065
+		return Qt.rgba(Math.min(1, Math.max(rawColor0.r, minR)), Math.min(1, Math.max(rawColor0.g, minG)), Math.min(1, Math.max(rawColor0.b, minB)), 1.0)
+	}
 	property color fg: "#cdd6f4"
-	property color color0: "#1e1e2e"
 	property color color1: "#f38ba8"
 	property color color2: "#a6e3a1"
 	property color color3: "#f9e2af"
@@ -339,9 +344,9 @@ ShellRoot {
 				if (d.wallMode) root.animWallpapers = (d.wallMode === "animated")
 				if (d.uiEffects !== undefined && !root.isVM) root.cfgEnableEffects = Boolean(d.uiEffects)
 				if (d.firstRunDone !== undefined) root.firstRunDone = Boolean(d.firstRunDone)
-				if (d.background) root.bg = d.background
+				if (d.background) root.rawBg = d.background
 				if (d.foreground) root.fg = d.foreground
-				if (d.color0) root.color0 = d.color0
+				if (d.color0) root.rawColor0 = d.color0
 				if (d.color1) root.color1 = d.color1
 				if (d.color2) root.color2 = d.color2
 				if (d.color3) root.color3 = d.color3
@@ -430,21 +435,35 @@ ShellRoot {
 		}
 	}
 
+	// Ultra-lightweight fastPoll: reads sysfs brightness in pure bash (0 subshells) & checks fullscreen/DPMS only when animated wallpapers are active
 	Process {
 		id: fastPoll
 		command: ["bash", "-c", "
-			b=$(brightnessctl -m 2>/dev/null | cut -d, -f4 | tr -d '%' || echo 100)
-			fs=0
+			b=100
+			for bd in /sys/class/backlight/*; do
+				if [[ -f \"$bd/brightness\" && -f \"$bd/max_brightness\" ]]; then
+					max=$(<\"$bd/max_brightness\"); (( max > 0 )) && b=$(( $(<\"$bd/brightness\") * 100 / max ))
+					break
+				fi
+			done
+			fs=0; dpms=0
 			if [[ -n \"$NIRI_SOCKET\" ]]; then
 				ws=$(niri msg -j workspaces 2>/dev/null | awk 'BEGIN{RS=\"}\";ORS=\"\"}/\"idx\":/{match($0,/\"idx\":[0-9]+/);idx=substr($0,RSTART+6,RLENGTH-6);act=($0~/\"is_active\":true/)?\"1\":\"0\";occ=($0~/\"active_window_id\":null/)?\"0\":\"1\";print idx\":\"act\":\"occ\" \"}')
-				niri msg focused-window 2>/dev/null | grep -qiE 'fullscreen.*yes|is_fullscreen.*true' && fs=1
+				if [[ \"" + (root.animWallpapers ? "1" : "0") + "\" == \"1\" ]]; then
+					niri msg focused-window 2>/dev/null | grep -qiE 'fullscreen.*yes|is_fullscreen.*true' && fs=1
+				fi
 			elif [[ -n \"$HYPRLAND_INSTANCE_SIGNATURE\" ]]; then
 				act=$(hyprctl activeworkspace -j 2>/dev/null | awk -F': ' '/\"id\":/{gsub(/,/,\"\",$2);print $2;exit}')
 				occ_l=$(hyprctl workspaces -j 2>/dev/null | awk 'BEGIN{RS=\"}\"}/\"windows\": *[1-9]/{match($0,/\"id\": *[0-9]+/);print substr($0,RSTART+5,RLENGTH-5)}')
 				ws=\"\"; for i in 1 2 3 4 5; do a=0; [[ \"$i\" == \"$act\" ]] && a=1; o=0; echo \"$occ_l\" | grep -qx \"$i\" && o=1; ws+=\"$i:$a:$o \"; done
-				hyprctl activewindow -j 2>/dev/null | grep -qE '\"fullscreen\": *(1|2|true)' && fs=1
+				if [[ \"" + (root.animWallpapers ? "1" : "0") + "\" == \"1\" ]]; then
+					hyprctl activewindow -j 2>/dev/null | grep -qE '\"fullscreen\": *(1|2|true)' && fs=1
+				fi
 			fi
-			printf '%s|%s|%d\n' \"${b:-100}\" \"$ws\" \"$fs\"
+			if [[ \"" + (root.animWallpapers ? "1" : "0") + "\" == \"1\" ]]; then
+				for df in /sys/class/drm/*/dpms; do [[ -f \"$df\" && \"$(<\"$df\")\" == \"Off\" ]] && { dpms=1; break; }; done
+			fi
+			printf '%s|%s|%d|%d\n' \"$b\" \"$ws\" \"$fs\" \"$dpms\"
 		"]
 		stdout: SplitParser {
 			onRead: data => {
@@ -472,6 +491,7 @@ ShellRoot {
 					root.lastWsSignature = wsRaw
 				}
 				if (p.length >= 3) root.hasActiveFullWindow = (p[2] === "1")
+				if (p.length >= 4 && root.animWallpapers) root.isMonitorDpmsOff = (p[3] === "1")
 			}
 		}
 	}
@@ -659,7 +679,7 @@ ShellRoot {
 		}
 	}
 
-	Timer { interval: root.isVM ? 800 : 350; running: !root.screenLocked && !root.isMonitorDpmsOff; repeat: true; onTriggered: fastPoll.running = true }
+	Timer { interval: root.isVM ? 1200 : 900; running: !root.screenLocked && !root.isMonitorDpmsOff; repeat: true; onTriggered: fastPoll.running = true }
 	Timer { interval: 1800000; running: true; repeat: true; onTriggered: weatherProc.running = true }
 	Timer {
 		interval: 1000; running: true; repeat: true; triggeredOnStart: true
@@ -674,7 +694,6 @@ ShellRoot {
 				root.mediaProg = (root.activePlayer.length > 0) ? Math.min(1, Math.max(0, root.activePlayer.position / root.activePlayer.length)) : 0.25
 			}
 			if (root.centerMode === "system" && tick % 3 === 0) sysPoll.running = true
-			else if (root.animWallpapers && tick % 12 === 0) sysPoll.running = true
 			if (tick > 2 && tick % 15 === 0 && root.weatherShort.includes("--")) weatherProc.running = true
 			if (tick % 4 === 0 && root.centerMode === "system" && root.sysSubmenu !== "") subPoll.running = true
 			tick = (tick + 1) % 3600
@@ -774,7 +793,7 @@ ShellRoot {
 		}
 	}
 
-	// 2. INVISIBLE 40px TOP SPACER (Leaves 8px above bar and 8px below bar with Niri 16px gaps)
+	// 2. INVISIBLE 40px TOP SPACER
 	Variants {
 		model: Quickshell.screens
 		PanelWindow {
@@ -818,7 +837,7 @@ ShellRoot {
 			anchors { top: true }
 			margins.top: 8
 			implicitWidth: centerPill.width + (Math.max(leftPill.width, rightOsdPill.width) * 2) + 32
-			implicitHeight: Math.max(leftPill.height, centerPill.height + (launcherListCard.visible ? (launcherListCard.height + 8) : 0), rightOsdPill.height) + 8
+			implicitHeight: Math.max(leftPill.height, centerPill.height, rightOsdPill.height) + 8
 			color: "transparent"
 
 			function grabKeyboardNow() {
@@ -866,8 +885,9 @@ ShellRoot {
 					anchors.fill: parent; acceptedButtons: Qt.NoButton
 					onWheel: wheel => {
 						let targetWs = Math.max(1, root.lastActiveWs + (wheel.angleDelta.y > 0 ? -1 : 1))
-						root.wsExpanded = true; wsCollapseTimer.restart()
+						root.lastActiveWs = targetWs; root.wsExpanded = true; wsCollapseTimer.restart()
 						root.runCmd((root.isHyprland ? "hyprctl dispatch workspace " : "niri msg action focus-workspace ") + targetWs)
+						fastPoll.running = true
 					}
 				}
 
@@ -901,7 +921,14 @@ ShellRoot {
 							color: modelData.active ? root.color4 : (modelData.occupied ? root.withAlpha(root.color2, 0.25) : Qt.rgba(1, 1, 1, 0.06))
 							border.width: modelData.occupied && !modelData.active ? 1 : 0; border.color: root.color2
 							Text { anchors.centerIn: parent; text: modelData.idx.toString(); color: modelData.active ? root.bg : (modelData.occupied ? root.color2 : root.color8); font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12; font.bold: true }
-							MouseArea { anchors.fill: parent; onClicked: root.runCmd((root.isHyprland ? "hyprctl dispatch workspace " : "niri msg action focus-workspace ") + modelData.idx) }
+							MouseArea {
+								anchors.fill: parent
+								onClicked: {
+									root.lastActiveWs = modelData.idx
+									root.runCmd((root.isHyprland ? "hyprctl dispatch workspace " : "niri msg action focus-workspace ") + modelData.idx)
+									fastPoll.running = true
+								}
+							}
 						}
 					}
 				}
@@ -963,7 +990,7 @@ ShellRoot {
 				}
 			}
 
-			// CENTER DYNAMIC ISLAND PILL (Morphs into 40px Search Bar when Launcher is open)
+			// CENTER DYNAMIC ISLAND PILL (Unified 392px height for Control Center, Launcher & Overview)
 			Rectangle {
 				id: centerPill
 				anchors.top: parent.top
@@ -976,7 +1003,7 @@ ShellRoot {
 				property bool isOverviewOpen: root.centerMode === "overview"
 
 				width: (isHoverPreview || isCalOpen || isSysOpen || isLauncherOpen || isOverviewOpen) ? 380 : (compactClockRow.implicitWidth + 28)
-				height: isLauncherOpen ? 40 : (isOverviewOpen ? 400 : (isSysOpen ? (sysContainer.implicitHeight + 52) : (isCalOpen ? (calCardCol.implicitHeight + 52) : (isHoverPreview ? (calPreviewBox.implicitHeight + 52) : 40))))
+				height: (isLauncherOpen || isOverviewOpen) ? 392 : (isSysOpen ? (sysContainer.implicitHeight + 52) : (isCalOpen ? (calCardCol.implicitHeight + 52) : (isHoverPreview ? (calPreviewBox.implicitHeight + 52) : 40)))
 				radius: 20
 				color: root.withAlpha(root.bg, root.panelAlpha)
 				border.width: (isCalOpen || isSysOpen || isLauncherOpen || isOverviewOpen) ? 2 : (isHoverPreview ? 0 : 1)
@@ -998,32 +1025,40 @@ ShellRoot {
 					acceptedButtons: Qt.RightButton; onClicked: root.openSystemPanel()
 				}
 
-				// LAUNCHER 40px MORPHED SEARCH BAR (Directly inside centerPill without nested box)
-				RowLayout {
-					visible: centerPill.isLauncherOpen
-					anchors.fill: parent; anchors.leftMargin: 14; anchors.rightMargin: 14; spacing: 8
-					Text { text: "󰍉"; color: root.color4; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 15 }
-					TextInput {
-						id: launcherSearchInput; Layout.fillWidth: true
-						color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 13; font.bold: true; clip: true
-						onTextChanged: { root.searchQuery = text; root.selectedAppIndex = 0 }
-						Keys.onDownPressed: { if (root.selectedAppIndex < root.filteredApps.length - 1) root.selectedAppIndex++ }
-						Keys.onUpPressed: { if (root.selectedAppIndex > 0) root.selectedAppIndex-- }
-						Keys.onEscapePressed: root.closeCenterPill()
-						Keys.onReturnPressed: { if (root.filteredApps.length > 0) { let a = root.filteredApps[root.selectedAppIndex]; root.closeCenterPill(); a.execute() } }
-					}
-				}
-
-				// UNIFIED FIXED 40px TOP HEADER
+				// UNIFIED FIXED 40px TOP HEADER (Also acts as the direct 40px Search Bar when Launcher is open!)
 				Item {
 					id: topPillBar
-					visible: !centerPill.isLauncherOpen && !centerPill.isOverviewOpen
+					visible: !centerPill.isOverviewOpen
 					anchors { top: parent.top; left: parent.left; right: parent.right }
 					height: 40
 
+					// Launcher Direct Search Header (No nested border box)
+					RowLayout {
+						visible: centerPill.isLauncherOpen
+						anchors.fill: parent; anchors.leftMargin: 14; anchors.rightMargin: 14; spacing: 8
+						Text { text: "󰍉"; color: root.color4; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 15 }
+						TextInput {
+							id: launcherSearchInput; Layout.fillWidth: true
+							color: root.fg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 13; font.bold: true; clip: true
+							onTextChanged: { root.searchQuery = text; root.selectedAppIndex = 0 }
+							Keys.onDownPressed: { if (root.selectedAppIndex < root.filteredApps.length - 1) root.selectedAppIndex++ }
+							Keys.onUpPressed: { if (root.selectedAppIndex > 0) root.selectedAppIndex-- }
+							Keys.onEscapePressed: root.closeCenterPill()
+							Keys.onReturnPressed: { if (root.filteredApps.length > 0) { let a = root.filteredApps[root.selectedAppIndex]; root.closeCenterPill(); a.execute() } }
+						}
+					}
+
+					// Subtle 1px separator under the 40px Search Header when Launcher is open
+					Rectangle {
+						visible: centerPill.isLauncherOpen
+						anchors.bottom: parent.bottom; anchors.left: parent.left; anchors.right: parent.right
+						anchors.leftMargin: 12; anchors.rightMargin: 12
+						height: 1; color: Qt.rgba(1, 1, 1, 0.08)
+					}
+
 					Item {
 						anchors.fill: parent
-						visible: (!centerPill.isSysOpen || root.sysSubmenu === "") && (!centerPill.isCalOpen || root.calSubmenu === "")
+						visible: !centerPill.isLauncherOpen && (!centerPill.isSysOpen || root.sysSubmenu === "") && (!centerPill.isCalOpen || root.calSubmenu === "")
 
 						RowLayout {
 							id: compactClockRow; anchors.centerIn: parent; spacing: 8
@@ -1045,7 +1080,7 @@ ShellRoot {
 					}
 
 					RowLayout {
-						visible: (centerPill.isSysOpen && root.sysSubmenu !== "") || (centerPill.isCalOpen && root.calSubmenu !== "")
+						visible: !centerPill.isLauncherOpen && ((centerPill.isSysOpen && root.sysSubmenu !== "") || (centerPill.isCalOpen && root.calSubmenu !== ""))
 						anchors.fill: parent; anchors.leftMargin: 10; anchors.rightMargin: 10; spacing: 8
 
 						Rectangle {
@@ -1090,6 +1125,78 @@ ShellRoot {
 							visible: centerPill.isSysOpen && root.sysSubmenu === "power"; implicitWidth: 90; implicitHeight: 24; radius: 7; color: root.color1
 							Text { anchors.centerIn: parent; text: "󰐥 Poweroff"; color: root.bg; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 11; font.bold: true }
 							MouseArea { anchors.fill: parent; onClicked: root.runCmd("loginctl poweroff || sudo -n poweroff || poweroff") }
+						}
+					}
+				}
+
+				// ATTACHED APP LAUNCHER LIST (Directly inside centerPill below topPillBar, total height = 392px)
+				ListView {
+					id: appListView
+					visible: centerPill.isLauncherOpen
+					anchors { top: topPillBar.bottom; bottom: parent.bottom; left: parent.left; right: parent.right }
+					anchors.margins: 10; anchors.topMargin: 6
+					clip: true; spacing: 4
+					model: root.filteredApps
+					currentIndex: root.selectedAppIndex
+
+					Text {
+						anchors.centerIn: parent
+						visible: root.filteredApps.length === 0
+						text: "No matching applications"
+						color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12
+					}
+
+					delegate: Rectangle {
+						required property var modelData
+						required property int index
+						width: ListView.view.width
+						height: 46
+						radius: 10
+						property bool isSel: index === root.selectedAppIndex
+						color: isSel ? Qt.rgba(1, 1, 1, 0.09) : (appMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.04) : "transparent")
+
+						// Left vertical pill accent bar on selected app (No outer border)
+						Rectangle {
+							visible: parent.isSel
+							width: 3.5; height: 22; radius: 2
+							anchors.left: parent.left; anchors.leftMargin: 4
+							anchors.verticalCenter: parent.verticalCenter
+							color: root.color6
+						}
+
+						RowLayout {
+							anchors.fill: parent
+							anchors.leftMargin: 13; anchors.rightMargin: 10
+							spacing: 10
+
+							Rectangle {
+								implicitWidth: 32; implicitHeight: 32; radius: 8
+								color: Qt.rgba(1, 1, 1, 0.06)
+								IconImage { anchors.centerIn: parent; implicitSize: 22; source: Quickshell.iconPath(modelData.icon, true) }
+							}
+
+							ColumnLayout {
+								Layout.fillWidth: true; spacing: 1
+								Text {
+									text: modelData.name
+									color: root.fg
+									font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 13; font.bold: true
+									elide: Text.ElideRight; Layout.fillWidth: true
+								}
+								Text {
+									visible: text !== ""
+									text: modelData.genericName || modelData.comment || ""
+									color: root.color8
+									font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 10
+									elide: Text.ElideRight; Layout.fillWidth: true
+								}
+							}
+						}
+
+						MouseArea {
+							id: appMouse; anchors.fill: parent; hoverEnabled: true
+							onEntered: root.selectedAppIndex = index
+							onClicked: { root.closeCenterPill(); modelData.execute() }
 						}
 					}
 				}
@@ -1518,7 +1625,7 @@ ShellRoot {
 							}
 						}
 
-						// 3. Shared Interactive Slider Bars (Display hidden inside Display submenu to avoid duplicate bar)
+						// 3. Shared Interactive Slider Bars
 						Repeater {
 							model: ["display", "sound", "mic"]
 							Rectangle {
@@ -1610,7 +1717,7 @@ ShellRoot {
 							}
 						}
 
-						// 4. Shared Read-Only Status Bars (Battery & System Info)
+						// 4. Shared Read-Only Status Bars
 						Repeater {
 							model: root.sysSubmenu === "battery" ? [
 								{ "icon": root.batCharging ? "󰂄" : "󰁹", "title": root.batCharging ? "Charging" : "Charge Level", "pct": root.batPct, "col": root.color2 }
@@ -1779,7 +1886,7 @@ ShellRoot {
 							}
 						}
 
-						// 9. Display Submenu (Active Monitor Bars Only + Night Light)
+						// 9. Display Submenu
 						ColumnLayout {
 							visible: root.sysSubmenu === "display"; Layout.fillWidth: true; spacing: 8
 							Repeater {
@@ -2306,92 +2413,6 @@ ShellRoot {
 				}
 			}
 
-			// DETACHED APP LAUNCHER LIST CARD (8px below the 40px Search Bar Pill)
-			Rectangle {
-				id: launcherListCard
-				visible: centerPill.isLauncherOpen
-				anchors.top: centerPill.bottom
-				anchors.topMargin: 8
-				anchors.horizontalCenter: centerPill.horizontalCenter
-				width: 380
-				height: Math.min(348, Math.max(58, appListView.contentHeight + 16))
-				radius: 20
-				color: root.withAlpha(root.bg, root.panelAlpha)
-				border.width: 2
-				border.color: root.color4
-				clip: true
-				Behavior on height { NumberAnimation { duration: root.animMs; easing.type: root.cfgIslandEasing } }
-
-				ListView {
-					id: appListView
-					anchors.fill: parent; anchors.margins: 8
-					clip: true; spacing: 4
-					model: root.filteredApps
-					currentIndex: root.selectedAppIndex
-
-					Text {
-						anchors.centerIn: parent
-						visible: root.filteredApps.length === 0
-						text: "No matching applications"
-						color: root.color8; font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 12
-					}
-
-					delegate: Rectangle {
-						required property var modelData
-						required property int index
-						width: ListView.view.width
-						height: 46
-						radius: 10
-						property bool isSel: index === root.selectedAppIndex
-						color: isSel ? Qt.rgba(1, 1, 1, 0.09) : (appMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.04) : "transparent")
-
-						// Left vertical pill accent bar on selected app (No outer border)
-						Rectangle {
-							visible: parent.isSel
-							width: 3.5; height: 22; radius: 2
-							anchors.left: parent.left; anchors.leftMargin: 4
-							anchors.verticalCenter: parent.verticalCenter
-							color: root.color6
-						}
-
-						RowLayout {
-							anchors.fill: parent
-							anchors.leftMargin: 13; anchors.rightMargin: 10
-							spacing: 10
-
-							Rectangle {
-								implicitWidth: 32; implicitHeight: 32; radius: 8
-								color: Qt.rgba(1, 1, 1, 0.06)
-								IconImage { anchors.centerIn: parent; implicitSize: 22; source: Quickshell.iconPath(modelData.icon, true) }
-							}
-
-							ColumnLayout {
-								Layout.fillWidth: true; spacing: 1
-								Text {
-									text: modelData.name
-									color: root.fg
-									font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 13; font.bold: true
-									elide: Text.ElideRight; Layout.fillWidth: true
-								}
-								Text {
-									visible: text !== ""
-									text: modelData.genericName || modelData.comment || ""
-									color: root.color8
-									font.family: "JetBrainsMono Nerd Font"; font.pixelSize: 10
-									elide: Text.ElideRight; Layout.fillWidth: true
-								}
-							}
-						}
-
-						MouseArea {
-							id: appMouse; anchors.fill: parent; hoverEnabled: true
-							onEntered: root.selectedAppIndex = index
-							onClicked: { root.closeCenterPill(); modelData.execute() }
-						}
-					}
-				}
-			}
-
 			// RIGHT OSD PILL (Anchored 10px to the right of centerPill)
 			Rectangle {
 				id: rightOsdPill
@@ -2540,15 +2561,15 @@ ShellRoot {
 
 			Image {
 				id: lockWall; anchors.fill: parent
-				source: (!root.showLiveLockWall && root.wallpaperPath !== "") ? (root.isVideoFile ? "file:///tmp/wall_frame.jpg" : "file://" + root.wallpaperPath) : ""
+				source: (lockWin.visible && !root.showLiveLockWall && root.wallpaperPath !== "") ? (root.isVideoFile ? "file:///tmp/wall_frame.jpg" : "file://" + root.wallpaperPath) : ""
 				fillMode: Image.PreserveAspectCrop; asynchronous: true; cache: false
-				visible: !root.showLiveLockWall && (!root.fxActive || root.cfgLockBlurMax <= 0)
+				visible: lockWin.visible && !root.showLiveLockWall && (!root.fxActive || root.cfgLockBlurMax <= 0)
 			}
 
 			MultiEffect {
 				anchors.fill: parent; source: lockWall
-				visible: !root.showLiveLockWall && root.fxActive && root.cfgLockBlurMax > 0 && root.wallpaperPath !== ""
-				blurEnabled: visible; blurMax: root.cfgLockBlurMax; blur: 1.0
+				visible: lockWin.visible && !root.showLiveLockWall && root.fxActive && root.cfgLockBlurMax > 0 && root.wallpaperPath !== ""
+				blurEnabled: lockWin.visible && visible; blurMax: root.cfgLockBlurMax; blur: 1.0
 			}
 
 			Rectangle { anchors.fill: parent; color: Qt.rgba(0, 0, 0, 0.38) }
