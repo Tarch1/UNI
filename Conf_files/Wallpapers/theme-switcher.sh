@@ -21,7 +21,7 @@ ROTATE_INTERVAL=0
 WALLUST_BACKEND="resized"
 
 # Wallust color difference threshold (1-20)
-# Options: 2 = Best for flat illustrations | 11 = Balanced | 20 = Photographs
+# Options: 0 = Auto heuristic | 2 = Best for flat illustrations | 11 = Balanced | 20 = Photographs
 WALLUST_THRESHOLD=0
 
 # Wallust palette for Night mode
@@ -45,11 +45,12 @@ QS_DIR="$HOME/.config/quickshell"
 QT6_DIR="$HOME/.config/qt6ct/colors"
 FRAME_CACHE="/tmp/wall_frame.jpg"
 FORCED_MODE="${1:-}"
+
 CURRENT_WALL=$(grep -o '"wallpaper": *"[^"]*"' "$QS_DIR/colors.json" 2>/dev/null | cut -d'"' -f4)
 CURRENT_THEME=""
 LAST_MODE=$(grep -o '"wallMode": *"[^"]*"' "$QS_DIR/colors.json" 2>/dev/null | cut -d'"' -f4)
 [[ -z "$LAST_MODE" ]] && LAST_MODE="static"
-if [[ -n "$CURRENT_WALL" && -f "$CURRENT_WALL" && -f "$QS_DIR/colors-wallust.json" ]]; then
+if [[ -n "$CURRENT_WALL" && -f "$CURRENT_WALL" ]]; then
 	[[ "$CURRENT_WALL" == *"/day"* ]] && CURRENT_THEME="day"
 	[[ "$CURRENT_WALL" == *"/night"* ]] && CURRENT_THEME="night"
 else
@@ -67,10 +68,10 @@ get_wall_mode() {
 	[[ "$m" == "animated" ]] && echo "animated" || echo "static"
 }
 
-get_ui_effects() {
-	local fx
-	fx=$(grep -o '"uiEffects": *[a-z]*' "$QS_DIR/colors.json" 2>/dev/null | awk -F: '{gsub(/[[:space:]]/,"",$2); print $2}')
-	[[ "$fx" == "false" ]] && echo "false" || echo "true"
+get_json_bool() {
+	local key="$1" def="$2" val
+	val=$(grep -o "\"$key\": *[a-z]*" "$QS_DIR/colors.json" 2>/dev/null | awk -F: '{gsub(/[[:space:]]/,"",$2); print $2}')
+	[[ "$val" =~ ^(true|false)$ ]] && echo "$val" || echo "$def"
 }
 
 update_qt6ct_colors() {
@@ -91,39 +92,26 @@ update_qt6ct_colors() {
 	}' "$QS_DIR/colors.json" > "$QT6_DIR/wallust.conf"
 }
 
-update_quickshell_json() {
-	local wall="$1"
-	local mode fx
-	mode=$(get_wall_mode)
-	fx=$(get_ui_effects)
-	FORCED_MODE=""
-	mkdir -p "$QS_DIR"
-	if [[ -f "$QS_DIR/colors-wallust.json" ]] && grep -q '"color4": *"#' "$QS_DIR/colors-wallust.json" 2>/dev/null; then
-		sed "s|{|{\n\t\"wallpaper\": \"$wall\",\n\t\"wallMode\": \"$mode\",\n\t\"uiEffects\": $fx,|" "$QS_DIR/colors-wallust.json" > "$QS_DIR/colors.json"
-	elif [[ -f "$HOME/.config/kitty/colors.conf" ]]; then
-		awk -v w="$wall" -v m="$mode" -v fx="$fx" '
-		BEGIN {
-			c["background"]="#1e1e2e"; c["foreground"]="#cdd6f4";
-			c["color0"]="#1e1e2e"; c["color1"]="#f38ba8"; c["color2"]="#a6e3a1";
-			c["color3"]="#f9e2af"; c["color4"]="#89b4fa"; c["color5"]="#cba6f7";
-			c["color6"]="#94e2d5"; c["color7"]="#bac2de"; c["color8"]="#585b70";
-		}
-		/^(background|foreground|color[0-8])[[:space:]]+#/ { c[$1]=$2 }
-		END {
-			printf "{\n\t\"wallpaper\": \"%s\",\n\t\"wallMode\": \"%s\",\n\t\"uiEffects\": %s,\n\t\"background\": \"%s\",\n\t\"foreground\": \"%s\",\n\t\"color0\": \"%s\",\n\t\"color1\": \"%s\",\n\t\"color2\": \"%s\",\n\t\"color3\": \"%s\",\n\t\"color4\": \"%s\",\n\t\"color5\": \"%s\",\n\t\"color6\": \"%s\",\n\t\"color7\": \"%s\",\n\t\"color8\": \"%s\"\n}\n",
-			w, m, fx, c["background"], c["foreground"], c["color0"], c["color1"], c["color2"], c["color3"], c["color4"], c["color5"], c["color6"], c["color7"], c["color8"]
-		}' "$HOME/.config/kitty/colors.conf" > "$QS_DIR/colors.json"
+sync_quickshell_state() {
+	local wall="$1" mode="$2" fx="$3" fr="$4"
+	local tpl="$HOME/.config/wallust/templates/colors-quickshell.json"
+	if [[ -f "$tpl" ]]; then
+		sed -i -e "s|\"wallMode\": *\"[^\"]*\"|\"wallMode\": \"$mode\"|" \
+			-e "s|\"uiEffects\": *[a-z]*|\"uiEffects\": $fx|" \
+			-e "s|\"firstRunDone\": *[a-z]*|\"firstRunDone\": $fr|" "$tpl"
 	fi
-	update_qt6ct_colors
-	quickshell ipc call theme reload >/dev/null 2>&1 || true
 }
 
 apply_theme() {
 	local theme="$1"
 	local static_dir="$2"
 	local anim_dir="$3"
-	local mode
+	local mode fx fr
 	mode=$(get_wall_mode)
+	fx=$(get_json_bool "uiEffects" "true")
+	fr=$(get_json_bool "firstRunDone" "false")
+	FORCED_MODE=""
+
 	local target_dir="$static_dir"
 	if [[ "$mode" == "animated" && -d "$anim_dir" ]]; then
 		if [[ -n $(find "$anim_dir" -type f \( -iname "*.webm" -o -iname "*.mp4" -o -iname "*.gif" -o -iname "*.webp" -o -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" \) -print -quit 2>/dev/null) ]]; then
@@ -153,14 +141,24 @@ apply_theme() {
 		fi
 	fi
 
+	sync_quickshell_state "$wall" "$mode" "$fx" "$fr"
+	local t_flag=()
+	(( WALLUST_THRESHOLD > 0 )) && t_flag=(-t "$WALLUST_THRESHOLD")
 	if [[ "$theme" == "night" ]]; then
-		wallust run -s --backend "$WALLUST_BACKEND" -t "$WALLUST_THRESHOLD" "$wall_img" --palette "$WALLUST_NIGHT_PALETTE" 2>/dev/null
+		wallust run -s --backend "$WALLUST_BACKEND" "${t_flag[@]}" "$wall_img" --palette "$WALLUST_NIGHT_PALETTE" 2>/dev/null
 	else
-		wallust run -s --backend "$WALLUST_BACKEND" -t "$WALLUST_THRESHOLD" "$wall_img" 2>/dev/null
+		wallust run -s --backend "$WALLUST_BACKEND" "${t_flag[@]}" "$wall_img" 2>/dev/null
+	fi
+	if [[ -f "$QS_DIR/colors.json" ]]; then
+		sed -i -e "s|\"wallpaper\": *\"[^\"]*\"|\"wallpaper\": \"$wall\"|" \
+			-e "s|\"wallMode\": *\"[^\"]*\"|\"wallMode\": \"$mode\"|" \
+			-e "s|\"uiEffects\": *[a-z]*|\"uiEffects\": $fx|" \
+			-e "s|\"firstRunDone\": *[a-z]*|\"firstRunDone\": $fr|" "$QS_DIR/colors.json"
 	fi
 	killall -SIGUSR1 kitty 2>/dev/null || true
 	if command -v quickshell >/dev/null 2>&1; then
-		update_quickshell_json "$wall"
+		update_qt6ct_colors
+		quickshell ipc call theme reload >/dev/null 2>&1 || true
 	else
 		if pgrep -u "$UID" -x waybar >/dev/null; then killall -SIGUSR2 waybar ; else waybar & fi
 		swaync-client -rs >/dev/null 2>&1 || true
