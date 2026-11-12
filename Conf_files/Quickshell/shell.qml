@@ -56,6 +56,7 @@ ShellRoot {
 		if (!animWallpapers || (!isVideoFile && !isAnimatedGif)) return false
 		if (cfgPauseOnScreenOff && isMonitorDpmsOff) return false
 		if (screenLocked) return cfgLockKeepAnimated
+		if (isVM && centerMode !== "none") return false
 		if (cfgPauseOnFullscreen && hasActiveFullWindow) return false
 		return true
 	}
@@ -66,12 +67,9 @@ ShellRoot {
 	}
 
 	property color rawBg: "#1e1e2e"
-	property color rawColor0: "#282a36"
-	property color bg: Qt.rgba(Math.max(0.10, rawBg.r), Math.max(0.11, rawBg.g), Math.max(0.13, rawBg.b), 1.0)
-	property color color0: {
-		let minR = bg.r + 0.055, minG = bg.g + 0.055, minB = bg.b + 0.065
-		return Qt.rgba(Math.min(1, Math.max(rawColor0.r, minR)), Math.min(1, Math.max(rawColor0.g, minG)), Math.min(1, Math.max(rawColor0.b, minB)), 1.0)
-	}
+	property color rawColor8: "#585b70"
+	property color bg: rawBg
+	property color color0: Qt.rgba(Math.min(1, bg.r + 0.055), Math.min(1, bg.g + 0.058), Math.min(1, bg.b + 0.068), 1.0)
 	property color fg: "#cdd6f4"
 	property color color1: "#f38ba8"
 	property color color2: "#a6e3a1"
@@ -79,7 +77,7 @@ ShellRoot {
 	property color color4: "#89b4fa"
 	property color color5: "#cba6f7"
 	property color color6: "#94e2d5"
-	property color color8: "#585b70"
+	property color color8: Qt.rgba(Math.max(0.56, rawColor8.r), Math.max(0.60, rawColor8.g), Math.max(0.64, rawColor8.b), 1.0)
 
 	property bool barVisible: true
 	property string centerMode: "none"
@@ -240,8 +238,7 @@ ShellRoot {
 	function openSubmenu(sub) {
 		root.wifiPromptSsid = ""; root.expandedResMon = ""; root.showSavedList = false; root.expandedDevInfo = ""
 		root.sysSubmenu = sub
-		if (sub === "cpu" || sub === "battery") sysPoll.running = true
-		else if (sub === "net" || sub === "bt" || sub === "sound" || sub === "mic" || sub === "display") subPoll.running = true
+		if (sub !== "") deferPollTimer.restart()
 	}
 	function openLauncher() {
 		if (root.centerMode === "launcher") root.closeCenterPill()
@@ -249,14 +246,14 @@ ShellRoot {
 	}
 	function openOverview() {
 		if (root.centerMode === "overview") root.closeCenterPill()
-		else { root.sysSubmenu = ""; root.calSubmenu = ""; root.wifiPromptSsid = ""; overviewPoll.running = true; root.centerMode = "overview" }
+		else { root.sysSubmenu = ""; root.calSubmenu = ""; root.wifiPromptSsid = ""; root.centerMode = "overview"; deferPollTimer.restart() }
 	}
 	function openCalendar() {
 		root.calMonth = (new Date()).getMonth(); root.calYear = (new Date()).getFullYear(); root.updateCalendar()
 		root.sysSubmenu = ""; root.calSubmenu = ""; root.wifiPromptSsid = ""; root.centerMode = "calendar"
 	}
 	function openSystemPanel() {
-		root.sysSubmenu = ""; root.calSubmenu = ""; root.wifiPromptSsid = ""; root.centerMode = "system"; sysPoll.running = true
+		root.sysSubmenu = ""; root.calSubmenu = ""; root.wifiPromptSsid = ""; root.centerMode = "system"; deferPollTimer.restart()
 	}
 	function triggerOsd(mode) { root.osdMode = mode; osdTimer.restart() }
 	function triggerLock() {
