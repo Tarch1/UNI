@@ -682,7 +682,7 @@ ShellRoot {
 	Timer { interval: root.isVM ? 1200 : 900; running: !root.screenLocked && !root.isMonitorDpmsOff; repeat: true; onTriggered: fastPoll.running = true }
 	Timer { interval: 1800000; running: true; repeat: true; onTriggered: weatherProc.running = true }
 	Timer {
-		interval: 1000; running: true; repeat: true; triggeredOnStart: true
+		interval: 1000; running: !root.isMonitorDpmsOff; repeat: true; triggeredOnStart: true
 		property int tick: 0
 		onTriggered: {
 			let now = new Date()
@@ -836,7 +836,7 @@ ShellRoot {
 			WlrLayershell.keyboardFocus: (root.centerMode === "launcher" || root.wifiPromptSsid !== "") ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 			anchors { top: true }
 			margins.top: 8
-			implicitWidth: centerPill.width + (Math.max(leftPill.width, rightOsdPill.width) * 2) + 32
+			implicitWidth: centerPill.targetW + (Math.max(leftPill.targetW, rightOsdPill.width) * 2) + 32
 			implicitHeight: Math.max(leftPill.height, centerPill.height, rightOsdPill.height) + 8
 			color: "transparent"
 
@@ -863,8 +863,9 @@ ShellRoot {
 				property bool showWsStrip: root.wsExpanded || (!hasMedia && leftHover.hovered)
 				property bool showMediaCard: hasMedia && !root.wsExpanded && leftHover.hovered
 				property bool showMediaCompact: hasMedia && !root.wsExpanded && !leftHover.hovered
+				property int targetW: showMediaCard ? 330 : (showWsStrip ? (wsRow.implicitWidth + 16) : 40)
 
-				width: showMediaCard ? 330 : (showWsStrip ? (wsRow.implicitWidth + 16) : 40)
+				width: targetW
 				height: showMediaCard ? 150 : 40
 				radius: showMediaCard ? 22 : 20
 				color: root.withAlpha(root.bg, root.panelAlpha)
@@ -1001,8 +1002,9 @@ ShellRoot {
 				property bool isSysOpen: root.centerMode === "system"
 				property bool isLauncherOpen: root.centerMode === "launcher"
 				property bool isOverviewOpen: root.centerMode === "overview"
+				property int targetW: (isHoverPreview || isCalOpen || isSysOpen || isLauncherOpen || isOverviewOpen) ? 380 : (compactClockRow.implicitWidth + 28)
 
-				width: (isHoverPreview || isCalOpen || isSysOpen || isLauncherOpen || isOverviewOpen) ? 380 : (compactClockRow.implicitWidth + 28)
+				width: targetW
 				height: (isLauncherOpen || isOverviewOpen) ? 392 : (isSysOpen ? (sysContainer.implicitHeight + 52) : (isCalOpen ? (calCardCol.implicitHeight + 52) : (isHoverPreview ? (calPreviewBox.implicitHeight + 52) : 40)))
 				radius: 20
 				color: root.withAlpha(root.bg, root.panelAlpha)
@@ -1138,6 +1140,7 @@ ShellRoot {
 					clip: true; spacing: 4
 					model: root.filteredApps
 					currentIndex: root.selectedAppIndex
+					onCurrentIndexChanged: positionViewAtIndex(currentIndex, ListView.Contain)
 
 					Text {
 						anchors.centerIn: parent
@@ -2381,8 +2384,8 @@ ShellRoot {
 							Repeater {
 								model: [
 									{ "icon": "󰑐", "label": "Reboot System", "cmd": "loginctl reboot || sudo -n reboot || reboot", "pause": false },
-									{ "icon": "󰤄", "label": "Suspend", "cmd": "loginctl suspend || zzz", "pause": true },
-									{ "icon": "󰒲", "label": "Hibernate", "cmd": "loginctl hibernate || ZZZ", "pause": true },
+									{ "icon": "󰤄", "label": "Suspend", "cmd": "loginctl suspend || sudo -n zzz || zzz", "pause": true },
+									{ "icon": "󰒲", "label": "Hibernate", "cmd": "loginctl hibernate || sudo -n ZZZ || ZZZ", "pause": true },
 									{ "icon": "󰌾", "label": "Lock Screen", "cmd": "LOCK", "pause": false },
 									{ "icon": "󰍃", "label": "Log Out", "cmd": "LOGOUT", "pause": false }
 								]
