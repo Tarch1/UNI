@@ -1,6 +1,7 @@
 backend = "resized"
 color_space = "lab"
-palette = "dark16"
+palette = "softdark16"
+threshold = 12
 check_contrast = true
 
 [templates.hyprland]
