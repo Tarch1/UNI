@@ -186,7 +186,12 @@ FStabGen () {
 	fi
 	if [[ -f /mnt/etc/fstab ]]; then mv -f /mnt/etc/fstab /mnt/etc/old-fstab ; fi
 	if [[ "${OSsel,,}" == "void" ]]; then echo -e "$UNIfstab" > /mnt/etc/fstab
-	else "$FSTABgen" -t "$EFF_PID" /mnt >> /mnt/etc/fstab ; sed -i '/\/media\// s/relatime/noatime,nofail/' /mnt/etc/fstab ; fi
+	else
+		"$FSTABgen" -t "$EFF_PID" /mnt >> /mnt/etc/fstab
+		sed -i -e '/\/media\// s/relatime/noatime,nofail/' \
+			-e '/exfat/ s/user_id=[0-9]*,group_id=[0-9]*,default_permissions/uid=1000,gid=1000,umask=0002,nofail/g' \
+			-e '/exfat/ s/,allow_other//g' /mnt/etc/fstab
+	fi
 	cat /mnt/etc/fstab
 }
 SetupEnvironment () {
@@ -447,9 +452,8 @@ UserSetup () {
 
 	local va_drv="iHD"
 	if echo "$SYS_LSPCI" | grep -Ei "VGA|3D|Display" | grep -qi "Intel"; then va_drv="iHD"
-	elif [[ "$HAS_AMD" -eq 1 ]]; then va_drv="radeonsi"
-	elif [[ "$HAS_NVIDIA" -eq 1 ]]; then va_drv="nvidia"
-	elif [[ "$CPU_TYPE" == "AMD" ]]; then va_drv="radeonsi" ; fi
+	elif echo "$SYS_LSPCI" | grep -Ei "VGA|3D|Display" | grep -qiE "AMD|ATI|Radeon" || [[ "$CPU_TYPE" == "AMD" || "$HAS_AMD" -eq 1 ]]; then va_drv="radeonsi"
+	elif [[ "$HAS_NVIDIA" -eq 1 ]]; then va_drv="nvidia" ; fi
 
 	if [[ "$DEsel" =~ ^(Hyprland|Niri)$ ]]; then
 		echo "Installing Wallust..." ; local w_ok=0
@@ -488,19 +492,19 @@ UserSetup () {
 			cfg="/mnt/home/$UNsel/.config/hypr/hyprland.conf"
 		fi
 		if ! compgen -G "/sys/class/power_supply/BAT*" >/dev/null; then
-			if [[ "$DEsel" == "Niri" ]]; then sed -i '/repeat-delay/i \        numlock' "$cfg"
-			elif [[ "$DEsel" == "Hyprland" ]]; then sed -i '/kb_layout/a \    numlock_by_default = true' "$cfg" ; fi
+			if [[ "$DEsel" == "Niri" ]]; then sed -i '/repeat-delay/i \\t\tnumlock' "$cfg"
+			elif [[ "$DEsel" == "Hyprland" ]]; then sed -i '/kb_layout/a \\tnumlock_by_default = true' "$cfg" ; fi
 		fi
 		if [[ "$SHELLsel" == "Quickshell" ]]; then
 			mkdir -p /mnt/home/"$UNsel"/.config/{quickshell,wallust/templates}
 			sed -i -e '/\[templates\.fuzzel\]/,/^$/d' -e '/\[templates\.waybar\]/,/^$/d' -e '/\[templates\.quickshell\]/,/^$/d' -e '/\[templates\.niri\]/,/^$/d' /mnt/home/"$UNsel"/.config/wallust/wallust.toml
-			printf '{\n\t"wallpaper": "{{wallpaper}}",\n\t"wallMode": "static",\n\t"uiEffects": true,\n\t"firstRunDone": false,\n\t"background": "{{background}}",\n\t"foreground": "{{foreground}}",\n\t"color0": "{{color0}}",\n\t"color1": "{{color1}}",\n\t"color2": "{{color2}}",\n\t"color3": "{{color3}}",\n\t"color4": "{{color4}}",\n\t"color5": "{{color5}}",\n\t"color6": "{{color6}}",\n\t"color7": "{{color7}}",\n\t"color8": "{{color8}}"\n}\n' > /mnt/home/"$UNsel"/.config/wallust/templates/colors-quickshell.json
+			printf '{\n\t"wallpaper": "{{wallpaper}}",\n\t"wallMode": "static",\n\t"uiBlur": true,\n\t"uiAnimations": true,\n\t"firstRunDone": false,\n\t"background": "{{background}}",\n\t"foreground": "{{foreground}}",\n\t"color0": "{{color0}}",\n\t"color1": "{{color1}}",\n\t"color2": "{{color2}}",\n\t"color3": "{{color3}}",\n\t"color4": "{{color4}}",\n\t"color5": "{{color5}}",\n\t"color6": "{{color6}}",\n\t"color7": "{{color7}}",\n\t"color8": "{{color8}}"\n}\n' > /mnt/home/"$UNsel"/.config/wallust/templates/colors-quickshell.json
 			printf '\n[templates.quickshell]\ntemplate = "colors-quickshell.json"\ntarget = "~/.config/quickshell/colors.json"\n' >> /mnt/home/"$UNsel"/.config/wallust/wallust.toml
 			if [[ "$DEsel" == "Niri" && -f "/mnt/home/$UNsel/.config/wallust/templates/colors-niri.conf" ]]; then
 				printf '\n[templates.niri]\ntemplate = "colors-niri.conf"\ntarget = "~/.config/niri/config.kdl"\n' >> /mnt/home/"$UNsel"/.config/wallust/wallust.toml
 			fi
-			local qs_env="DRI_PRIME=0 __NV_PRIME_RENDER_OFFLOAD=0 __GLX_VENDOR_LIBRARY_NAME=mesa VDPAU_DRIVER=null LIBVA_DRIVER_NAME=$va_drv QT_FFMPEG_DECODING_HW_DEVICE_TYPES=vaapi QSG_RHI_BACKEND=opengl"
-			if [[ "$VBTsel" -eq 1 ]]; then qs_env="VDPAU_DRIVER=null QSG_RHI_BACKEND=opengl QSG_RENDER_LOOP=basic" ; fi
+			local qs_env="DRI_PRIME=0 __NV_PRIME_RENDER_OFFLOAD=0 __GLX_VENDOR_LIBRARY_NAME=mesa __EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/50_mesa.json VK_LOADER_DRIVERS_DISABLE=*nvidia* VDPAU_DRIVER=null LIBVA_DRIVER_NAME=$va_drv QT_FFMPEG_DECODING_HW_DEVICE_TYPES=vaapi QSG_RHI_BACKEND=opengl QT_LOGGING_RULES=\"qt.qpa.wayland.textinput=false\""
+			if [[ "$VBTsel" -eq 1 ]]; then qs_env="QSG_RHI_BACKEND=opengl QSG_RENDER_LOOP=basic QT_LOGGING_RULES=\"qt.qpa.wayland.textinput=false\"" ; fi
 			local qs_run="bash -c 'while :; do env $qs_env quickshell; [[ -f /tmp/qs_lock_active_\$UID ]] || break; sleep 1; done'"
 			local qs_niri="\"bash\" \"-c\" \"while :; do env $qs_env quickshell; [[ -f /tmp/qs_lock_active_\$UID ]] || break; sleep 1; done\""
 			sed -i -e "s|lock_cmd = .*|lock_cmd = quickshell ipc call lock lock|" \
@@ -544,8 +548,8 @@ UserSetup () {
 				sed -i 's/spawn "hyprlock"/spawn "env" "-u" "LIBGL_ALWAYS_SOFTWARE" "hyprlock"/g; s/exec, hyprlock/exec, env -u LIBGL_ALWAYS_SOFTWARE hyprlock/g' "$cfg"
 			fi
 			if [[ "$DEsel" == "Niri" ]]; then
-				if grep -q "environment *{" "$cfg"; then sed -i '/environment *{/a\	LIBGL_ALWAYS_SOFTWARE "1"' "$cfg" ; else echo -e '\nenvironment {\n	LIBGL_ALWAYS_SOFTWARE "1"\n}' >> "$cfg" ; fi
-				echo -e '\noutput "Virtual-1" {\n	mode "1440x900"\n}' >> "$cfg"
+				if grep -q "environment *{" "$cfg"; then sed -i '/environment *{/a\\tLIBGL_ALWAYS_SOFTWARE "1"' "$cfg" ; else echo -e '\nenvironment {\n\tLIBGL_ALWAYS_SOFTWARE "1"\n}' >> "$cfg" ; fi
+				echo -e '\noutput "Virtual-1" {\n\tmode "1440x900"\n}' >> "$cfg"
 				sed -i 's/blur true/blur false/g' "$cfg"
 				sed -i -e '/spawn-at-startup/{i\spawn-at-startup "/usr/bin/qs-session" "--clipboard"' -e ':a;n;ba}' "$cfg"
 			else
@@ -576,9 +580,9 @@ UserSetup () {
 	fi
 	rm -f /mnt/etc/sudoers.d/99-installer-temp
 	if [[ "$VBTsel" -eq 1 ]]; then
-		printf 'WLR_NO_HARDWARE_CURSORS=1\nWLR_RENDERER_ALLOW_SOFTWARE=1\nLIBGL_ALWAYS_SOFTWARE=1\nKITTY_DISABLE_WAYLAND=1\nVDPAU_DRIVER=null\nQT_QPA_PLATFORMTHEME=qt6ct\n' >> /mnt/etc/environment
+		printf 'WLR_NO_HARDWARE_CURSORS=1\nWLR_RENDERER_ALLOW_SOFTWARE=1\nLIBGL_ALWAYS_SOFTWARE=1\nKITTY_DISABLE_WAYLAND=1\nQT_QPA_PLATFORMTHEME=qt6ct\n' >> /mnt/etc/environment
 	else
-		printf 'MOZ_ENABLE_WAYLAND=1\nQT_QPA_PLATFORM="wayland;xcb"\nQT_QPA_PLATFORMTHEME=qt6ct\nGDK_BACKEND="wayland,x11"\nSDL_VIDEODRIVER=wayland\nELECTRON_OZONE_PLATFORM_HINT=auto\nDRI_PRIME=0\n__NV_PRIME_RENDER_OFFLOAD=0\n__GLX_VENDOR_LIBRARY_NAME=mesa\n__EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/50_mesa.json\nVDPAU_DRIVER=null\nLIBVA_DRIVER_NAME=%s\nQT_FFMPEG_DECODING_HW_DEVICE_TYPES=vaapi\n' "$va_drv" >> /mnt/etc/environment
+		printf 'MOZ_ENABLE_WAYLAND=1\nQT_QPA_PLATFORM="wayland;xcb"\nQT_QPA_PLATFORMTHEME=qt6ct\nGDK_BACKEND="wayland,x11"\nSDL_VIDEODRIVER=wayland\nELECTRON_OZONE_PLATFORM_HINT=auto\nDRI_PRIME=0\n__NV_PRIME_RENDER_OFFLOAD=0\n__GLX_VENDOR_LIBRARY_NAME=mesa\n__EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/50_mesa.json\nVK_LOADER_DRIVERS_DISABLE="*nvidia*"\nVDPAU_DRIVER=null\nLIBVA_DRIVER_NAME=%s\nQT_FFMPEG_DECODING_HW_DEVICE_TYPES=vaapi\n' "$va_drv" >> /mnt/etc/environment
 	fi
 	mkdir -p /mnt/etc/skel/.config
 	cp -r /mnt/home/"$UNsel"/.config/* /mnt/etc/skel/.config/ 2>/dev/null || true
