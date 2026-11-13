@@ -1262,10 +1262,17 @@ ShellRoot {
               }
             }
 
-            Component.onCompleted: {
-              buildSilhouetteMap()
-              swarmAnim.start()
+            function startWhenReady() {
+              if (baseStaticWall.status === Image.Ready) {
+                buildSilhouetteMap()
+                swarmAnim.start()
+              }
             }
+            Connections {
+              target: baseStaticWall
+              function onStatusChanged() { transRoot.startWhenReady() }
+            }
+            Component.onCompleted: startWhenReady()
           }
         }
       }
