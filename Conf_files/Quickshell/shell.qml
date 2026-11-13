@@ -34,6 +34,7 @@ ShellRoot {
   property int cfgLockBlurMax: 48
   property bool cfgPauseOnFullscreen: true
   property bool cfgPauseOnScreenOff: true
+  property int cfgBarAutoCloseMs: 2000
   // =========================================================================
 
   property string homeDir: Quickshell.env("HOME")
@@ -59,7 +60,6 @@ ShellRoot {
     if (!animWallpapers || (!isVideoFile && !isAnimatedGif)) return false
     if (cfgPauseOnScreenOff && isMonitorDpmsOff) return false
     if (screenLocked) return cfgLockKeepAnimated
-    if (isVM && centerMode !== "none") return false
     if (cfgPauseOnFullscreen && hasActiveFullWindow) return false
     return true
   }
@@ -97,6 +97,7 @@ ShellRoot {
     let all = DesktopEntries.applications.values, q = searchQuery.toLowerCase().trim(), res = []
     for (let i = 0; i < all.length; i++) {
       let a = all[i]
+      if (a.noDisplay) continue
       if (q === "" || (a.name && a.name.toLowerCase().includes(q)) || (a.genericName && a.genericName.toLowerCase().includes(q)) || (a.comment && a.comment.toLowerCase().includes(q))) res.push(a)
     }
     return res
@@ -193,6 +194,20 @@ ShellRoot {
   function withAlpha(c, a) { return Qt.rgba(c.r, c.g, c.b, a) }
   function runCmd(cmd) { Quickshell.execDetached(["bash", "-c", cmd]) }
   function shQuote(s) { return "'" + String(s || "").replace(/'/g, "'\\''") + "'" }
+  function saveJsonBool(key, val, extraCmd) {
+    let vStr = val ? "true" : "false"
+    runCmd((extraCmd || "") + "sed -i 's/\"" + key + "\": *[a-z]*/\"" + key + "\": " + vStr + "/' \"" + root.homeDir + "/.config/quickshell/colors.json\" \"" + root.homeDir + "/.config/wallust/templates/colors-quickshell.json\" 2>/dev/null || true")
+  }
+  function launchApp(a) {
+    if (!a) return
+    root.closeCenterPill()
+    if (a.runInTerminal) {
+      let cmd = (a.command && a.command.length > 0) ? ["kitty", "-e"].concat(a.command) : ["kitty", "-e", a.execString.replace(/%[fFuUdDnNickvm]/g, "").trim()]
+      Quickshell.execDetached({ command: cmd, workingDirectory: a.workingDirectory || root.homeDir })
+    } else {
+      a.execute()
+    }
+  }
   function formatSec(s) {
     let sec = Math.max(0, Math.floor(s || 0)), m = Math.floor(sec / 60), r = sec % 60
     return m + ":" + (r < 10 ? "0" + r : r)
@@ -234,7 +249,7 @@ ShellRoot {
   function checkFirstRunNiri() {
     if (!root.firstRunDone && !root.isHyprland && !root.screenLocked) {
       root.firstRunDone = true
-      runCmd("sed -i 's/\"firstRunDone\": *[a-z]*/\"firstRunDone\": true/' \"" + root.homeDir + "/.config/quickshell/colors.json\" \"" + root.homeDir + "/.config/wallust/templates/colors-quickshell.json\" 2>/dev/null || true; sleep 0.6 && niri msg action show-hotkey-overlay >/dev/null 2>&1")
+      saveJsonBool("firstRunDone", true, "sleep 0.6 && niri msg action show-hotkey-overlay >/dev/null 2>&1 & ")
     }
   }
   function closeCenterPill() {
@@ -293,14 +308,11 @@ ShellRoot {
   function toggleUiBlur() {
     if (root.isVM) return
     root.cfgEnableBlur = !root.cfgEnableBlur
-    let bStr = root.cfgEnableBlur ? "true" : "false"
-    let hyprCmd = root.isHyprland ? ("hyprctl keyword decoration:blur:enabled " + bStr + " >/dev/null 2>&1; ") : ""
-    runCmd(hyprCmd + "sed -i 's/\"uiBlur\": *[a-z]*/\"uiBlur\": " + bStr + "/' \"" + root.homeDir + "/.config/quickshell/colors.json\" \"" + root.homeDir + "/.config/wallust/templates/colors-quickshell.json\" 2>/dev/null || true")
+    saveJsonBool("uiBlur", root.cfgEnableBlur, root.isHyprland ? ("hyprctl keyword decoration:blur:enabled " + (root.cfgEnableBlur ? "true" : "false") + " >/dev/null 2>&1; ") : "")
   }
   function toggleUiAnimations() {
     root.cfgEnableAnimations = !root.cfgEnableAnimations
-    let aStr = root.cfgEnableAnimations ? "true" : "false"
-    runCmd("sed -i 's/\"uiAnimations\": *[a-z]*/\"uiAnimations\": " + aStr + "/' \"" + root.homeDir + "/.config/quickshell/colors.json\" \"" + root.homeDir + "/.config/wallust/templates/colors-quickshell.json\" 2>/dev/null || true")
+    saveJsonBool("uiAnimations", root.cfgEnableAnimations, "")
   }
   function togglePrimaryNetwork() {
     if (root.ethIface !== "" && (!root.hasWifiHw || root.ethConnected)) runCmd("nmcli dev " + (root.ethConnected ? "disconnect " : "connect ") + root.ethIface)
@@ -379,9 +391,9 @@ ShellRoot {
     function onMutedChanged() { root.triggerOsd("mic") }
   }
 
-  Timer { id: osdTimer; interval: 2000; onTriggered: root.osdMode = "volume" }
-  Timer { id: wsCollapseTimer; interval: 1400; onTriggered: root.wsExpanded = false }
-  Timer { id: autoCloseTimer; interval: 4500; onTriggered: { if (root.centerMode !== "none" && root.wifiPromptSsid === "") root.closeCenterPill() } }
+  Timer { id: osdTimer; interval: root.cfgBarAutoCloseMs; onTriggered: root.osdMode = "volume" }
+  Timer { id: wsCollapseTimer; interval: root.cfgBarAutoCloseMs; onTriggered: root.wsExpanded = false }
+  Timer { id: autoCloseTimer; interval: root.cfgBarAutoCloseMs; onTriggered: { if (root.centerMode !== "none" && root.wifiPromptSsid === "") root.closeCenterPill() } }
   Timer { id: popupTimer; interval: 5000; onTriggered: root.popupNotifications = [] }
   Timer {
     id: deferPollTimer; interval: 55; repeat: false
@@ -825,13 +837,13 @@ ShellRoot {
     }
   }
 
-  // 3. CLICK-OUTSIDE BACKDROP LAYER
+  // 3. CLICK-OUTSIDE BACKDROP LAYER (Overlay layer so clicks outside islandWin always close the panel)
   Variants {
     model: Quickshell.screens
     PanelWindow {
       required property var modelData
       screen: modelData; visible: root.centerMode !== "none" && !root.screenLocked
-      WlrLayershell.layer: WlrLayer.Top; WlrLayershell.namespace: "qs-backdrop"
+      WlrLayershell.layer: WlrLayer.Overlay; WlrLayershell.namespace: "qs-backdrop"
       WlrLayershell.exclusionMode: ExclusionMode.Ignore
       anchors { top: true; bottom: true; left: true; right: true }
       color: "transparent"
@@ -859,6 +871,13 @@ ShellRoot {
       implicitWidth: 1080
       implicitHeight: panelExpanded ? 460 : 48
       color: "transparent"
+
+      MouseArea {
+        anchors.fill: parent
+        enabled: root.centerMode !== "none"
+        acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+        onClicked: root.closeCenterPill()
+      }
 
       function grabKeyboardNow() {
         if (root.centerMode === "launcher" && !launcherSearchInput.activeFocus) launcherSearchInput.forceActiveFocus()
@@ -1018,7 +1037,7 @@ ShellRoot {
         }
       }
 
-     // CENTER DYNAMIC ISLAND PILL
+      // CENTER DYNAMIC ISLAND PILL
       Rectangle {
         id: centerPill
         anchors.top: parent.top
@@ -1052,7 +1071,7 @@ ShellRoot {
             } else {
               hoverPreviewTimer.stop()
               centerPill.hoverPreviewReady = false
-              if (root.centerMode === "calendar" || root.centerMode === "system") autoCloseTimer.restart()
+              if (root.centerMode !== "none" && root.wifiPromptSsid === "") autoCloseTimer.restart()
             }
           }
         }
@@ -1080,7 +1099,7 @@ ShellRoot {
               Keys.onDownPressed: { if (root.selectedAppIndex < root.filteredApps.length - 1) root.selectedAppIndex++ }
               Keys.onUpPressed: { if (root.selectedAppIndex > 0) root.selectedAppIndex-- }
               Keys.onEscapePressed: root.closeCenterPill()
-              Keys.onReturnPressed: { if (root.filteredApps.length > 0) { let a = root.filteredApps[root.selectedAppIndex]; root.closeCenterPill(); a.execute() } }
+              Keys.onReturnPressed: { if (root.filteredApps.length > 0) root.launchApp(root.filteredApps[root.selectedAppIndex]) }
             }
           }
 
@@ -1231,7 +1250,7 @@ ShellRoot {
             MouseArea {
               id: appMouse; anchors.fill: parent; hoverEnabled: true
               onEntered: root.selectedAppIndex = index
-              onClicked: { root.closeCenterPill(); modelData.execute() }
+              onClicked: root.launchApp(modelData)
             }
           }
         }
@@ -2601,7 +2620,7 @@ ShellRoot {
           root.isMonitorDpmsOff = false; root.lockPromptActive = false; root.authError = false
           root.lockDateFormatted = Qt.formatDateTime(new Date(), "dddd, MMMM d").toUpperCase()
           pwLockInput.text = ""
-          pwLockInput.forceActiveFocus()
+          if (!pwLockInput.activeFocus) pwLockInput.forceActiveFocus()
         }
       }
 
@@ -2624,7 +2643,7 @@ ShellRoot {
         anchors.fill: parent
         onClicked: {
           root.lockPromptActive = true
-          pwLockInput.forceActiveFocus()
+          if (!pwLockInput.activeFocus) pwLockInput.forceActiveFocus()
         }
       }
 
@@ -2720,7 +2739,7 @@ ShellRoot {
                 else root.lockPromptActive = !root.lockPromptActive
               }
               snapAnim.restart()
-              pwLockInput.forceActiveFocus()
+              if (!pwLockInput.activeFocus) pwLockInput.forceActiveFocus()
             }
             onWheel: wheel => {
               if (root.usersList.length > 1) root.cycleUser(wheel.angleDelta.y > 0 ? -1 : 1)
