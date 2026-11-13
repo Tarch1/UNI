@@ -507,8 +507,8 @@ UserSetup () {
 			if [[ "$DEsel" == "Niri" && -f "/mnt/home/$UNsel/.config/wallust/templates/colors-niri.conf" ]]; then
 				printf '\n[templates.niri]\ntemplate = "colors-niri.conf"\ntarget = "~/.config/niri/config.kdl"\n' >> /mnt/home/"$UNsel"/.config/wallust/wallust.toml
 			fi
-			local qs_env="DRI_PRIME=0 __NV_PRIME_RENDER_OFFLOAD=0 __GLX_VENDOR_LIBRARY_NAME=mesa __EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/50_mesa.json VK_LOADER_DRIVERS_DISABLE=*nvidia* VDPAU_DRIVER=null LIBVA_DRIVER_NAME=$va_drv QT_FFMPEG_DECODING_HW_DEVICE_TYPES=vaapi QSG_RHI_BACKEND=opengl QT_LOGGING_RULES=\"qt.qpa.wayland.textinput=false\""
-			if [[ "$VBTsel" -eq 1 ]]; then qs_env="QSG_RHI_BACKEND=opengl QSG_RENDER_LOOP=basic QT_LOGGING_RULES=\"qt.qpa.wayland.textinput=false\"" ; fi
+			local qs_env="DRI_PRIME=0 __NV_PRIME_RENDER_OFFLOAD=0 __GLX_VENDOR_LIBRARY_NAME=mesa __EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/50_mesa.json VK_LOADER_DRIVERS_DISABLE=*nvidia* VDPAU_DRIVER=null LIBVA_DRIVER_NAME=$va_drv QT_FFMPEG_DECODING_HW_DEVICE_TYPES=vaapi QSG_RHI_BACKEND=opengl QT_LOGGING_RULES=qt.qpa.wayland.textinput=false"
+			if [[ "$VBTsel" -eq 1 ]]; then qs_env="QSG_RHI_BACKEND=opengl QSG_RENDER_LOOP=basic QT_LOGGING_RULES=qt.qpa.wayland.textinput=false" ; fi
 			local qs_run="bash -c 'while :; do env $qs_env quickshell; [[ -f /tmp/qs_lock_active_\$UID ]] || break; sleep 1; done'"
 			local qs_niri="\"bash\" \"-c\" \"while :; do env $qs_env quickshell; [[ -f /tmp/qs_lock_active_\$UID ]] || break; sleep 1; done\""
 			sed -i -e "s|lock_cmd = .*|lock_cmd = quickshell ipc call lock lock|" \
