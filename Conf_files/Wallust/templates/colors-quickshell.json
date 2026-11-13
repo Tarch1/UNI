@@ -1,7 +1,8 @@
 {
 	"wallpaper": "{{wallpaper}}",
 	"wallMode": "static",
-	"uiEffects": true,
+	"uiBlur": true,
+	"uiAnimations": true,
 	"firstRunDone": false,
 	"background": "{{background}}",
 	"foreground": "{{foreground}}",
