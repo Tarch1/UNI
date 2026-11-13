@@ -303,6 +303,7 @@ apply_theme() {
 	local wall_img="$wall"
 	if [[ "${wall,,}" =~ \.(webm|mp4)$ ]]; then
 		wall_img="$FRAME_CACHE"
+		[[ -f "$FRAME_CACHE" ]] && cp -f "$FRAME_CACHE" "/tmp/wall_frame_prev.jpg" 2>/dev/null || true
 		ffmpeg -y -loglevel quiet -i "$wall" -frames:v 1 -vf "scale=320:-1" -q:v 4 "$wall_img" 2>/dev/null
 	fi
 
