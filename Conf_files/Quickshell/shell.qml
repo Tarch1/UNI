@@ -1130,7 +1130,7 @@ ShellRoot {
           id: wallVideoOut; anchors.fill: parent; visible: root.animWallpapers && root.isVideoFile && !root.wallTransitionActive; fillMode: VideoOutput.PreserveAspectCrop
         }
 
-        // TEMPORARY WALLPAPER TRANSITION LOADER
+        // TEMPORARY WALLPAPER TRANSITION LOADER (Unloaded -> 0 RAM/VRAM when idle)
         Loader {
           anchors.fill: parent
           active: root.wallTransitionActive && root.prevWallSource !== ""
@@ -1195,21 +1195,7 @@ ShellRoot {
               cellInSil = inS; cellEdge = edg; cellThresh = thr; mapReady = true
             }
 
-            Canvas {
-              id: oldMaskCanvas; width: transRoot.gw; height: transRoot.gh
-              visible: false; layer.enabled: root.cfgWallpaperTransition === "swarm"; layer.smooth: true
-              onPaint: {
-                var ctx = getContext("2d"); ctx.reset()
-                ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, width, height)
-                if (!transRoot.mapReady) return
-                var p = transRoot.prog, thr = transRoot.cellThresh
-                for (var y = 0; y < height; y++) {
-                  for (var x = 0; x < width; x++) {
-                    if (p >= thr[y * width + x]) ctx.clearRect(x, y, 1.25, 1.25)
-                  }
-                }
-              }
-            }
+            Canvas { id: probeCanvas; width: transRoot.gw; height: transRoot.gh; visible: false }
 
             // Old wallpaper kept underneath and masked out as swarm patches grow
             Image {
@@ -1221,17 +1207,15 @@ ShellRoot {
 
             Canvas {
               id: oldMaskCanvas; width: transRoot.gw; height: transRoot.gh
-              visible: false; layer.enabled: root.cfgWallpaperTransition === "swarm"
+              visible: false; layer.enabled: root.cfgWallpaperTransition === "swarm"; layer.smooth: true
               onPaint: {
                 var ctx = getContext("2d"); ctx.reset()
                 ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, width, height)
                 if (!transRoot.mapReady) return
                 var p = transRoot.prog, thr = transRoot.cellThresh
-                ctx.fillStyle = "#000000"
                 for (var y = 0; y < height; y++) {
                   for (var x = 0; x < width; x++) {
-                    var i = y * width + x
-                    if (p >= thr[i]) ctx.fillRect(x, y, 1.25, 1.25)
+                    if (p >= thr[y * width + x]) ctx.clearRect(x, y, 1.25, 1.25)
                   }
                 }
               }
