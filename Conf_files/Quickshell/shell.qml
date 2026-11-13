@@ -598,7 +598,7 @@ ShellRoot {
         let d = JSON.parse(text())
         if (d.wallpaper && d.wallpaper !== root.wallpaperPath) {
           if (root.wallpaperPath !== "" && root.animActive && root.cfgWallpaperTransition !== "none") {
-            root.prevWallSource = root.staticWallSource
+            root.prevWallSource = root.isVideoFile ? ("file:///tmp/wall_frame_prev.jpg?" + root.wallpaperPath) : root.staticWallSource
             root.wallTransitionActive = true
           }
           root.wallpaperPath = d.wallpaper
