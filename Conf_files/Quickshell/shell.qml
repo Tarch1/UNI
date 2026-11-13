@@ -26,8 +26,9 @@ ShellRoot {
   property string cfgSubmenuAnimStyle: "fade"
   property int cfgSubmenuAnimMs: 100
   property int cfgSubmenuSlidePx: 14
-  property string cfgWallpaperTransition: "crossfade"
-  property int cfgWallpaperTransitionMs: 260
+  // Wallpaper transition: "swarm" (Silhouette + Swarm patches) | "crossfade" | "zoom" | "none"
+  property string cfgWallpaperTransition: "swarm"
+  property int cfgWallpaperTransitionMs: 750
   property real cfgGlassOpacity: 0.76
   property real cfgSolidOpacity: 0.96
   property bool cfgLockKeepAnimated: true
@@ -61,7 +62,7 @@ ShellRoot {
     Layout.fillWidth: true
     implicitHeight: extra !== "" ? 64 : 52
     radius: 14
-    color: (interactive && tMouse.containsMouse) ? Qt.lighter(root.color0, 1.12) : root.color0
+    color: (interactive && tMouse.containsMouse) ? root.cardHoverCol : root.color0
 
     MouseArea {
       id: tMouse; anchors.fill: parent; enabled: tileRoot.interactive; hoverEnabled: tileRoot.interactive
@@ -71,7 +72,7 @@ ShellRoot {
     Rectangle {
       id: tSq; width: 34; height: 34; radius: 10
       anchors.left: parent.left; anchors.leftMargin: 8; anchors.verticalCenter: parent.verticalCenter
-      color: tileRoot.active ? tileRoot.accentCol : Qt.rgba(1, 1, 1, 0.08)
+      color: tileRoot.active ? tileRoot.accentCol : root.subtleFill
       QsText { anchors.centerIn: parent; text: tileRoot.icon; color: tileRoot.iconFg; font.pixelSize: 15; font.bold: true }
       MouseArea {
         anchors.fill: parent; enabled: tileRoot.interactive
@@ -102,8 +103,8 @@ ShellRoot {
     signal barPressed(int button, real ratio)
     signal barMoved(real ratio)
 
-    Layout.fillWidth: true; implicitHeight: 48; radius: 14
-    color: (interactive && bCardMouse.containsMouse && root.sysSubmenu === "") ? Qt.lighter(root.color0, 1.12) : root.color0
+    Layout.fillWidth: true; implicitHeight: 46; radius: 14
+    color: (interactive && bCardMouse.containsMouse && root.sysSubmenu === "") ? root.cardHoverCol : root.color0
 
     MouseArea {
       id: bCardMouse; anchors.fill: parent; enabled: barRoot.interactive; hoverEnabled: barRoot.interactive
@@ -123,7 +124,7 @@ ShellRoot {
     }
     Rectangle {
       anchors.left: bSq.right; anchors.leftMargin: 7; anchors.right: parent.right; anchors.rightMargin: 7
-      anchors.verticalCenter: parent.verticalCenter; height: 30; radius: 9; clip: true; color: Qt.rgba(1, 1, 1, 0.08)
+      anchors.verticalCenter: parent.verticalCenter; height: 30; radius: 9; clip: true; color: root.subtleFill
       Rectangle { width: parent.width * Math.max(0, Math.min(1, barRoot.pct / 100.0)); height: parent.height; radius: 9; color: root.withAlpha(barRoot.accentCol, 0.78) }
       QsText {
         anchors.left: parent.left; anchors.leftMargin: 10; anchors.right: bRightTxt.left; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter
@@ -142,6 +143,109 @@ ShellRoot {
     }
   }
 
+  // UNIVERSAL METRIC GRAPH CARD (Used for Battery, CPU, Temperature & RAM)
+  component QsMetricCard: Rectangle {
+    id: mcRoot
+    property string icon: ""
+    property string title: ""
+    property string sub: ""
+    property string valueText: ""
+    property string timeLabel: "last 60 s"
+    property string unitSuffix: "%"
+    property real minBound: 0
+    property real maxBound: 100
+    property bool autoScale: true
+    property var history: []
+    property color accentCol: root.color4
+
+    property real effMax: {
+      if (!autoScale) return maxBound
+      let mx = minBound + 10
+      for (let i = 0; i < history.length; i++) if (history[i] > mx) mx = history[i]
+      if (mx <= 22) return 25
+      if (mx <= 48) return 50
+      if (mx <= 72) return 75
+      return maxBound
+    }
+
+    Layout.fillWidth: true; implicitHeight: 102; radius: 14; color: root.color0
+    onHistoryChanged: { if (visible) graphCanvas.requestPaint() }
+    onVisibleChanged: { if (visible) graphCanvas.requestPaint() }
+
+    ColumnLayout {
+      anchors.fill: parent; anchors.margins: 8; spacing: 4
+      RowLayout {
+        Layout.fillWidth: true; spacing: 8
+        Rectangle {
+          implicitWidth: 32; implicitHeight: 32; radius: 9; color: root.withAlpha(mcRoot.accentCol, 0.2)
+          QsText { anchors.centerIn: parent; text: mcRoot.icon; color: mcRoot.accentCol; font.pixelSize: 15; font.bold: true }
+        }
+        ColumnLayout {
+          Layout.fillWidth: true; spacing: 1
+          QsText { text: mcRoot.title; font.bold: true; Layout.fillWidth: true; elide: Text.ElideRight }
+          QsText { text: mcRoot.sub; color: root.color8; font.pixelSize: 10; Layout.fillWidth: true; elide: Text.ElideRight }
+        }
+        QsText { text: mcRoot.valueText; color: mcRoot.accentCol; font.pixelSize: 15; font.bold: true }
+      }
+
+      Item {
+        Layout.fillWidth: true; Layout.fillHeight: true
+        Canvas {
+          id: graphCanvas; anchors.fill: parent
+          onPaint: {
+            var ctx = getContext("2d"); ctx.reset()
+            var w = width, h = height, padL = 30, padR = 6, padT = 5, padB = 4
+            var gw = w - padL - padR, gh = h - padT - padB
+            if (gw <= 4 || gh <= 4) return
+
+            ctx.strokeStyle = root.subtleFillHover.toString()
+            ctx.lineWidth = 1; ctx.setLineDash([3, 3])
+            ctx.beginPath()
+            ctx.moveTo(padL, padT); ctx.lineTo(w - padR, padT)
+            ctx.moveTo(padL, padT + gh * 0.5); ctx.lineTo(w - padR, padT + gh * 0.5)
+            ctx.moveTo(padL, padT + gh); ctx.lineTo(w - padR, padT + gh)
+            ctx.stroke(); ctx.setLineDash([])
+
+            var pts = mcRoot.history
+            if (!pts || pts.length === 0) return
+            var lo = mcRoot.minBound, hi = Math.max(lo + 1, mcRoot.effMax), n = pts.length
+            var coords = []
+            for (var i = 0; i < n; i++) {
+              var x = padL + (n > 1 ? (i / (n - 1)) * gw : gw)
+              var norm = Math.max(0, Math.min(1, (pts[i] - lo) / (hi - lo)))
+              coords.push({ x: x, y: padT + gh * (1.0 - norm) })
+            }
+            if (coords.length === 1) coords.unshift({ x: padL, y: coords[0].y })
+
+            ctx.beginPath()
+            ctx.moveTo(coords[0].x, coords[0].y)
+            for (var j = 0; j < coords.length - 1; j++) {
+              var xc = (coords[j].x + coords[j + 1].x) * 0.5
+              var yc = (coords[j].y + coords[j + 1].y) * 0.5
+              ctx.quadraticCurveTo(coords[j].x, coords[j].y, xc, yc)
+            }
+            var last = coords[coords.length - 1]
+            ctx.lineTo(last.x, last.y)
+
+            ctx.lineWidth = 2.0; ctx.strokeStyle = mcRoot.accentCol.toString(); ctx.stroke()
+
+            ctx.lineTo(last.x, padT + gh); ctx.lineTo(coords[0].x, padT + gh); ctx.closePath()
+            var grad = ctx.createLinearGradient(0, padT, 0, padT + gh)
+            grad.addColorStop(0, root.withAlpha(mcRoot.accentCol, 0.30).toString())
+            grad.addColorStop(1, root.withAlpha(mcRoot.accentCol, 0.01).toString())
+            ctx.fillStyle = grad; ctx.fill()
+
+            ctx.beginPath(); ctx.arc(last.x, last.y, 3.2, 0, Math.PI * 2)
+            ctx.fillStyle = mcRoot.accentCol.toString(); ctx.fill()
+          }
+        }
+        QsText { anchors.left: parent.left; anchors.top: parent.top; text: Math.round(mcRoot.effMax) + mcRoot.unitSuffix; color: root.color8; font.pixelSize: 9 }
+        QsText { anchors.left: parent.left; anchors.bottom: parent.bottom; text: Math.round(mcRoot.minBound) + mcRoot.unitSuffix; color: root.color8; font.pixelSize: 9 }
+        QsText { anchors.right: parent.right; anchors.rightMargin: 6; anchors.top: parent.top; text: mcRoot.timeLabel; color: root.color8; font.pixelSize: 9 }
+      }
+    }
+  }
+
   property string homeDir: Quickshell.env("HOME")
   property bool isVM: Quickshell.env("QSG_RENDER_LOOP") === "basic"
   property bool isHyprland: Quickshell.env("XDG_CURRENT_DESKTOP") === "Hyprland"
@@ -154,6 +258,8 @@ ShellRoot {
   property real panelAlpha: blurActive ? cfgGlassOpacity : cfgSolidOpacity
 
   property string wallpaperPath: ""
+  property string prevWallSource: ""
+  property bool wallTransitionActive: false
   property bool animWallpapers: false
   property bool firstRunDone: false
   property bool isVideoFile: wallpaperPath.toLowerCase().endsWith(".webm") || wallpaperPath.toLowerCase().endsWith(".mp4")
@@ -163,6 +269,7 @@ ShellRoot {
   property bool isMonitorDpmsOff: false
   property bool shouldPlayAnimation: {
     if (!animWallpapers || (!isVideoFile && !isAnimatedGif)) return false
+    if (wallTransitionActive) return false
     if (cfgPauseOnScreenOff && isMonitorDpmsOff) return false
     if (screenLocked) return cfgLockKeepAnimated
     if (cfgPauseOnFullscreen && hasActiveFullWindow) return false
@@ -184,6 +291,10 @@ ShellRoot {
   property color color5: "#cba6f7"
   property color color6: "#94e2d5"
   property color color8: "#585b70"
+  property bool isLightTheme: (0.299 * bg.r + 0.587 * bg.g + 0.114 * bg.b) > 0.5
+  property color subtleFill: isLightTheme ? Qt.rgba(0, 0, 0, 0.07) : Qt.rgba(1, 1, 1, 0.08)
+  property color subtleFillHover: isLightTheme ? Qt.rgba(0, 0, 0, 0.13) : Qt.rgba(1, 1, 1, 0.14)
+  property color cardHoverCol: isLightTheme ? Qt.darker(color0, 1.06) : Qt.lighter(color0, 1.12)
 
   property bool barVisible: true
   property string centerMode: "none"
@@ -265,16 +376,26 @@ ShellRoot {
   property string batPowerDraw: "0.0 W"
   property string batCycles: "0"
   property string batTech: "Li-ion"
+  property var batHistory: []
+
   property bool isRecording: false
   property int recSeconds: 0
   property bool recSysAudio: true
   property bool recMicAudio: false
   property bool recAreaSelect: false
+
   property string cpuModel: "Processor"
+  property string cpuThreads: "4 threads"
+  property string cpuLoad: "0.20"
   property int cpuUsage: 0
   property int cpuTemp: 40
   property string ramInfo: "0 / 0 GiB"
+  property string ramSlotsInfo: "System RAM"
   property int ramPct: 0
+  property var cpuHistory: []
+  property var tempHistory: []
+  property var ramHistory: []
+
   property string diskRootInfo: "0 / 0 GiB"
   property int diskRootPct: 0
   property string diskSecInfo: "Not mounted"
@@ -299,6 +420,11 @@ ShellRoot {
   function withAlpha(c, a) { return Qt.rgba(c.r, c.g, c.b, a) }
   function runCmd(cmd) { Quickshell.execDetached(["bash", "-c", cmd]) }
   function shQuote(s) { return "'" + String(s || "").replace(/'/g, "'\\''") + "'" }
+  function pushHist(arr, val) {
+    let a = arr ? arr.slice() : []
+    a.push(val); if (a.length > 30) a.shift()
+    return a
+  }
   function saveJsonBool(key, val, extraCmd) {
     let vStr = val ? "true" : "false"
     runCmd((extraCmd || "") + "sed -i 's/\"" + key + "\": *[a-z]*/\"" + key + "\": " + vStr + "/' \"" + root.homeDir + "/.config/quickshell/colors.json\" \"" + root.homeDir + "/.config/wallust/templates/colors-quickshell.json\" 2>/dev/null || true")
@@ -321,7 +447,7 @@ ShellRoot {
     var ctx = canvas.getContext("2d"); ctx.reset()
     var cx = canvas.width / 2, cy = canvas.height / 2, r = (canvas.width / 2) - 3
     ctx.lineWidth = 2.6; ctx.lineCap = "round"
-    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2, false); ctx.strokeStyle = Qt.rgba(1, 1, 1, 0.14); ctx.stroke()
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2, false); ctx.strokeStyle = root.subtleFillHover.toString(); ctx.stroke()
     if (pct > 0.005) {
       var s = -Math.PI / 2, e = s + (Math.PI * 2 * Math.min(1, pct))
       ctx.beginPath(); ctx.arc(cx, cy, r, s, e, false); ctx.strokeStyle = strokeCol.toString(); ctx.stroke()
@@ -458,6 +584,7 @@ ShellRoot {
     updateCalendar()
     initPoll.running = true
     fastPoll.running = true
+    statPoll.running = true
     checkFirstRunNiri()
   }
 
@@ -469,7 +596,13 @@ ShellRoot {
     onLoaded: {
       try {
         let d = JSON.parse(text())
-        if (d.wallpaper) root.wallpaperPath = d.wallpaper
+        if (d.wallpaper && d.wallpaper !== root.wallpaperPath) {
+          if (root.wallpaperPath !== "" && root.animActive && root.cfgWallpaperTransition !== "none") {
+            root.prevWallSource = root.staticWallSource
+            root.wallTransitionActive = true
+          }
+          root.wallpaperPath = d.wallpaper
+        }
         if (d.wallMode) root.animWallpapers = (d.wallMode === "animated")
         if (d.uiBlur !== undefined && !root.isVM) root.cfgEnableBlur = Boolean(d.uiBlur)
         if (d.uiAnimations !== undefined) root.cfgEnableAnimations = Boolean(d.uiAnimations)
@@ -510,10 +643,27 @@ ShellRoot {
     onTriggered: {
       if (root.centerMode === "overview") overviewPoll.running = true
       else if (root.centerMode === "system") {
-        if (root.sysSubmenu === "" || root.sysSubmenu === "cpu" || root.sysSubmenu === "battery") sysPoll.running = true
+        if (root.sysSubmenu === "" || root.sysSubmenu === "cpu") { sysPoll.running = true; statPoll.running = true }
+        else if (root.sysSubmenu === "battery") { if (root.batHistory.length === 0) batPoll.running = true }
         else if (root.sysSubmenu === "net" || root.sysSubmenu === "bt" || root.sysSubmenu === "sound" || root.sysSubmenu === "mic" || root.sysSubmenu === "display") subPoll.running = true
       }
     }
+  }
+
+  // Dedicated 1.5s Resource Monitor Timer (Active ONLY while System Info submenu is open)
+  Timer {
+    interval: 1500
+    running: root.centerMode === "system" && root.sysSubmenu === "cpu" && !root.screenLocked && !root.isMonitorDpmsOff
+    repeat: true
+    onTriggered: statPoll.running = true
+  }
+
+  // Dedicated 60s Battery Poll Timer (Max 1 call/minute for battery curve & hardware stats)
+  Timer {
+    interval: 60000
+    running: !root.isMonitorDpmsOff
+    repeat: true; triggeredOnStart: true
+    onTriggered: batPoll.running = true
   }
 
   NotificationServer {
@@ -533,7 +683,7 @@ ShellRoot {
   IpcHandler { target: "theme"; function reload(): void { colorFile.reload() } }
   IpcHandler { target: "bar"; function toggle(): void { root.barVisible = !root.barVisible } }
 
-  // ZERO-POLLING EVENT STREAM (Wakes only on Niri/Hyprland Workspace/Window events or Backlight udev changes)
+  // ZERO-POLLING EVENT STREAM
   Process {
     id: wmStream
     running: !root.screenLocked
@@ -553,7 +703,14 @@ ShellRoot {
     id: initPoll
     command: ["bash", "-c", "
       u=$(awk -F: '$3>=1000 && $3<60000 && $1!=\"nobody\" && $1!=\"greeter\"{printf \"%s,\", tolower($1)}' /etc/passwd)
-      printf '%s|%s|%s\n' \"$(awk -F': ' '/model name/{print $2; exit}' /proc/cpuinfo)\" \"$(uname -r)\" \"${u%,}\"
+      ram_sl=$(udevadm info -e 2>/dev/null | awk -F= '
+        /MEMORY_ARRAY_NUM_DEVICES=/{tot=$2}
+        /MEMORY_DEVICE_[0-9]+_SIZE=/{used++; sz=int($2/1073741824); if(sz>0) s=(s?s\"+\":\"\") sz\"G\"}
+        /MEMORY_DEVICE_[0-9]+_TYPE=/ && tp==\"\" && $2!=\"Unknown\"{tp=$2}
+        END { if(used>0) printf \"%d/%d slots (%s%s)\", used, (tot>used?tot:used), s, (tp?\" \"tp:\"\") }
+      ')
+      [[ -z \"$ram_sl\" ]] && ram_sl=\"1/1 slot (Unified / VM)\"
+      printf '%s|%s|%s|%s threads|%s\n' \"$(awk -F': ' '/model name/{print $2; exit}' /proc/cpuinfo)\" \"$(uname -r)\" \"${u%,}\" \"$(nproc 2>/dev/null || echo 4)\" \"$ram_sl\"
     "]
     stdout: SplitParser {
       onRead: data => {
@@ -567,7 +724,60 @@ ShellRoot {
             root.selectedUserIdx = idx >= 0 ? idx : 0
           }
         }
+        if (p.length >= 4) root.cpuThreads = p[3]
+        if (p.length >= 5) root.ramSlotsInfo = p[4]
         root.audioReady = true
+      }
+    }
+  }
+
+  // Ultra-fast (<0.2ms) pure /proc & /sys reader for CPU, Load, Temp and RAM graphs
+  Process {
+    id: statPoll
+    command: ["bash", "-c", "
+      t=40000; [[ -f /sys/class/thermal/thermal_zone0/temp ]] && t=$(</sys/class/thermal/thermal_zone0/temp)
+      cpu_u=$(awk -v f=\"/tmp/qs_cpu_$UID\" '/^cpu /{u=$2+$3+$4+$6+$7+$8; tot=u+$5+$9; if((getline < f)>0){du=u-$1; dt=tot-$2} else {du=u; dt=tot}; close(f); print u, tot > f; close(f); print (dt>0 ? int(du*100/dt) : 0); exit}' /proc/stat)
+      read -r ld _ < /proc/loadavg
+      ram_s=$(awk '/^MemTotal:/{mt=$2} /^MemAvailable:/{ma=$2} END{u=(mt-ma)/1048576; t=mt/1048576; printf \"%.1f / %.1f GiB|%d\", u, t, (mt>0 ? int((mt-ma)*100/mt) : 0)}' /proc/meminfo)
+      printf '%d|%d|%s|%s\n' \"${cpu_u:-0}\" \"$((t/1000))\" \"$ld\" \"$ram_s\"
+    "]
+    stdout: SplitParser {
+      onRead: data => {
+        let p = data.trim().split("|")
+        if (p.length >= 5) {
+          let cu = parseInt(p[0]) || 0, ct = parseInt(p[1]) || 40, rp = parseInt(p[4]) || 0
+          root.cpuUsage = cu; root.cpuTemp = ct; root.cpuLoad = p[2]; root.ramInfo = p[3]; root.ramPct = rp
+          root.cpuHistory = root.pushHist(root.cpuHistory, cu)
+          root.tempHistory = root.pushHist(root.tempHistory, ct)
+          root.ramHistory = root.pushHist(root.ramHistory, rp)
+        }
+      }
+    }
+  }
+
+  // 60s Battery Hardware Stats & History Reader
+  Process {
+    id: batPoll
+    command: ["bash", "-c", "
+      bat_d=\"\"; for bd in /sys/class/power_supply/BAT*; do [[ -d \"$bd\" ]] && { bat_d=\"$bd\"; break; }; done
+      if [[ -n \"$bat_d\" ]]; then
+        ef=100; [[ -f \"$bat_d/energy_full\" ]] && ef=$(<\"$bat_d/energy_full\") || { [[ -f \"$bat_d/charge_full\" ]] && ef=$(<\"$bat_d/charge_full\"); }
+        efd=100; [[ -f \"$bat_d/energy_full_design\" ]] && efd=$(<\"$bat_d/energy_full_design\") || { [[ -f \"$bat_d/charge_full_design\" ]] && efd=$(<\"$bat_d/charge_full_design\"); }
+        b_h=\"$(( ef * 100 / (efd > 0 ? efd : 100) ))%\"
+        pw=0; [[ -f \"$bat_d/power_now\" ]] && pw=$(<\"$bat_d/power_now\")
+        b_p=$(awk -v p=\"$pw\" 'BEGIN{printf \"%.1f W\", p/1000000}')
+        b_c=0; [[ -f \"$bat_d/cycle_count\" ]] && b_c=$(<\"$bat_d/cycle_count\")
+        b_t=\"Li-ion\"; [[ -f \"$bat_d/technology\" ]] && b_t=$(<\"$bat_d/technology\")
+      else b_h=\"AC Power\"; b_p=\"0.0 W\"; b_c=\"N/A\"; b_t=\"Virtual / AC\"; fi
+      printf '%s|%s|%s|%s\n' \"$b_h\" \"$b_p\" \"$b_c\" \"$b_t\"
+    "]
+    stdout: SplitParser {
+      onRead: data => {
+        let p = data.trim().split("|")
+        if (p.length >= 4) {
+          root.batHealth = p[0]; root.batPowerDraw = p[1]; root.batCycles = p[2]; root.batTech = p[3]
+          root.batHistory = root.pushHist(root.batHistory, root.batPct)
+        }
       }
     }
   }
@@ -653,7 +863,6 @@ ShellRoot {
   Process {
     id: sysPoll
     command: ["bash", "-c", "
-      t=40000; [[ -f /sys/class/thermal/thermal_zone0/temp ]] && t=$(</sys/class/thermal/thermal_zone0/temp)
       eth_line=$(nmcli -t -f DEVICE,TYPE,STATE,CONNECTION dev 2>/dev/null | awk -F: '$2==\"ethernet\"{print $0; exit}')
       IFS=':' read -r e_dev _ e_st e_con <<< \"$eth_line\"
       e_on=0; e_ip=\"Disconnected\"
@@ -674,34 +883,21 @@ ShellRoot {
       hp=0; hmic=0
       [[ \"$(wpctl inspect @DEFAULT_AUDIO_SINK@ 2>/dev/null | tr '[:upper:]' '[:lower:]')\" =~ (headphone|headset|bluez|earphone|buds) ]] && hp=1
       [[ \"$(wpctl inspect @DEFAULT_AUDIO_SOURCE@ 2>/dev/null | tr '[:upper:]' '[:lower:]')\" =~ (headset|bluez|buds|headphone) ]] && hmic=1
-      cpu_u=$(awk -v f=\"/tmp/qs_cpu_$UID\" '/^cpu /{u=$2+$3+$4+$6+$7+$8; tot=u+$5+$9; if((getline < f)>0){du=u-$1; dt=tot-$2} else {du=u; dt=tot}; close(f); print u, tot > f; close(f); print (dt>0 ? int(du*100/dt) : 0); exit}' /proc/stat)
-      ram_s=$(free -m | awk '/^Mem:/{printf \"%.1f / %.1f GiB|%d\", $3/1024, $2/1024, ($3*100)/$2}')
       d_root=$(df -h / | awk 'NR==2{gsub(/%/,\"\",$5); printf \"%s / %s|%d\", $3, $2, $5}')
       d_sec=$(df -h | awk '$6 ~ /^\\/media\\//{printf \"%s: %s / %s (%s)\", $6, $3, $2, $5; exit}')
-      bat_d=\"\"; for bd in /sys/class/power_supply/BAT*; do [[ -d \"$bd\" ]] && { bat_d=\"$bd\"; break; }; done
-      if [[ -n \"$bat_d\" ]]; then
-        ef=100; [[ -f \"$bat_d/energy_full\" ]] && ef=$(<\"$bat_d/energy_full\") || { [[ -f \"$bat_d/charge_full\" ]] && ef=$(<\"$bat_d/charge_full\"); }
-        efd=100; [[ -f \"$bat_d/energy_full_design\" ]] && efd=$(<\"$bat_d/energy_full_design\") || { [[ -f \"$bat_d/charge_full_design\" ]] && efd=$(<\"$bat_d/charge_full_design\"); }
-        b_h=\"$(( ef * 100 / (efd > 0 ? efd : 100) ))%\"
-        pw=0; [[ -f \"$bat_d/power_now\" ]] && pw=$(<\"$bat_d/power_now\")
-        b_p=$(awk -v p=\"$pw\" 'BEGIN{printf \"%.1f W\", p/1000000}')
-        b_c=0; [[ -f \"$bat_d/cycle_count\" ]] && b_c=$(<\"$bat_d/cycle_count\")
-        b_t=\"Li-ion\"; [[ -f \"$bat_d/technology\" ]] && b_t=$(<\"$bat_d/technology\")
-      else b_h=\"AC Power\"; b_p=\"0.0 W\"; b_c=\"N/A\"; b_t=\"Virtual / AC\"; fi
       dpms_off=0; for df in /sys/class/drm/*/dpms; do [[ -f \"$df\" && \"$(<\"$df\")\" == \"Off\" ]] && { dpms_off=1; break; }; done
-      printf '%d|%s|%d|%s|%d|%s|%s|%d|%d|%s|%d|%d|%d|%s|%s|%s|%s|%s|%s|%s|%s|%d\n' \"$((t/1000))\" \"${e_dev:-}\" \"$e_on\" \"$e_ip\" \"$w_hw\" \"${w_rad:-disabled}\" \"$net\" \"$bt_hw\" \"$bt_en\" \"$bt_name\" \"$hp\" \"$hmic\" \"${cpu_u:-0}\" \"$ram_s\" \"$d_root\" \"${d_sec:-No secondary drive}\" \"$(uptime -p 2>/dev/null | sed 's/^up //')\" \"$b_h\" \"$b_p\" \"$b_c\" \"$b_t\" \"$dpms_off\"
+      printf '%s|%d|%s|%d|%s|%s|%d|%d|%s|%d|%d|%s|%s|%s|%d\n' \"${e_dev:-}\" \"$e_on\" \"$e_ip\" \"$w_hw\" \"${w_rad:-disabled}\" \"$net\" \"$bt_hw\" \"$bt_en\" \"$bt_name\" \"$hp\" \"$hmic\" \"$d_root\" \"${d_sec:-No secondary drive}\" \"$(uptime -p 2>/dev/null | sed 's/^up //')\" \"$dpms_off\"
     "]
     stdout: SplitParser {
       onRead: data => {
         let p = data.trim().split("|")
-        if (p.length >= 24) {
-          root.cpuTemp = parseInt(p[0]) || 40; root.ethIface = p[1]; root.ethConnected = (p[2] === "1"); root.ethIp = p[3]
-          root.hasWifiHw = (p[4] === "1"); root.wifiEnabled = (p[5] === "enabled") && root.hasWifiHw; root.netName = p[6]
-          root.hasBtAdapter = (p[7] === "1"); root.btEnabled = (p[8] === "1"); root.btName = p[9]
-          root.isHeadphones = (p[10] === "1"); root.isHeadsetMic = (p[11] === "1"); root.cpuUsage = parseInt(p[12]) || 0
-          root.ramInfo = p[13]; root.ramPct = parseInt(p[14]) || 0; root.diskRootInfo = p[15]; root.diskRootPct = parseInt(p[16]) || 0
-          root.diskSecInfo = p[17]; root.uptimeStr = p[18]; root.batHealth = p[19]; root.batPowerDraw = p[20]; root.batCycles = p[21]; root.batTech = p[22]
-          root.isMonitorDpmsOff = (p[23] === "1")
+        if (p.length >= 16) {
+          root.ethIface = p[0]; root.ethConnected = (p[1] === "1"); root.ethIp = p[2]
+          root.hasWifiHw = (p[3] === "1"); root.wifiEnabled = (p[4] === "enabled") && root.hasWifiHw; root.netName = p[5]
+          root.hasBtAdapter = (p[6] === "1"); root.btEnabled = (p[7] === "1"); root.btName = p[8]
+          root.isHeadphones = (p[9] === "1"); root.isHeadsetMic = (p[10] === "1")
+          root.diskRootInfo = p[11]; root.diskRootPct = parseInt(p[12]) || 0
+          root.diskSecInfo = p[13]; root.uptimeStr = p[14]; root.isMonitorDpmsOff = (p[15] === "1")
         }
       }
     }
@@ -852,6 +1048,7 @@ ShellRoot {
       if (root.activePlayer && !root.screenLocked && !root.isMonitorDpmsOff) {
         root.mediaProg = (root.activePlayer.length > 0) ? Math.min(1, Math.max(0, root.activePlayer.position / root.activePlayer.length)) : 0.25
       }
+      if (!highFreq && !root.isMonitorDpmsOff) statPoll.running = true
       if (root.centerMode === "system" && tick % 3 === 0) sysPoll.running = true
       if (tick % 4 === 0 && root.centerMode === "system" && root.sysSubmenu !== "") subPoll.running = true
       if (tick > 2 && tick % 10 === 0 && root.weatherShort.includes("--")) weatherProc.running = true
@@ -884,7 +1081,7 @@ ShellRoot {
     }
   }
 
-  // 1B. NATIVE DESKTOP WALLPAPER
+  // 1B. NATIVE DESKTOP WALLPAPER (With Zero-Idle-Cost Silhouette + Swarm Transition Loader)
   Variants {
     model: Quickshell.screens
     PanelWindow {
@@ -897,35 +1094,25 @@ ShellRoot {
 
       Item {
         id: wallContainer; anchors.fill: parent
-        NumberAnimation {
-          id: wallFadeAnim; target: wallContainer; property: "opacity"; from: 0.2; to: 1.0
-          duration: root.animActive && root.cfgWallpaperTransition !== "none" ? root.cfgWallpaperTransitionMs : 0; easing.type: Easing.OutQuad
-        }
-        NumberAnimation {
-          id: wallZoomAnim; target: wallContainer; property: "scale"; from: root.cfgWallpaperTransition === "zoom" ? 1.04 : 1.0; to: 1.0
-          duration: root.animActive && root.cfgWallpaperTransition === "zoom" ? root.cfgWallpaperTransitionMs : 0; easing.type: Easing.OutQuad
-        }
+
         Connections {
           target: root
-          function onWallpaperPathChanged() {
-            if (root.animActive && root.cfgWallpaperTransition !== "none") {
-              wallFadeAnim.restart()
-              if (root.cfgWallpaperTransition === "zoom") wallZoomAnim.restart()
-            }
-          }
           function onShouldPlayAnimationChanged() {
             if (!root.isVideoFile || !root.animWallpapers) { wallVideoPlayer.stop(); return }
             if (root.shouldPlayAnimation) wallVideoPlayer.play()
             else wallVideoPlayer.pause()
           }
         }
+
         Image {
-          anchors.fill: parent; visible: !root.isVideoFile && !root.isAnimatedGif
-          source: (!root.isVideoFile && !root.isAnimatedGif) ? root.staticWallSource : ""
+          id: baseStaticWall
+          anchors.fill: parent
+          visible: (!root.isVideoFile && !root.isAnimatedGif) || root.wallTransitionActive
+          source: root.staticWallSource
           fillMode: Image.PreserveAspectCrop; asynchronous: true; cache: true; smooth: true
         }
         AnimatedImage {
-          anchors.fill: parent; visible: root.isAnimatedGif
+          anchors.fill: parent; visible: root.isAnimatedGif && !root.wallTransitionActive
           source: (root.isAnimatedGif && root.wallpaperPath !== "") ? ("file://" + root.wallpaperPath) : ""
           playing: visible && root.shouldPlayAnimation
           fillMode: Image.PreserveAspectCrop; asynchronous: true; cache: false; smooth: true
@@ -940,7 +1127,146 @@ ShellRoot {
           }
         }
         VideoOutput {
-          id: wallVideoOut; anchors.fill: parent; visible: root.animWallpapers && root.isVideoFile; fillMode: VideoOutput.PreserveAspectCrop
+          id: wallVideoOut; anchors.fill: parent; visible: root.animWallpapers && root.isVideoFile && !root.wallTransitionActive; fillMode: VideoOutput.PreserveAspectCrop
+        }
+
+        // TEMPORARY WALLPAPER TRANSITION LOADER (Unloaded -> 0 RAM/VRAM when idle)
+        Loader {
+          anchors.fill: parent
+          active: root.wallTransitionActive && root.prevWallSource !== ""
+          sourceComponent: Item {
+            id: transRoot; anchors.fill: parent
+            property real prog: 0.0
+            property int gw: 96
+            property int gh: 54
+            property var cellInSil: []
+            property var cellEdge: []
+            property var cellThresh: []
+            property bool mapReady: false
+
+            function buildSilhouetteMap() {
+              if (mapReady) return
+              var inS = new Array(gw * gh), edg = new Array(gw * gh), thr = new Array(gw * gh)
+              var ok = false
+              try {
+                var ctx = probeCanvas.getContext("2d")
+                ctx.drawImage(baseStaticWall, 0, 0, gw, gh)
+                var img = ctx.getImageData(0, 0, gw, gh).data
+                var bLum = 0, bCnt = 0
+                for (var x = 0; x < gw; x++) {
+                  var iT = x * 4, iB = ((gh - 1) * gw + x) * 4
+                  bLum += (0.299 * img[iT] + 0.587 * img[iT + 1] + 0.114 * img[iT + 2]) + (0.299 * img[iB] + 0.587 * img[iB + 1] + 0.114 * img[iB + 2])
+                  bCnt += 2
+                }
+                bLum /= Math.max(1, bCnt)
+                for (var y = 0; y < gh; y++) {
+                  for (var xx = 0; xx < gw; xx++) {
+                    var idx = y * gw + xx, p = idx * 4
+                    var lum = 0.299 * img[p] + 0.587 * img[p + 1] + 0.114 * img[p + 2]
+                    var cx = (xx / gw) - 0.5, cy = (y / gh) - 0.5
+                    var centerBias = Math.max(0, 1.0 - Math.sqrt(cx * cx * 1.8 + cy * cy * 2.2))
+                    inS[idx] = (Math.abs(lum - bLum) + centerBias * 38.0) > 42.0 ? 1 : 0
+                  }
+                }
+                ok = true
+              } catch (e) {}
+
+              for (var r = 0; r < gh; r++) {
+                for (var c = 0; c < gw; c++) {
+                  var k = r * gw + c
+                  if (!ok) {
+                    var dx = (c / gw) - 0.5, dy = (r / gh) - 0.5
+                    var wobble = 0.08 * Math.sin(c * 0.28) * Math.cos(r * 0.28)
+                    inS[k] = (dx * dx + dy * dy * 1.4) < (0.14 + wobble) ? 1 : 0
+                  }
+                  var n1 = (Math.sin(c * 0.37 + r * 0.23) * Math.cos(r * 0.41 - c * 0.19) + 1.0) * 0.5
+                  var n2 = (Math.sin(c * 0.83 - r * 0.67) + 1.0) * 0.5
+                  var noise = n1 * 0.7 + n2 * 0.3
+                  var sweep = (c / gw) * 0.35 + noise * 0.65
+                  thr[k] = inS[k] ? (0.14 + noise * 0.42) : (0.50 + sweep * 0.46)
+                }
+              }
+              for (var r2 = 1; r2 < gh - 1; r2++) {
+                for (var c2 = 1; c2 < gw - 1; c2++) {
+                  var k2 = r2 * gw + c2
+                  edg[k2] = (inS[k2] && (!inS[k2 - 1] || !inS[k2 + 1] || !inS[k2 - gw] || !inS[k2 + gw])) ? 1 : 0
+                }
+              }
+              cellInSil = inS; cellEdge = edg; cellThresh = thr; mapReady = true
+            }
+
+            Canvas { id: probeCanvas; width: transRoot.gw; height: transRoot.gh; visible: false }
+
+            // Old wallpaper kept underneath and masked out as swarm patches grow
+            Image {
+              id: oldWallImg; anchors.fill: parent; source: root.prevWallSource
+              fillMode: Image.PreserveAspectCrop; asynchronous: false; cache: true
+              visible: root.cfgWallpaperTransition !== "swarm"
+              opacity: root.cfgWallpaperTransition === "swarm" ? 1.0 : (1.0 - transRoot.prog)
+            }
+
+            Canvas {
+              id: oldMaskCanvas; width: transRoot.gw; height: transRoot.gh
+              visible: false; layer.enabled: root.cfgWallpaperTransition === "swarm"
+              onPaint: {
+                var ctx = getContext("2d"); ctx.reset()
+                ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, width, height)
+                if (!transRoot.mapReady) return
+                var p = transRoot.prog, thr = transRoot.cellThresh
+                ctx.fillStyle = "#000000"
+                for (var y = 0; y < height; y++) {
+                  for (var x = 0; x < width; x++) {
+                    var i = y * width + x
+                    if (p >= thr[i]) ctx.fillRect(x, y, 1.25, 1.25)
+                  }
+                }
+              }
+            }
+
+            MultiEffect {
+              anchors.fill: parent; source: oldWallImg
+              visible: root.cfgWallpaperTransition === "swarm"
+              maskEnabled: true; maskSource: oldMaskCanvas
+            }
+
+            // Silhouette outline drawn in primary accent color (root.color4)
+            Canvas {
+              id: outlineCanvas; anchors.fill: parent
+              visible: root.cfgWallpaperTransition === "swarm"
+              opacity: transRoot.prog < 0.25 ? (transRoot.prog / 0.25) : Math.max(0, 1.0 - (transRoot.prog - 0.25) / 0.55)
+              onPaint: {
+                if (!transRoot.mapReady) return
+                var ctx = getContext("2d"); ctx.reset()
+                var cw = width / transRoot.gw, ch = height / transRoot.gh
+                var edg = transRoot.cellEdge, p = Math.min(1, transRoot.prog / 0.28)
+                var maxX = Math.floor(transRoot.gw * p)
+                ctx.fillStyle = root.color4.toString()
+                for (var y = 1; y < transRoot.gh - 1; y++) {
+                  for (var x = 1; x <= maxX && x < transRoot.gw - 1; x++) {
+                    if (edg[y * transRoot.gw + x]) ctx.fillRect(x * cw, y * ch, cw * 1.35, ch * 1.35)
+                  }
+                }
+              }
+            }
+
+            NumberAnimation {
+              id: swarmAnim; target: transRoot; property: "prog"; from: 0.0; to: 1.0
+              duration: root.cfgWallpaperTransitionMs; easing.type: Easing.InOutQuad
+              onStopped: { root.wallTransitionActive = false; root.prevWallSource = "" }
+            }
+
+            onProgChanged: {
+              if (root.cfgWallpaperTransition === "swarm") {
+                oldMaskCanvas.requestPaint()
+                outlineCanvas.requestPaint()
+              }
+            }
+
+            Component.onCompleted: {
+              buildSilhouetteMap()
+              swarmAnim.start()
+            }
+          }
         }
       }
     }
@@ -959,13 +1285,13 @@ ShellRoot {
     }
   }
 
-  // 3. CLICK-OUTSIDE BACKDROP LAYER
+  // 3. CLICK-OUTSIDE BACKDROP LAYER (Top layer so it never covers Overlay islandWin)
   Variants {
     model: Quickshell.screens
     PanelWindow {
       required property var modelData
       screen: modelData; visible: root.centerMode !== "none" && !root.screenLocked
-      WlrLayershell.layer: WlrLayer.Overlay; WlrLayershell.namespace: "qs-backdrop"
+      WlrLayershell.layer: WlrLayer.Top; WlrLayershell.namespace: "qs-backdrop"
       WlrLayershell.exclusionMode: ExclusionMode.Ignore
       anchors { top: true; bottom: true; left: true; right: true }
       color: "transparent"
@@ -991,7 +1317,7 @@ ShellRoot {
       anchors { top: true }
       margins.top: 8
       implicitWidth: 1080
-      implicitHeight: panelExpanded ? 460 : 48
+      implicitHeight: panelExpanded ? 540 : 48
       color: "transparent"
 
       MouseArea {
@@ -1075,7 +1401,7 @@ ShellRoot {
             Rectangle {
               required property var modelData
               implicitWidth: 26; implicitHeight: 26; radius: 8
-              color: modelData.active ? root.color4 : (modelData.occupied ? root.withAlpha(root.color2, 0.25) : Qt.rgba(1, 1, 1, 0.06))
+              color: modelData.active ? root.color4 : (modelData.occupied ? root.withAlpha(root.color2, 0.25) : root.subtleFill)
               border.width: modelData.occupied && !modelData.active ? 1 : 0; border.color: root.color2
               QsText { anchors.centerIn: parent; text: modelData.idx.toString(); color: modelData.active ? root.bg : (modelData.occupied ? root.color2 : root.color8); font.bold: true }
               MouseArea {
@@ -1108,7 +1434,7 @@ ShellRoot {
           ColumnLayout {
             Layout.fillWidth: true; spacing: 3
             Rectangle {
-              Layout.fillWidth: true; implicitHeight: 5; radius: 3; color: Qt.rgba(1, 1, 1, 0.15)
+              Layout.fillWidth: true; implicitHeight: 5; radius: 3; color: root.subtleFillHover
               Rectangle { width: parent.width * root.mediaProg; height: parent.height; radius: 3; color: root.color6 }
             }
             RowLayout {
@@ -1125,7 +1451,7 @@ ShellRoot {
               Rectangle {
                 required property string modelData
                 implicitWidth: modelData === "play" ? 32 : 24; implicitHeight: modelData === "play" ? 32 : 24; radius: 8
-                color: modelData === "play" ? Qt.rgba(1, 1, 1, 0.15) : "transparent"
+                color: modelData === "play" ? root.subtleFillHover : "transparent"
                 QsText {
                   anchors.centerIn: parent
                   text: modelData === "prev" ? "󰒮" : (modelData === "next" ? "󰒭" : ((root.activePlayer && root.activePlayer.playbackState === MprisPlaybackState.Playing) ? "󰏤" : "󰐊"))
@@ -1182,9 +1508,14 @@ ShellRoot {
           }
         }
 
+        // Shield MouseArea prevents clicks inside open panels from falling through to islandWin close area
         MouseArea {
-          anchors.fill: parent; visible: centerPill.isCalOpen || centerPill.isHoverPreview
-          acceptedButtons: Qt.RightButton; onClicked: root.openSystemPanel()
+          anchors.fill: parent
+          acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+          onClicked: mouse => {
+            if (mouse.button === Qt.RightButton && (centerPill.isCalOpen || centerPill.isHoverPreview))
+              root.openSystemPanel()
+          }
         }
 
         // UNIFIED FIXED 40px TOP HEADER
@@ -1212,7 +1543,7 @@ ShellRoot {
           Rectangle {
             visible: centerPill.isLauncherOpen
             anchors.bottom: parent.bottom; anchors.left: parent.left; anchors.right: parent.right
-            anchors.leftMargin: 12; anchors.rightMargin: 12; height: 1; color: Qt.rgba(1, 1, 1, 0.08)
+            anchors.leftMargin: 12; anchors.rightMargin: 12; height: 1; color: root.subtleFill
           }
 
           Item {
@@ -1243,7 +1574,7 @@ ShellRoot {
             anchors.fill: parent; anchors.leftMargin: 10; anchors.rightMargin: 10; spacing: 8
 
             Rectangle {
-              implicitWidth: 24; implicitHeight: 24; radius: 7; color: Qt.rgba(1, 1, 1, 0.08)
+              implicitWidth: 24; implicitHeight: 24; radius: 7; color: root.subtleFill
               QsText { anchors.centerIn: parent; text: "‹"; font.pixelSize: 14; font.bold: true }
               MouseArea {
                 anchors.fill: parent
@@ -1261,7 +1592,7 @@ ShellRoot {
               visible: centerPill.isSysOpen && ((root.sysSubmenu === "net" && root.ethIface !== "") || (root.sysSubmenu === "bt" && root.hasBtAdapter) || root.sysSubmenu === "sound" || root.sysSubmenu === "mic")
               implicitWidth: 36; implicitHeight: 18; radius: 9
               property bool isOn: root.sysSubmenu === "net" ? root.ethConnected : (root.sysSubmenu === "bt" ? root.btEnabled : (root.sysSubmenu === "sound" ? !root.outMuted : !root.micMuted))
-              color: isOn ? root.color4 : Qt.rgba(1, 1, 1, 0.15)
+              color: isOn ? root.color4 : root.subtleFillHover
               Rectangle { width: 12; height: 12; radius: 6; anchors.verticalCenter: parent.verticalCenter; x: parent.isOn ? 20 : 4; color: parent.isOn ? root.bg : root.fg; Behavior on x { NumberAnimation { duration: 120 } } }
               MouseArea {
                 anchors.fill: parent
@@ -1303,7 +1634,7 @@ ShellRoot {
             required property int index
             width: ListView.view.width; height: 46; radius: 10
             property bool isSel: index === root.selectedAppIndex
-            color: isSel ? Qt.rgba(1, 1, 1, 0.09) : (appMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.04) : "transparent")
+            color: isSel ? root.subtleFillHover : (appMouse.containsMouse ? root.subtleFill : "transparent")
 
             Rectangle {
               visible: parent.isSel; width: 3.5; height: 22; radius: 2
@@ -1312,7 +1643,7 @@ ShellRoot {
             RowLayout {
               anchors.fill: parent; anchors.leftMargin: 13; anchors.rightMargin: 10; spacing: 10
               Rectangle {
-                implicitWidth: 32; implicitHeight: 32; radius: 8; color: Qt.rgba(1, 1, 1, 0.06)
+                implicitWidth: 32; implicitHeight: 32; radius: 8; color: root.subtleFill
                 IconImage { anchors.centerIn: parent; implicitSize: 22; source: Quickshell.iconPath(modelData.icon, true) }
               }
               ColumnLayout {
@@ -1346,7 +1677,7 @@ ShellRoot {
               RowLayout {
                 Layout.fillWidth: true
                 Rectangle {
-                  visible: centerPill.isCalOpen; implicitWidth: 24; implicitHeight: 24; radius: 7; color: Qt.rgba(1, 1, 1, 0.08)
+                  visible: centerPill.isCalOpen; implicitWidth: 24; implicitHeight: 24; radius: 7; color: root.subtleFill
                   QsText { anchors.centerIn: parent; text: "‹"; font.pixelSize: 14; font.bold: true }
                   MouseArea {
                     anchors.fill: parent; acceptedButtons: Qt.LeftButton | Qt.RightButton
@@ -1358,7 +1689,7 @@ ShellRoot {
                 }
                 QsText { Layout.fillWidth: true; horizontalAlignment: Text.AlignHCenter; text: Qt.formatDate(new Date(root.calYear, root.calMonth, 1), "MMMM yyyy"); color: root.color4; font.pixelSize: 13; font.bold: true }
                 Rectangle {
-                  visible: centerPill.isCalOpen; implicitWidth: 24; implicitHeight: 24; radius: 7; color: Qt.rgba(1, 1, 1, 0.08)
+                  visible: centerPill.isCalOpen; implicitWidth: 24; implicitHeight: 24; radius: 7; color: root.subtleFill
                   QsText { anchors.centerIn: parent; text: "›"; font.pixelSize: 14; font.bold: true }
                   MouseArea {
                     anchors.fill: parent; acceptedButtons: Qt.LeftButton | Qt.RightButton
@@ -1435,7 +1766,7 @@ ShellRoot {
                 RowLayout {
                   anchors.fill: parent; anchors.margins: 6; spacing: 8
                   Rectangle {
-                    implicitWidth: 32; implicitHeight: 32; radius: 9; color: Qt.rgba(1, 1, 1, 0.08)
+                    implicitWidth: 32; implicitHeight: 32; radius: 9; color: root.subtleFill
                     QsText { anchors.centerIn: parent; text: "󰃭"; color: root.color2; font.pixelSize: 14 }
                   }
                   QsText { text: modelData.day; font.bold: true; Layout.fillWidth: true }
@@ -1452,7 +1783,7 @@ ShellRoot {
               Layout.fillWidth: true
               QsText { text: "Notifications (" + notifServer.trackedNotifications.values.length + ")"; font.bold: true; Layout.fillWidth: true }
               Rectangle {
-                implicitWidth: 68; implicitHeight: 22; radius: 7; color: Qt.rgba(1, 1, 1, 0.08)
+                implicitWidth: 68; implicitHeight: 22; radius: 7; color: root.subtleFill
                 QsText { anchors.centerIn: parent; text: "Clear all"; color: root.color4; font.pixelSize: 10; font.bold: true }
                 MouseArea {
                   anchors.fill: parent; acceptedButtons: Qt.LeftButton | Qt.RightButton
@@ -1478,7 +1809,7 @@ ShellRoot {
                     QsText { text: modelData.body || ""; font.pixelSize: 11; elide: Text.ElideRight; Layout.fillWidth: true }
                   }
                   Rectangle {
-                    implicitWidth: 22; implicitHeight: 22; radius: 7; color: Qt.rgba(1, 1, 1, 0.1)
+                    implicitWidth: 22; implicitHeight: 22; radius: 7; color: root.subtleFill
                     QsText { anchors.centerIn: parent; text: "✕"; font.pixelSize: 11 }
                     MouseArea { anchors.fill: parent; onClicked: modelData.dismiss() }
                   }
@@ -1556,7 +1887,7 @@ ShellRoot {
             opacity: sysContainer.viewOpacity
             transform: Translate { x: sysContainer.viewOffset }
             anchors { left: parent.left; right: parent.right }
-            spacing: 8
+            spacing: 6
 
             // 1. 2x2 QuickTiles Grid
             GridLayout {
@@ -1596,12 +1927,12 @@ ShellRoot {
               visible: root.sysSubmenu === ""; Layout.fillWidth: true; spacing: 8
               Rectangle {
                 Layout.fillWidth: true; implicitHeight: 48; radius: 14
-                color: recCardMouse.containsMouse ? Qt.lighter(root.color0, 1.12) : root.color0
+                color: recCardMouse.containsMouse ? root.cardHoverCol : root.color0
                 MouseArea { id: recCardMouse; anchors.fill: parent; hoverEnabled: true; acceptedButtons: Qt.LeftButton | Qt.RightButton; onClicked: root.openSubmenu("rec") }
                 RowLayout {
                   anchors.fill: parent; anchors.margins: 7; spacing: 7
                   Rectangle {
-                    Layout.fillWidth: true; implicitHeight: 34; radius: 10; color: root.isRecording ? root.color1 : Qt.rgba(1, 1, 1, 0.08)
+                    Layout.fillWidth: true; implicitHeight: 34; radius: 10; color: root.isRecording ? root.color1 : root.subtleFill
                     RowLayout {
                       anchors.centerIn: parent; spacing: 6
                       QsText { text: root.isRecording ? "󰓛" : "󰻂"; color: root.isRecording ? root.bg : root.color1; font.pixelSize: 15 }
@@ -1610,7 +1941,7 @@ ShellRoot {
                     MouseArea { anchors.fill: parent; acceptedButtons: Qt.LeftButton | Qt.RightButton; onClicked: mouse => { if (mouse.button === Qt.RightButton) root.openSubmenu("rec"); else root.toggleRecording() } }
                   }
                   Rectangle {
-                    implicitWidth: 34; implicitHeight: 34; radius: 10; color: shotMouse.containsMouse ? root.color4 : Qt.rgba(1, 1, 1, 0.08)
+                    implicitWidth: 34; implicitHeight: 34; radius: 10; color: shotMouse.containsMouse ? root.color4 : root.subtleFill
                     QsText { anchors.centerIn: parent; text: "󰄄"; color: shotMouse.containsMouse ? root.bg : root.fg; font.pixelSize: 15 }
                     MouseArea {
                       id: shotMouse; anchors.fill: parent; hoverEnabled: true; acceptedButtons: Qt.LeftButton | Qt.RightButton
@@ -1627,7 +1958,7 @@ ShellRoot {
                     model: [{ "icon": "󰻠", "col": root.color4, "act": "cpu" }, { "icon": "󰐥", "col": root.color1, "act": "power" }]
                     Rectangle {
                       required property var modelData
-                      implicitWidth: 34; implicitHeight: 34; radius: 10; color: sysPwrMouse.containsMouse ? modelData.col : Qt.rgba(1, 1, 1, 0.08)
+                      implicitWidth: 34; implicitHeight: 34; radius: 10; color: sysPwrMouse.containsMouse ? modelData.col : root.subtleFill
                       QsText { anchors.centerIn: parent; text: modelData.icon; color: sysPwrMouse.containsMouse ? root.bg : modelData.col; font.pixelSize: 15 }
                       MouseArea { id: sysPwrMouse; anchors.fill: parent; hoverEnabled: true; onClicked: root.openSubmenu(modelData.act) }
                     }
@@ -1650,7 +1981,7 @@ ShellRoot {
                 label: modelData === "display" ? (isNight ? "Display • Night Light" : "Display") : (modelData === "sound" ? "Sound" : "Mic")
                 rightText: isMuted ? "Mute" : (pct + "%")
                 accentCol: isMuted ? root.color8 : root.color4
-                iconBg: isMuted ? root.withAlpha(root.color1, 0.22) : (isNight ? root.withAlpha(root.color2, 0.25) : Qt.rgba(1, 1, 1, 0.08))
+                iconBg: isMuted ? root.withAlpha(root.color1, 0.22) : (isNight ? root.withAlpha(root.color2, 0.25) : root.subtleFill)
                 iconFg: isMuted ? root.color1 : (isNight ? root.color2 : root.color4)
                 function setRatio(r) {
                   let cl = Math.max(0, Math.min(1, r))
@@ -1672,18 +2003,52 @@ ShellRoot {
               }
             }
 
-            // 4. Shared Read-Only Status Bars
+            // 4. Unified Metric Graph Cards (Used for Battery Submenu & System Info Submenu)
             Repeater {
               model: root.sysSubmenu === "battery" ? [
-                { "icon": root.batCharging ? "󰂄" : "󰁹", "title": root.batCharging ? "Charging" : "Charge Level", "pct": root.batPct, "col": root.color2 }
+                {
+                  "icon": root.batCharging ? "󰂄" : "󰁹",
+                  "title": root.batCharging ? "Battery • Charging" : "Battery • Discharging",
+                  "sub": root.batHealth + " • " + root.batPowerDraw + " • Cycles: " + root.batCycles + " • " + root.batTech,
+                  "val": root.batPct + "%",
+                  "time": "last 30 m",
+                  "unit": "%", "min": 0, "max": 100, "auto": false,
+                  "hist": root.batHistory, "col": root.color2
+                }
               ] : (root.sysSubmenu === "cpu" ? [
-                { "icon": "󰻠", "title": root.cpuModel + " (" + root.cpuTemp + "°C)", "pct": root.cpuUsage, "col": root.color4 },
-                { "icon": "󰍛", "title": "RAM • " + root.ramInfo, "pct": root.ramPct, "col": root.color2 },
-                { "icon": "󰋊", "title": "Root (/) • " + root.diskRootInfo, "pct": root.diskRootPct, "col": root.color6 }
+                {
+                  "icon": "󰻠",
+                  "title": root.cpuModel,
+                  "sub": "load " + root.cpuLoad + " • " + root.cpuThreads,
+                  "val": root.cpuUsage + "%",
+                  "time": "last 60 s",
+                  "unit": "%", "min": 0, "max": 100, "auto": true,
+                  "hist": root.cpuHistory, "col": root.color4
+                },
+                {
+                  "icon": "󰔏",
+                  "title": "Temperature",
+                  "sub": root.cpuTemp < 55 ? "Cool • Optimal" : (root.cpuTemp < 75 ? "Normal Load" : "High Thermal"),
+                  "val": root.cpuTemp + " °C",
+                  "time": "last 60 s",
+                  "unit": "°C", "min": 25, "max": 95, "auto": false,
+                  "hist": root.tempHistory, "col": root.cpuTemp >= 75 ? root.color1 : root.color3
+                },
+                {
+                  "icon": "󰍛",
+                  "title": "Memory",
+                  "sub": root.ramInfo + " • " + root.ramSlotsInfo,
+                  "val": root.ramPct + "%",
+                  "time": "last 60 s",
+                  "unit": "%", "min": 0, "max": 100, "auto": true,
+                  "hist": root.ramHistory, "col": root.color2
+                }
               ] : [])
-              QsBar {
+              QsMetricCard {
                 required property var modelData
-                icon: modelData.icon; label: modelData.title; pct: modelData.pct; accentCol: modelData.col
+                icon: modelData.icon; title: modelData.title; sub: modelData.sub; valueText: modelData.val
+                timeLabel: modelData.time; unitSuffix: modelData.unit; minBound: modelData.min; maxBound: modelData.max
+                autoScale: modelData.auto; history: modelData.hist; accentCol: modelData.col
               }
             }
 
@@ -1731,33 +2096,18 @@ ShellRoot {
               }
             }
 
-            // 6. Battery 2x2 Hardware Stats Grid
-            GridLayout {
-              visible: root.sysSubmenu === "battery"
-              Layout.fillWidth: true; columns: 2; uniformCellWidths: true; rowSpacing: 8; columnSpacing: 8
-              Repeater {
-                model: [
-                  { "icon": "󰂑", "l": "Battery Health", "v": root.batHealth },
-                  { "icon": "󱐋", "l": "Power Draw", "v": root.batPowerDraw },
-                  { "icon": "󰑖", "l": "Cycle Count", "v": root.batCycles },
-                  { "icon": "󰂀", "l": "Technology", "v": root.batTech }
-                ]
-                QsTile {
-                  required property var modelData
-                  Layout.preferredWidth: 1; interactive: false; icon: modelData.icon; iconFg: root.color2
-                  title: modelData.v; sub: modelData.l; subCol: root.color8
-                }
-              }
+            // 6. System Info Storage Bar & Kernel Footer Card
+            QsBar {
+              visible: root.sysSubmenu === "cpu"
+              icon: "󰋊"; label: "Root (/) • " + root.diskRootInfo; pct: root.diskRootPct; accentCol: root.color6
             }
-
-            // 7. System Info Kernel & Secondary Drive Footer Card
             QsTile {
               visible: root.sysSubmenu === "cpu"; interactive: false; icon: "󰌽"; iconFg: root.color4
               title: "Kernel: " + root.kernelVer + "  •  Up: " + root.uptimeStr
               sub: "Secondary Drive: " + root.diskSecInfo; subCol: root.color8
             }
 
-            // 8. Audio / Mic Devices List
+            // 7. Audio / Mic Devices List
             ColumnLayout {
               visible: root.sysSubmenu === "sound" || root.sysSubmenu === "mic"; Layout.fillWidth: true; spacing: 6
               QsText { text: "Available Devices"; color: root.color8; font.pixelSize: 11; font.bold: true }
@@ -1771,7 +2121,7 @@ ShellRoot {
                   RowLayout {
                     anchors.fill: parent; anchors.margins: 6; spacing: 8
                     Rectangle {
-                      implicitWidth: 32; implicitHeight: 32; radius: 9; color: modelData.active ? root.color4 : Qt.rgba(1, 1, 1, 0.08)
+                      implicitWidth: 32; implicitHeight: 32; radius: 9; color: modelData.active ? root.color4 : root.subtleFill
                       QsText { anchors.centerIn: parent; text: root.sysSubmenu === "sound" ? "󰕾" : "󰍬"; color: modelData.active ? root.bg : root.fg; font.pixelSize: 15 }
                     }
                     QsText { text: modelData.name; font.bold: modelData.active; elide: Text.ElideRight; Layout.fillWidth: true }
@@ -1781,7 +2131,7 @@ ShellRoot {
               }
             }
 
-            // 9. Display Submenu
+            // 8. Display Submenu
             ColumnLayout {
               visible: root.sysSubmenu === "display"; Layout.fillWidth: true; spacing: 8
               Repeater {
@@ -1815,7 +2165,7 @@ ShellRoot {
                           property string curMode: monCardCol.parent.modelData.curMode
                           property bool activeScale: parseFloat(curScale) === parseFloat(modelData)
                           Layout.fillWidth: true; implicitHeight: 26; radius: 8
-                          color: activeScale ? root.color2 : Qt.rgba(1, 1, 1, 0.08)
+                          color: activeScale ? root.color2 : root.subtleFill
                           QsText { anchors.centerIn: parent; text: modelData + "x"; color: parent.activeScale ? root.bg : root.fg; font.pixelSize: 11; font.bold: true }
                           MouseArea {
                             anchors.fill: parent
@@ -1853,7 +2203,7 @@ ShellRoot {
                           property string curScale: monCardCol.parent.modelData.scale
                           property bool isCurrent: modelData === monCardCol.parent.modelData.curMode
                           Layout.fillWidth: true; implicitHeight: 30; radius: 8
-                          color: isCurrent ? root.withAlpha(root.color4, 0.25) : Qt.rgba(1, 1, 1, 0.05)
+                          color: isCurrent ? root.withAlpha(root.color4, 0.25) : root.subtleFill
                           RowLayout {
                             anchors.fill: parent; anchors.margins: 6
                             QsText { text: modelData.replace("@", " @ ") + " Hz"; color: parent.parent.isCurrent ? root.color4 : root.fg; font.pixelSize: 11; font.bold: parent.parent.isCurrent; Layout.fillWidth: true }
@@ -1874,14 +2224,13 @@ ShellRoot {
                 }
               }
 
-              // Unified 48px Night Light Slider Card
               QsBar {
                 interactive: true; icon: "󰖔"
                 label: root.nightLightOn ? "Night Light • Active" : "Night Light • Off"
                 pct: Math.round(((root.nightLightTemp - 2500) / 3500.0) * 100)
                 rightText: root.nightLightTemp + " K"
                 accentCol: root.nightLightOn ? root.color2 : root.color8
-                iconBg: root.nightLightOn ? root.color2 : Qt.rgba(1, 1, 1, 0.08)
+                iconBg: root.nightLightOn ? root.color2 : root.subtleFill
                 iconFg: root.nightLightOn ? root.bg : root.fg
                 function setKelvin(r) {
                   if (r < 0) return
@@ -1895,7 +2244,7 @@ ShellRoot {
               }
             }
 
-            // 10. System Tray Submenu
+            // 9. System Tray Submenu
             ColumnLayout {
               visible: root.sysSubmenu === "tray"; Layout.fillWidth: true; spacing: 6
               Rectangle {
@@ -1911,7 +2260,7 @@ ShellRoot {
                   RowLayout {
                     anchors.fill: parent; anchors.margins: 6; spacing: 10
                     Rectangle {
-                      implicitWidth: 34; implicitHeight: 34; radius: 10; color: Qt.rgba(1, 1, 1, 0.08)
+                      implicitWidth: 34; implicitHeight: 34; radius: 10; color: root.subtleFill
                       IconImage { anchors.centerIn: parent; implicitSize: 20; source: modelData.icon }
                     }
                     QsText { text: modelData.title || modelData.tooltipTitle || modelData.id || "Tray App"; font.bold: true; elide: Text.ElideRight; Layout.fillWidth: true }
@@ -1925,7 +2274,7 @@ ShellRoot {
               }
             }
 
-            // 11. UNIFIED NETWORK & BLUETOOTH SUBMENU
+            // 10. UNIFIED NETWORK & BLUETOOTH SUBMENU
             ColumnLayout {
               id: wirelessCol
               visible: root.sysSubmenu === "net" || root.sysSubmenu === "bt"
@@ -1951,7 +2300,7 @@ ShellRoot {
                 Rectangle {
                   id: wCtrlSq; width: 34; height: 34; radius: 10
                   anchors.left: parent.left; anchors.leftMargin: 7; anchors.verticalCenter: parent.verticalCenter
-                  color: wirelessCol.isEn ? root.color4 : Qt.rgba(1, 1, 1, 0.08)
+                  color: wirelessCol.isEn ? root.color4 : root.subtleFill
                   QsText { anchors.centerIn: parent; text: wirelessCol.isNet ? (wirelessCol.isEn ? "󰤨" : "󰤭") : ""; color: wirelessCol.isEn ? root.bg : root.fg; font.pixelSize: 16 }
                   MouseArea {
                     anchors.fill: parent
@@ -1967,7 +2316,7 @@ ShellRoot {
                   id: wRightScan
                   visible: wirelessCol.hasHw && wirelessCol.isEn
                   anchors.right: parent.right; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter
-                  implicitWidth: 52; implicitHeight: 22; radius: 7; color: Qt.rgba(1, 1, 1, 0.08)
+                  implicitWidth: 52; implicitHeight: 22; radius: 7; color: root.subtleFill
                   QsText { anchors.centerIn: parent; text: "Scan"; color: root.color4; font.pixelSize: 10; font.bold: true }
                   MouseArea {
                     anchors.fill: parent
@@ -2016,13 +2365,13 @@ ShellRoot {
                       model: root.showSavedList ? wirelessCol.savedList : []
                       Rectangle {
                         required property var modelData
-                        Layout.fillWidth: true; implicitHeight: 32; radius: 8; color: Qt.rgba(1, 1, 1, 0.05)
+                        Layout.fillWidth: true; implicitHeight: 32; radius: 8; color: root.subtleFill
                         RowLayout {
                           anchors.fill: parent; anchors.leftMargin: 8; anchors.rightMargin: 6; spacing: 6
                           QsText { text: wirelessCol.isNet ? "󰆼" : ""; color: root.color6; font.pixelSize: 13 }
                           QsText { text: modelData.name; font.pixelSize: 11; font.bold: true; elide: Text.ElideRight; Layout.fillWidth: true }
                           Rectangle {
-                            implicitWidth: 52; implicitHeight: 22; radius: 6; color: Qt.rgba(1, 1, 1, 0.08)
+                            implicitWidth: 52; implicitHeight: 22; radius: 6; color: root.subtleFillHover
                             QsText { anchors.centerIn: parent; text: "Connect"; color: root.color4; font.pixelSize: 10; font.bold: true }
                             MouseArea {
                               anchors.fill: parent
@@ -2034,7 +2383,7 @@ ShellRoot {
                             }
                           }
                           Rectangle {
-                            implicitWidth: 48; implicitHeight: 22; radius: 6; color: Qt.rgba(1, 1, 1, 0.08)
+                            implicitWidth: 48; implicitHeight: 22; radius: 6; color: root.subtleFillHover
                             QsText { anchors.centerIn: parent; text: "Forget"; color: root.color1; font.pixelSize: 10 }
                             MouseArea {
                               anchors.fill: parent
@@ -2089,7 +2438,7 @@ ShellRoot {
                     RowLayout {
                       Layout.fillWidth: true; spacing: 8
                       Rectangle {
-                        implicitWidth: 32; implicitHeight: 32; radius: 9; color: modelData.connected ? root.color4 : Qt.rgba(1, 1, 1, 0.08)
+                        implicitWidth: 32; implicitHeight: 32; radius: 9; color: modelData.connected ? root.color4 : root.subtleFill
                         QsText { anchors.centerIn: parent; text: wirelessCol.isNet ? "󰤨" : ""; color: modelData.connected ? root.bg : root.fg; font.pixelSize: 15 }
                       }
                       Item {
@@ -2125,13 +2474,13 @@ ShellRoot {
                       }
                       Rectangle {
                         implicitWidth: 26; implicitHeight: 26; radius: 7
-                        color: parent.parent.parent.isExpanded ? root.color4 : Qt.rgba(1, 1, 1, 0.08)
+                        color: parent.parent.parent.isExpanded ? root.color4 : root.subtleFill
                         QsText { anchors.centerIn: parent; text: "󰋼"; color: parent.parent.parent.isExpanded ? root.bg : root.color4; font.pixelSize: 13 }
                         MouseArea { anchors.fill: parent; onClicked: root.expandedDevInfo = (root.expandedDevInfo === modelData.id ? "" : modelData.id) }
                       }
                     }
                     Rectangle {
-                      visible: parent.parent.isExpanded; Layout.fillWidth: true; implicitHeight: 22; radius: 6; color: Qt.rgba(1, 1, 1, 0.06)
+                      visible: parent.parent.isExpanded; Layout.fillWidth: true; implicitHeight: 22; radius: 6; color: root.subtleFill
                       QsText {
                         anchors.left: parent.left; anchors.leftMargin: 8; anchors.right: parent.right; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter
                         text: modelData.details; color: root.color6; font.pixelSize: 10; elide: Text.ElideRight
@@ -2142,7 +2491,7 @@ ShellRoot {
               }
             }
 
-            // 12. Power Menu Submenu
+            // 11. Power Menu Submenu
             ColumnLayout {
               visible: root.sysSubmenu === "power"; Layout.fillWidth: true; spacing: 6
               Repeater {
