@@ -8,7 +8,6 @@ CHECK_INTERVAL=60
 ROTATE_INTERVAL=0
 
 # Wallust palettes written into ~/.config/wallust/wallust.toml on Day/Night switch
-# Options: "softdark16" "softdark" "dark16" "harddark16"
 DAY_PALETTE="light16"
 NIGHT_PALETTE="dark16"
 # ==============================================================================
@@ -85,7 +84,7 @@ calibrate_and_apply_colors() {
 		-v hypr_out="$HYPR_CONF" '
 	function abs(v) { return v < 0 ? -v : v }
 	function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v) }
-	function hex2dec(h,  i, ch, v) {
+	function hex2dec(h, i, ch, v) {
 		v = 0; h = tolower(h)
 		for (i = 1; i <= length(h); i++) {
 			ch = substr(h, i, 1)
@@ -93,7 +92,7 @@ calibrate_and_apply_colors() {
 		}
 		return v
 	}
-	function rgb2hsl(hex,  r, g, b, mx, mn, d, h, s, l) {
+	function rgb2hsl(hex, r, g, b, mx, mn, d, h, s, l) {
 		gsub(/^#/, "", hex)
 		r = hex2dec(substr(hex, 1, 2)) / 255.0
 		g = hex2dec(substr(hex, 3, 2)) / 255.0
@@ -120,7 +119,7 @@ calibrate_and_apply_colors() {
 		if (t < 2.0 / 3.0) return p + (q - p) * (2.0 / 3.0 - t) * 6.0
 		return p
 	}
-	function hsl2hex(h, s, l,  q, p, hk, r, g, b, ri, gi, bi) {
+	function hsl2hex(h, s, l, q, p, hk, r, g, b, ri, gi, bi) {
 		l = clamp(l, 0.0, 1.0); s = clamp(s, 0.0, 1.0)
 		while (h < 0.0) h += 360.0
 		while (h >= 360.0) h -= 360.0
@@ -136,7 +135,7 @@ calibrate_and_apply_colors() {
 		ri = int(r * 255.0 + 0.5); gi = int(g * 255.0 + 0.5); bi = int(b * 255.0 + 0.5)
 		return sprintf("%02x%02x%02x", clamp(ri, 0, 255), clamp(gi, 0, 255), clamp(bi, 0, 255))
 	}
-	function hdist(h1, h2,  d) {
+	function hdist(h1, h2, d) {
 		d = abs(h1 - h2) % 360.0
 		return d > 180.0 ? 360.0 - d : d
 	}
@@ -157,7 +156,6 @@ calibrate_and_apply_colors() {
 			ch[i] = H; cs[i] = S; cl[i] = L
 		}
 
-		# 1. Pick Primary (most saturated/vibrant), Secondary (most contrasting hue) & Tertiary accents across all 16 slots
 		b1 = 4; best_s1 = -1
 		for (i = 0; i < 16; i++) {
 			sc = cs[i] * (1.0 - 0.55 * abs(cl[i] - 0.52))
@@ -179,7 +177,6 @@ calibrate_and_apply_colors() {
 			if (cl[i] > 0.08 && cl[i] < 0.94 && sc > best_s3) { best_s3 = sc; b3 = i }
 		}
 
-		# 2. Harmonious low-contrast Surfaces (bg & color0) + High-contrast Text (fg & color8)
 		if (theme == "day") {
 			surf_s = clamp(bg_s, 0.10, 0.28)
 			bg_hex = hsl2hex(bg_h, surf_s, 0.85)
@@ -199,7 +196,6 @@ calibrate_and_apply_colors() {
 			c15_hex = hsl2hex(bg_h, clamp(bg_s, 0.06, 0.16), 0.94)
 		}
 
-		# 3. Assign Accents (color4 = primary, color5 = secondary contrasting hue, color6 = tertiary)
 		ah[4] = ch[b1]; as[4] = cs[b1]; al[4] = cl[b1]
 		ah[5] = ch[b2]; as[5] = cs[b2]; al[5] = cl[b2]
 		ah[6] = ch[b3]; as[6] = cs[b3]; al[6] = cl[b3]
@@ -228,7 +224,6 @@ calibrate_and_apply_colors() {
 			out_c[k + 8] = hsl2hex(ah[k], sat, l_bold)
 		}
 
-		# A. Write Quickshell colors.json
 		printf "{\n\t\"wallpaper\": \"%s\",\n\t\"wallMode\": \"%s\",\n\t\"uiBlur\": %s,\n\t\"uiAnimations\": %s,\n\t\"firstRunDone\": %s,\n", wall, mode, bl, an, fr > qs_out
 		printf "\t\"background\": \"#%s\",\n\t\"foreground\": \"#%s\",\n", bg_hex, fg_hex >> qs_out
 		for (i = 0; i < 16; i++) {
@@ -237,26 +232,22 @@ calibrate_and_apply_colors() {
 		printf "}\n" >> qs_out
 		close(qs_out)
 
-		# B. Write Qt6ct wallust.conf (Cohesive Window=c0 / Base=bg / Button=c0 + High-contrast Text=fg)
 		printf "[ColorScheme]\n" > qt_out
 		printf "active_colors=#ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #80%s\n", fg_hex, c0_hex, c0_hex, c0_hex, bg_hex, c0_hex, fg_hex, fg_hex, fg_hex, bg_hex, c0_hex, bg_hex, out_c[4], bg_hex, out_c[4], out_c[5], c0_hex, fg_hex, c0_hex, fg_hex, fg_hex >> qt_out
 		printf "disabled_colors=#ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #80%s\n", c8_hex, c0_hex, c0_hex, c0_hex, bg_hex, c0_hex, c8_hex, c8_hex, c8_hex, bg_hex, c0_hex, bg_hex, c8_hex, bg_hex, out_c[4], out_c[5], c0_hex, c8_hex, c0_hex, c8_hex, c8_hex >> qt_out
 		printf "inactive_colors=#ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #ff%s, #80%s\n", fg_hex, c0_hex, c0_hex, c0_hex, bg_hex, c0_hex, fg_hex, fg_hex, fg_hex, bg_hex, c0_hex, bg_hex, out_c[4], bg_hex, out_c[4], out_c[5], c0_hex, fg_hex, c0_hex, fg_hex, fg_hex >> qt_out
 		close(qt_out)
 
-		# C. Write Kitty colors.conf
 		printf "foreground #%s\nbackground #%s\ncursor #%s\nselection_foreground #%s\nselection_background #%s\n", fg_hex, bg_hex, out_c[4], bg_hex, out_c[4] > kitty_out
 		for (i = 0; i < 16; i++) printf "color%d #%s\n", i, out_c[i] >> kitty_out
 		close(kitty_out)
 
-		# D. Write Hyprland colors.conf
 		printf "$background = rgb(%s)\n$foreground = rgb(%s)\n$color0 = rgb(%s)\n$color4 = rgb(%s)\n$color5 = rgb(%s)\n$color6 = rgb(%s)\n", bg_hex, fg_hex, c0_hex, out_c[4], out_c[5], out_c[6] > hypr_out
 		close(hypr_out)
 	}' "$QS_DIR/colors.json"
 
 	mv -f "$QS_DIR/colors.json.tmp" "$QS_DIR/colors.json"
 
-	# Sync Niri active/inactive window border colors with calibrated color4 & color0
 	if [[ -f "$HOME/.config/niri/config.kdl" ]]; then
 		local n_c4 n_c0
 		n_c4=$(grep -o '"color4": *"[^"]*"' "$QS_DIR/colors.json" | cut -d'"' -f4)
@@ -265,7 +256,6 @@ calibrate_and_apply_colors() {
 		[[ -n "$n_c0" ]] && sed -i "s|inactive-color \"#[0-9a-fA-F]*\"|inactive-color \"$n_c0\"|g" "$HOME/.config/niri/config.kdl"
 	fi
 
-	# Sync Icon Theme (Papirus-Light on Day, Papirus-Dark on Night) & FeatherPad sheet lightness
 	local icon_thm="Papirus-Dark" dark_fp="true" fp_bg="30"
 	if [[ "$theme" == "day" ]]; then
 		icon_thm="Papirus-Light"; dark_fp="false"; fp_bg="222"
