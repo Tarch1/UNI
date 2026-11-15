@@ -158,42 +158,46 @@ calibrate_and_apply_colors() {
 
 		b1 = 4; best_s1 = -1
 		for (i = 0; i < 16; i++) {
-			sc = cs[i] * (1.0 - 0.55 * abs(cl[i] - 0.52))
-			if (cl[i] > 0.08 && cl[i] < 0.94 && sc > best_s1) { best_s1 = sc; b1 = i }
+			sc = cs[i] * (1.0 - 0.50 * abs(cl[i] - 0.52))
+			if (cl[i] > 0.06 && cl[i] < 0.94 && sc > best_s1) { best_s1 = sc; b1 = i }
 		}
-		if (bg_s < 0.06 && cs[b1] > 0.10) { bg_h = ch[b1]; bg_s = 0.16 }
+		if (bg_s < 0.06 && cs[b1] > 0.08) { bg_h = ch[b1]; bg_s = clamp(cs[b1] * 0.6, 0.08, 0.22) }
 
-		b2 = 5; best_s2 = -1
+		b2 = b1; best_s2 = -1
 		for (i = 0; i < 16; i++) {
-			if (i == b1) continue
-			sc = (cs[i] + 0.08) * (0.25 + 0.75 * (hdist(ch[i], ch[b1]) / 180.0))
-			if (cl[i] > 0.08 && cl[i] < 0.94 && sc > best_s2) { best_s2 = sc; b2 = i }
+			if (i == b1 || cl[i] <= 0.06 || cl[i] >= 0.94) continue
+			hd = (cs[i] >= 0.16) ? (hdist(ch[i], ch[b1]) / 180.0) : 0.0
+			sc = cs[i] * (0.45 + 0.55 * hd)
+			if (sc > best_s2) { best_s2 = sc; b2 = i }
 		}
+		if (cs[b2] < 0.10) b2 = b1
 
-		b3 = 6; best_s3 = -1
+		b3 = b2; best_s3 = -1
 		for (i = 0; i < 16; i++) {
-			if (i == b1 || i == b2) continue
-			sc = (cs[i] + 0.08) * (0.25 + 0.75 * ((hdist(ch[i], ch[b1]) + hdist(ch[i], ch[b2])) / 360.0))
-			if (cl[i] > 0.08 && cl[i] < 0.94 && sc > best_s3) { best_s3 = sc; b3 = i }
+			if (i == b1 || i == b2 || cl[i] <= 0.06 || cl[i] >= 0.94) continue
+			hd = (cs[i] >= 0.16) ? ((hdist(ch[i], ch[b1]) + hdist(ch[i], ch[b2])) / 360.0) : 0.0
+			sc = cs[i] * (0.45 + 0.55 * hd)
+			if (sc > best_s3) { best_s3 = sc; b3 = i }
 		}
+		if (cs[b3] < 0.10) b3 = b1
 
 		if (theme == "day") {
-			surf_s = clamp(bg_s, 0.10, 0.28)
+			surf_s = clamp(bg_s, 0.08, 0.26)
 			bg_hex = hsl2hex(bg_h, surf_s, 0.85)
 			c0_hex = hsl2hex(bg_h, surf_s, 0.78)
-			fg_hex = hsl2hex(bg_h, clamp(bg_s, 0.08, 0.22), 0.12)
-			c8_hex = hsl2hex(bg_h, clamp(bg_s, 0.08, 0.18), 0.36)
-			c7_hex = hsl2hex(bg_h, clamp(bg_s, 0.08, 0.20), 0.24)
-			c15_hex = hsl2hex(bg_h, clamp(bg_s, 0.06, 0.16), 0.10)
+			fg_hex = hsl2hex(bg_h, clamp(bg_s, 0.06, 0.20), 0.12)
+			c8_hex = hsl2hex(bg_h, clamp(bg_s, 0.06, 0.16), 0.36)
+			c7_hex = hsl2hex(bg_h, clamp(bg_s, 0.06, 0.18), 0.24)
+			c15_hex = hsl2hex(bg_h, clamp(bg_s, 0.05, 0.14), 0.10)
 		} else {
-			surf_s = clamp(bg_s, 0.10, 0.30)
+			surf_s = clamp(bg_s, 0.08, 0.28)
 			base_l = clamp(bg_l, 0.11, 0.16)
 			bg_hex = hsl2hex(bg_h, surf_s, base_l)
 			c0_hex = hsl2hex(bg_h, surf_s, base_l + 0.065)
-			fg_hex = hsl2hex(bg_h, clamp(bg_s, 0.08, 0.20), 0.91)
-			c8_hex = hsl2hex(bg_h, clamp(bg_s, 0.08, 0.18), 0.62)
-			c7_hex = hsl2hex(bg_h, clamp(bg_s, 0.08, 0.18), 0.78)
-			c15_hex = hsl2hex(bg_h, clamp(bg_s, 0.06, 0.16), 0.94)
+			fg_hex = hsl2hex(bg_h, clamp(bg_s, 0.06, 0.18), 0.91)
+			c8_hex = hsl2hex(bg_h, clamp(bg_s, 0.06, 0.16), 0.62)
+			c7_hex = hsl2hex(bg_h, clamp(bg_s, 0.06, 0.16), 0.78)
+			c15_hex = hsl2hex(bg_h, clamp(bg_s, 0.05, 0.14), 0.94)
 		}
 
 		ah[4] = ch[b1]; as[4] = cs[b1]; al[4] = cl[b1]
@@ -201,24 +205,26 @@ calibrate_and_apply_colors() {
 		ah[6] = ch[b3]; as[6] = cs[b3]; al[6] = cl[b3]
 		for (k = 1; k <= 3; k++) {
 			src = (cs[k] >= cs[k + 8]) ? k : (k + 8)
-			if (cs[src] < 0.15) {
-				ah[k] = (ch[b1] + k * 55.0) % 360.0
-				as[k] = clamp(cs[b1], 0.45, 0.75)
-				al[k] = 0.55
+			if (cs[src] < 0.12) {
+				pick = (k == 1) ? b2 : ((k == 2) ? b3 : b1)
+				ah[k] = ch[pick]
+				as[k] = cs[pick]
+				al[k] = cl[src]
 			} else {
 				ah[k] = ch[src]; as[k] = cs[src]; al[k] = cl[src]
 			}
 		}
 
 		out_c[0] = c0_hex; out_c[7] = c7_hex; out_c[8] = c8_hex; out_c[15] = c15_hex
+		min_s = clamp(cs[b1], 0.14, 0.32)
 		for (k = 1; k <= 6; k++) {
-			sat = clamp(as[k] < 0.42 ? as[k] + 0.22 : as[k], 0.45, 0.86)
+			sat = clamp(as[k] * 1.12, min_s, 0.78)
 			if (theme == "day") {
-				l_norm = clamp(al[k], 0.28, 0.39)
+				l_norm = clamp(al[k], 0.28, 0.40)
 				l_bold = clamp(l_norm - 0.05, 0.22, 0.34)
 			} else {
-				l_norm = clamp(al[k], 0.64, 0.75)
-				l_bold = clamp(l_norm + 0.06, 0.70, 0.82)
+				l_norm = clamp(al[k], 0.62, 0.74)
+				l_bold = clamp(l_norm + 0.06, 0.68, 0.82)
 			}
 			out_c[k] = hsl2hex(ah[k], sat, l_norm)
 			out_c[k + 8] = hsl2hex(ah[k], sat, l_bold)
