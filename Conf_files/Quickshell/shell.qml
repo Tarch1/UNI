@@ -258,6 +258,7 @@ ShellRoot {
   property real panelAlpha: blurActive ? cfgGlassOpacity : cfgSolidOpacity
 
   property string wallpaperPath: ""
+  property string wallpaperSilhouette: ""
   property string prevWallSource: ""
   property bool wallTransitionActive: false
   property bool animWallpapers: false
@@ -596,8 +597,10 @@ ShellRoot {
     onLoaded: {
       try {
         let d = JSON.parse(text())
+        if (d.silhouette !== undefined) root.wallpaperSilhouette = String(d.silhouette)
         if (d.wallpaper && d.wallpaper !== root.wallpaperPath) {
           if (root.wallpaperPath !== "" && root.animActive && root.cfgWallpaperTransition !== "none") {
+            root.wallTransitionActive = false
             root.prevWallSource = root.isVideoFile ? ("file:///tmp/wall_frame_prev.jpg?" + root.wallpaperPath) : root.staticWallSource
             root.wallTransitionActive = true
           }
@@ -1139,63 +1142,41 @@ ShellRoot {
             property real prog: 0.0
             property int gw: 96
             property int gh: 54
-            property var cellInSil: []
             property var cellEdge: []
             property var cellThresh: []
             property bool mapReady: false
 
             function buildSilhouetteMap() {
               if (mapReady) return
-              var inS = new Array(gw * gh), edg = new Array(gw * gh), thr = new Array(gw * gh)
-              var ok = false
-              try {
-                var ctx = probeCanvas.getContext("2d")
-                ctx.drawImage(baseStaticWall, 0, 0, gw, gh)
-                var img = ctx.getImageData(0, 0, gw, gh).data
-                var bLum = 0, bCnt = 0
-                for (var x = 0; x < gw; x++) {
-                  var iT = x * 4, iB = ((gh - 1) * gw + x) * 4
-                  bLum += (0.299 * img[iT] + 0.587 * img[iT + 1] + 0.114 * img[iT + 2]) + (0.299 * img[iB] + 0.587 * img[iB + 1] + 0.114 * img[iB + 2])
-                  bCnt += 2
-                }
-                bLum /= Math.max(1, bCnt)
-                for (var y = 0; y < gh; y++) {
-                  for (var xx = 0; xx < gw; xx++) {
-                    var idx = y * gw + xx, p = idx * 4
-                    var lum = 0.299 * img[p] + 0.587 * img[p + 1] + 0.114 * img[p + 2]
-                    var cx = (xx / gw) - 0.5, cy = (y / gh) - 0.5
-                    var centerBias = Math.max(0, 1.0 - Math.sqrt(cx * cx * 1.8 + cy * cy * 2.2))
-                    inS[idx] = (Math.abs(lum - bLum) + centerBias * 38.0) > 42.0 ? 1 : 0
-                  }
-                }
-                ok = true
-              } catch (e) {}
+              var tot = gw * gh
+              var edg = new Array(tot), thr = new Array(tot)
+              var sil = root.wallpaperSilhouette
+              var hasSil = (sil && sil.length >= tot)
 
               for (var r = 0; r < gh; r++) {
                 for (var c = 0; c < gw; c++) {
                   var k = r * gw + c
-                  if (!ok) {
+                  var code = hasSil ? sil.charAt(k) : "0"
+                  var isEdge = (code === "2") ? 1 : 0
+                  var isInside = (code === "1" || code === "2") ? 1 : 0
+                  if (!hasSil) {
                     var dx = (c / gw) - 0.5, dy = (r / gh) - 0.5
-                    var wobble = 0.08 * Math.sin(c * 0.28) * Math.cos(r * 0.28)
-                    inS[k] = (dx * dx + dy * dy * 1.4) < (0.14 + wobble) ? 1 : 0
+                    isInside = (dx * dx + dy * dy * 1.4) < 0.14 ? 1 : 0
                   }
-                  var n1 = (Math.sin(c * 0.37 + r * 0.23) * Math.cos(r * 0.41 - c * 0.19) + 1.0) * 0.5
-                  var n2 = (Math.sin(c * 0.83 - r * 0.67) + 1.0) * 0.5
-                  var noise = n1 * 0.7 + n2 * 0.3
-                  var sweep = (c / gw) * 0.35 + noise * 0.65
-                  thr[k] = inS[k] ? (0.14 + noise * 0.42) : (0.50 + sweep * 0.46)
-                }
-              }
-              for (var r2 = 1; r2 < gh - 1; r2++) {
-                for (var c2 = 1; c2 < gw - 1; c2++) {
-                  var k2 = r2 * gw + c2
-                  edg[k2] = (inS[k2] && (!inS[k2 - 1] || !inS[k2 + 1] || !inS[k2 - gw] || !inS[k2 + gw])) ? 1 : 0
-                }
-              }
-              cellInSil = inS; cellEdge = edg; cellThresh = thr; mapReady = true
-            }
+                  edg[k] = isEdge
 
-            Canvas { id: probeCanvas; width: transRoot.gw; height: transRoot.gh; visible: false }
+                  // Organic multi-cluster noise for patch growth
+                  var n1 = (Math.sin(c * 0.31 + r * 0.27) * Math.cos(r * 0.39 - c * 0.21) + 1.0) * 0.5
+                  var n2 = (Math.sin(c * 0.73 - r * 0.61) + 1.0) * 0.5
+                  var noise = n1 * 0.72 + n2 * 0.28
+                  var sweep = (c / gw) * 0.25 + noise * 0.75
+
+                  // Inside real silhouette opens first (0.10..0.54), background opens second (0.48..0.96)
+                  thr[k] = isInside ? (0.10 + noise * 0.44) : (0.48 + sweep * 0.48)
+                }
+              }
+              cellEdge = edg; cellThresh = thr; mapReady = true
+            }
 
             // Old wallpaper kept underneath and masked out as swarm patches grow
             Image {
@@ -1215,7 +1196,7 @@ ShellRoot {
                 var p = transRoot.prog, thr = transRoot.cellThresh
                 for (var y = 0; y < height; y++) {
                   for (var x = 0; x < width; x++) {
-                    if (p >= thr[y * width + x]) ctx.clearRect(x, y, 1.25, 1.25)
+                    if (p >= thr[y * width + x]) ctx.clearRect(x, y, 1.35, 1.35)
                   }
                 }
               }
@@ -1227,7 +1208,7 @@ ShellRoot {
               maskEnabled: true; maskSource: oldMaskCanvas
             }
 
-            // Silhouette outline drawn in primary accent color (root.color4)
+            // Real subject contour outline drawn in primary accent color (root.color4)
             Canvas {
               id: outlineCanvas; anchors.fill: parent
               visible: root.cfgWallpaperTransition === "swarm"
@@ -1236,12 +1217,12 @@ ShellRoot {
                 if (!transRoot.mapReady) return
                 var ctx = getContext("2d"); ctx.reset()
                 var cw = width / transRoot.gw, ch = height / transRoot.gh
-                var edg = transRoot.cellEdge, p = Math.min(1, transRoot.prog / 0.28)
+                var edg = transRoot.cellEdge, p = Math.min(1, transRoot.prog / 0.30)
                 var maxX = Math.floor(transRoot.gw * p)
                 ctx.fillStyle = root.color4.toString()
                 for (var y = 1; y < transRoot.gh - 1; y++) {
                   for (var x = 1; x <= maxX && x < transRoot.gw - 1; x++) {
-                    if (edg[y * transRoot.gw + x]) ctx.fillRect(x * cw, y * ch, cw * 1.35, ch * 1.35)
+                    if (edg[y * transRoot.gw + x]) ctx.fillRect(x * cw, y * ch, cw * 1.25, ch * 1.25)
                   }
                 }
               }
