@@ -76,8 +76,73 @@ calibrate_and_apply_colors() {
 	mkdir -p "$QT6_DIR" "$QS_DIR"
 	[[ ! -f "$QS_DIR/colors.json" ]] && return 0
 
+	local probe_img="$wall" sil_map=""
+	[[ "${wall,,}" =~ \.(webm|mp4)$ && -f "/tmp/wall_frame.jpg" ]] && probe_img="/tmp/wall_frame.jpg"
+	if [[ -f "$probe_img" ]] && command -v ffmpeg >/dev/null 2>&1; then
+		sil_map=$(ffmpeg -v quiet -i "$probe_img" -frames:v 1 -vf "scale=96:54:flags=area" -pix_fmt rgb24 -f rawvideo - 2>/dev/null | od -An -tu1 -v | LC_ALL=C awk '
+		function abs(v) { return v < 0 ? -v : v }
+		function max3(a, b, c) { return (a >= b && a >= c) ? a : (b >= c ? b : c) }
+		{
+			for (i = 1; i <= NF; i++) raw[n++] = $i
+		}
+		END {
+			gw = 96; gh = 54; tot = gw * gh
+			if (n < tot * 3) exit 0
+			for (p = 0; p < tot; p++) {
+				b = p * 3
+				R[p] = raw[b]; G[p] = raw[b + 1]; B[p] = raw[b + 2]
+			}
+			bgR = 0; bgG = 0; bgB = 0; bc = 0
+			for (x = 0; x < gw; x++) {
+				pT = x; pB = (gh - 1) * gw + x
+				bgR += R[pT] + R[pB]; bgG += G[pT] + G[pB]; bgB += B[pT] + B[pB]; bc += 2
+			}
+			for (y = 1; y < gh - 1; y++) {
+				pL = y * gw; pR = y * gw + (gw - 1)
+				bgR += R[pL] + R[pR]; bgG += G[pL] + G[pR]; bgB += B[pL] + B[pR]; bc += 2
+			}
+			bgR /= bc; bgG /= bc; bgB /= bc
+
+			sum_fg = 0; sum_edg = 0
+			for (y = 0; y < gh; y++) {
+				for (x = 0; x < gw; x++) {
+					idx = y * gw + x
+					fg[idx] = abs(R[idx] - bgR) + abs(G[idx] - bgG) + abs(B[idx] - bgB)
+					sum_fg += fg[idx]
+					if (y > 0 && y < gh - 1 && x > 0 && x < gw - 1) {
+						tl = idx - gw - 1; tc = idx - gw; tr = idx - gw + 1
+						ml = idx - 1;                     mr = idx + 1
+						bl = idx + gw - 1; bc2 = idx + gw; br = idx + gw + 1
+						gxR = (R[tr] + 2*R[mr] + R[br]) - (R[tl] + 2*R[ml] + R[bl])
+						gyR = (R[bl] + 2*R[bc2] + R[br]) - (R[tl] + 2*R[tc] + R[tr])
+						gxG = (G[tr] + 2*G[mr] + G[br]) - (G[tl] + 2*G[ml] + G[bl])
+						gyG = (G[bl] + 2*G[bc2] + G[br]) - (G[tl] + 2*G[tc] + G[tr])
+						gxB = (B[tr] + 2*B[mr] + B[br]) - (B[tl] + 2*B[ml] + B[bl])
+						gyB = (B[bl] + 2*B[bc2] + B[br]) - (B[tl] + 2*B[tc] + B[tr])
+						edg[idx] = max3(abs(gxR) + abs(gyR), abs(gxG) + abs(gyG), abs(gxB) + abs(gyB))
+						sum_edg += edg[idx]
+					} else {
+						edg[idx] = 0
+					}
+				}
+			}
+			m_fg = sum_fg / tot
+			m_edg = sum_edg / tot
+			e_thr = (m_edg * 1.50 > 42) ? (m_edg * 1.50) : 42
+			f_thr = (m_fg * 0.92 > 24) ? (m_fg * 0.92) : 24
+
+			out = ""
+			for (i = 0; i < tot; i++) {
+				if (edg[i] >= e_thr) out = out "2"
+				else if (fg[i] >= f_thr || edg[i] >= m_edg * 0.85) out = out "1"
+				else out = out "0"
+			}
+			printf "%s", out
+		}' || true)
+	fi
+
 	LC_ALL=C awk -F'"' \
-		-v theme="$theme" -v wall="$wall" -v mode="$mode" -v bl="$bl" -v an="$an" -v fr="$fr" \
+		-v theme="$theme" -v wall="$wall" -v mode="$mode" -v bl="$bl" -v an="$an" -v fr="$fr" -v sil="$sil_map" \
 		-v qs_out="$QS_DIR/colors.json.tmp" \
 		-v qt_out="$QT6_DIR/wallust.conf" \
 		-v kitty_out="$KITTY_CONF" \
@@ -230,7 +295,7 @@ calibrate_and_apply_colors() {
 			out_c[k + 8] = hsl2hex(ah[k], sat, l_bold)
 		}
 
-		printf "{\n\t\"wallpaper\": \"%s\",\n\t\"wallMode\": \"%s\",\n\t\"uiBlur\": %s,\n\t\"uiAnimations\": %s,\n\t\"firstRunDone\": %s,\n", wall, mode, bl, an, fr > qs_out
+		printf "{\n\t\"wallpaper\": \"%s\",\n\t\"silhouette\": \"%s\",\n\t\"wallMode\": \"%s\",\n\t\"uiBlur\": %s,\n\t\"uiAnimations\": %s,\n\t\"firstRunDone\": %s,\n", wall, sil, mode, bl, an, fr > qs_out
 		printf "\t\"background\": \"#%s\",\n\t\"foreground\": \"#%s\",\n", bg_hex, fg_hex >> qs_out
 		for (i = 0; i < 16; i++) {
 			printf "\t\"color%d\": \"#%s\"%s\n", i, out_c[i], (i < 15 ? "," : "") >> qs_out
@@ -292,7 +357,8 @@ apply_theme() {
 	fi
 	[[ ! -d "$target_dir" ]] && return 1
 	local wall
-	wall=$(find "$target_dir" -type f \( -iname "*.webm" -o -iname "*.mp4" -o -iname "*.gif" -o -iname "*.webp" -o -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" \) | shuf -n 1)
+	wall=$(find "$target_dir" -type f \( -iname "*.webm" -o -iname "*.mp4" -o -iname "*.gif" -o -iname "*.webp" -o -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" \) ! -wholename "$CURRENT_WALL" 2>/dev/null | shuf -n 1)
+	[[ -z "$wall" ]] && wall=$(find "$target_dir" -type f \( -iname "*.webm" -o -iname "*.mp4" -o -iname "*.gif" -o -iname "*.webp" -o -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" \) 2>/dev/null | shuf -n 1)
 	[[ -z "$wall" ]] && return 1
 	[[ "$CURRENT_WALL" == "$wall" && "$LAST_MODE" == "$mode" && "$CURRENT_THEME" == "$theme" ]] && return 0
 
