@@ -69,6 +69,9 @@ sync_quickshell_state() {
 			-e "s|\"uiAnimations\": *[a-z]*|\"uiAnimations\": $an|" \
 			-e "s|\"firstRunDone\": *[a-z]*|\"firstRunDone\": $fr|" "$tpl"
 	fi
+	if [[ -f "$WALLUST_TOML" ]]; then
+		sed -i "s|target *= *\"~/.config/quickshell/colors.json\"|target = \"$RAW_QS_JSON\"|" "$WALLUST_TOML"
+	fi
 }
 
 calibrate_and_apply_colors() {
@@ -121,7 +124,6 @@ thr = float(np.percentile(m, 78))
 thr = max(0.35, min(0.75, thr))
 fg = m >= thr
 
-# Fill enclosed interior holes via exterior BFS from border
 h, w = fg.shape
 ext = np.zeros((h, w), dtype=bool)
 q = deque()
@@ -561,7 +563,7 @@ apply_theme() {
 	if [[ "${wall,,}" =~ \.(webm|mp4)$ ]]; then
 		wall_img="$FRAME_CACHE"
 		[[ -f "$FRAME_CACHE" ]] && cp -f "$FRAME_CACHE" "/tmp/wall_frame_prev.jpg" 2>/dev/null || true
-		ffmpeg -y -loglevel quiet -i "$wall" -frames:v 1 -vf "scale=320:-1" -q:v 4 "$wall_img" 2>/dev/null
+		ffmpeg -y -loglevel quiet -i "$wall" -frames:v 1 -vf "scale=360:-1" -q:v 3 "$wall_img" 2>/dev/null
 	fi
 
 	if ! command -v quickshell >/dev/null 2>&1; then
