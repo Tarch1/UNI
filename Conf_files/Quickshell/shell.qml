@@ -1133,52 +1133,152 @@ ShellRoot {
           id: wallVideoOut; anchors.fill: parent; visible: root.animWallpapers && root.isVideoFile && !root.wallTransitionActive; fillMode: VideoOutput.PreserveAspectCrop
         }
 
-        // TEMPORARY WALLPAPER TRANSITION LOADER (Unloaded -> 0 RAM/VRAM when idle)
+       // TEMPORARY WALLPAPER TRANSITION LOADER (Unloaded -> 0 RAM/VRAM when idle)
         Loader {
           anchors.fill: parent
           active: root.wallTransitionActive && root.prevWallSource !== ""
           sourceComponent: Item {
             id: transRoot; anchors.fill: parent
             property real prog: 0.0
-            property int gw: 96
-            property int gh: 54
-            property var cellEdge: []
-            property var cellThresh: []
+            property int lastBucket: -1
+            property int fgw: 360
+            property int fgh: 202
+            property int sw: 480
+            property int sh: 270
+            property int numBuckets: 240
+            property real cropU0: 0.0
+            property real cropV0: 0.0
+            property real cropUSpan: 1.0
+            property real cropVSpan: 1.0
+            property var contourPts: []
+            property var swarmBuckets: []
             property bool mapReady: false
 
             function buildSilhouetteMap() {
               if (mapReady) return
-              var tot = gw * gh
-              var edg = new Array(tot), thr = new Array(tot)
+              var ftot = fgw * fgh
+              var fld = new Array(ftot)
               var sil = root.wallpaperSilhouette
-              var hasSil = (sil && sil.length >= tot)
+              var hasSil = (sil && sil.length >= ftot)
 
-              for (var r = 0; r < gh; r++) {
-                for (var c = 0; c < gw; c++) {
-                  var k = r * gw + c
-                  var code = hasSil ? sil.charAt(k) : "0"
-                  var isEdge = (code === "2") ? 1 : 0
-                  var isInside = (code === "1" || code === "2") ? 1 : 0
-                  if (!hasSil) {
-                    var dx = (c / gw) - 0.5, dy = (r / gh) - 0.5
-                    isInside = (dx * dx + dy * dy * 1.4) < 0.14 ? 1 : 0
+              // Match exact Image.PreserveAspectCrop scaling and centering on any aspect ratio
+              var imgW = baseStaticWall.implicitWidth > 0 ? baseStaticWall.implicitWidth : 1920
+              var imgH = baseStaticWall.implicitHeight > 0 ? baseStaticWall.implicitHeight : 1080
+              var scrW = width > 0 ? width : 1920
+              var scrH = height > 0 ? height : 1080
+              var scale = Math.max(scrW / imgW, scrH / imgH)
+              var drawW = imgW * scale, drawH = imgH * scale
+              var offX = (scrW - drawW) * 0.5, offY = (scrH - drawH) * 0.5
+              cropU0 = Math.max(0.0, -offX / drawW)
+              cropUSpan = Math.min(1.0 - cropU0, scrW / drawW)
+              cropV0 = Math.max(0.0, -offY / drawH)
+              cropVSpan = Math.min(1.0 - cropV0, scrH / drawH)
+
+              var sumX = 0, sumY = 0, cntP = 0
+              for (var r = 0; r < fgh; r++) {
+                for (var c = 0; c < fgw; c++) {
+                  var k = r * fgw + c
+                  var v = 0.0
+                  if (hasSil) {
+                    var hv = parseInt(sil.charAt(k), 16)
+                    v = isNaN(hv) ? 0.0 : hv
+                  } else {
+                    var dx = (c / fgw) - 0.5, dy = (r / fgh) - 0.5
+                    var d = Math.sqrt(dx * dx * 2.8 + dy * dy * 3.2)
+                    v = Math.max(0.0, (1.0 - d) * 14.0)
                   }
-                  edg[k] = isEdge
-
-                  // Organic multi-cluster noise for patch growth
-                  var n1 = (Math.sin(c * 0.31 + r * 0.27) * Math.cos(r * 0.39 - c * 0.21) + 1.0) * 0.5
-                  var n2 = (Math.sin(c * 0.73 - r * 0.61) + 1.0) * 0.5
-                  var noise = n1 * 0.72 + n2 * 0.28
-                  var sweep = (c / gw) * 0.25 + noise * 0.75
-
-                  // Inside real silhouette opens first (0.10..0.54), background opens second (0.48..0.96)
-                  thr[k] = isInside ? (0.10 + noise * 0.44) : (0.48 + sweep * 0.48)
+                  fld[k] = v
+                  if (v >= 8.0) { sumX += c; sumY += r; cntP++ }
                 }
               }
-              cellEdge = edg; cellThresh = thr; mapReady = true
+
+              var cenX = cntP > 0 ? (sumX / cntP) : (fgw * 0.5)
+              var cenY = cntP > 0 ? (sumY / cntP) : (fgh * 0.5)
+
+              // 1. Extract closed radial perimeter around subject centroid (no diagonal branch jumps)
+              var iso = 7.5
+              var nAngles = 360
+              var bndPts = []
+              var maxR = Math.hypot(fgw, fgh)
+              for (var ai = 0; ai < nAngles; ai++) {
+                var ang = (ai / nAngles) * Math.PI * 2.0
+                var cosA = Math.cos(ang), sinA = Math.sin(ang)
+                var hitX = -1, hitY = -1
+                var prevV = 0.0, prevX = cenX, prevY = cenY
+                for (var rad = 1.0; rad < maxR; rad += 0.5) {
+                  var px = cenX + cosA * rad
+                  var py = cenY + sinA * rad
+                  var ix = Math.floor(px), iy = Math.floor(py)
+                  if (ix <= 1 || ix >= fgw - 2 || iy <= 1 || iy >= fgh - 2) break
+                  var curV = fld[iy * fgw + ix]
+                  if (prevV >= iso && curV < iso) {
+                    var tFrac = (prevV - curV) > 0.0001 ? ((prevV - iso) / (prevV - curV)) : 0.5
+                    hitX = prevX + (px - prevX) * tFrac
+                    hitY = prevY + (py - prevY) * tFrac
+                    break
+                  }
+                  prevV = curV; prevX = px; prevY = py
+                }
+                if (hitX >= 0) bndPts.push({x: hitX, y: hitY})
+              }
+
+              // Smooth closed perimeter
+              if (bndPts.length > 6) {
+                var sm = []
+                var blen = bndPts.length
+                for (var bi = 0; bi < blen; bi++) {
+                  var pPrev = bndPts[(bi - 1 + blen) % blen]
+                  var pCur = bndPts[bi]
+                  var pNext = bndPts[(bi + 1) % blen]
+                  sm.push({
+                    x: pPrev.x * 0.22 + pCur.x * 0.56 + pNext.x * 0.22,
+                    y: pPrev.y * 0.22 + pCur.y * 0.56 + pNext.y * 0.22
+                  })
+                }
+                bndPts = sm
+              }
+              contourPts = bndPts
+
+              // 2. Swarm expanding OUTWARD from the drawn closed contour:
+              // - Inside (fv >= iso): starts right at the contour (inNorm = 0) and expands inward (0.22 -> 0.55)
+              // - Outside (fv < iso): starts right at the contour (outDist = 0) and expands outward (0.58 -> 0.96)
+              var bkts = new Array(numBuckets)
+              for (var bInit = 0; bInit < numBuckets; bInit++) bkts[bInit] = []
+
+              for (var sy = 0; sy < sh; sy++) {
+                var vNorm = cropV0 + (sy / (sh - 1)) * cropVSpan
+                var fy = Math.max(0.0, Math.min(fgh - 1, vNorm * (fgh - 1)))
+                var y0 = Math.floor(fy), y1 = Math.min(fgh - 1, y0 + 1), wy = fy - y0
+                for (var sx = 0; sx < sw; sx++) {
+                  var uNorm = cropU0 + (sx / (sw - 1)) * cropUSpan
+                  var fx = Math.max(0.0, Math.min(fgw - 1, uNorm * (fgw - 1)))
+                  var x0 = Math.floor(fx), x1 = Math.min(fgw - 1, x0 + 1), wx = fx - x0
+                  var fv = (1 - wy) * ((1 - wx) * fld[y0 * fgw + x0] + wx * fld[y0 * fgw + x1]) + wy * ((1 - wx) * fld[y1 * fgw + x0] + wx * fld[y1 * fgw + x1])
+
+                  var h1 = Math.sin(sx * 12.9898 + sy * 78.233) * 43758.5453
+                  var jitter = h1 - Math.floor(h1)
+                  var ripple = (Math.sin(sx * 0.16 + sy * 0.14) + 1.0) * 0.5
+                  var tVal = 0.0
+
+                  if (fv >= iso) {
+                    // Expand from contour boundary (fv ~ iso) toward interior peak (fv ~ 15)
+                    var depthIn = Math.min(1.0, (fv - iso) / 7.5)
+                    tVal = 0.22 + depthIn * 0.20 + ripple * 0.05 + jitter * 0.08
+                  } else {
+                    // Expand from contour boundary (fv ~ iso) toward outer edges (fv ~ 0)
+                    var depthOut = Math.min(1.0, (iso - fv) / iso)
+                    tVal = 0.58 + depthOut * 0.22 + ripple * 0.06 + jitter * 0.10
+                  }
+
+                  var bIdx = Math.max(0, Math.min(numBuckets - 1, Math.floor(tVal * numBuckets)))
+                  bkts[bIdx].push((sy << 10) | sx)
+                }
+              }
+              swarmBuckets = bkts
+              lastBucket = -1
+              mapReady = true
             }
 
-            // Old wallpaper kept underneath and masked out as swarm patches grow
             Image {
               id: oldWallImg; anchors.fill: parent; source: root.prevWallSource
               fillMode: Image.PreserveAspectCrop; asynchronous: false; cache: true
@@ -1187,18 +1287,32 @@ ShellRoot {
             }
 
             Canvas {
-              id: oldMaskCanvas; width: transRoot.gw; height: transRoot.gh
+              id: oldMaskCanvas; width: transRoot.sw; height: transRoot.sh
               visible: false; layer.enabled: root.cfgWallpaperTransition === "swarm"; layer.smooth: true
               onPaint: {
-                var ctx = getContext("2d"); ctx.reset()
-                ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, width, height)
+                var ctx = getContext("2d")
+                if (!transRoot.mapReady || transRoot.lastBucket < 0) {
+                  ctx.reset()
+                  ctx.fillStyle = "#ffffff"
+                  ctx.fillRect(0, 0, width, height)
+                  transRoot.lastBucket = 0
+                }
                 if (!transRoot.mapReady) return
-                var p = transRoot.prog, thr = transRoot.cellThresh
-                for (var y = 0; y < height; y++) {
-                  for (var x = 0; x < width; x++) {
-                    if (p >= thr[y * width + x]) ctx.clearRect(x, y, 1.35, 1.35)
+                if (transRoot.prog >= 0.98) {
+                  ctx.clearRect(0, 0, width, height)
+                  return
+                }
+                var targetB = Math.min(transRoot.numBuckets - 1, Math.floor(transRoot.prog * transRoot.numBuckets))
+                var bkts = transRoot.swarmBuckets
+                for (var b = transRoot.lastBucket; b <= targetB; b++) {
+                  var arr = bkts[b]
+                  if (!arr) continue
+                  for (var i = 0; i < arr.length; i++) {
+                    var c = arr[i]
+                    ctx.clearRect((c & 1023) - 0.2, (c >> 10) - 0.2, 1.45, 1.45)
                   }
                 }
+                transRoot.lastBucket = targetB + 1
               }
             }
 
@@ -1208,36 +1322,50 @@ ShellRoot {
               maskEnabled: true; maskSource: oldMaskCanvas
             }
 
-            // Real subject contour outline drawn in primary accent color (root.color4)
+            // Closed continuous vector contour of the NEW wallpaper's subject
             Canvas {
               id: outlineCanvas; anchors.fill: parent
-              visible: root.cfgWallpaperTransition === "swarm"
-              opacity: transRoot.prog < 0.25 ? (transRoot.prog / 0.25) : Math.max(0, 1.0 - (transRoot.prog - 0.25) / 0.55)
+              visible: root.cfgWallpaperTransition === "swarm" && transRoot.prog < 0.68
+              opacity: transRoot.prog < 0.56 ? 1.0 : Math.max(0.0, 1.0 - (transRoot.prog - 0.56) / 0.10)
               onPaint: {
-                if (!transRoot.mapReady) return
                 var ctx = getContext("2d"); ctx.reset()
-                var cw = width / transRoot.gw, ch = height / transRoot.gh
-                var edg = transRoot.cellEdge, p = Math.min(1, transRoot.prog / 0.30)
-                var maxX = Math.floor(transRoot.gw * p)
-                ctx.fillStyle = root.color4.toString()
-                for (var y = 1; y < transRoot.gh - 1; y++) {
-                  for (var x = 1; x <= maxX && x < transRoot.gw - 1; x++) {
-                    if (edg[y * transRoot.gw + x]) ctx.fillRect(x * cw, y * ch, cw * 1.25, ch * 1.25)
-                  }
+                if (!transRoot.mapReady) return
+                var pts = transRoot.contourPts
+                if (!pts || pts.length < 3) return
+                var drawFrac = Math.min(1.0, transRoot.prog / 0.24)
+                var maxPts = Math.max(2, Math.floor(pts.length * drawFrac))
+                var invGw = 1.0 / (transRoot.fgw - 1), invGh = 1.0 / (transRoot.fgh - 1)
+                var u0 = transRoot.cropU0, v0 = transRoot.cropV0
+                var uSpan = transRoot.cropUSpan, vSpan = transRoot.cropVSpan
+
+                ctx.strokeStyle = root.color4.toString()
+                ctx.lineWidth = 2.4
+                ctx.lineCap = "round"
+                ctx.lineJoin = "round"
+                ctx.beginPath()
+                var x0 = ((pts[0].x * invGw - u0) / uSpan) * width
+                var y0 = ((pts[0].y * invGh - v0) / vSpan) * height
+                ctx.moveTo(x0, y0)
+                for (var i = 1; i < maxPts; i++) {
+                  var px = ((pts[i].x * invGw - u0) / uSpan) * width
+                  var py = ((pts[i].y * invGh - v0) / vSpan) * height
+                  ctx.lineTo(px, py)
                 }
+                if (drawFrac >= 0.99) ctx.closePath()
+                ctx.stroke()
               }
             }
 
             NumberAnimation {
               id: swarmAnim; target: transRoot; property: "prog"; from: 0.0; to: 1.0
-              duration: root.cfgWallpaperTransitionMs; easing.type: Easing.InOutQuad
+              duration: root.cfgWallpaperTransitionMs; easing.type: Easing.Linear
               onStopped: { root.wallTransitionActive = false; root.prevWallSource = "" }
             }
 
             onProgChanged: {
               if (root.cfgWallpaperTransition === "swarm") {
                 oldMaskCanvas.requestPaint()
-                outlineCanvas.requestPaint()
+                if (transRoot.prog <= 0.26 || transRoot.prog >= 0.55) outlineCanvas.requestPaint()
               }
             }
 
