@@ -281,6 +281,7 @@ PKGcheck () {
 	net=(iwd chrony) ; if [[ "${OSsel,,}" == "void" ]]; then net+=(NetworkManager) ; else net+=(networkmanager) ; fi ; if [[ "${OSsel,,}" == "artix" ]]; then net+=("iwd-${init_sys,,}" "chrony-${init_sys,,}" "networkmanager-${init_sys,,}") ; fi
 	print=(cups cups-pdf) ; if [[ "${OSsel,,}" == "void" ]]; then print+=(avahi-daemon cups-filters) ; else print+=(avahi system-config-printer) ; fi ; if [[ "${OSsel,,}" == "artix" ]]; then print+=("avahi-${init_sys,,}" "cups-${init_sys,,}") ; fi
 	utility=(imv featherpad ffmpeg libqalculate fd btop fwupd fastfetch grim slurp wf-recorder wlsunset libnotify wl-clipboard xclip swappy brightnessctl playerctl pavucontrol xorg-xwayland)
+	if [[ "$SHELLsel" == "Quickshell" && "${OSsel,,}" != "void" ]]; then utility+=(python-onnxruntime-cpu python-pillow python-numpy) ; fi
 	if [[ "$DEsel" == "Niri" && "$SHELLsel" != "Quickshell" ]]; then utility+=(awww) ; fi
 	if [[ "${OSsel,,}" != "void" ]]; then utility+=(lact cowfortune pacman-contrib) ; fi ; if [[ "${OSsel,,}" == "artix" ]]; then if [[ "$LUKS_ENC" -eq 1 ]]; then utility+=("cryptsetup-${init_sys,,}") ; fi ; fi
 	if compgen -G "/sys/class/power_supply/BAT*" >/dev/null; then if [[ "${OSsel,,}" == "arch" && "$DEsel" =~ ^(KDE|GNOME|COSMIC)$ ]]; then utility+=(power-profiles-daemon) ; else utility+=(tlp) ; if [[ "${OSsel,,}" == "artix" ]]; then utility+=("tlp-${init_sys,,}") ; fi ; fi ; if [[ "$CPU_TYPE" == "Intel" ]]; then utility+=(thermald) ; if [[ "${OSsel,,}" == "artix" ]]; then utility+=("thermald-${init_sys,,}") ; fi ; fi ; fi
@@ -507,6 +508,11 @@ UserSetup () {
 			elif [[ "$DEsel" == "Hyprland" ]]; then sed -i '/kb_layout/a \\tnumlock_by_default = true' "$cfg" ; fi
 		fi
 		if [[ "$SHELLsel" == "Quickshell" ]]; then
+			mkdir -p /mnt/usr/share/quickshell
+			if [[ ! -f /mnt/usr/share/quickshell/u2netp.onnx ]]; then
+				curl -fsSL -L -o /mnt/usr/share/quickshell/u2netp.onnx \
+				"https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2netp.onnx" 2>/dev/null || rm -f /mnt/usr/share/quickshell/u2netp.onnx
+			fi
 			mkdir -p /mnt/home/"$UNsel"/.config/{quickshell,wallust/templates}
 			sed -i -e '/\[templates\.fuzzel\]/,/^$/d' -e '/\[templates\.waybar\]/,/^$/d' -e '/\[templates\.quickshell\]/,/^$/d' -e '/\[templates\.niri\]/,/^$/d' /mnt/home/"$UNsel"/.config/wallust/wallust.toml
 			printf '{\n\t"wallpaper": "{{wallpaper}}",\n\t"wallMode": "static",\n\t"uiBlur": true,\n\t"uiAnimations": true,\n\t"firstRunDone": false,\n\t"background": "{{background}}",\n\t"foreground": "{{foreground}}",\n\t"color0": "{{color0}}",\n\t"color1": "{{color1}}",\n\t"color2": "{{color2}}",\n\t"color3": "{{color3}}",\n\t"color4": "{{color4}}",\n\t"color5": "{{color5}}",\n\t"color6": "{{color6}}",\n\t"color7": "{{color7}}",\n\t"color8": "{{color8}}",\n\t"color9": "{{color9}}",\n\t"color10": "{{color10}}",\n\t"color11": "{{color11}}",\n\t"color12": "{{color12}}",\n\t"color13": "{{color13}}",\n\t"color14": "{{color14}}",\n\t"color15": "{{color15}}"\n}\n' > /mnt/home/"$UNsel"/.config/wallust/templates/colors-quickshell.json
