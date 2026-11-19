@@ -509,10 +509,7 @@ UserSetup () {
 		fi
 		if [[ "$SHELLsel" == "Quickshell" ]]; then
 			mkdir -p /mnt/usr/share/quickshell
-			if [[ ! -f /mnt/usr/share/quickshell/u2netp.onnx ]]; then
-				curl -fsSL -L -o /mnt/usr/share/quickshell/u2netp.onnx \
-				"https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2netp.onnx" 2>/dev/null || rm -f /mnt/usr/share/quickshell/u2netp.onnx
-			fi
+			if [[ ! -f /mnt/usr/share/quickshell/u2netp.onnx ]]; then curl -fsSL -L -o /mnt/usr/share/quickshell/u2netp.onnx "https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2netp.onnx" 2>/dev/null || rm -f /mnt/usr/share/quickshell/u2netp.onnx ; fi
 			mkdir -p /mnt/home/"$UNsel"/.config/{quickshell,wallust/templates}
 			sed -i -e '/\[templates\.fuzzel\]/,/^$/d' -e '/\[templates\.waybar\]/,/^$/d' -e '/\[templates\.quickshell\]/,/^$/d' -e '/\[templates\.niri\]/,/^$/d' /mnt/home/"$UNsel"/.config/wallust/wallust.toml
 			printf '{\n\t"wallpaper": "{{wallpaper}}",\n\t"wallMode": "static",\n\t"uiBlur": true,\n\t"uiAnimations": true,\n\t"firstRunDone": false,\n\t"background": "{{background}}",\n\t"foreground": "{{foreground}}",\n\t"color0": "{{color0}}",\n\t"color1": "{{color1}}",\n\t"color2": "{{color2}}",\n\t"color3": "{{color3}}",\n\t"color4": "{{color4}}",\n\t"color5": "{{color5}}",\n\t"color6": "{{color6}}",\n\t"color7": "{{color7}}",\n\t"color8": "{{color8}}",\n\t"color9": "{{color9}}",\n\t"color10": "{{color10}}",\n\t"color11": "{{color11}}",\n\t"color12": "{{color12}}",\n\t"color13": "{{color13}}",\n\t"color14": "{{color14}}",\n\t"color15": "{{color15}}"\n}\n' > /mnt/home/"$UNsel"/.config/wallust/templates/colors-quickshell.json
