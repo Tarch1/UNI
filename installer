@@ -281,7 +281,7 @@ PKGcheck () {
 	net=(iwd chrony) ; if [[ "${OSsel,,}" == "void" ]]; then net+=(NetworkManager) ; else net+=(networkmanager) ; fi ; if [[ "${OSsel,,}" == "artix" ]]; then net+=("iwd-${init_sys,,}" "chrony-${init_sys,,}" "networkmanager-${init_sys,,}") ; fi
 	print=(cups cups-pdf) ; if [[ "${OSsel,,}" == "void" ]]; then print+=(avahi-daemon cups-filters) ; else print+=(avahi system-config-printer) ; fi ; if [[ "${OSsel,,}" == "artix" ]]; then print+=("avahi-${init_sys,,}" "cups-${init_sys,,}") ; fi
 	utility=(imv featherpad ffmpeg libqalculate fd btop fwupd fastfetch grim slurp wf-recorder wlsunset libnotify wl-clipboard xclip swappy brightnessctl playerctl pavucontrol xorg-xwayland)
-	if [[ "$SHELLsel" == "Quickshell" && "${OSsel,,}" != "void" ]]; then utility+=(python-onnxruntime-cpu python-pillow python-numpy) ; fi
+	if [[ "$SHELLsel" == "Quickshell" && ( "${OSsel,,}" == "arch" || ( "${OSsel,,}" == "artix" && "${ARCHrepo:-0}" == "1" ) ) ]]; then utility+=(python-onnxruntime-cpu python-pillow python-numpy) ; fi
 	if [[ "$DEsel" == "Niri" && "$SHELLsel" != "Quickshell" ]]; then utility+=(awww) ; fi
 	if [[ "${OSsel,,}" != "void" ]]; then utility+=(lact cowfortune pacman-contrib) ; fi ; if [[ "${OSsel,,}" == "artix" ]]; then if [[ "$LUKS_ENC" -eq 1 ]]; then utility+=("cryptsetup-${init_sys,,}") ; fi ; fi
 	if compgen -G "/sys/class/power_supply/BAT*" >/dev/null; then if [[ "${OSsel,,}" == "arch" && "$DEsel" =~ ^(KDE|GNOME|COSMIC)$ ]]; then utility+=(power-profiles-daemon) ; else utility+=(tlp) ; if [[ "${OSsel,,}" == "artix" ]]; then utility+=("tlp-${init_sys,,}") ; fi ; fi ; if [[ "$CPU_TYPE" == "Intel" ]]; then utility+=(thermald) ; if [[ "${OSsel,,}" == "artix" ]]; then utility+=("thermald-${init_sys,,}") ; fi ; fi ; fi
@@ -509,7 +509,21 @@ UserSetup () {
 		fi
 		if [[ "$SHELLsel" == "Quickshell" ]]; then
 			mkdir -p /mnt/usr/share/quickshell
-			if [[ ! -f /mnt/usr/share/quickshell/u2netp.onnx ]]; then curl -fsSL -L -o /mnt/usr/share/quickshell/u2netp.onnx "https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2netp.onnx" 2>/dev/null || rm -f /mnt/usr/share/quickshell/u2netp.onnx ; fi
+			if CR python3 -c "import onnxruntime, numpy, PIL" &>/dev/null; then
+				echo "Downloading MobileSAM silhouette models (~44 MB)..."
+				local sam_base="https://huggingface.co/Acly/MobileSAM/resolve/main"
+				for sam_f in mobile_sam_image_encoder.onnx sam_mask_decoder_multi.onnx; do
+					if [[ ! -f "/mnt/usr/share/quickshell/$sam_f" ]]; then
+						if curl -fsSL --connect-timeout 15 --max-time 180 -L -o "/mnt/usr/share/quickshell/${sam_f}.part" "${sam_base}/${sam_f}"; then
+							mv -f "/mnt/usr/share/quickshell/${sam_f}.part" "/mnt/usr/share/quickshell/${sam_f}"
+							chmod 644 "/mnt/usr/share/quickshell/${sam_f}"
+						else
+							rm -f "/mnt/usr/share/quickshell/${sam_f}.part" "/mnt/usr/share/quickshell/${sam_f}"
+							echo "[!] Warning: failed to download ${sam_f}. Falling back to ffmpeg+awk engine."
+						fi
+					fi
+				done
+			fi
 			mkdir -p /mnt/home/"$UNsel"/.config/{quickshell,wallust/templates}
 			sed -i -e '/\[templates\.fuzzel\]/,/^$/d' -e '/\[templates\.waybar\]/,/^$/d' -e '/\[templates\.quickshell\]/,/^$/d' -e '/\[templates\.niri\]/,/^$/d' /mnt/home/"$UNsel"/.config/wallust/wallust.toml
 			printf '{\n\t"wallpaper": "{{wallpaper}}",\n\t"wallMode": "static",\n\t"uiBlur": true,\n\t"uiAnimations": true,\n\t"firstRunDone": false,\n\t"background": "{{background}}",\n\t"foreground": "{{foreground}}",\n\t"color0": "{{color0}}",\n\t"color1": "{{color1}}",\n\t"color2": "{{color2}}",\n\t"color3": "{{color3}}",\n\t"color4": "{{color4}}",\n\t"color5": "{{color5}}",\n\t"color6": "{{color6}}",\n\t"color7": "{{color7}}",\n\t"color8": "{{color8}}",\n\t"color9": "{{color9}}",\n\t"color10": "{{color10}}",\n\t"color11": "{{color11}}",\n\t"color12": "{{color12}}",\n\t"color13": "{{color13}}",\n\t"color14": "{{color14}}",\n\t"color15": "{{color15}}"\n}\n' > /mnt/home/"$UNsel"/.config/wallust/templates/colors-quickshell.json
@@ -589,10 +603,10 @@ UserSetup () {
 		if [[ -f /mnt/home/"$UNsel"/.config/wallust/wallust.toml ]]; then sed -i "s|^[[:space:]]*palette *=.*|palette = \"$init_pal\"|" /mnt/home/"$UNsel"/.config/wallust/wallust.toml ; fi
 		if [[ -n "$init_wall" && -x /mnt/usr/bin/wallust ]]; then
 			CR_USER "wallust run -s \"$init_wall\"" || true
-			CR_USER "eval \"\$(sed -n '/^calibrate_and_apply_colors/,/^}/p' ~/.config/wallpapers/theme-switcher.sh)\"; QT6_DIR=~/.config/qt6ct/colors QS_DIR=~/.config/quickshell KITTY_CONF=~/.config/kitty/colors.conf HYPR_CONF=~/.config/hypr/colors.conf calibrate_and_apply_colors \"$init_sub\" \"$init_wall\" \"static\" \"$init_fx\" \"true\" \"false\"" || true
+			CR_USER "~/.config/wallpapers/theme-switcher.sh --init-only \"$init_sub\" \"$init_wall\" \"static\" \"$init_fx\" \"true\" \"false\"" || true
 		fi
 		if [[ "$SHELLsel" == "Quickshell" && ! -f /mnt/home/"$UNsel"/.config/quickshell/colors.json ]]; then
-			printf '{\n\t"wallpaper": "%s",\n\t"wallMode": "static",\n\t"uiBlur": %s,\n\t"uiAnimations": true,\n\t"firstRunDone": false,\n\t"background": "#1e1e2e",\n\t"foreground": "#cdd6f4",\n\t"color0": "#282a36",\n\t"color1": "#f38ba8",\n\t"color2": "#a6e3a1",\n\t"color3": "#f9e2af",\n\t"color4": "#89b4fa",\n\t"color5": "#cba6f7",\n\t"color6": "#94e2d5",\n\t"color7": "#bac2de",\n\t"color8": "#585b70",\n\t"color9": "#f38ba8",\n\t"color10": "#a6e3a1",\n\t"color11": "#f9e2af",\n\t"color12": "#89b4fa",\n\t"color13": "#cba6f7",\n\t"color14": "#94e2d5",\n\t"color15": "#cdd6f4"\n}\n' "$init_wall" "$init_fx" > /mnt/home/"$UNsel"/.config/quickshell/colors.json
+			printf '{\n\t"wallpaper": "%s",\n\t"silhouette": "",\n\t"wallMode": "static",\n\t"uiBlur": %s,\n\t"uiAnimations": true,\n\t"firstRunDone": false,\n\t"background": "#1e1e2e",\n\t"foreground": "#cdd6f4",\n\t"color0": "#282a36",\n\t"color1": "#f38ba8",\n\t"color2": "#a6e3a1",\n\t"color3": "#f9e2af",\n\t"color4": "#89b4fa",\n\t"color5": "#cba6f7",\n\t"color6": "#94e2d5",\n\t"color7": "#bac2de",\n\t"color8": "#585b70",\n\t"color9": "#f38ba8",\n\t"color10": "#a6e3a1",\n\t"color11": "#f9e2af",\n\t"color12": "#89b4fa",\n\t"color13": "#cba6f7",\n\t"color14": "#94e2d5",\n\t"color15": "#cdd6f4"\n}\n' "$init_wall" "$init_fx" > /mnt/home/"$UNsel"/.config/quickshell/colors.json
 		fi
 	fi
 	rm -f /mnt/etc/sudoers.d/99-installer-temp
