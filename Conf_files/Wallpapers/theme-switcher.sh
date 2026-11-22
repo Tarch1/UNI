@@ -12,13 +12,6 @@ DAY_PALETTE="light16"
 NIGHT_PALETTE="dark16"
 # ==============================================================================
 
-PIDFILE="/tmp/theme-switcher-$UID.pid"
-if [[ -f "$PIDFILE" ]]; then
-	old_pid=$(<"$PIDFILE")
-	[[ -n "$old_pid" && "$old_pid" != "$$" ]] && kill "$old_pid" 2>/dev/null || true
-fi
-echo "$$" > "$PIDFILE"
-
 WALL_DIR="$HOME/.config/wallpapers"
 DAY_DIR="$WALL_DIR/day"
 NIGHT_DIR="$WALL_DIR/night"
@@ -29,20 +22,22 @@ QS_DIR="$HOME/.config/quickshell"
 QT6_DIR="$HOME/.config/qt6ct/colors"
 KITTY_CONF="$HOME/.config/kitty/colors.conf"
 HYPR_CONF="$HOME/.config/hypr/colors.conf"
-FRAME_CACHE="/tmp/wall_frame.jpg"
-FORCED_MODE="${1:-}"
+RAW_QS_JSON="/tmp/wallust_raw_${UID:-0}.json"
 
-CURRENT_WALL=$(grep -o '"wallpaper": *"[^"]*"' "$QS_DIR/colors.json" 2>/dev/null | cut -d'"' -f4)
-CURRENT_THEME=""
-LAST_MODE=$(grep -o '"wallMode": *"[^"]*"' "$QS_DIR/colors.json" 2>/dev/null | cut -d'"' -f4)
-[[ -z "$LAST_MODE" ]] && LAST_MODE="static"
-if [[ -n "$CURRENT_WALL" && -f "$CURRENT_WALL" ]]; then
-	[[ "$CURRENT_WALL" == *"/day"* ]] && CURRENT_THEME="day"
-	[[ "$CURRENT_WALL" == *"/night"* ]] && CURRENT_THEME="night"
-else
-	CURRENT_WALL=""
-fi
-LAST_ROTATE_TS=$SECONDS
+USER_TAG="${USER:-$(id -un 2>/dev/null || echo user)}"
+USER_TAG="${USER_TAG,,}"
+FRAME_CACHE="/tmp/wall_frame_${USER_TAG}.jpg"
+FRAME_PREV="/tmp/wall_frame_prev_${USER_TAG}.jpg"
+SIL_TMP="/tmp/wall_sil_${UID:-0}_$$.txt"
+
+cleanup_children() {
+	pkill -P $$ 2>/dev/null || true
+	rm -f "$SIL_TMP" "${FRAME_CACHE}.tmp.$$.jpg" 2>/dev/null || true
+	if [[ -n "${PIDFILE:-}" && -f "$PIDFILE" && "$(<"$PIDFILE")" == "$$" ]]; then
+		rm -f "$PIDFILE" 2>/dev/null || true
+	fi
+}
+trap cleanup_children EXIT INT TERM
 
 get_wall_mode() {
 	if [[ "$FORCED_MODE" =~ ^(animated|static)$ ]]; then
@@ -70,275 +65,423 @@ sync_quickshell_state() {
 			-e "s|\"firstRunDone\": *[a-z]*|\"firstRunDone\": $fr|" "$tpl"
 	fi
 	if [[ -f "$WALLUST_TOML" ]]; then
-		sed -i "s|target *= *\"~/.config/quickshell/colors.json\"|target = \"$RAW_QS_JSON\"|" "$WALLUST_TOML"
+		sed -i "/^\[templates\.quickshell\]/,/^\[/{s|^[[:space:]]*target *=.*|target = \"$RAW_QS_JSON\"|}" "$WALLUST_TOML"
 	fi
+}
+
+extract_video_frame() {
+	local src="$1" dst="$2" tmp="${2}.tmp.$$.jpg"
+	command -v ffmpeg >/dev/null 2>&1 || return 1
+	if ffmpeg -y -loglevel quiet -i "$src" -frames:v 1 -vf "scale='min(1280,iw)':-1" -q:v 2 "$tmp" 2>/dev/null && [[ -s "$tmp" ]]; then
+		mv -f "$tmp" "$dst"
+		return 0
+	fi
+	rm -f "$tmp" 2>/dev/null || true
+	return 1
 }
 
 calibrate_and_apply_colors() {
 	local theme="$1" wall="$2" mode="$3" bl="$4" an="$5" fr="$6"
 	mkdir -p "$QT6_DIR" "$QS_DIR"
-	local src_json="${RAW_QS_JSON:-/tmp/wallust_raw_${UID:-0}.json}"
+	local src_json="$RAW_QS_JSON"
 	[[ ! -f "$src_json" ]] && src_json="$QS_DIR/colors.json"
 	[[ ! -f "$src_json" ]] && return 0
 
-	local probe_img="$wall" sil_file="/tmp/wall_sil_${UID:-0}.txt" u2_used=0
-	: > "$sil_file"
-	[[ "${wall,,}" =~ \.(webm|mp4)$ && -f "/tmp/wall_frame.jpg" ]] && probe_img="/tmp/wall_frame.jpg"
+	: > "$SIL_TMP"
+	local need_sil=0
+	if [[ "$an" == "true" ]] && command -v quickshell >/dev/null 2>&1; then
+		need_sil=1
+	fi
 
-	local model_path="" py_bin="python3"
-	for p in "/usr/share/quickshell/u2netp.onnx" "$HOME/.local/share/quickshell/u2netp.onnx"; do
-		[[ -f "$p" ]] && { model_path="$p"; break; }
-	done
-	[[ -x "/opt/u2net-venv/bin/python" ]] && py_bin="/opt/u2net-venv/bin/python"
+	if [[ "$need_sil" -eq 1 ]]; then
+		local probe_img="$wall" sil_ready=0
+		if [[ "${wall,,}" =~ \.(webm|mp4)$ ]]; then
+			[[ ! -f "$FRAME_CACHE" ]] && extract_video_frame "$wall" "$FRAME_CACHE" || true
+			[[ -f "$FRAME_CACHE" ]] && probe_img="$FRAME_CACHE"
+		fi
 
-	if [[ -f "$probe_img" && -n "$model_path" ]] && "$py_bin" -c "import onnxruntime, numpy, PIL" 2>/dev/null; then
-		if "$py_bin" - "$probe_img" "$model_path" "$sil_file" <<'PYEOF' 2>/dev/null; then
+		local sam_enc="" sam_dec="" d
+		for d in "/usr/share/quickshell" "$HOME/.local/share/quickshell"; do
+			if [[ -f "$d/mobile_sam_image_encoder.onnx" && -f "$d/sam_mask_decoder_multi.onnx" ]]; then
+				sam_enc="$d/mobile_sam_image_encoder.onnx"
+				sam_dec="$d/sam_mask_decoder_multi.onnx"
+				break
+			fi
+		done
+
+		local cache_dir="$HOME/.cache/quickshell/silhouettes"
+		mkdir -p "$cache_dir"
+		local wall_meta sam_key sam_cache awk_key awk_cache
+		wall_meta=$(stat -c '%Y:%s' "$wall" 2>/dev/null || echo "0:0")
+		sam_key=$(printf '%s|%s|mobilesam_v1' "$wall" "$wall_meta" | sha256sum | cut -c1-16)
+		sam_cache="$cache_dir/mobilesam_v1_${sam_key}.txt"
+		awk_key=$(printf '%s|%s|awk_v1' "$wall" "$wall_meta" | sha256sum | cut -c1-16)
+		awk_cache="$cache_dir/awk_v1_${awk_key}.txt"
+
+		# 1. Fast path: MobileSAM multi-silhouette cache hit (<5ms, 0% CPU)
+		if [[ -n "$sam_enc" && -f "$sam_cache" && -s "$sam_cache" ]]; then
+			shuf -n 1 "$sam_cache" | tr -d '\r\n' > "$SIL_TMP"
+			[[ $(wc -c < "$SIL_TMP") -ge 72720 ]] && sil_ready=1
+		fi
+
+		# 2. Primary engine: MobileSAM (CPU-polite via nice -n 15, saves up to 5 clean objects)
+		if [[ "$sil_ready" -eq 0 && -f "$probe_img" && -n "$sam_enc" ]] && python3 -c "import onnxruntime, numpy, PIL" 2>/dev/null; then
+			local run_nice=()
+			command -v nice >/dev/null 2>&1 && run_nice=(nice -n 15)
+			if "${run_nice[@]}" python3 - "$probe_img" "$sam_enc" "$sam_dec" "$sam_cache" <<'PYEOF' 2>/dev/null; then
+import os
 import sys
 from collections import deque
 import numpy as np
-from PIL import Image, ImageFilter
+from PIL import Image
 import onnxruntime as ort
 
-img_path, model_path, out_path = sys.argv[1], sys.argv[2], sys.argv[3]
+def largest_component(mask_bool):
+    h, w = mask_bool.shape
+    lbl = np.zeros((h, w), dtype=np.int32)
+    sizes = [0]
+    cid = 0
+    for y in range(h):
+        for x in range(w):
+            if mask_bool[y, x] and lbl[y, x] == 0:
+                cid += 1
+                cnt = 0
+                q = deque([(y, x)])
+                lbl[y, x] = cid
+                while q:
+                    cy, cx = q.popleft()
+                    cnt += 1
+                    if cx > 0 and mask_bool[cy, cx - 1] and lbl[cy, cx - 1] == 0:
+                        lbl[cy, cx - 1] = cid; q.append((cy, cx - 1))
+                    if cx < w - 1 and mask_bool[cy, cx + 1] and lbl[cy, cx + 1] == 0:
+                        lbl[cy, cx + 1] = cid; q.append((cy, cx + 1))
+                    if cy > 0 and mask_bool[cy - 1, cx] and lbl[cy - 1, cx] == 0:
+                        lbl[cy - 1, cx] = cid; q.append((cy - 1, cx))
+                    if cy < h - 1 and mask_bool[cy + 1, cx] and lbl[cy + 1, cx] == 0:
+                        lbl[cy + 1, cx] = cid; q.append((cy + 1, cx))
+                sizes.append(cnt)
+    if cid == 0:
+        return np.zeros((h, w), dtype=bool), 0
+    best = int(np.argmax(sizes[1:])) + 1
+    return (lbl == best), sizes[best]
+
+def fill_holes(mask_bool):
+    h, w = mask_bool.shape
+    ext = np.zeros((h, w), dtype=bool)
+    q = deque()
+    for x in range(w):
+        if not mask_bool[0, x]:
+            ext[0, x] = True; q.append((0, x))
+        if not mask_bool[h - 1, x]:
+            ext[h - 1, x] = True; q.append((h - 1, x))
+    for y in range(1, h - 1):
+        if not mask_bool[y, 0]:
+            ext[y, 0] = True; q.append((y, 0))
+        if not mask_bool[y, w - 1]:
+            ext[y, w - 1] = True; q.append((y, w - 1))
+    while q:
+        cy, cx = q.popleft()
+        if cx > 0 and not mask_bool[cy, cx - 1] and not ext[cy, cx - 1]:
+            ext[cy, cx - 1] = True; q.append((cy, cx - 1))
+        if cx < w - 1 and not mask_bool[cy, cx + 1] and not ext[cy, cx + 1]:
+            ext[cy, cx + 1] = True; q.append((cy, cx + 1))
+        if cy > 0 and not mask_bool[cy - 1, cx] and not ext[cy - 1, cx]:
+            ext[cy - 1, cx] = True; q.append((cy - 1, cx))
+        if cy < h - 1 and not mask_bool[cy + 1, cx] and not ext[cy + 1, cx]:
+            ext[cy + 1, cx] = True; q.append((cy + 1, cx))
+    return ~ext
+
+def dedup_pick(cands, limit=5):
+    cands.sort(key=lambda x: x[0], reverse=True)
+    picked = []
+    for item in cands:
+        m = item[1]
+        dup = False
+        for _, pm in picked:
+            inter = np.logical_and(m, pm).sum()
+            union = np.logical_or(m, pm).sum()
+            if union > 0 and (inter / union) > 0.45:
+                dup = True
+                break
+        if not dup:
+            picked.append(item)
+        if len(picked) >= limit:
+            break
+    return picked
+
+img_path, enc_path, dec_path, out_cache = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 gw, gh = 360, 202
 
-sess_opts = ort.SessionOptions()
-sess_opts.intra_op_num_threads = 2
-sess_opts.inter_op_num_threads = 1
-sess = ort.InferenceSession(model_path, sess_options=sess_opts, providers=["CPUExecutionProvider"])
-in_name = sess.get_inputs()[0].name
+ncpu = os.cpu_count() or 2
+opts = ort.SessionOptions()
+opts.intra_op_num_threads = max(2, min(4, ncpu // 2 if ncpu >= 4 else ncpu))
+opts.inter_op_num_threads = 1
+enc = ort.InferenceSession(enc_path, opts, providers=["CPUExecutionProvider"])
+dec = ort.InferenceSession(dec_path, opts, providers=["CPUExecutionProvider"])
+ein = enc.get_inputs()[0]
 
 im = Image.open(img_path).convert("RGB")
-im_net = im.resize((320, 320), Image.Resampling.BILINEAR)
-arr = np.asarray(im_net, dtype=np.float32) / 255.0
-mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
-std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
-arr = ((arr - mean) / std).transpose(2, 0, 1)[None, ...]
+ow, oh = im.size
+scale = 1024.0 / max(ow, oh)
+nw, nh = int(round(ow * scale)), int(round(oh * scale))
+im_r = im.resize((nw, nh), Image.Resampling.BILINEAR)
 
-pred = sess.run(None, {in_name: arr})[0][0, 0]
-pred = np.clip(pred, 0.0, 1.0)
-mask_im = Image.fromarray((pred * 255.0).astype(np.uint8), mode="L").resize((gw, gh), Image.Resampling.BILINEAR)
-m = np.asarray(mask_im, dtype=np.float32) / 255.0
+if len(ein.shape) == 3:
+    enc_arr = np.asarray(im_r, dtype=np.float32)
+else:
+    arr = (np.asarray(im_r, dtype=np.float32) - np.array([123.675, 116.28, 103.53], np.float32)) / np.array([58.395, 57.12, 57.375], np.float32)
+    pad = np.zeros((1024, 1024, 3), dtype=np.float32)
+    pad[:nh, :nw, :] = arr
+    enc_arr = pad.transpose(2, 0, 1)[None, ...]
 
-thr = float(np.percentile(m, 78))
-thr = max(0.35, min(0.75, thr))
-fg = m >= thr
+emb = enc.run(None, {ein.name: enc_arr})[0]
+tw = 360
+th = max(120, int(round(360 * oh / ow)))
+orig_size = np.array([th, tw], dtype=np.float32)
+mask_in = np.zeros((1, 1, 256, 256), dtype=np.float32)
+has_mask = np.zeros((1,), dtype=np.float32)
 
-h, w = fg.shape
-ext = np.zeros((h, w), dtype=bool)
-q = deque()
-for x in range(w):
-	if not fg[0, x]:
-		ext[0, x] = True; q.append((0, x))
-	if not fg[h - 1, x]:
-		ext[h - 1, x] = True; q.append((h - 1, x))
-for y in range(1, h - 1):
-	if not fg[y, 0]:
-		ext[y, 0] = True; q.append((y, 0))
-	if not fg[y, w - 1]:
-		ext[y, w - 1] = True; q.append((y, w - 1))
+gx_list = (0.09, 0.21, 0.33, 0.44, 0.56, 0.67, 0.79, 0.91)
+gy_list = (0.14, 0.33, 0.52, 0.71, 0.88)
 
-while q:
-	cy, cx = q.popleft()
-	if cx > 0 and not fg[cy, cx - 1] and not ext[cy, cx - 1]:
-		ext[cy, cx - 1] = True; q.append((cy, cx - 1))
-	if cx < w - 1 and not fg[cy, cx + 1] and not ext[cy, cx + 1]:
-		ext[cy, cx + 1] = True; q.append((cy, cx + 1))
-	if cy > 0 and not fg[cy - 1, cx] and not ext[cy - 1, cx]:
-		ext[cy - 1, cx] = True; q.append((cy - 1, cx))
-	if cy < h - 1 and not fg[cy + 1, cx] and not ext[cy + 1, cx]:
-		ext[cy + 1, cx] = True; q.append((cy + 1, cx))
+strict_cands = []
+relaxed_cands = []
 
-closed = (~ext).astype(np.float32) * 15.0
-sm_im = Image.fromarray(closed.astype(np.uint8), mode="L").filter(ImageFilter.BoxBlur(1))
-q_arr = np.clip(np.round(np.asarray(sm_im, dtype=np.float32)), 0, 15).astype(np.uint8)
-hex_chars = "0123456789abcdef"
-out_str = "".join(hex_chars[v] for v in q_arr.ravel())
-with open(out_path, "w", encoding="ascii") as f:
-	f.write(out_str)
+for gy in gy_list:
+    for gx in gx_list:
+        pts = np.array([[[gx * nw, gy * nh], [0.0, 0.0]]], dtype=np.float32)
+        lbl = np.array([[1.0, -1.0]], dtype=np.float32)
+        masks, ious, _ = dec.run(None, {
+            "image_embeddings": emb,
+            "point_coords": pts,
+            "point_labels": lbl,
+            "mask_input": mask_in,
+            "has_mask_input": has_mask,
+            "orig_im_size": orig_size,
+        })
+        k_range = range(1, masks.shape[1]) if masks.shape[1] >= 4 else range(masks.shape[1])
+        for k in k_range:
+            iou = float(ious[0, k])
+            if iou < 0.82:
+                continue
+            logits = masks[0, k]
+            m = logits > 0.0
+            frac = float(m.mean())
+            if not (0.0045 <= frac <= 0.28):
+                continue
+            m_lo = logits > -1.0
+            m_hi = logits > 1.0
+            u_st = int(np.logical_or(m_lo, m_hi).sum())
+            if u_st == 0:
+                continue
+            stab = float(np.logical_and(m_lo, m_hi).sum()) / u_st
+            if stab < 0.84:
+                continue
+            border_touch = (m[0, :].mean() + m[-1, :].mean() + m[:, 0].mean() + m[:, -1].mean()) / 4.0
+            if border_touch > 0.16:
+                continue
+            tot_px = int(m.sum())
+            main_m, main_px = largest_component(m)
+            if (main_px / max(1, tot_px)) < 0.88:
+                continue
+            clean_m = fill_holes(main_m)
+            hole_ratio = (int(clean_m.sum()) - main_px) / max(1, main_px)
+            if hole_ratio > 0.30:
+                continue
+
+            interior_bonus = 0.045 if border_touch < 0.01 else 0.0
+            score = iou * stab + interior_bonus
+            if iou >= 0.88 and stab >= 0.90:
+                strict_cands.append((score, clean_m))
+            else:
+                relaxed_cands.append((score, clean_m))
+
+picked = dedup_pick(strict_cands, 5)
+if len(picked) < 2 and relaxed_cands:
+    picked = dedup_pick(strict_cands + relaxed_cands, 4)
+
+if not picked:
+    sys.exit(1)
+
+lines = []
+for _, cm in picked:
+    if cm.shape != (gh, gw):
+        cm_img = Image.fromarray((cm.astype(np.uint8) * 255)).resize((gw, gh), Image.Resampling.NEAREST)
+        cm = np.asarray(cm_img) > 127
+    lines.append("".join("f" if v else "0" for v in cm.ravel()))
+
+tmp_cache = f"{out_cache}.{os.getpid()}.tmp"
+with open(tmp_cache, "w", encoding="ascii") as f:
+    for ln in lines:
+        f.write(ln + "\n")
+os.replace(tmp_cache, out_cache)
 PYEOF
-			[[ $(wc -c < "$sil_file") -ge 72720 ]] && u2_used=1
+				if [[ -f "$sam_cache" && -s "$sam_cache" ]]; then
+					shuf -n 1 "$sam_cache" | tr -d '\r\n' > "$SIL_TMP"
+					[[ $(wc -c < "$SIL_TMP") -ge 72720 ]] && sil_ready=1
+				fi
+			fi
 		fi
-	fi
 
-	if [[ "$u2_used" -eq 0 && -f "$probe_img" ]] && command -v ffmpeg >/dev/null 2>&1; then
-		ffmpeg -v quiet -i "$probe_img" -frames:v 1 -vf "scale=360:202:flags=area" -pix_fmt rgb24 -f rawvideo - 2>/dev/null | od -An -tu1 -v | LC_ALL=C awk '
-		function abs(v) { return v < 0 ? -v : v }
-		function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v) }
-		{
-			for (i = 1; i <= NF; i++) raw[n++] = $i
-		}
-		END {
-			gw = 360; gh = 202; tot = gw * gh
-			if (n < tot * 3) exit 0
-			for (p = 0; p < tot; p++) {
-				b = p * 3
-				R[p] = raw[b]; G[p] = raw[b + 1]; B[p] = raw[b + 2]
+		# 3. Fallback cache hit (Void / Artix without Arch repos / offline fallback)
+		if [[ "$sil_ready" -eq 0 && -f "$awk_cache" && -s "$awk_cache" ]]; then
+			tr -d '\r\n' < "$awk_cache" > "$SIL_TMP"
+			[[ $(wc -c < "$SIL_TMP") -ge 72720 ]] && sil_ready=1
+		fi
+
+		# 4. Zero-dependency fallback engine: ffmpeg + awk
+		if [[ "$sil_ready" -eq 0 && -f "$probe_img" ]] && command -v ffmpeg >/dev/null 2>&1; then
+			ffmpeg -v quiet -i "$probe_img" -frames:v 1 -vf "scale=360:202:flags=area" -pix_fmt rgb24 -f rawvideo - 2>/dev/null | od -An -tu1 -v | LC_ALL=C awk '
+			function abs(v) { return v < 0 ? -v : v }
+			function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v) }
+			{
+				for (i = 1; i <= NF; i++) raw[n++] = $i
 			}
-
-			for (y = 1; y < gh - 1; y++) {
-				row = y * gw
-				for (x = 1; x < gw - 1; x++) {
-					i = row + x
-					gx = abs(R[i + 1] - R[i - 1]) + abs(G[i + 1] - G[i - 1]) + abs(B[i + 1] - B[i - 1])
-					gy = abs(R[i + gw] - R[i - gw]) + abs(G[i + gw] - G[i - gw]) + abs(B[i + gw] - B[i - gw])
-					grad[i] = (gx + gy) * 0.5
+			END {
+				gw = 360; gh = 202; tot = gw * gh
+				if (n < tot * 3) exit 0
+				for (p = 0; p < tot; p++) {
+					b = p * 3
+					R[p] = raw[b]; G[p] = raw[b + 1]; B[p] = raw[b + 2]
 				}
-			}
-
-			head = 0; tail = 0
-			for (x = 0; x < gw; x++) {
-				iT = x; iB = (gh - 1) * gw + x
-				is_bg[iT] = 1; oR[iT] = R[iT]; oG[iT] = G[iT]; oB[iT] = B[iT]; q[tail++] = iT
-				is_bg[iB] = 1; oR[iB] = R[iB]; oG[iB] = G[iB]; oB[iB] = B[iB]; q[tail++] = iB
-			}
-			for (y = 1; y < gh - 1; y++) {
-				iL = y * gw; iR = y * gw + (gw - 1)
-				is_bg[iL] = 1; oR[iL] = R[iL]; oG[iL] = G[iL]; oB[iL] = B[iL]; q[tail++] = iL
-				is_bg[iR] = 1; oR[iR] = R[iR]; oG[iR] = G[iR]; oB[iR] = B[iR]; q[tail++] = iR
-			}
-
-			while (head < tail) {
-				u = q[head++]
-				ux = u % gw; uy = int(u / gw)
-				nb[0] = (ux > 0) ? u - 1 : -1
-				nb[1] = (ux < gw - 1) ? u + 1 : -1
-				nb[2] = (uy > 0) ? u - gw : -1
-				nb[3] = (uy < gh - 1) ? u + gw : -1
-				for (k = 0; k < 4; k++) {
-					v = nb[k]
-					if (v < 0 || is_bg[v]) continue
-					step_d = abs(R[v] - R[u]) + abs(G[v] - G[u]) + abs(B[v] - B[u])
-					orig_d = abs(R[v] - oR[u]) + abs(G[v] - oG[u]) + abs(B[v] - oB[u])
-					chr_d = abs((R[v] - G[v]) - (oR[u] - oG[u])) + abs((G[v] - B[v]) - (oG[u] - oB[u]))
-					if (step_d <= 44 && grad[v] <= 52 && orig_d <= 105 && chr_d <= 75) {
-						is_bg[v] = 1
-						oR[v] = int(oR[u] * 0.96 + R[v] * 0.04)
-						oG[v] = int(oG[u] * 0.96 + G[v] * 0.04)
-						oB[v] = int(oB[u] * 0.96 + B[v] * 0.04)
-						q[tail++] = v
-					}
-				}
-			}
-
-			best_cid = 0; best_score = -1; cid = 0
-			for (y = 4; y < gh - 4; y++) {
-				for (x = 4; x < gw - 4; x++) {
-					start_i = y * gw + x
-					if (is_bg[start_i] || comp[start_i]) continue
-					cid++
-					ch_head = 0; ch_tail = 0
-					cq[ch_tail++] = start_i
-					comp[start_i] = cid
-					c_size = 0; sum_x = 0; sum_y = 0
-					while (ch_head < ch_tail) {
-						u = cq[ch_head++]
-						ux = u % gw; uy = int(u / gw)
-						c_size++; sum_x += ux; sum_y += uy
-						if (ux > 2 && !is_bg[u - 1] && !comp[u - 1]) { comp[u - 1] = cid; cq[ch_tail++] = u - 1 }
-						if (ux < gw - 3 && !is_bg[u + 1] && !comp[u + 1]) { comp[u + 1] = cid; cq[ch_tail++] = u + 1 }
-						if (uy > 2 && !is_bg[u - gw] && !comp[u - gw]) { comp[u - gw] = cid; cq[ch_tail++] = u - gw }
-						if (uy < gh - 3 && !is_bg[u + gw] && !comp[u + gw]) { comp[u + gw] = cid; cq[ch_tail++] = u + gw }
-					}
-					comp_sz[cid] = c_size
-					if (c_size >= int(tot * 0.015)) {
-						cx = (sum_x / c_size) / gw - 0.5
-						cy = (sum_y / c_size) / gh - 0.5
-						c_w = clamp(1.0 - (cx * cx * 2.2 + cy * cy * 2.2), 0.25, 1.0)
-						sc = c_size * c_w
-						if (sc > best_score) { best_score = sc; best_cid = cid }
-					}
-				}
-			}
-
-			best_sz = (best_cid > 0) ? comp_sz[best_cid] : 0
-			if (best_cid > 0 && best_sz >= int(tot * 0.025) && best_sz <= int(tot * 0.28)) {
-				for (i = 0; i < tot; i++) {
-					if (comp[i] == best_cid) inSil[i] = 1
-				}
-			} else {
-				seed = int(gh * 0.55) * gw + int(gw * 0.5)
-				best_seed_sc = -1
-				for (y = int(gh * 0.22); y <= int(gh * 0.82); y += 3) {
+				for (y = 1; y < gh - 1; y++) {
 					row = y * gw
-					for (x = int(gw * 0.18); x <= int(gw * 0.82); x += 3) {
+					for (x = 1; x < gw - 1; x++) {
 						i = row + x
-						if (is_bg[i]) continue
-						dx = (x / gw) - 0.5; dy = (y / gh) - 0.55
-						cw = clamp(1.0 - (dx * dx * 2.0 + dy * dy * 2.0), 0.3, 1.0)
-						loc_g = grad[i] + grad[i - 2] + grad[i + 2] + grad[i - 2 * gw] + grad[i + 2 * gw]
-						sc = loc_g * cw
-						if (sc > best_seed_sc) { best_seed_sc = sc; seed = i }
+						gx = abs(R[i + 1] - R[i - 1]) + abs(G[i + 1] - G[i - 1]) + abs(B[i + 1] - B[i - 1])
+						gy = abs(R[i + gw] - R[i - gw]) + abs(G[i + gw] - G[i - gw]) + abs(B[i + gw] - B[i - gw])
+						grad[i] = (gx + gy) * 0.5
 					}
 				}
-				sR = R[seed]; sG = G[seed]; sB = B[seed]
-				target = int(tot * 0.11)
-				vis[seed] = 1; b_cnt[255] = 1; b_dat[255, 0] = seed
-				cur_b = 255; picked = 0
-				while (picked < target) {
-					while (cur_b >= 20 && b_cnt[cur_b] <= 0) cur_b--
-					if (cur_b < 20) break
-					u = b_dat[cur_b, --b_cnt[cur_b]]
-					inSil[u] = 1; picked++
+				head = 0; tail = 0
+				for (x = 0; x < gw; x++) {
+					iT = x; iB = (gh - 1) * gw + x
+					is_bg[iT] = 1; oR[iT] = R[iT]; oG[iT] = G[iT]; oB[iT] = B[iT]; q[tail++] = iT
+					is_bg[iB] = 1; oR[iB] = R[iB]; oG[iB] = G[iB]; oB[iB] = B[iB]; q[tail++] = iB
+				}
+				for (y = 1; y < gh - 1; y++) {
+					iL = y * gw; iR = y * gw + (gw - 1)
+					is_bg[iL] = 1; oR[iL] = R[iL]; oG[iL] = G[iL]; oB[iL] = B[iL]; q[tail++] = iL
+					is_bg[iR] = 1; oR[iR] = R[iR]; oG[iR] = G[iR]; oB[iR] = B[iR]; q[tail++] = iR
+				}
+				while (head < tail) {
+					u = q[head++]
 					ux = u % gw; uy = int(u / gw)
-					if (ux <= 4 || ux >= gw - 5 || uy <= 4 || uy >= gh - 5) continue
-					nb[0] = u - 1; nb[1] = u + 1; nb[2] = u - gw; nb[3] = u + gw
+					nb[0] = (ux > 0) ? u - 1 : -1
+					nb[1] = (ux < gw - 1) ? u + 1 : -1
+					nb[2] = (uy > 0) ? u - gw : -1
+					nb[3] = (uy < gh - 1) ? u + gw : -1
 					for (k = 0; k < 4; k++) {
 						v = nb[k]
-						if (!vis[v] && !is_bg[v]) {
-							vis[v] = 1
-							step_d = abs(R[v] - R[u]) + abs(G[v] - G[u]) + abs(B[v] - B[u])
-							seed_d = abs(R[v] - sR) + abs(G[v] - sG) + abs(B[v] - sB)
-							pr = clamp(int(240 - step_d * 1.4 - seed_d * 0.45 - grad[v] * 0.6), 1, 255)
-							idx_b = b_cnt[pr] + 0
-							b_dat[pr, idx_b] = v
-							b_cnt[pr] = idx_b + 1
-							if (pr > cur_b) cur_b = pr
+						if (v < 0 || is_bg[v]) continue
+						step_d = abs(R[v] - R[u]) + abs(G[v] - G[u]) + abs(B[v] - B[u])
+						orig_d = abs(R[v] - oR[u]) + abs(G[v] - oG[u]) + abs(B[v] - oB[u])
+						chr_d = abs((R[v] - G[v]) - (oR[u] - oG[u])) + abs((G[v] - B[v]) - (oG[u] - oB[u]))
+						if (step_d <= 44 && grad[v] <= 52 && orig_d <= 105 && chr_d <= 75) {
+							is_bg[v] = 1
+							oR[v] = int(oR[u] * 0.96 + R[v] * 0.04)
+							oG[v] = int(oG[u] * 0.96 + G[v] * 0.04)
+							oB[v] = int(oB[u] * 0.96 + B[v] * 0.04)
+							q[tail++] = v
 						}
 					}
 				}
-			}
-
-			eq[0] = 0; ext[0] = 1; ehead = 0; etail = 1
-			while (ehead < etail) {
-				u = eq[ehead++]
-				ux = u % gw; uy = int(u / gw)
-				if (ux > 0 && !inSil[u - 1] && !ext[u - 1]) { ext[u - 1] = 1; eq[etail++] = u - 1 }
-				if (ux < gw - 1 && !inSil[u + 1] && !ext[u + 1]) { ext[u + 1] = 1; eq[etail++] = u + 1 }
-				if (uy > 0 && !inSil[u - gw] && !ext[u - gw]) { ext[u - gw] = 1; eq[etail++] = u - gw }
-				if (uy < gh - 1 && !inSil[u + gw] && !ext[u + gw]) { ext[u + gw] = 1; eq[etail++] = u + gw }
-			}
-
-			for (y = 2; y < gh - 2; y++) {
-				row = y * gw
-				for (x = 2; x < gw - 2; x++) {
-					i = row + x
-					closed[i] = (!ext[i]) ? 15.0 : 0.0
-				}
-			}
-
-			hex = "0123456789abcdef"
-			out = ""
-			for (y = 0; y < gh; y++) {
-				row = y * gw
-				for (x = 0; x < gw; x++) {
-					i = row + x
-					if (y <= 1 || y >= gh - 2 || x <= 1 || x >= gw - 2) {
-						q_val = 0
-					} else {
-						sm = (closed[i] * 6.0 + (closed[i - 1] + closed[i + 1] + closed[i - gw] + closed[i + gw]) * 2.0 + closed[i - gw - 1] + closed[i - gw + 1] + closed[i + gw - 1] + closed[i + gw + 1]) / 18.0
-						q_val = clamp(int(sm + 0.5), 0, 15)
+				best_cid = 0; best_score = -1; cid = 0
+				for (y = 4; y < gh - 4; y++) {
+					for (x = 4; x < gw - 4; x++) {
+						start_i = y * gw + x
+						if (is_bg[start_i] || comp[start_i]) continue
+						cid++
+						ch_head = 0; ch_tail = 0
+						cq[ch_tail++] = start_i
+						comp[start_i] = cid
+						c_size = 0; sum_x = 0; sum_y = 0
+						while (ch_head < ch_tail) {
+							u = cq[ch_head++]
+							ux = u % gw; uy = int(u / gw)
+							c_size++; sum_x += ux; sum_y += uy
+							if (ux > 2 && !is_bg[u - 1] && !comp[u - 1]) { comp[u - 1] = cid; cq[ch_tail++] = u - 1 }
+							if (ux < gw - 3 && !is_bg[u + 1] && !comp[u + 1]) { comp[u + 1] = cid; cq[ch_tail++] = u + 1 }
+							if (uy > 2 && !is_bg[u - gw] && !comp[u - gw]) { comp[u - gw] = cid; cq[ch_tail++] = u - gw }
+							if (uy < gh - 3 && !is_bg[u + gw] && !comp[u + gw]) { comp[u + gw] = cid; cq[ch_tail++] = u + gw }
+						}
+						comp_sz[cid] = c_size
+						if (c_size >= int(tot * 0.015)) {
+							cx = (sum_x / c_size) / gw - 0.5
+							cy = (sum_y / c_size) / gh - 0.5
+							c_w = clamp(1.0 - (cx * cx * 2.2 + cy * cy * 2.2), 0.25, 1.0)
+							sc = c_size * c_w
+							if (sc > best_score) { best_score = sc; best_cid = cid }
+						}
 					}
-					out = out substr(hex, q_val + 1, 1)
 				}
-			}
-			printf "%s", out
-		}' > "$sil_file" 2>/dev/null || true
+				best_sz = (best_cid > 0) ? comp_sz[best_cid] : 0
+				if (best_cid > 0 && best_sz >= int(tot * 0.025) && best_sz <= int(tot * 0.30)) {
+					for (i = 0; i < tot; i++) if (comp[i] == best_cid) inSil[i] = 1
+				} else {
+					seed = int(gh * 0.55) * gw + int(gw * 0.5)
+					best_seed_sc = -1
+					for (y = int(gh * 0.22); y <= int(gh * 0.82); y += 3) {
+						row = y * gw
+						for (x = int(gw * 0.18); x <= int(gw * 0.82); x += 3) {
+							i = row + x
+							if (is_bg[i]) continue
+							dx = (x / gw) - 0.5; dy = (y / gh) - 0.55
+							cw = clamp(1.0 - (dx * dx * 2.0 + dy * dy * 2.0), 0.3, 1.0)
+							loc_g = grad[i] + grad[i - 2] + grad[i + 2] + grad[i - 2 * gw] + grad[i + 2 * gw]
+							sc = loc_g * cw
+							if (sc > best_seed_sc) { best_seed_sc = sc; seed = i }
+						}
+					}
+					sR = R[seed]; sG = G[seed]; sB = B[seed]
+					target = int(tot * 0.11)
+					vis[seed] = 1; b_cnt[255] = 1; b_dat[255, 0] = seed
+					cur_b = 255; picked = 0
+					while (picked < target) {
+						while (cur_b >= 20 && b_cnt[cur_b] <= 0) cur_b--
+						if (cur_b < 20) break
+						u = b_dat[cur_b, --b_cnt[cur_b]]
+						inSil[u] = 1; picked++
+						ux = u % gw; uy = int(u / gw)
+						if (ux <= 4 || ux >= gw - 5 || uy <= 4 || uy >= gh - 5) continue
+						nb[0] = u - 1; nb[1] = u + 1; nb[2] = u - gw; nb[3] = u + gw
+						for (k = 0; k < 4; k++) {
+							v = nb[k]
+							if (!vis[v] && !is_bg[v]) {
+								vis[v] = 1
+								step_d = abs(R[v] - R[u]) + abs(G[v] - G[u]) + abs(B[v] - B[u])
+								seed_d = abs(R[v] - sR) + abs(G[v] - sG) + abs(B[v] - sB)
+								pr = clamp(int(240 - step_d * 1.4 - seed_d * 0.45 - grad[v] * 0.6), 1, 255)
+								idx_b = b_cnt[pr] + 0
+								b_dat[pr, idx_b] = v
+								b_cnt[pr] = idx_b + 1
+								if (pr > cur_b) cur_b = pr
+							}
+						}
+					}
+				}
+				eq[0] = 0; ext[0] = 1; ehead = 0; etail = 1
+				while (ehead < etail) {
+					u = eq[ehead++]
+					ux = u % gw; uy = int(u / gw)
+					if (ux > 0 && !inSil[u - 1] && !ext[u - 1]) { ext[u - 1] = 1; eq[etail++] = u - 1 }
+					if (ux < gw - 1 && !inSil[u + 1] && !ext[u + 1]) { ext[u + 1] = 1; eq[etail++] = u + 1 }
+					if (uy > 0 && !inSil[u - gw] && !ext[u - gw]) { ext[u - gw] = 1; eq[etail++] = u - gw }
+					if (uy < gh - 1 && !inSil[u + gw] && !ext[u + gw]) { ext[u + gw] = 1; eq[etail++] = u + gw }
+				}
+				out = ""
+				for (i = 0; i < tot; i++) out = out (!ext[i] ? "f" : "0")
+				printf "%s", out
+			}' > "$SIL_TMP" 2>/dev/null || true
+			if [[ $(wc -c < "$SIL_TMP") -ge 72720 ]]; then
+				cp -f "$SIL_TMP" "${awk_cache}.$$.tmp" 2>/dev/null && mv -f "${awk_cache}.$$.tmp" "$awk_cache" 2>/dev/null || true
+			fi
+		fi
 	fi
 
 	LC_ALL=C awk -F'"' \
-		-v theme="$theme" -v wall="$wall" -v mode="$mode" -v bl="$bl" -v an="$an" -v fr="$fr" -v sil_file="$sil_file" \
-		-v qs_out="$QS_DIR/colors.json.tmp" \
+		-v theme="$theme" -v wall="$wall" -v mode="$mode" -v bl="$bl" -v an="$an" -v fr="$fr" -v sil_file="$SIL_TMP" \
+		-v qs_out="$QS_DIR/colors.json.tmp.$$" \
 		-v qt_out="$QT6_DIR/wallust.conf" \
 		-v kitty_out="$KITTY_CONF" \
 		-v hypr_out="$HYPR_CONF" '
@@ -401,7 +544,7 @@ PYEOF
 	}
 	BEGIN {
 		raw_bg = "1e1e2e"; raw_fg = "cdd6f4"; sil = ""
-		if ((getline sil < sil_file) > 0) close(sil_file)
+		if (sil_file != "") { getline sil < sil_file; close(sil_file) }
 		for (i = 0; i < 16; i++) raw_c[i] = "89b4fa"
 	}
 	/"background":/ { gsub(/^#/, "", $4); raw_bg = $4 }
@@ -468,9 +611,7 @@ PYEOF
 			src = (cs[k] >= cs[k + 8]) ? k : (k + 8)
 			if (cs[src] < 0.12) {
 				pick = (k == 1) ? b2 : ((k == 2) ? b3 : b1)
-				ah[k] = ch[pick]
-				as[k] = cs[pick]
-				al[k] = cl[src]
+				ah[k] = ch[pick]; as[k] = cs[pick]; al[k] = cl[src]
 			} else {
 				ah[k] = ch[src]; as[k] = cs[src]; al[k] = cl[src]
 			}
@@ -513,8 +654,8 @@ PYEOF
 		close(hypr_out)
 	}' "$src_json"
 
-	rm -f "$sil_file" 2>/dev/null || true
-	mv -f "$QS_DIR/colors.json.tmp" "$QS_DIR/colors.json"
+	rm -f "$SIL_TMP" 2>/dev/null || true
+	mv -f "$QS_DIR/colors.json.tmp.$$" "$QS_DIR/colors.json"
 
 	if [[ -f "$HOME/.config/niri/config.kdl" ]]; then
 		local n_c4 n_c0
@@ -534,6 +675,33 @@ PYEOF
 		sed -i -e "s|^darkColScheme=.*|darkColScheme=$dark_fp|" -e "s|^bgColValue=.*|bgColValue=$fp_bg|" "$HOME/.config/featherpad/fp.conf"
 	fi
 }
+
+# One-shot initialization mode used by installer (no daemon loop, no PIDFILE touch)
+if [[ "${1:-}" == "--init-only" ]]; then
+	shift
+	calibrate_and_apply_colors "${1:-night}" "${2:-}" "${3:-static}" "${4:-true}" "${5:-true}" "${6:-false}"
+	exit $?
+fi
+
+PIDFILE="/tmp/theme-switcher-${UID:-0}.pid"
+if [[ -f "$PIDFILE" ]]; then
+	old_pid=$(<"$PIDFILE")
+	[[ -n "$old_pid" && "$old_pid" != "$$" ]] && kill "$old_pid" 2>/dev/null || true
+fi
+echo "$$" > "$PIDFILE"
+
+FORCED_MODE="${1:-}"
+CURRENT_WALL=$(grep -o '"wallpaper": *"[^"]*"' "$QS_DIR/colors.json" 2>/dev/null | cut -d'"' -f4)
+CURRENT_THEME=""
+LAST_MODE=$(grep -o '"wallMode": *"[^"]*"' "$QS_DIR/colors.json" 2>/dev/null | cut -d'"' -f4)
+[[ -z "$LAST_MODE" ]] && LAST_MODE="static"
+if [[ -n "$CURRENT_WALL" && -f "$CURRENT_WALL" ]]; then
+	[[ "$CURRENT_WALL" == *"/day"* ]] && CURRENT_THEME="day"
+	[[ "$CURRENT_WALL" == *"/night"* ]] && CURRENT_THEME="night"
+else
+	CURRENT_WALL=""
+fi
+LAST_ROTATE_TS=$SECONDS
 
 apply_theme() {
 	local theme="$1"
@@ -559,11 +727,15 @@ apply_theme() {
 	[[ -z "$wall" ]] && return 1
 	[[ "$CURRENT_WALL" == "$wall" && "$LAST_MODE" == "$mode" && "$CURRENT_THEME" == "$theme" ]] && return 0
 
+	# Preserve previous video frame before switching away (even when transitioning animated -> static)
+	if [[ "${CURRENT_WALL,,}" =~ \.(webm|mp4)$ && -f "$FRAME_CACHE" ]]; then
+		cp -f "$FRAME_CACHE" "$FRAME_PREV" 2>/dev/null || true
+	fi
+
 	local wall_img="$wall"
 	if [[ "${wall,,}" =~ \.(webm|mp4)$ ]]; then
 		wall_img="$FRAME_CACHE"
-		[[ -f "$FRAME_CACHE" ]] && cp -f "$FRAME_CACHE" "/tmp/wall_frame_prev.jpg" 2>/dev/null || true
-		ffmpeg -y -loglevel quiet -i "$wall" -frames:v 1 -vf "scale=360:-1" -q:v 3 "$wall_img" 2>/dev/null
+		extract_video_frame "$wall" "$FRAME_CACHE" || true
 	fi
 
 	if ! command -v quickshell >/dev/null 2>&1; then
@@ -587,11 +759,11 @@ apply_theme() {
 	wallust run -s "$wall_img" 2>/dev/null
 	calibrate_and_apply_colors "$theme" "$wall" "$mode" "$bl" "$an" "$fr"
 
-	killall -SIGUSR1 kitty 2>/dev/null || true
+	pkill -u "$UID" -USR1 -x kitty 2>/dev/null || true
 	if command -v quickshell >/dev/null 2>&1; then
 		quickshell ipc call theme reload >/dev/null 2>&1 || true
 	else
-		if pgrep -u "$UID" -x waybar >/dev/null; then killall -SIGUSR2 waybar ; else waybar & fi
+		if pgrep -u "$UID" -x waybar >/dev/null; then pkill -u "$UID" -USR2 -x waybar ; else waybar & fi
 		swaync-client -rs >/dev/null 2>&1 || true
 	fi
 	CURRENT_WALL="$wall"
