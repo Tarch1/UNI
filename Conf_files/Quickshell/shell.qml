@@ -28,7 +28,7 @@ ShellRoot {
   property int cfgSubmenuSlidePx: 14
   // Wallpaper transition: "swarm" (Silhouette + Swarm patches) | "crossfade" | "zoom" | "none"
   property string cfgWallpaperTransition: "swarm"
-  property int cfgWallpaperTransitionMs: 750
+  property int cfgWallpaperTransitionMs: 1500
   property real cfgGlassOpacity: 0.76
   property real cfgSolidOpacity: 0.96
   property bool cfgLockKeepAnimated: true
@@ -38,7 +38,8 @@ ShellRoot {
   property int cfgBarAutoCloseMs: 2000
   // =========================================================================
 
-  // INLINE REUSABLE UI COMPONENTS
+  // === REUSABLE UI COMPONENTS ===
+
   component QsText: Text {
     color: root.fg
     font.family: "JetBrainsMono Nerd Font"
@@ -143,7 +144,43 @@ ShellRoot {
     }
   }
 
-  // UNIVERSAL METRIC GRAPH CARD (Used for Battery, CPU, Temperature & RAM)
+  component QsMediaControls: RowLayout {
+    id: mcBtns
+    property int btnSize: 24
+    property int playSize: 32
+    property int iconSize: 18
+    property int playIconSize: 16
+    property bool pillBg: true
+    spacing: 22
+
+    Repeater {
+      model: ["prev", "play", "next"]
+      Rectangle {
+        required property string modelData
+        property bool isPlay: modelData === "play"
+        implicitWidth: isPlay ? mcBtns.playSize : mcBtns.btnSize
+        implicitHeight: isPlay ? mcBtns.playSize : mcBtns.btnSize
+        radius: 8
+        color: (isPlay && mcBtns.pillBg) ? root.subtleFillHover : "transparent"
+        QsText {
+          anchors.centerIn: parent
+          text: modelData === "prev" ? "󰒮" : (modelData === "next" ? "󰒭" : ((root.activePlayer && root.activePlayer.playbackState === MprisPlaybackState.Playing) ? "󰏤" : "󰐊"))
+          color: (!mcBtns.pillBg && parent.isPlay) ? root.color4 : root.fg
+          font.pixelSize: parent.isPlay ? mcBtns.playIconSize : mcBtns.iconSize
+        }
+        MouseArea {
+          anchors.fill: parent
+          onClicked: {
+            if (!root.activePlayer) return
+            if (modelData === "prev") root.activePlayer.previous()
+            else if (modelData === "next") root.activePlayer.next()
+            else root.activePlayer.togglePlaying()
+          }
+        }
+      }
+    }
+  }
+
   component QsMetricCard: Rectangle {
     id: mcRoot
     property string icon: ""
@@ -246,7 +283,10 @@ ShellRoot {
     }
   }
 
+  // === ENVIRONMENT, THEME & RUNTIME STATE ===
+
   property string homeDir: Quickshell.env("HOME")
+  property string currentSessionUser: (Quickshell.env("USER") || Quickshell.env("LOGNAME") || "user").toLowerCase()
   property bool isVM: Quickshell.env("QSG_RENDER_LOOP") === "basic"
   property bool isHyprland: Quickshell.env("XDG_CURRENT_DESKTOP") === "Hyprland"
   property bool isGreeterMode: Quickshell.env("QS_GREETER") === "1"
@@ -260,12 +300,13 @@ ShellRoot {
   property string wallpaperPath: ""
   property string wallpaperSilhouette: ""
   property string prevWallSource: ""
+  property int wallRev: 0
   property bool wallTransitionActive: false
   property bool animWallpapers: false
   property bool firstRunDone: false
   property bool isVideoFile: wallpaperPath.toLowerCase().endsWith(".webm") || wallpaperPath.toLowerCase().endsWith(".mp4")
   property bool isAnimatedGif: !isVideoFile && (wallpaperPath.toLowerCase().endsWith(".gif") || (animWallpapers && wallpaperPath.toLowerCase().endsWith(".webp")))
-  property string staticWallSource: wallpaperPath !== "" ? (isVideoFile ? ("file:///tmp/wall_frame.jpg?" + wallpaperPath) : ("file://" + wallpaperPath)) : ""
+  property string staticWallSource: wallpaperPath !== "" ? (isVideoFile ? ("file:///tmp/wall_frame_" + currentSessionUser + ".jpg?v=" + wallRev) : ("file://" + wallpaperPath)) : ""
   property bool hasActiveFullWindow: false
   property bool isMonitorDpmsOff: false
   property bool shouldPlayAnimation: {
@@ -371,6 +412,7 @@ ShellRoot {
   property bool nightLightOn: false
   property int nightLightTemp: 4000
 
+  property bool hasBattery: UPower.displayDevice ? UPower.displayDevice.isLaptopBattery : false
   property int batPct: (UPower.displayDevice && UPower.displayDevice.isLaptopBattery) ? Math.round(UPower.displayDevice.percentage * 100) : 100
   property bool batCharging: UPower.displayDevice && UPower.displayDevice.state === UPowerDeviceState.Charging
   property string batHealth: "100%"
@@ -405,11 +447,27 @@ ShellRoot {
   property var workspacesList: [{ "idx": 1, "active": true, "occupied": true }]
   property var popupNotifications: []
 
-  property string currentSessionUser: (Quickshell.env("USER") || Quickshell.env("LOGNAME") || "user").toLowerCase()
   property var usersList: [currentSessionUser]
   property int selectedUserIdx: 0
   property string selectedUser: (usersList.length > 0 && selectedUserIdx >= 0 && selectedUserIdx < usersList.length) ? usersList[selectedUserIdx] : currentSessionUser
   property bool isSwitchingUser: !isGreeterMode && selectedUser !== currentSessionUser
+
+  property bool authError: false
+  property bool authBusy: false
+  property bool lockPromptActive: false
+  property string pendingPassword: ""
+  property string lockDateFormatted: Qt.formatDateTime(new Date(), "dddd, MMMM d").toUpperCase()
+  property bool showLiveLockWall: root.animWallpapers && root.cfgLockKeepAnimated && (root.isVideoFile || root.isAnimatedGif)
+
+  property string lockWeatherMain: {
+    let cond = (root.weatherDetail.split("•")[0] || "").trim()
+    return root.weatherShort + (cond !== "" && !cond.includes("Fetching") ? ("   •   " + cond) : "")
+  }
+  property string lockWeatherSub: {
+    let parts = root.weatherDetail.split("•")
+    if (parts.length < 4) return ""
+    return parts[1].trim() + "   •   󰖝 " + parts[2].replace("Wind:", "").trim() + "   •   󰖎 " + parts[3].replace("Hum:", "").trim()
+  }
 
   property var activePlayer: {
     let list = Mpris.players.values
@@ -417,6 +475,8 @@ ShellRoot {
     for (let i = 0; i < list.length; i++) if (list[i].playbackState === MprisPlaybackState.Playing) return list[i]
     return list[0]
   }
+
+  // === INTERNAL HELPERS: UTILITIES & RENDERING ===
 
   function withAlpha(c, a) { return Qt.rgba(c.r, c.g, c.b, a) }
   function runCmd(cmd) { Quickshell.execDetached(["bash", "-c", cmd]) }
@@ -426,23 +486,18 @@ ShellRoot {
     a.push(val); if (a.length > 30) a.shift()
     return a
   }
-  function saveJsonBool(key, val, extraCmd) {
-    let vStr = val ? "true" : "false"
-    runCmd((extraCmd || "") + "sed -i 's/\"" + key + "\": *[a-z]*/\"" + key + "\": " + vStr + "/' \"" + root.homeDir + "/.config/quickshell/colors.json\" \"" + root.homeDir + "/.config/wallust/templates/colors-quickshell.json\" 2>/dev/null || true")
-  }
-  function launchApp(a) {
-    if (!a) return
-    root.closeCenterPill()
-    if (a.runInTerminal) {
-      let cmd = (a.command && a.command.length > 0) ? ["kitty", "-e"].concat(a.command) : ["kitty", "-e", a.execString.replace(/%[fFuUdDnNickvm]/g, "").trim()]
-      Quickshell.execDetached({ command: cmd, workingDirectory: a.workingDirectory || root.homeDir })
-    } else {
-      a.execute()
-    }
-  }
   function formatSec(s) {
     let sec = Math.max(0, Math.floor(s || 0)), m = Math.floor(sec / 60), r = sec % 60
     return m + ":" + (r < 10 ? "0" + r : r)
+  }
+  function updateClock() {
+    let now = new Date()
+    root.timeStr = Qt.formatDateTime(now, "HH:mm")
+    root.dateStr = Qt.formatDateTime(now, "dd MMM")
+  }
+  function saveJsonBool(key, val, extraCmd) {
+    let vStr = val ? "true" : "false"
+    runCmd((extraCmd || "") + "sed -i 's/\"" + key + "\": *[a-z]*/\"" + key + "\": " + vStr + "/' \"" + root.homeDir + "/.config/quickshell/colors.json\" \"" + root.homeDir + "/.config/wallust/templates/colors-quickshell.json\" 2>/dev/null || true")
   }
   function paintArc(canvas, pct, strokeCol) {
     var ctx = canvas.getContext("2d"); ctx.reset()
@@ -452,6 +507,49 @@ ShellRoot {
     if (pct > 0.005) {
       var s = -Math.PI / 2, e = s + (Math.PI * 2 * Math.min(1, pct))
       ctx.beginPath(); ctx.arc(cx, cy, r, s, e, false); ctx.strokeStyle = strokeCol.toString(); ctx.stroke()
+    }
+  }
+  function updateCalendar() {
+    let startDow = (new Date(root.calYear, root.calMonth, 1).getDay() + 6) % 7
+    let daysInMonth = new Date(root.calYear, root.calMonth + 1, 0).getDate()
+    let now = new Date(), arr = []
+    for (let i = 0; i < startDow; i++) arr.push({ "day": "", "today": false })
+    for (let d = 1; d <= daysInMonth; d++)
+      arr.push({ "day": d.toString(), "today": (d === now.getDate() && root.calMonth === now.getMonth() && root.calYear === now.getFullYear()) })
+    root.calendarDays = arr
+  }
+
+  // === INTERNAL HELPERS: SESSION, POWER & APPS ===
+
+  function execPower(action) {
+    if (action === "lock") { root.triggerLock(); return }
+    if (action === "logout") { root.cleanExitSession(""); return }
+    if (action === "suspend" || action === "hibernate") {
+      root.isMonitorDpmsOff = true
+      root.triggerLock()
+    }
+    const cmds = {
+      "poweroff": "loginctl poweroff 2>/dev/null || sudo -n poweroff 2>/dev/null || poweroff",
+      "reboot": "loginctl reboot 2>/dev/null || sudo -n reboot 2>/dev/null || reboot",
+      "suspend": "loginctl suspend 2>/dev/null || sudo -n zzz 2>/dev/null || zzz",
+      "hibernate": "loginctl hibernate 2>/dev/null || sudo -n ZZZ 2>/dev/null || ZZZ"
+    }
+    if (cmds[action]) runCmd(cmds[action])
+  }
+  function cleanExitSession(targetUser) {
+    let sw = targetUser !== "" ? ("sudo -n /usr/bin/qs-session --switch " + shQuote(targetUser) + " 2>/dev/null || true; ") : "rm -f /tmp/qs_lock_active_$UID 2>/dev/null || true; "
+    let clean = "pkill -u \"$UID\" -f '[t]heme-switcher.sh|[q]s-session --clipboard' 2>/dev/null || true; pkill -u \"$UID\" -x 'hypridle|wlsunset|wf-recorder' 2>/dev/null || true; command -v systemctl >/dev/null 2>&1 || pkill -u \"$UID\" -x 'wireplumber|pipewire-pulse|pipewire' 2>/dev/null || true; "
+    let wmExit = "niri msg action quit -s 2>/dev/null || hyprctl dispatch exit 2>/dev/null || loginctl terminate-session $XDG_SESSION_ID 2>/dev/null || pkill -TERM -u \"$UID\" -x 'niri|Hyprland'"
+    runCmd(sw + clean + wmExit)
+  }
+  function launchApp(a) {
+    if (!a) return
+    root.closeCenterPill()
+    if (a.runInTerminal) {
+      let cmd = (a.command && a.command.length > 0) ? ["kitty", "-e"].concat(a.command) : ["kitty", "-e", a.execString.replace(/%[fFuUdDnNickvm]/g, "").trim()]
+      Quickshell.execDetached({ command: cmd, workingDirectory: a.workingDirectory || root.homeDir })
+    } else {
+      a.execute()
     }
   }
   function activateTrayItem(item, win, itemWidget, button) {
@@ -472,18 +570,15 @@ ShellRoot {
     root.selectedUserIdx = (root.selectedUserIdx + (step % n) + n) % n
     root.authError = false; root.lockPromptActive = true
   }
-  function cleanExitSession(targetUser) {
-    let sw = targetUser !== "" ? ("sudo -n /usr/bin/qs-session --switch " + shQuote(targetUser) + " 2>/dev/null || true; ") : "rm -f /tmp/qs_lock_active_$UID 2>/dev/null || true; "
-    let clean = "pkill -u \"$UID\" -f '[t]heme-switcher.sh|[q]s-session --clipboard' 2>/dev/null || true; pkill -u \"$UID\" -x 'hypridle|wlsunset|wf-recorder' 2>/dev/null || true; command -v systemctl >/dev/null 2>&1 || pkill -u \"$UID\" -x 'wireplumber|pipewire-pulse|pipewire' 2>/dev/null || true; "
-    let wmExit = "niri msg action quit -s 2>/dev/null || hyprctl dispatch exit 2>/dev/null || loginctl terminate-session $XDG_SESSION_ID 2>/dev/null || pkill -TERM -u \"$UID\" -x 'niri|Hyprland'"
-    runCmd(sw + clean + wmExit)
-  }
   function checkFirstRunNiri() {
     if (!root.firstRunDone && !root.isHyprland && !root.screenLocked) {
       root.firstRunDone = true
       saveJsonBool("firstRunDone", true, "sleep 0.6 && niri msg action show-hotkey-overlay >/dev/null 2>&1 & ")
     }
   }
+
+  // === INTERNAL HELPERS: PANEL NAVIGATION & LOCK ===
+
   function closeCenterPill() {
     autoCloseTimer.stop()
     root.centerMode = "none"; root.sysSubmenu = ""; root.calSubmenu = ""; root.wifiPromptSsid = ""; root.expandedResMon = ""; root.showSavedList = false; root.expandedDevInfo = ""
@@ -518,6 +613,8 @@ ShellRoot {
     root.screenLocked = true
   }
 
+  // === INTERNAL HELPERS: HARDWARE, AUDIO, NETWORK & RECORDING ===
+
   function setSinkVolume(pct) {
     let p = Math.max(0, Math.min(100, Math.round(pct)))
     if (root.sinkAudio) root.sinkAudio.volume = p / 100.0
@@ -549,18 +646,27 @@ ShellRoot {
     root.cfgEnableAnimations = !root.cfgEnableAnimations
     saveJsonBool("uiAnimations", root.cfgEnableAnimations, "")
   }
-  function togglePrimaryNetwork() {
-    if (root.ethIface !== "" && (!root.hasWifiHw || root.ethConnected)) runCmd("nmcli dev " + (root.ethConnected ? "disconnect " : "connect ") + root.ethIface)
-    else if (root.hasWifiHw) runCmd("nmcli radio wifi " + (root.wifiEnabled ? "off" : "on"))
+  function toggleEthernet() {
+    if (root.ethIface === "") return
+    runCmd("nmcli dev " + (root.ethConnected ? "disconnect " : "connect ") + root.ethIface)
     deferPollTimer.restart()
   }
+  function toggleBluetooth() {
+    if (!root.hasBtAdapter) return
+    runCmd(root.btEnabled ? "bluetoothctl power off; rfkill block bluetooth" : "rfkill unblock bluetooth; bluetoothctl power on")
+    deferPollTimer.restart()
+  }
+  function togglePrimaryNetwork() {
+    if (root.ethIface !== "" && (!root.hasWifiHw || root.ethConnected)) toggleEthernet()
+    else if (root.hasWifiHw) { runCmd("nmcli radio wifi " + (root.wifiEnabled ? "off" : "on")); deferPollTimer.restart() }
+  }
   function applyNightLight() {
-    if (root.nightLightOn) runCmd("pkill -x wlsunset 2>/dev/null; wlsunset -t " + root.nightLightTemp + " -T " + (root.nightLightTemp + 1) + " &")
-    else runCmd("pkill -x wlsunset 2>/dev/null")
+    if (root.nightLightOn) runCmd("pkill -u \"$UID\" -x wlsunset 2>/dev/null; wlsunset -t " + root.nightLightTemp + " -T " + (root.nightLightTemp + 1) + " &")
+    else runCmd("pkill -u \"$UID\" -x wlsunset 2>/dev/null")
   }
   function toggleRecording() {
     if (root.isRecording) {
-      runCmd("pkill -INT -x wf-recorder; notify-send 'Screen Recorder' 'Saved in ~/Videos/Recordings'")
+      runCmd("pkill -u \"$UID\" -INT -x wf-recorder; notify-send 'Screen Recorder' 'Saved in ~/Videos/Recordings'")
       root.isRecording = false; root.recSeconds = 0
     } else {
       let f = root.homeDir + "/Videos/Recordings/rec-" + Qt.formatDateTime(new Date(), "yyyyMMdd-HHmmss") + ".mp4"
@@ -571,17 +677,13 @@ ShellRoot {
       root.isRecording = true; root.recSeconds = 0
     }
   }
-  function updateCalendar() {
-    let startDow = (new Date(root.calYear, root.calMonth, 1).getDay() + 6) % 7
-    let daysInMonth = new Date(root.calYear, root.calMonth + 1, 0).getDate()
-    let now = new Date(), arr = []
-    for (let i = 0; i < startDow; i++) arr.push({ "day": "", "today": false })
-    for (let d = 1; d <= daysInMonth; d++)
-      arr.push({ "day": d.toString(), "today": (d === now.getDate() && root.calMonth === now.getMonth() && root.calYear === now.getFullYear()) })
-    root.calendarDays = arr
-  }
+
+  // === INITIALIZATION, CONFIG WATCHER, IPC & TIMERS ===
+
+  onIsMonitorDpmsOffChanged: { if (!isMonitorDpmsOff) updateClock() }
 
   Component.onCompleted: {
+    updateClock()
     updateCalendar()
     initPoll.running = true
     fastPoll.running = true
@@ -599,12 +701,16 @@ ShellRoot {
         let d = JSON.parse(text())
         if (d.silhouette !== undefined) root.wallpaperSilhouette = String(d.silhouette)
         if (d.wallpaper && d.wallpaper !== root.wallpaperPath) {
-          if (root.wallpaperPath !== "" && root.animActive && root.cfgWallpaperTransition !== "none") {
+          let doTrans = (root.wallpaperPath !== "" && root.animActive && root.cfgWallpaperTransition !== "none")
+          if (doTrans) {
             root.wallTransitionActive = false
-            root.prevWallSource = root.isVideoFile ? ("file:///tmp/wall_frame_prev.jpg?" + root.wallpaperPath) : root.staticWallSource
-            root.wallTransitionActive = true
+            root.prevWallSource = root.isVideoFile
+              ? ("file:///tmp/wall_frame_prev_" + root.currentSessionUser + ".jpg?v=" + root.wallRev)
+              : root.staticWallSource
           }
+          root.wallRev++
           root.wallpaperPath = d.wallpaper
+          if (doTrans) root.wallTransitionActive = true
         }
         if (d.wallMode) root.animWallpapers = (d.wallMode === "animated")
         if (d.uiBlur !== undefined && !root.isVM) root.cfgEnableBlur = Boolean(d.uiBlur)
@@ -652,21 +758,45 @@ ShellRoot {
       }
     }
   }
-
-  // Dedicated 1.5s Resource Monitor Timer (Active ONLY while System Info submenu is open)
   Timer {
     interval: 1500
     running: root.centerMode === "system" && root.sysSubmenu === "cpu" && !root.screenLocked && !root.isMonitorDpmsOff
     repeat: true
     onTriggered: statPoll.running = true
   }
-
-  // Dedicated 60s Battery Poll Timer (Max 1 call/minute for battery curve & hardware stats)
   Timer {
     interval: 60000
-    running: !root.isMonitorDpmsOff
+    running: root.hasBattery && !root.isMonitorDpmsOff
     repeat: true; triggeredOnStart: true
     onTriggered: batPoll.running = true
+  }
+  Timer {
+    interval: 1500; running: true; repeat: false
+    onTriggered: { weatherProc.running = true; sysPoll.running = true }
+  }
+  Timer {
+    interval: 1800000; running: !root.isMonitorDpmsOff; repeat: true
+    onTriggered: weatherProc.running = true
+  }
+  Timer {
+    id: mainTimer
+    property bool highFreq: root.isRecording || root.centerMode === "system" || (root.activePlayer !== null && root.activePlayer.playbackState === MprisPlaybackState.Playing)
+    interval: highFreq ? 1000 : 15000
+    running: !root.isMonitorDpmsOff || root.isRecording
+    repeat: true
+    property int tick: 0
+    onTriggered: {
+      root.updateClock()
+      if (root.isRecording) root.recSeconds++
+      if (root.activePlayer && !root.screenLocked && !root.isMonitorDpmsOff) {
+        root.mediaProg = (root.activePlayer.length > 0) ? Math.min(1, Math.max(0, root.activePlayer.position / root.activePlayer.length)) : 0.25
+      }
+      if (root.centerMode === "system" && tick % 3 === 0) sysPoll.running = true
+      if (root.centerMode === "system" && root.sysSubmenu !== "" && tick % 4 === 0) subPoll.running = true
+      if (root.weatherShort.includes("--") && tick > 0 && tick % (highFreq ? 300 : 20) === 0) weatherProc.running = true
+      if (root.animWallpapers && (!highFreq || tick % 15 === 0)) fastPoll.running = true
+      tick = (tick + 1) % 3600
+    }
   }
 
   NotificationServer {
@@ -686,17 +816,18 @@ ShellRoot {
   IpcHandler { target: "theme"; function reload(): void { colorFile.reload() } }
   IpcHandler { target: "bar"; function toggle(): void { root.barVisible = !root.barVisible } }
 
-  // ZERO-POLLING EVENT STREAM
+  // === SYSTEM POLLERS & EVENT STREAM ===
+
   Process {
     id: wmStream
-    running: !root.screenLocked
+    running: !root.screenLocked && !root.isMonitorDpmsOff
     command: ["bash", "-c", "
       if [[ -n \"$NIRI_SOCKET\" ]]; then
         ( niri msg -j event-stream 2>/dev/null & udevadm monitor -u -s backlight 2>/dev/null & wait ) | grep --line-buffered -E 'Workspace|Window|backlight'
       elif [[ -n \"$HYPRLAND_INSTANCE_SIGNATURE\" ]] && command -v socat >/dev/null 2>&1; then
         ( socat -U - \"UNIX-CONNECT:${XDG_RUNTIME_DIR:-/run/user/$UID}/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket2.sock\" 2>/dev/null & udevadm monitor -u -s backlight 2>/dev/null & wait ) | grep --line-buffered -E 'workspace|fullscreen|activewindow|backlight'
       else
-        while sleep 1.2; do echo tick; done
+        while sleep 1.5; do echo tick; done
       fi
     "]
     stdout: SplitParser { onRead: data => evDebounce.restart() }
@@ -713,7 +844,8 @@ ShellRoot {
         END { if(used>0) printf \"%d/%d slots (%s%s)\", used, (tot>used?tot:used), s, (tp?\" \"tp:\"\") }
       ')
       [[ -z \"$ram_sl\" ]] && ram_sl=\"1/1 slot (Unified / VM)\"
-      printf '%s|%s|%s|%s threads|%s\n' \"$(awk -F': ' '/model name/{print $2; exit}' /proc/cpuinfo)\" \"$(uname -r)\" \"${u%,}\" \"$(nproc 2>/dev/null || echo 4)\" \"$ram_sl\"
+      has_bat=0; for bd in /sys/class/power_supply/BAT*; do [[ -d \"$bd\" ]] && { has_bat=1; break; }; done
+      printf '%s|%s|%s|%s threads|%s|%d\n' \"$(awk -F': ' '/model name/{print $2; exit}' /proc/cpuinfo)\" \"$(uname -r)\" \"${u%,}\" \"$(nproc 2>/dev/null || echo 4)\" \"$ram_sl\" \"$has_bat\"
     "]
     stdout: SplitParser {
       onRead: data => {
@@ -729,16 +861,21 @@ ShellRoot {
         }
         if (p.length >= 4) root.cpuThreads = p[3]
         if (p.length >= 5) root.ramSlotsInfo = p[4]
+        if (p.length >= 6) root.hasBattery = (p[5] === "1")
         root.audioReady = true
       }
     }
   }
 
-  // Ultra-fast (<0.2ms) pure /proc & /sys reader for CPU, Load, Temp and RAM graphs
   Process {
     id: statPoll
     command: ["bash", "-c", "
-      t=40000; [[ -f /sys/class/thermal/thermal_zone0/temp ]] && t=$(</sys/class/thermal/thermal_zone0/temp)
+      t=40000
+      for tz in /sys/class/thermal/thermal_zone*; do
+        [[ -f \"$tz/type\" && -f \"$tz/temp\" ]] || continue
+        case \"$(<\"$tz/type\")\" in *pkg*|*cpu*|*Tctl*|*k10temp*|*coretemp*) t=$(<\"$tz/temp\"); break ;; esac
+      done
+      [[ \"$t\" -eq 40000 && -f /sys/class/thermal/thermal_zone0/temp ]] && t=$(</sys/class/thermal/thermal_zone0/temp)
       cpu_u=$(awk -v f=\"/tmp/qs_cpu_$UID\" '/^cpu /{u=$2+$3+$4+$6+$7+$8; tot=u+$5+$9; if((getline < f)>0){du=u-$1; dt=tot-$2} else {du=u; dt=tot}; close(f); print u, tot > f; close(f); print (dt>0 ? int(du*100/dt) : 0); exit}' /proc/stat)
       read -r ld _ < /proc/loadavg
       ram_s=$(awk '/^MemTotal:/{mt=$2} /^MemAvailable:/{ma=$2} END{u=(mt-ma)/1048576; t=mt/1048576; printf \"%.1f / %.1f GiB|%d\", u, t, (mt>0 ? int((mt-ma)*100/mt) : 0)}' /proc/meminfo)
@@ -758,7 +895,6 @@ ShellRoot {
     }
   }
 
-  // 60s Battery Hardware Stats & History Reader
   Process {
     id: batPoll
     command: ["bash", "-c", "
@@ -1035,32 +1171,8 @@ ShellRoot {
     }
   }
 
-  Timer { interval: 1800000; running: true; repeat: true; onTriggered: weatherProc.running = true }
-  Timer {
-    id: mainTimer
-    property bool highFreq: root.isRecording || root.centerMode === "system" || (root.activePlayer !== null && root.activePlayer.playbackState === MprisPlaybackState.Playing) || root.weatherShort.includes("--")
-    interval: highFreq ? 1000 : 15000
-    running: true; repeat: true; triggeredOnStart: true
-    property int tick: 0
-    onTriggered: {
-      let now = new Date()
-      root.timeStr = Qt.formatDateTime(now, "HH:mm")
-      root.dateStr = Qt.formatDateTime(now, "dd MMM")
-      if (root.isRecording) root.recSeconds++
-      if (tick === 1) { weatherProc.running = true; sysPoll.running = true }
-      if (root.activePlayer && !root.screenLocked && !root.isMonitorDpmsOff) {
-        root.mediaProg = (root.activePlayer.length > 0) ? Math.min(1, Math.max(0, root.activePlayer.position / root.activePlayer.length)) : 0.25
-      }
-      if (!highFreq && !root.isMonitorDpmsOff) statPoll.running = true
-      if (root.centerMode === "system" && tick % 3 === 0) sysPoll.running = true
-      if (tick % 4 === 0 && root.centerMode === "system" && root.sysSubmenu !== "") subPoll.running = true
-      if (tick > 2 && tick % 10 === 0 && root.weatherShort.includes("--")) weatherProc.running = true
-      if (root.animWallpapers && (!highFreq || tick % 15 === 0)) fastPoll.running = true
-      tick = (tick + 1) % 3600
-    }
-  }
+  // === NIRI OVERVIEW BACKDROP ===
 
-  // 1A. NIRI OVERVIEW BLURRED BACKDROP LAYER
   Variants {
     model: Quickshell.screens
     PanelWindow {
@@ -1084,7 +1196,8 @@ ShellRoot {
     }
   }
 
-  // 1B. NATIVE DESKTOP WALLPAPER (With Zero-Idle-Cost Silhouette + Swarm Transition Loader)
+  // === DESKTOP WALLPAPER & SILHOUETTE TRANSITION ENGINE ===
+
   Variants {
     model: Quickshell.screens
     PanelWindow {
@@ -1130,10 +1243,11 @@ ShellRoot {
           }
         }
         VideoOutput {
-          id: wallVideoOut; anchors.fill: parent; visible: root.animWallpapers && root.isVideoFile && !root.wallTransitionActive; fillMode: VideoOutput.PreserveAspectCrop
+          id: wallVideoOut; anchors.fill: parent
+          visible: root.animWallpapers && root.isVideoFile && !root.wallTransitionActive
+          fillMode: VideoOutput.PreserveAspectCrop
         }
 
-       // TEMPORARY WALLPAPER TRANSITION LOADER (Unloaded -> 0 RAM/VRAM when idle)
         Loader {
           anchors.fill: parent
           active: root.wallTransitionActive && root.prevWallSource !== ""
@@ -1143,8 +1257,8 @@ ShellRoot {
             property int lastBucket: -1
             property int fgw: 360
             property int fgh: 202
-            property int sw: 480
-            property int sh: 270
+            property int sw: root.isVM ? 320 : 480
+            property int sh: root.isVM ? 180 : 270
             property int numBuckets: 240
             property real cropU0: 0.0
             property real cropV0: 0.0
@@ -1153,15 +1267,22 @@ ShellRoot {
             property var contourPts: []
             property var swarmBuckets: []
             property bool mapReady: false
+            property bool outlineFinished: false
+            property bool started: false
+
+            function effectiveProg(p) {
+              if (p <= 0.58) return p
+              var u = Math.min(1.0, (p - 0.58) / 0.42)
+              return 0.58 + (0.30 * u + 0.70 * Math.pow(u, 2.5)) * 0.42
+            }
 
             function buildSilhouetteMap() {
               if (mapReady) return
               var ftot = fgw * fgh
-              var fld = new Array(ftot)
+              var mask = new Uint8Array(ftot)
               var sil = root.wallpaperSilhouette
               var hasSil = (sil && sil.length >= ftot)
 
-              // Match exact Image.PreserveAspectCrop scaling and centering on any aspect ratio
               var imgW = baseStaticWall.implicitWidth > 0 ? baseStaticWall.implicitWidth : 1920
               var imgH = baseStaticWall.implicitHeight > 0 ? baseStaticWall.implicitHeight : 1080
               var scrW = width > 0 ? width : 1920
@@ -1174,116 +1295,171 @@ ShellRoot {
               cropV0 = Math.max(0.0, -offY / drawH)
               cropVSpan = Math.min(1.0 - cropV0, scrH / drawH)
 
-              var sumX = 0, sumY = 0, cntP = 0
-              for (var r = 0; r < fgh; r++) {
-                for (var c = 0; c < fgw; c++) {
-                  var k = r * fgw + c
-                  var v = 0.0
-                  if (hasSil) {
-                    var hv = parseInt(sil.charAt(k), 16)
-                    v = isNaN(hv) ? 0.0 : hv
-                  } else {
-                    var dx = (c / fgw) - 0.5, dy = (r / fgh) - 0.5
-                    var d = Math.sqrt(dx * dx * 2.8 + dy * dy * 3.2)
-                    v = Math.max(0.0, (1.0 - d) * 14.0)
+              var activeCnt = 0
+              if (hasSil) {
+                for (var r = 1; r < fgh - 1; r++) {
+                  var rowOff = r * fgw
+                  for (var c = 1; c < fgw - 1; c++) {
+                    var hv = parseInt(sil.charAt(rowOff + c), 16)
+                    if (!isNaN(hv) && hv >= 8) {
+                      mask[rowOff + c] = 1
+                      activeCnt++
+                    }
                   }
-                  fld[k] = v
-                  if (v >= 8.0) { sumX += c; sumY += r; cntP++ }
                 }
               }
-
-              var cenX = cntP > 0 ? (sumX / cntP) : (fgw * 0.5)
-              var cenY = cntP > 0 ? (sumY / cntP) : (fgh * 0.5)
-
-              // 1. Extract closed radial perimeter around subject centroid (no diagonal branch jumps)
-              var iso = 7.5
-              var nAngles = 360
-              var bndPts = []
-              var maxR = Math.hypot(fgw, fgh)
-              for (var ai = 0; ai < nAngles; ai++) {
-                var ang = (ai / nAngles) * Math.PI * 2.0
-                var cosA = Math.cos(ang), sinA = Math.sin(ang)
-                var hitX = -1, hitY = -1
-                var prevV = 0.0, prevX = cenX, prevY = cenY
-                for (var rad = 1.0; rad < maxR; rad += 0.5) {
-                  var px = cenX + cosA * rad
-                  var py = cenY + sinA * rad
-                  var ix = Math.floor(px), iy = Math.floor(py)
-                  if (ix <= 1 || ix >= fgw - 2 || iy <= 1 || iy >= fgh - 2) break
-                  var curV = fld[iy * fgw + ix]
-                  if (prevV >= iso && curV < iso) {
-                    var tFrac = (prevV - curV) > 0.0001 ? ((prevV - iso) / (prevV - curV)) : 0.5
-                    hitX = prevX + (px - prevX) * tFrac
-                    hitY = prevY + (py - prevY) * tFrac
-                    break
+              if (activeCnt < 150 || activeCnt > ftot * 0.85) {
+                mask.fill(0)
+                for (var r2 = 1; r2 < fgh - 1; r2++) {
+                  var row2 = r2 * fgw
+                  var dy2 = (r2 / fgh) - 0.5
+                  for (var c2 = 1; c2 < fgw - 1; c2++) {
+                    var dx2 = (c2 / fgw) - 0.5
+                    if ((dx2 * dx2 * 2.8 + dy2 * dy2 * 3.2) < 0.16) mask[row2 + c2] = 1
                   }
-                  prevV = curV; prevX = px; prevY = py
                 }
-                if (hitX >= 0) bndPts.push({x: hitX, y: hitY})
               }
 
-              // Smooth closed perimeter
-              if (bndPts.length > 6) {
-                var sm = []
-                var blen = bndPts.length
-                for (var bi = 0; bi < blen; bi++) {
-                  var pPrev = bndPts[(bi - 1 + blen) % blen]
-                  var pCur = bndPts[bi]
-                  var pNext = bndPts[(bi + 1) % blen]
-                  sm.push({
-                    x: pPrev.x * 0.22 + pCur.x * 0.56 + pNext.x * 0.22,
-                    y: pPrev.y * 0.22 + pCur.y * 0.56 + pNext.y * 0.22
-                  })
+              // Contour tracing (Moore-Neighbor)
+              var sx = -1, sy = -1
+              for (var ry = 1; ry < fgh - 1 && sx < 0; ry++) {
+                var rOff = ry * fgw
+                for (var rx = 1; rx < fgw - 1; rx++) {
+                  if (mask[rOff + rx] === 1) { sx = rx; sy = ry; break }
                 }
-                bndPts = sm
               }
-              contourPts = bndPts
+              var loop = []
+              if (sx >= 0) {
+                var ddx = [1, 1, 0, -1, -1, -1, 0, 1]
+                var ddy = [0, 1, 1, 1, 0, -1, -1, -1]
+                var cx = sx, cy = sy, bDir = 4, firstDir = -1
+                for (var step = 0; step < 16000; step++) {
+                  loop.push({ x: cx, y: cy })
+                  var found = -1
+                  var startD = (bDir + 1) & 7
+                  for (var k = 0; k < 8; k++) {
+                    var dir = (startD + k) & 7
+                    if (mask[(cy + ddy[dir]) * fgw + (cx + ddx[dir])] === 1) { found = dir; break }
+                  }
+                  if (found < 0) break
+                  if (firstDir < 0) firstDir = found
+                  else if (cx === sx && cy === sy && found === firstDir) { loop.pop(); break }
+                  cx += ddx[found]
+                  cy += ddy[found]
+                  bDir = ((found & 1) === 0) ? ((found + 6) & 7) : ((found + 5) & 7)
+                }
+              }
+              if (loop.length > 480) {
+                var sub = [], stride = loop.length / 480.0
+                for (var si = 0; si < 480; si++) sub.push(loop[Math.floor(si * stride)])
+                loop = sub
+              }
+              if (loop.length > 6) {
+                for (var pass = 0; pass < 2; pass++) {
+                  var sm = [], blen = loop.length
+                  for (var bi = 0; bi < blen; bi++) {
+                    var pPrev = loop[(bi - 1 + blen) % blen], pCur = loop[bi], pNext = loop[(bi + 1) % blen]
+                    sm.push({
+                      x: pPrev.x * 0.25 + pCur.x * 0.50 + pNext.x * 0.25,
+                      y: pPrev.y * 0.25 + pCur.y * 0.50 + pNext.y * 0.25
+                    })
+                  }
+                  loop = sm
+                }
+              }
+              contourPts = loop
 
-              // 2. Swarm expanding OUTWARD from the drawn closed contour:
-              // - Inside (fv >= iso): starts right at the contour (inNorm = 0) and expands inward (0.22 -> 0.55)
-              // - Outside (fv < iso): starts right at the contour (outDist = 0) and expands outward (0.58 -> 0.96)
+              // Euclidean Distance Transform (2-pass Chamfer)
+              var dw = 180, dh = 101, dtot = dw * dh
+              var dMask = new Uint8Array(dtot)
+              var dist = new Float32Array(dtot)
+              dist.fill(100000.0)
+              for (var dy0 = 0; dy0 < dh; dy0++) {
+                var mr = Math.min(fgh - 1, dy0 * 2) * fgw
+                var dr = dy0 * dw
+                for (var dx0 = 0; dx0 < dw; dx0++) {
+                  dMask[dr + dx0] = mask[mr + Math.min(fgw - 1, dx0 * 2)]
+                }
+              }
+              for (var by = 0; by < dh; by++) {
+                var brow = by * dw
+                for (var bx = 0; bx < dw; bx++) {
+                  var bi0 = brow + bx
+                  if (dMask[bi0] === 1) {
+                    if (bx === 0 || bx === dw - 1 || by === 0 || by === dh - 1 ||
+                        dMask[bi0 - 1] === 0 || dMask[bi0 + 1] === 0 || dMask[bi0 - dw] === 0 || dMask[bi0 + dw] === 0) {
+                      dist[bi0] = 0.0
+                    }
+                  }
+                }
+              }
+              for (var fy0 = 0; fy0 < dh; fy0++) {
+                var frow = fy0 * dw
+                for (var fx0 = 0; fx0 < dw; fx0++) {
+                  var fi = frow + fx0, fv = dist[fi]
+                  if (fx0 > 0 && dist[fi - 1] + 1.0 < fv) fv = dist[fi - 1] + 1.0
+                  if (fy0 > 0) {
+                    if (dist[fi - dw] + 1.0 < fv) fv = dist[fi - dw] + 1.0
+                    if (fx0 > 0 && dist[fi - dw - 1] + 1.4142 < fv) fv = dist[fi - dw - 1] + 1.4142
+                    if (fx0 < dw - 1 && dist[fi - dw + 1] + 1.4142 < fv) fv = dist[fi - dw + 1] + 1.4142
+                  }
+                  dist[fi] = fv
+                }
+              }
+              var maxIn = 1.0, maxOut = 1.0
+              for (var fy1 = dh - 1; fy1 >= 0; fy1--) {
+                var rrow = fy1 * dw
+                for (var fx1 = dw - 1; fx1 >= 0; fx1--) {
+                  var ri = rrow + fx1, rv = dist[ri]
+                  if (fx1 < dw - 1 && dist[ri + 1] + 1.0 < rv) rv = dist[ri + 1] + 1.0
+                  if (fy1 < dh - 1) {
+                    if (dist[ri + dw] + 1.0 < rv) rv = dist[ri + dw] + 1.0
+                    if (fx1 < dw - 1 && dist[ri + dw + 1] + 1.4142 < rv) rv = dist[ri + dw + 1] + 1.4142
+                    if (fx1 > 0 && dist[ri + dw - 1] + 1.4142 < rv) rv = dist[ri + dw - 1] + 1.4142
+                  }
+                  dist[ri] = rv
+                  if (dMask[ri] === 1) { if (rv > maxIn) maxIn = rv }
+                  else { if (rv > maxOut) maxOut = rv }
+                }
+              }
+
+              // Swarm reveal buckets
               var bkts = new Array(numBuckets)
               for (var bInit = 0; bInit < numBuckets; bInit++) bkts[bInit] = []
-
-              for (var sy = 0; sy < sh; sy++) {
-                var vNorm = cropV0 + (sy / (sh - 1)) * cropVSpan
-                var fy = Math.max(0.0, Math.min(fgh - 1, vNorm * (fgh - 1)))
-                var y0 = Math.floor(fy), y1 = Math.min(fgh - 1, y0 + 1), wy = fy - y0
-                for (var sx = 0; sx < sw; sx++) {
-                  var uNorm = cropU0 + (sx / (sw - 1)) * cropUSpan
-                  var fx = Math.max(0.0, Math.min(fgw - 1, uNorm * (fgw - 1)))
-                  var x0 = Math.floor(fx), x1 = Math.min(fgw - 1, x0 + 1), wx = fx - x0
-                  var fv = (1 - wy) * ((1 - wx) * fld[y0 * fgw + x0] + wx * fld[y0 * fgw + x1]) + wy * ((1 - wx) * fld[y1 * fgw + x0] + wx * fld[y1 * fgw + x1])
-
-                  var h1 = Math.sin(sx * 12.9898 + sy * 78.233) * 43758.5453
+              for (var sy0 = 0; sy0 < sh; sy0++) {
+                var vNorm = cropV0 + (sy0 / (sh - 1)) * cropVSpan
+                var dfy = Math.max(0.0, Math.min(dh - 1, vNorm * (dh - 1)))
+                var iy0 = Math.floor(dfy), iy1 = Math.min(dh - 1, iy0 + 1), wy = dfy - iy0
+                var rInY = Math.round(dfy) * dw
+                for (var sx0 = 0; sx0 < sw; sx0++) {
+                  var uNorm = cropU0 + (sx0 / (sw - 1)) * cropUSpan
+                  var dfx = Math.max(0.0, Math.min(dw - 1, uNorm * (dw - 1)))
+                  var ix0 = Math.floor(dfx), ix1 = Math.min(dw - 1, ix0 + 1), wx = dfx - ix0
+                  var dVal = (1 - wy) * ((1 - wx) * dist[iy0 * dw + ix0] + wx * dist[iy0 * dw + ix1]) +
+                             wy * ((1 - wx) * dist[iy1 * dw + ix0] + wx * dist[iy1 * dw + ix1])
+                  var inFg = dMask[rInY + Math.round(dfx)] === 1
+                  var h1 = Math.sin(sx0 * 12.9898 + sy0 * 78.233) * 43758.5453
                   var jitter = h1 - Math.floor(h1)
-                  var ripple = (Math.sin(sx * 0.16 + sy * 0.14) + 1.0) * 0.5
-                  var tVal = 0.0
-
-                  if (fv >= iso) {
-                    // Expand from contour boundary (fv ~ iso) toward interior peak (fv ~ 15)
-                    var depthIn = Math.min(1.0, (fv - iso) / 7.5)
-                    tVal = 0.22 + depthIn * 0.20 + ripple * 0.05 + jitter * 0.08
-                  } else {
-                    // Expand from contour boundary (fv ~ iso) toward outer edges (fv ~ 0)
-                    var depthOut = Math.min(1.0, (iso - fv) / iso)
-                    tVal = 0.58 + depthOut * 0.22 + ripple * 0.06 + jitter * 0.10
-                  }
-
+                  var ripple = (Math.sin(sx0 * 0.14 + sy0 * 0.12) + 1.0) * 0.5
+                  var tVal = inFg
+                    ? (0.24 + Math.min(1.0, dVal / maxIn) * 0.22 + ripple * 0.04 + jitter * 0.07)
+                    : (0.58 + Math.min(1.0, dVal / maxOut) * 0.28 + ripple * 0.04 + jitter * 0.08)
                   var bIdx = Math.max(0, Math.min(numBuckets - 1, Math.floor(tVal * numBuckets)))
-                  bkts[bIdx].push((sy << 10) | sx)
+                  bkts[bIdx].push((sy0 << 10) | sx0)
                 }
               }
               swarmBuckets = bkts
               lastBucket = -1
+              outlineFinished = false
               mapReady = true
             }
 
             Image {
               id: oldWallImg; anchors.fill: parent; source: root.prevWallSource
-              fillMode: Image.PreserveAspectCrop; asynchronous: false; cache: true
+              fillMode: Image.PreserveAspectCrop; asynchronous: false; cache: false
               visible: root.cfgWallpaperTransition !== "swarm"
               opacity: root.cfgWallpaperTransition === "swarm" ? 1.0 : (1.0 - transRoot.prog)
+              scale: root.cfgWallpaperTransition === "zoom" ? (1.0 + transRoot.prog * 0.08) : 1.0
             }
 
             Canvas {
@@ -1297,19 +1473,20 @@ ShellRoot {
                   ctx.fillRect(0, 0, width, height)
                   transRoot.lastBucket = 0
                 }
-                if (!transRoot.mapReady) return
-                if (transRoot.prog >= 0.98) {
+                if (!transRoot.mapReady || transRoot.prog < 0.22) return
+                if (transRoot.prog >= 0.985) {
                   ctx.clearRect(0, 0, width, height)
                   return
                 }
-                var targetB = Math.min(transRoot.numBuckets - 1, Math.floor(transRoot.prog * transRoot.numBuckets))
+                var ep = transRoot.effectiveProg(transRoot.prog)
+                var targetB = Math.min(transRoot.numBuckets - 1, Math.floor(ep * transRoot.numBuckets))
                 var bkts = transRoot.swarmBuckets
                 for (var b = transRoot.lastBucket; b <= targetB; b++) {
                   var arr = bkts[b]
                   if (!arr) continue
                   for (var i = 0; i < arr.length; i++) {
                     var c = arr[i]
-                    ctx.clearRect((c & 1023) - 0.2, (c >> 10) - 0.2, 1.45, 1.45)
+                    ctx.clearRect((c & 1023) - 0.25, (c >> 10) - 0.25, 1.5, 1.5)
                   }
                 }
                 transRoot.lastBucket = targetB + 1
@@ -1322,17 +1499,16 @@ ShellRoot {
               maskEnabled: true; maskSource: oldMaskCanvas
             }
 
-            // Closed continuous vector contour of the NEW wallpaper's subject
             Canvas {
               id: outlineCanvas; anchors.fill: parent
               visible: root.cfgWallpaperTransition === "swarm" && transRoot.prog < 0.68
-              opacity: transRoot.prog < 0.56 ? 1.0 : Math.max(0.0, 1.0 - (transRoot.prog - 0.56) / 0.10)
+              opacity: transRoot.prog < 0.54 ? 1.0 : Math.max(0.0, 1.0 - (transRoot.prog - 0.54) / 0.12)
               onPaint: {
                 var ctx = getContext("2d"); ctx.reset()
                 if (!transRoot.mapReady) return
                 var pts = transRoot.contourPts
                 if (!pts || pts.length < 3) return
-                var drawFrac = Math.min(1.0, transRoot.prog / 0.24)
+                var drawFrac = Math.min(1.0, transRoot.prog / 0.28)
                 var maxPts = Math.max(2, Math.floor(pts.length * drawFrac))
                 var invGw = 1.0 / (transRoot.fgw - 1), invGh = 1.0 / (transRoot.fgh - 1)
                 var u0 = transRoot.cropU0, v0 = transRoot.cropV0
@@ -1343,15 +1519,14 @@ ShellRoot {
                 ctx.lineCap = "round"
                 ctx.lineJoin = "round"
                 ctx.beginPath()
-                var x0 = ((pts[0].x * invGw - u0) / uSpan) * width
-                var y0 = ((pts[0].y * invGh - v0) / vSpan) * height
-                ctx.moveTo(x0, y0)
+                ctx.moveTo(((pts[0].x * invGw - u0) / uSpan) * width, ((pts[0].y * invGh - v0) / vSpan) * height)
                 for (var i = 1; i < maxPts; i++) {
-                  var px = ((pts[i].x * invGw - u0) / uSpan) * width
-                  var py = ((pts[i].y * invGh - v0) / vSpan) * height
-                  ctx.lineTo(px, py)
+                  ctx.lineTo(((pts[i].x * invGw - u0) / uSpan) * width, ((pts[i].y * invGh - v0) / vSpan) * height)
                 }
-                if (drawFrac >= 0.99) ctx.closePath()
+                if (drawFrac >= 0.999) {
+                  ctx.closePath()
+                  transRoot.outlineFinished = true
+                }
                 ctx.stroke()
               }
             }
@@ -1362,16 +1537,31 @@ ShellRoot {
               onStopped: { root.wallTransitionActive = false; root.prevWallSource = "" }
             }
 
+            Timer {
+              interval: 3000; running: !transRoot.started; repeat: false
+              onTriggered: { root.wallTransitionActive = false; root.prevWallSource = "" }
+            }
+
             onProgChanged: {
               if (root.cfgWallpaperTransition === "swarm") {
-                oldMaskCanvas.requestPaint()
-                if (transRoot.prog <= 0.26 || transRoot.prog >= 0.55) outlineCanvas.requestPaint()
+                if (transRoot.prog >= 0.22) oldMaskCanvas.requestPaint()
+                if (!transRoot.outlineFinished) outlineCanvas.requestPaint()
               }
             }
 
             function startWhenReady() {
+              if (started) return
+              if (baseStaticWall.status === Image.Error) {
+                root.wallTransitionActive = false; root.prevWallSource = ""
+                return
+              }
               if (baseStaticWall.status === Image.Ready) {
-                buildSilhouetteMap()
+                started = true
+                if (root.cfgWallpaperTransition === "swarm") {
+                  buildSilhouetteMap()
+                  oldMaskCanvas.requestPaint()
+                  outlineCanvas.requestPaint()
+                }
                 swarmAnim.start()
               }
             }
@@ -1386,7 +1576,8 @@ ShellRoot {
     }
   }
 
-  // 2. INVISIBLE 40px TOP SPACER
+  // === TOP SPACER & CLICK-OUTSIDE BACKDROP ===
+
   Variants {
     model: Quickshell.screens
     PanelWindow {
@@ -1399,7 +1590,6 @@ ShellRoot {
     }
   }
 
-  // 3. CLICK-OUTSIDE BACKDROP LAYER (Top layer so it never covers Overlay islandWin)
   Variants {
     model: Quickshell.screens
     PanelWindow {
@@ -1417,7 +1607,8 @@ ShellRoot {
     }
   }
 
-  // 4. DYNAMIC ISLAND TOP BAR
+  // === DYNAMIC ISLAND TOP BAR ===
+
   Variants {
     model: Quickshell.screens
     PanelWindow {
@@ -1454,7 +1645,7 @@ ShellRoot {
         function onWifiPromptSsidChanged() { if (root.wifiPromptSsid !== "") focusTimer1.restart() }
       }
 
-      // UNIFIED LEFT PILL
+      // --- Left Pill (Workspaces & Media) ---
       Rectangle {
         id: leftPill
         anchors.top: parent.top; anchors.right: centerPill.left; anchors.rightMargin: 10
@@ -1558,35 +1749,11 @@ ShellRoot {
               QsText { text: (root.activePlayer && root.activePlayer.length > 0) ? root.formatSec(root.activePlayer.length) : ""; color: root.color8; font.pixelSize: 10 }
             }
           }
-          RowLayout {
-            Layout.alignment: Qt.AlignHCenter; spacing: 22
-            Repeater {
-              model: ["prev", "play", "next"]
-              Rectangle {
-                required property string modelData
-                implicitWidth: modelData === "play" ? 32 : 24; implicitHeight: modelData === "play" ? 32 : 24; radius: 8
-                color: modelData === "play" ? root.subtleFillHover : "transparent"
-                QsText {
-                  anchors.centerIn: parent
-                  text: modelData === "prev" ? "󰒮" : (modelData === "next" ? "󰒭" : ((root.activePlayer && root.activePlayer.playbackState === MprisPlaybackState.Playing) ? "󰏤" : "󰐊"))
-                  font.pixelSize: modelData === "play" ? 16 : 18
-                }
-                MouseArea {
-                  anchors.fill: parent
-                  onClicked: {
-                    if (!root.activePlayer) return
-                    if (modelData === "prev") root.activePlayer.previous()
-                    else if (modelData === "next") root.activePlayer.next()
-                    else root.activePlayer.togglePlaying()
-                  }
-                }
-              }
-            }
-          }
+          QsMediaControls { Layout.alignment: Qt.AlignHCenter }
         }
       }
 
-      // CENTER DYNAMIC ISLAND PILL
+      // --- Center Pill (Clock, Launcher, Calendar, Overview & Control Center) ---
       Rectangle {
         id: centerPill
         anchors.top: parent.top; anchors.horizontalCenter: parent.horizontalCenter
@@ -1622,7 +1789,6 @@ ShellRoot {
           }
         }
 
-        // Shield MouseArea prevents clicks inside open panels from falling through to islandWin close area
         MouseArea {
           anchors.fill: parent
           acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
@@ -1632,7 +1798,7 @@ ShellRoot {
           }
         }
 
-        // UNIFIED FIXED 40px TOP HEADER
+        // Top Header Bar
         Item {
           id: topPillBar
           visible: !centerPill.isOverviewOpen
@@ -1694,7 +1860,7 @@ ShellRoot {
                 anchors.fill: parent
                 onClicked: {
                   if (centerPill.isCalOpen) root.calSubmenu = ""
-                  else { root.wifiPromptSsid = ""; root.expandedResMon = ""; root.showSavedList = false; root.expandedDevInfo = ""; root.sysSubmenu = "" }
+                  else root.openSubmenu("")
                 }
               }
             }
@@ -1711,11 +1877,10 @@ ShellRoot {
               MouseArea {
                 anchors.fill: parent
                 onClicked: {
-                  if (root.sysSubmenu === "net" && root.ethIface !== "") root.runCmd("nmcli dev " + (root.ethConnected ? "disconnect " : "connect ") + root.ethIface)
-                  else if (root.sysSubmenu === "bt" && root.hasBtAdapter) root.runCmd(root.btEnabled ? "bluetoothctl power off; rfkill block bluetooth" : "rfkill unblock bluetooth; bluetoothctl power on")
+                  if (root.sysSubmenu === "net") root.toggleEthernet()
+                  else if (root.sysSubmenu === "bt") root.toggleBluetooth()
                   else if (root.sysSubmenu === "sound") root.toggleSinkMute()
                   else if (root.sysSubmenu === "mic") root.toggleSourceMute()
-                  deferPollTimer.restart()
                 }
               }
             }
@@ -1727,12 +1892,12 @@ ShellRoot {
             Rectangle {
               visible: centerPill.isSysOpen && root.sysSubmenu === "power"; implicitWidth: 90; implicitHeight: 24; radius: 7; color: root.color1
               QsText { anchors.centerIn: parent; text: "󰐥 Poweroff"; color: root.bg; font.pixelSize: 11; font.bold: true }
-              MouseArea { anchors.fill: parent; onClicked: root.runCmd("loginctl poweroff || sudo -n poweroff || poweroff") }
+              MouseArea { anchors.fill: parent; onClicked: root.execPower("poweroff") }
             }
           }
         }
 
-        // ATTACHED APP LAUNCHER LIST
+        // App Launcher View
         ListView {
           id: appListView
           visible: centerPill.isLauncherOpen
@@ -1774,7 +1939,7 @@ ShellRoot {
           }
         }
 
-        // CALENDAR, NOTIFICATIONS & WEATHER SUBMENU
+        // Calendar, Weather & Notifications View
         ColumnLayout {
           id: calCardCol
           visible: centerPill.isHoverPreview || centerPill.isCalOpen
@@ -1933,7 +2098,7 @@ ShellRoot {
           }
         }
 
-        // WORKSPACE WINDOWS OVERVIEW
+        // Workspace Windows Overview View
         ColumnLayout {
           visible: centerPill.isOverviewOpen; anchors.fill: parent; anchors.margins: 10; spacing: 8
           RowLayout {
@@ -1972,7 +2137,7 @@ ShellRoot {
           }
         }
 
-        // SYSTEM CONTROL CENTER
+        // System Control Center View
         Item {
           id: sysContainer
           visible: centerPill.isSysOpen
@@ -2003,7 +2168,7 @@ ShellRoot {
             anchors { left: parent.left; right: parent.right }
             spacing: 6
 
-            // 1. 2x2 QuickTiles Grid
+            // QuickTiles Grid
             GridLayout {
               visible: root.sysSubmenu === ""
               Layout.fillWidth: true; columns: 2; uniformCellWidths: true; rowSpacing: 8; columnSpacing: 8
@@ -2027,16 +2192,14 @@ ShellRoot {
                   onIconClicked: button => {
                     if (button === Qt.RightButton) root.openSubmenu(modelData.key)
                     else if (modelData.key === "net") root.togglePrimaryNetwork()
-                    else if (modelData.key === "bt" && root.hasBtAdapter) {
-                      root.runCmd(root.btEnabled ? "bluetoothctl power off; rfkill block bluetooth" : "rfkill unblock bluetooth; bluetoothctl power on")
-                      deferPollTimer.restart()
-                    } else root.openSubmenu(modelData.key)
+                    else if (modelData.key === "bt") root.toggleBluetooth()
+                    else root.openSubmenu(modelData.key)
                   }
                 }
               }
             }
 
-            // 2. Separated Action Row
+            // Recorder, Screenshot, System Info & Power Row
             RowLayout {
               visible: root.sysSubmenu === ""; Layout.fillWidth: true; spacing: 8
               Rectangle {
@@ -2081,7 +2244,7 @@ ShellRoot {
               }
             }
 
-            // 3. Shared Interactive Slider Bars
+            // Display, Sound & Mic Sliders
             Repeater {
               model: ["display", "sound", "mic"]
               QsBar {
@@ -2117,7 +2280,7 @@ ShellRoot {
               }
             }
 
-            // 4. Unified Metric Graph Cards (Used for Battery Submenu & System Info Submenu)
+            // Battery & System Info Graphs
             Repeater {
               model: root.sysSubmenu === "battery" ? [
                 {
@@ -2166,7 +2329,7 @@ ShellRoot {
               }
             }
 
-            // 5A. Battery Side-by-Side Blur & Animations QuickTiles
+            // Battery Submenu Controls (Blur, Animations & Wallpapers)
             GridLayout {
               visible: root.sysSubmenu === "battery"
               Layout.fillWidth: true; columns: 2; uniformCellWidths: true; rowSpacing: 8; columnSpacing: 8
@@ -2186,7 +2349,6 @@ ShellRoot {
               }
             }
 
-            // 5B. Animated Wallpapers & Screen Recorder Cards
             Repeater {
               model: root.sysSubmenu === "battery" ? [
                 { "key": "wall", "icon": root.animWallpapers ? "󰕧" : "󰸉", "title": "Animated Wallpapers", "sub": root.animWallpapers ? (root.shouldPlayAnimation ? "Playing (day_animated / night_animated)" : "Paused (Fullscreen / Standby)") : "Off • Static Power Saving (day / night)", "extra": "Loaded: " + root.wallpaperLabel, "on": root.animWallpapers, "col": root.color4, "scol": root.animWallpapers ? root.color4 : root.color2 }
@@ -2210,7 +2372,7 @@ ShellRoot {
               }
             }
 
-            // 6. System Info Storage Bar & Kernel Footer Card
+            // System Info Storage & Kernel Footer
             QsBar {
               visible: root.sysSubmenu === "cpu"
               icon: "󰋊"; label: "Root (/) • " + root.diskRootInfo; pct: root.diskRootPct; accentCol: root.color6
@@ -2221,7 +2383,7 @@ ShellRoot {
               sub: "Secondary Drive: " + root.diskSecInfo; subCol: root.color8
             }
 
-            // 7. Audio / Mic Devices List
+            // Audio Devices Submenu
             ColumnLayout {
               visible: root.sysSubmenu === "sound" || root.sysSubmenu === "mic"; Layout.fillWidth: true; spacing: 6
               QsText { text: "Available Devices"; color: root.color8; font.pixelSize: 11; font.bold: true }
@@ -2245,7 +2407,7 @@ ShellRoot {
               }
             }
 
-            // 8. Display Submenu
+            // Display Submenu
             ColumnLayout {
               visible: root.sysSubmenu === "display"; Layout.fillWidth: true; spacing: 8
               Repeater {
@@ -2358,7 +2520,7 @@ ShellRoot {
               }
             }
 
-            // 9. System Tray Submenu
+            // System Tray Submenu
             ColumnLayout {
               visible: root.sysSubmenu === "tray"; Layout.fillWidth: true; spacing: 6
               Rectangle {
@@ -2388,7 +2550,7 @@ ShellRoot {
               }
             }
 
-            // 10. UNIFIED NETWORK & BLUETOOTH SUBMENU
+            // Network & Bluetooth Submenu
             ColumnLayout {
               id: wirelessCol
               visible: root.sysSubmenu === "net" || root.sysSubmenu === "bt"
@@ -2405,8 +2567,8 @@ ShellRoot {
                 icon: "󰈀"; active: root.ethConnected
                 title: "Ethernet (" + (root.ethIface !== "" ? root.ethIface : "No port") + ")"
                 sub: root.ethIp; subCol: root.ethConnected ? root.color2 : root.color8
-                onTileClicked: { if (root.ethIface !== "") { root.runCmd("nmcli dev " + (root.ethConnected ? "disconnect " : "connect ") + root.ethIface); deferPollTimer.restart() } }
-                onIconClicked: { if (root.ethIface !== "") { root.runCmd("nmcli dev " + (root.ethConnected ? "disconnect " : "connect ") + root.ethIface); deferPollTimer.restart() } }
+                onTileClicked: root.toggleEthernet()
+                onIconClicked: root.toggleEthernet()
               }
 
               Rectangle {
@@ -2420,9 +2582,8 @@ ShellRoot {
                     anchors.fill: parent
                     onClicked: {
                       if (!wirelessCol.hasHw) return
-                      if (wirelessCol.isNet) root.runCmd("nmcli radio wifi " + (root.wifiEnabled ? "off" : "on"))
-                      else root.runCmd(root.btEnabled ? "bluetoothctl power off; rfkill block bluetooth" : "rfkill unblock bluetooth; bluetoothctl power on")
-                      deferPollTimer.restart()
+                      if (wirelessCol.isNet) { root.runCmd("nmcli radio wifi " + (root.wifiEnabled ? "off" : "on")); deferPollTimer.restart() }
+                      else root.toggleBluetooth()
                     }
                   }
                 }
@@ -2605,28 +2766,22 @@ ShellRoot {
               }
             }
 
-            // 11. Power Menu Submenu
+            // Power Menu Submenu
             ColumnLayout {
               visible: root.sysSubmenu === "power"; Layout.fillWidth: true; spacing: 6
               Repeater {
                 model: [
-                  { "icon": "󰑐", "label": "Reboot System", "cmd": "loginctl reboot || sudo -n reboot || reboot", "pause": false },
-                  { "icon": "󰤄", "label": "Suspend", "cmd": "loginctl suspend || sudo -n zzz || zzz", "pause": true },
-                  { "icon": "󰒲", "label": "Hibernate", "cmd": "loginctl hibernate || sudo -n ZZZ || ZZZ", "pause": true },
-                  { "icon": "󰌾", "label": "Lock Screen", "cmd": "LOCK", "pause": false },
-                  { "icon": "󰍃", "label": "Log Out", "cmd": "LOGOUT", "pause": false }
+                  { "icon": "󰑐", "label": "Reboot System", "act": "reboot" },
+                  { "icon": "󰤄", "label": "Suspend", "act": "suspend" },
+                  { "icon": "󰒲", "label": "Hibernate", "act": "hibernate" },
+                  { "icon": "󰌾", "label": "Lock Screen", "act": "lock" },
+                  { "icon": "󰍃", "label": "Log Out", "act": "logout" }
                 ]
                 QsTile {
                   required property var modelData
                   implicitHeight: 46; icon: modelData.icon; iconFg: root.color4; title: modelData.label
-                  function act() {
-                    if (modelData.pause) { root.isMonitorDpmsOff = true; root.triggerLock() }
-                    if (modelData.cmd === "LOCK") root.triggerLock()
-                    else if (modelData.cmd === "LOGOUT") root.cleanExitSession("")
-                    else root.runCmd(modelData.cmd)
-                  }
-                  onTileClicked: act()
-                  onIconClicked: act()
+                  onTileClicked: root.execPower(modelData.act)
+                  onIconClicked: root.execPower(modelData.act)
                 }
               }
             }
@@ -2634,7 +2789,7 @@ ShellRoot {
         }
       }
 
-      // RIGHT OSD PILL
+      // --- Right Pill (Audio & Brightness OSD) ---
       Rectangle {
         id: rightOsdPill
         anchors.top: parent.top; anchors.left: centerPill.right; anchors.leftMargin: 10
@@ -2674,7 +2829,8 @@ ShellRoot {
     }
   }
 
-  // 5. NOTIFICATION POPUP WINDOW
+  // === NOTIFICATION POPUPS ===
+
   Variants {
     model: Quickshell.screens
     PanelWindow {
@@ -2702,23 +2858,7 @@ ShellRoot {
     }
   }
 
-  // 6. UNIFIED LOGIN & LOCKSCREEN (Lazy-Loaded via Loader -> 0 RAM/VRAM when unlocked)
-  property bool authError: false
-  property bool authBusy: false
-  property bool lockPromptActive: false
-  property string pendingPassword: ""
-  property string lockDateFormatted: Qt.formatDateTime(new Date(), "dddd, MMMM d").toUpperCase()
-  property bool showLiveLockWall: root.animWallpapers && root.cfgLockKeepAnimated && (root.isVideoFile || root.isAnimatedGif)
-
-  property string lockWeatherMain: {
-    let cond = (root.weatherDetail.split("•")[0] || "").trim()
-    return root.weatherShort + (cond !== "" && !cond.includes("Fetching") ? ("   •   " + cond) : "")
-  }
-  property string lockWeatherSub: {
-    let parts = root.weatherDetail.split("•")
-    if (parts.length < 4) return ""
-    return parts[1].trim() + "   •   󰖝 " + parts[2].replace("Wind:", "").trim() + "   •   󰖎 " + parts[3].replace("Hum:", "").trim()
-  }
+  // === UNIFIED LOGIN & LOCKSCREEN ===
 
   PamContext {
     id: pamLock; config: "login"
@@ -2965,30 +3105,7 @@ ShellRoot {
                 text: (root.activePlayer && root.activePlayer.trackTitle) ? (root.activePlayer.trackTitle + (root.activePlayer.trackArtist ? " — " + root.activePlayer.trackArtist : "")) : "Media Playing"
                 font.pixelSize: 11; elide: Text.ElideRight
               }
-              RowLayout {
-                spacing: 10
-                Repeater {
-                  model: ["prev", "play", "next"]
-                  Item {
-                    required property string modelData
-                    implicitWidth: 20; implicitHeight: 20
-                    QsText {
-                      anchors.centerIn: parent
-                      text: modelData === "prev" ? "󰒮" : (modelData === "next" ? "󰒭" : ((root.activePlayer && root.activePlayer.playbackState === MprisPlaybackState.Playing) ? "󰏤" : "󰐊"))
-                      color: modelData === "play" ? root.color4 : root.fg; font.pixelSize: modelData === "play" ? 15 : 14
-                    }
-                    MouseArea {
-                      anchors.fill: parent
-                      onClicked: {
-                        if (!root.activePlayer) return
-                        if (modelData === "prev") root.activePlayer.previous()
-                        else if (modelData === "next") root.activePlayer.next()
-                        else root.activePlayer.togglePlaying()
-                      }
-                    }
-                  }
-                }
-              }
+              QsMediaControls { btnSize: 20; playSize: 20; iconSize: 14; playIconSize: 15; spacing: 10; pillBg: false }
             }
           }
 
@@ -3002,9 +3119,9 @@ ShellRoot {
               id: lockPowerCol; anchors.right: parent.right; anchors.bottom: parent.bottom; spacing: 10
               Repeater {
                 model: [
-                  { "label": "HIBERNATE", "cmd": "loginctl hibernate || sudo -n ZZZ || ZZZ", "pause": true },
-                  { "label": "SUSPEND", "cmd": "loginctl suspend || sudo -n zzz || zzz", "pause": true },
-                  { "label": "REBOOT", "cmd": "loginctl reboot || sudo -n reboot || reboot", "pause": false }
+                  { "label": "HIBERNATE", "act": "hibernate" },
+                  { "label": "SUSPEND", "act": "suspend" },
+                  { "label": "REBOOT", "act": "reboot" }
                 ]
                 Item {
                   required property var modelData
@@ -3017,7 +3134,7 @@ ShellRoot {
                   }
                   MouseArea {
                     id: pwrOptMouse; anchors.fill: parent; hoverEnabled: true
-                    onClicked: { if (modelData.pause) root.isMonitorDpmsOff = true; root.runCmd(modelData.cmd) }
+                    onClicked: root.execPower(modelData.act)
                   }
                 }
               }
@@ -3028,7 +3145,7 @@ ShellRoot {
                   color: shutdownMouse.containsMouse ? root.color1 : root.withAlpha(root.fg, 0.8)
                   font.pixelSize: 11; font.bold: true; font.letterSpacing: 2
                 }
-                MouseArea { id: shutdownMouse; anchors.fill: parent; hoverEnabled: true; onClicked: root.runCmd("loginctl poweroff || sudo -n poweroff || poweroff") }
+                MouseArea { id: shutdownMouse; anchors.fill: parent; hoverEnabled: true; onClicked: root.execPower("poweroff") }
               }
             }
           }
