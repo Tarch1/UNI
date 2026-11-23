@@ -144,43 +144,6 @@ ShellRoot {
     }
   }
 
-  component QsMediaControls: RowLayout {
-    id: mcBtns
-    property int btnSize: 24
-    property int playSize: 32
-    property int iconSize: 18
-    property int playIconSize: 16
-    property bool pillBg: true
-    spacing: 22
-
-    Repeater {
-      model: ["prev", "play", "next"]
-      Rectangle {
-        required property string modelData
-        property bool isPlay: modelData === "play"
-        implicitWidth: isPlay ? mcBtns.playSize : mcBtns.btnSize
-        implicitHeight: isPlay ? mcBtns.playSize : mcBtns.btnSize
-        radius: 8
-        color: (isPlay && mcBtns.pillBg) ? root.subtleFillHover : "transparent"
-        QsText {
-          anchors.centerIn: parent
-          text: modelData === "prev" ? "󰒮" : (modelData === "next" ? "󰒭" : ((root.activePlayer && root.activePlayer.playbackState === MprisPlaybackState.Playing) ? "󰏤" : "󰐊"))
-          color: (!mcBtns.pillBg && parent.isPlay) ? root.color4 : root.fg
-          font.pixelSize: parent.isPlay ? mcBtns.playIconSize : mcBtns.iconSize
-        }
-        MouseArea {
-          anchors.fill: parent
-          onClicked: {
-            if (!root.activePlayer) return
-            if (modelData === "prev") root.activePlayer.previous()
-            else if (modelData === "next") root.activePlayer.next()
-            else root.activePlayer.togglePlaying()
-          }
-        }
-      }
-    }
-  }
-
   component QsMetricCard: Rectangle {
     id: mcRoot
     property string icon: ""
@@ -298,22 +261,21 @@ ShellRoot {
   property real panelAlpha: blurActive ? cfgGlassOpacity : cfgSolidOpacity
 
   property string wallpaperPath: ""
+  property string wallpaperFrame: ""
   property string wallpaperSilhouette: ""
   property string prevWallSource: ""
-  property int wallRev: 0
   property bool wallTransitionActive: false
   property bool animWallpapers: false
   property bool firstRunDone: false
   property bool isVideoFile: wallpaperPath.toLowerCase().endsWith(".webm") || wallpaperPath.toLowerCase().endsWith(".mp4")
   property bool isAnimatedGif: !isVideoFile && (wallpaperPath.toLowerCase().endsWith(".gif") || (animWallpapers && wallpaperPath.toLowerCase().endsWith(".webp")))
-  property string staticWallSource: wallpaperPath !== "" ? (isVideoFile ? ("file:///tmp/wall_frame_" + currentSessionUser + ".jpg?v=" + wallRev) : ("file://" + wallpaperPath)) : ""
+  property string staticWallSource: wallpaperPath === "" ? "" : (isVideoFile ? (wallpaperFrame !== "" ? ("file://" + wallpaperFrame) : "") : ("file://" + wallpaperPath))
   property bool hasActiveFullWindow: false
   property bool isMonitorDpmsOff: false
   property bool shouldPlayAnimation: {
     if (!animWallpapers || (!isVideoFile && !isAnimatedGif)) return false
-    if (wallTransitionActive) return false
+    if (wallTransitionActive || screenLocked) return false
     if (cfgPauseOnScreenOff && isMonitorDpmsOff) return false
-    if (screenLocked) return cfgLockKeepAnimated
     if (cfgPauseOnFullscreen && hasActiveFullWindow) return false
     return true
   }
@@ -497,7 +459,7 @@ ShellRoot {
   }
   function saveJsonBool(key, val, extraCmd) {
     let vStr = val ? "true" : "false"
-    runCmd((extraCmd || "") + "sed -i 's/\"" + key + "\": *[a-z]*/\"" + key + "\": " + vStr + "/' \"" + root.homeDir + "/.config/quickshell/colors.json\" \"" + root.homeDir + "/.config/wallust/templates/colors-quickshell.json\" 2>/dev/null || true")
+    runCmd((extraCmd || "") + "sed -i 's/\"" + key + "\": *[a-z]*/\"" + key + "\": " + vStr + "/' \"" + root.homeDir + "/.config/quickshell/colors.json\" 2>/dev/null || true")
   }
   function paintArc(canvas, pct, strokeCol) {
     var ctx = canvas.getContext("2d"); ctx.reset()
@@ -519,7 +481,7 @@ ShellRoot {
     root.calendarDays = arr
   }
 
-  // === INTERNAL HELPERS: SESSION, POWER & APPS ===
+  // === INTERNAL HELPERS: SESSION, POWER, APPS & MEDIA ===
 
   function execPower(action) {
     if (action === "lock") { root.triggerLock(); return }
@@ -538,7 +500,7 @@ ShellRoot {
   }
   function cleanExitSession(targetUser) {
     let sw = targetUser !== "" ? ("sudo -n /usr/bin/qs-session --switch " + shQuote(targetUser) + " 2>/dev/null || true; ") : "rm -f /tmp/qs_lock_active_$UID 2>/dev/null || true; "
-    let clean = "pkill -u \"$UID\" -f '[t]heme-switcher.sh|[q]s-session --clipboard' 2>/dev/null || true; pkill -u \"$UID\" -x 'hypridle|wlsunset|wf-recorder' 2>/dev/null || true; command -v systemctl >/dev/null 2>&1 || pkill -u \"$UID\" -x 'wireplumber|pipewire-pulse|pipewire' 2>/dev/null || true; "
+    let clean = "pkill -u \"$UID\" -f '[t]heming --daemon|[q]s-session --clipboard' 2>/dev/null || true; pkill -u \"$UID\" -x 'hypridle|wlsunset|wf-recorder' 2>/dev/null || true; command -v systemctl >/dev/null 2>&1 || pkill -u \"$UID\" -x 'wireplumber|pipewire-pulse|pipewire' 2>/dev/null || true; "
     let wmExit = "niri msg action quit -s 2>/dev/null || hyprctl dispatch exit 2>/dev/null || loginctl terminate-session $XDG_SESSION_ID 2>/dev/null || pkill -TERM -u \"$UID\" -x 'niri|Hyprland'"
     runCmd(sw + clean + wmExit)
   }
@@ -551,6 +513,16 @@ ShellRoot {
     } else {
       a.execute()
     }
+  }
+  function focusWorkspace(idx) {
+    root.lastActiveWs = idx
+    runCmd((root.isHyprland ? "hyprctl dispatch workspace " : "niri msg action focus-workspace ") + idx)
+  }
+  function mediaAction(act) {
+    if (!root.activePlayer) return
+    if (act === "prev") root.activePlayer.previous()
+    else if (act === "next") root.activePlayer.next()
+    else root.activePlayer.togglePlaying()
   }
   function activateTrayItem(item, win, itemWidget, button) {
     try {
@@ -615,6 +587,12 @@ ShellRoot {
 
   // === INTERNAL HELPERS: HARDWARE, AUDIO, NETWORK & RECORDING ===
 
+  function setBrightness(pct, showOsd) {
+    let p = Math.max(5, Math.min(100, Math.round(pct)))
+    root.brightnessPct = p
+    if (showOsd) root.triggerOsd("brightness")
+    runCmd("brightnessctl s " + p + "%")
+  }
   function setSinkVolume(pct) {
     let p = Math.max(0, Math.min(100, Math.round(pct)))
     if (root.sinkAudio) root.sinkAudio.volume = p / 100.0
@@ -635,7 +613,7 @@ ShellRoot {
   }
   function toggleWallpaperMode() {
     root.animWallpapers = !root.animWallpapers
-    runCmd("\"" + root.homeDir + "/.config/wallpapers/theme-switcher.sh\" " + (root.animWallpapers ? "animated" : "static") + " &")
+    runCmd("theming " + (root.animWallpapers ? "animated" : "static"))
   }
   function toggleUiBlur() {
     if (root.isVM) return
@@ -687,7 +665,6 @@ ShellRoot {
     updateCalendar()
     initPoll.running = true
     fastPoll.running = true
-    statPoll.running = true
     checkFirstRunNiri()
   }
 
@@ -699,18 +676,22 @@ ShellRoot {
     onLoaded: {
       try {
         let d = JSON.parse(text())
+        let newWall = d.wallpaper ? String(d.wallpaper) : ""
+        let newFrame = d.wallFrame !== undefined ? String(d.wallFrame) : ""
+        let newIsVid = newWall.toLowerCase().endsWith(".webm") || newWall.toLowerCase().endsWith(".mp4")
+        let newStatic = newWall !== "" ? (newIsVid ? (newFrame !== "" ? ("file://" + newFrame) : "") : ("file://" + newWall)) : ""
         if (d.silhouette !== undefined) root.wallpaperSilhouette = String(d.silhouette)
-        if (d.wallpaper && d.wallpaper !== root.wallpaperPath) {
-          let doTrans = (root.wallpaperPath !== "" && root.animActive && root.cfgWallpaperTransition !== "none")
+        if (newWall !== "" && newWall !== root.wallpaperPath) {
+          let doTrans = (root.wallpaperPath !== "" && root.animActive && root.cfgWallpaperTransition !== "none" && root.staticWallSource !== "" && newStatic !== "")
           if (doTrans) {
             root.wallTransitionActive = false
-            root.prevWallSource = root.isVideoFile
-              ? ("file:///tmp/wall_frame_prev_" + root.currentSessionUser + ".jpg?v=" + root.wallRev)
-              : root.staticWallSource
+            root.prevWallSource = root.staticWallSource
           }
-          root.wallRev++
-          root.wallpaperPath = d.wallpaper
+          root.wallpaperFrame = newFrame
+          root.wallpaperPath = newWall
           if (doTrans) root.wallTransitionActive = true
+        } else if (newFrame !== root.wallpaperFrame) {
+          root.wallpaperFrame = newFrame
         }
         if (d.wallMode) root.animWallpapers = (d.wallMode === "animated")
         if (d.uiBlur !== undefined && !root.isVM) root.cfgEnableBlur = Boolean(d.uiBlur)
@@ -752,7 +733,8 @@ ShellRoot {
     onTriggered: {
       if (root.centerMode === "overview") overviewPoll.running = true
       else if (root.centerMode === "system") {
-        if (root.sysSubmenu === "" || root.sysSubmenu === "cpu") { sysPoll.running = true; statPoll.running = true }
+        if (root.sysSubmenu === "") sysPoll.running = true
+        else if (root.sysSubmenu === "cpu") { sysPoll.running = true; statPoll.running = true }
         else if (root.sysSubmenu === "battery") { if (root.batHistory.length === 0) batPoll.running = true }
         else if (root.sysSubmenu === "net" || root.sysSubmenu === "bt" || root.sysSubmenu === "sound" || root.sysSubmenu === "mic" || root.sysSubmenu === "display") subPoll.running = true
       }
@@ -781,9 +763,8 @@ ShellRoot {
   Timer {
     id: mainTimer
     property bool highFreq: root.isRecording || root.centerMode === "system" || (root.activePlayer !== null && root.activePlayer.playbackState === MprisPlaybackState.Playing)
-    interval: highFreq ? 1000 : 15000
-    running: !root.isMonitorDpmsOff || root.isRecording
-    repeat: true
+    interval: (root.isMonitorDpmsOff && !root.isRecording) ? 60000 : (highFreq ? 1000 : 15000)
+    running: true; repeat: true
     property int tick: 0
     onTriggered: {
       root.updateClock()
@@ -791,10 +772,12 @@ ShellRoot {
       if (root.activePlayer && !root.screenLocked && !root.isMonitorDpmsOff) {
         root.mediaProg = (root.activePlayer.length > 0) ? Math.min(1, Math.max(0, root.activePlayer.position / root.activePlayer.length)) : 0.25
       }
-      if (root.centerMode === "system" && tick % 3 === 0) sysPoll.running = true
-      if (root.centerMode === "system" && root.sysSubmenu !== "" && tick % 4 === 0) subPoll.running = true
-      if (root.weatherShort.includes("--") && tick > 0 && tick % (highFreq ? 300 : 20) === 0) weatherProc.running = true
-      if (root.animWallpapers && (!highFreq || tick % 15 === 0)) fastPoll.running = true
+      if (!root.isMonitorDpmsOff) {
+        if (root.centerMode === "system" && tick % 3 === 0) sysPoll.running = true
+        if (root.centerMode === "system" && root.sysSubmenu !== "" && tick % 4 === 0) subPoll.running = true
+        if (root.weatherShort.includes("--") && tick > 0 && tick % (highFreq ? 300 : 20) === 0) weatherProc.running = true
+      }
+      if ((root.animWallpapers || root.isMonitorDpmsOff) && (!highFreq || tick % 15 === 0)) fastPoll.running = true
       tick = (tick + 1) % 3600
     }
   }
@@ -820,7 +803,7 @@ ShellRoot {
 
   Process {
     id: wmStream
-    running: !root.screenLocked && !root.isMonitorDpmsOff
+    running: !root.screenLocked
     command: ["bash", "-c", "
       if [[ -n \"$NIRI_SOCKET\" ]]; then
         ( niri msg -j event-stream 2>/dev/null & udevadm monitor -u -s backlight 2>/dev/null & wait ) | grep --line-buffered -E 'Workspace|Window|backlight'
@@ -944,7 +927,7 @@ ShellRoot {
 
   Process {
     id: fastPoll
-    environment: ({ "QS_ANIM": root.animWallpapers ? "1" : "0" })
+    environment: ({ "QS_ANIM": root.animWallpapers ? "1" : "0", "QS_DPMS": root.isMonitorDpmsOff ? "1" : "0" })
     command: ["bash", "-c", "
       b=100
       for bd in /sys/class/backlight/*; do
@@ -963,7 +946,7 @@ ShellRoot {
         ws=\"\"; for i in 1 2 3 4 5; do a=0; [[ \"$i\" == \"$act\" ]] && a=1; o=0; echo \"$occ_l\" | grep -qx \"$i\" && o=1; ws+=\"$i:$a:$o \"; done
         [[ \"$QS_ANIM\" == \"1\" ]] && hyprctl activewindow -j 2>/dev/null | grep -qE '\"fullscreen\": *(1|2|true)' && fs=1
       fi
-      if [[ \"$QS_ANIM\" == \"1\" ]]; then
+      if [[ \"$QS_ANIM\" == \"1\" || \"$QS_DPMS\" == \"1\" ]]; then
         for df in /sys/class/drm/*/dpms; do [[ -f \"$df\" && \"$(<\"$df\")\" == \"Off\" ]] && { dpms=1; break; }; done
       fi
       printf '%s|%s|%d|%d\n' \"$b\" \"$ws\" \"$fs\" \"$dpms\"
@@ -994,7 +977,7 @@ ShellRoot {
           root.lastWsSignature = wsRaw
         }
         if (p.length >= 3) root.hasActiveFullWindow = (p[2] === "1")
-        if (p.length >= 4 && root.animWallpapers) root.isMonitorDpmsOff = (p[3] === "1")
+        if (p.length >= 4 && (root.animWallpapers || root.isMonitorDpmsOff)) root.isMonitorDpmsOff = (p[3] === "1")
       }
     }
   }
@@ -1189,7 +1172,7 @@ ShellRoot {
       }
       MultiEffect {
         anchors.fill: parent; source: backdropWall
-        visible: root.blurActive && root.wallpaperPath !== ""
+        visible: root.blurActive && root.staticWallSource !== ""
         blurEnabled: visible; blurMax: 48; blur: 1.0
       }
       Rectangle { anchors.fill: parent; color: Qt.rgba(0, 0, 0, 0.35) }
@@ -1223,14 +1206,14 @@ ShellRoot {
         Image {
           id: baseStaticWall
           anchors.fill: parent
-          visible: (!root.isVideoFile && !root.isAnimatedGif) || root.wallTransitionActive
+          visible: (!root.isVideoFile && !root.isAnimatedGif) || root.wallTransitionActive || !root.shouldPlayAnimation
           source: root.staticWallSource
           fillMode: Image.PreserveAspectCrop; asynchronous: true; cache: true; smooth: true
         }
         AnimatedImage {
-          anchors.fill: parent; visible: root.isAnimatedGif && !root.wallTransitionActive
+          anchors.fill: parent; visible: root.isAnimatedGif && !root.wallTransitionActive && root.shouldPlayAnimation
           source: (root.isAnimatedGif && root.wallpaperPath !== "") ? ("file://" + root.wallpaperPath) : ""
-          playing: visible && root.shouldPlayAnimation
+          playing: visible
           fillMode: Image.PreserveAspectCrop; asynchronous: true; cache: false; smooth: true
         }
         MediaPlayer {
@@ -1244,7 +1227,7 @@ ShellRoot {
         }
         VideoOutput {
           id: wallVideoOut; anchors.fill: parent
-          visible: root.animWallpapers && root.isVideoFile && !root.wallTransitionActive
+          visible: root.animWallpapers && root.isVideoFile && !root.wallTransitionActive && root.shouldPlayAnimation
           fillMode: VideoOutput.PreserveAspectCrop
         }
 
@@ -1300,8 +1283,7 @@ ShellRoot {
                 for (var r = 1; r < fgh - 1; r++) {
                   var rowOff = r * fgw
                   for (var c = 1; c < fgw - 1; c++) {
-                    var hv = parseInt(sil.charAt(rowOff + c), 16)
-                    if (!isNaN(hv) && hv >= 8) {
+                    if (sil.charCodeAt(rowOff + c) >= 56) {
                       mask[rowOff + c] = 1
                       activeCnt++
                     }
@@ -1311,8 +1293,7 @@ ShellRoot {
               if (activeCnt < 150 || activeCnt > ftot * 0.85) {
                 mask.fill(0)
                 for (var r2 = 1; r2 < fgh - 1; r2++) {
-                  var row2 = r2 * fgw
-                  var dy2 = (r2 / fgh) - 0.5
+                  var row2 = r2 * fgw, dy2 = (r2 / fgh) - 0.5
                   for (var c2 = 1; c2 < fgw - 1; c2++) {
                     var dx2 = (c2 / fgw) - 0.5
                     if ((dx2 * dx2 * 2.8 + dy2 * dy2 * 3.2) < 0.16) mask[row2 + c2] = 1
@@ -1335,8 +1316,7 @@ ShellRoot {
                 var cx = sx, cy = sy, bDir = 4, firstDir = -1
                 for (var step = 0; step < 16000; step++) {
                   loop.push({ x: cx, y: cy })
-                  var found = -1
-                  var startD = (bDir + 1) & 7
+                  var found = -1, startD = (bDir + 1) & 7
                   for (var k = 0; k < 8; k++) {
                     var dir = (startD + k) & 7
                     if (mask[(cy + ddy[dir]) * fgw + (cx + ddx[dir])] === 1) { found = dir; break }
@@ -1344,8 +1324,7 @@ ShellRoot {
                   if (found < 0) break
                   if (firstDir < 0) firstDir = found
                   else if (cx === sx && cy === sy && found === firstDir) { loop.pop(); break }
-                  cx += ddx[found]
-                  cy += ddy[found]
+                  cx += ddx[found]; cy += ddy[found]
                   bDir = ((found & 1) === 0) ? ((found + 6) & 7) : ((found + 5) & 7)
                 }
               }
@@ -1369,27 +1348,22 @@ ShellRoot {
               }
               contourPts = loop
 
-              // Euclidean Distance Transform (2-pass Chamfer)
+              // Distance Transform (2-pass Chamfer)
               var dw = 180, dh = 101, dtot = dw * dh
               var dMask = new Uint8Array(dtot)
               var dist = new Float32Array(dtot)
               dist.fill(100000.0)
               for (var dy0 = 0; dy0 < dh; dy0++) {
-                var mr = Math.min(fgh - 1, dy0 * 2) * fgw
-                var dr = dy0 * dw
-                for (var dx0 = 0; dx0 < dw; dx0++) {
-                  dMask[dr + dx0] = mask[mr + Math.min(fgw - 1, dx0 * 2)]
-                }
+                var mr = Math.min(fgh - 1, dy0 * 2) * fgw, dr = dy0 * dw
+                for (var dx0 = 0; dx0 < dw; dx0++) dMask[dr + dx0] = mask[mr + Math.min(fgw - 1, dx0 * 2)]
               }
               for (var by = 0; by < dh; by++) {
                 var brow = by * dw
                 for (var bx = 0; bx < dw; bx++) {
                   var bi0 = brow + bx
-                  if (dMask[bi0] === 1) {
-                    if (bx === 0 || bx === dw - 1 || by === 0 || by === dh - 1 ||
-                        dMask[bi0 - 1] === 0 || dMask[bi0 + 1] === 0 || dMask[bi0 - dw] === 0 || dMask[bi0 + dw] === 0) {
-                      dist[bi0] = 0.0
-                    }
+                  if (dMask[bi0] === 1 && (bx === 0 || bx === dw - 1 || by === 0 || by === dh - 1 ||
+                      dMask[bi0 - 1] === 0 || dMask[bi0 + 1] === 0 || dMask[bi0 - dw] === 0 || dMask[bi0 + dw] === 0)) {
+                    dist[bi0] = 0.0
                   }
                 }
               }
@@ -1468,16 +1442,11 @@ ShellRoot {
               onPaint: {
                 var ctx = getContext("2d")
                 if (!transRoot.mapReady || transRoot.lastBucket < 0) {
-                  ctx.reset()
-                  ctx.fillStyle = "#ffffff"
-                  ctx.fillRect(0, 0, width, height)
+                  ctx.reset(); ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, width, height)
                   transRoot.lastBucket = 0
                 }
                 if (!transRoot.mapReady || transRoot.prog < 0.22) return
-                if (transRoot.prog >= 0.985) {
-                  ctx.clearRect(0, 0, width, height)
-                  return
-                }
+                if (transRoot.prog >= 0.985) { ctx.clearRect(0, 0, width, height); return }
                 var ep = transRoot.effectiveProg(transRoot.prog)
                 var targetB = Math.min(transRoot.numBuckets - 1, Math.floor(ep * transRoot.numBuckets))
                 var bkts = transRoot.swarmBuckets
@@ -1515,18 +1484,13 @@ ShellRoot {
                 var uSpan = transRoot.cropUSpan, vSpan = transRoot.cropVSpan
 
                 ctx.strokeStyle = root.color4.toString()
-                ctx.lineWidth = 2.4
-                ctx.lineCap = "round"
-                ctx.lineJoin = "round"
+                ctx.lineWidth = 2.4; ctx.lineCap = "round"; ctx.lineJoin = "round"
                 ctx.beginPath()
                 ctx.moveTo(((pts[0].x * invGw - u0) / uSpan) * width, ((pts[0].y * invGh - v0) / vSpan) * height)
                 for (var i = 1; i < maxPts; i++) {
                   ctx.lineTo(((pts[i].x * invGw - u0) / uSpan) * width, ((pts[i].y * invGh - v0) / vSpan) * height)
                 }
-                if (drawFrac >= 0.999) {
-                  ctx.closePath()
-                  transRoot.outlineFinished = true
-                }
+                if (drawFrac >= 0.999) { ctx.closePath(); transRoot.outlineFinished = true }
                 ctx.stroke()
               }
             }
@@ -1677,9 +1641,8 @@ ShellRoot {
         MouseArea {
           anchors.fill: parent; acceptedButtons: Qt.NoButton
           onWheel: wheel => {
-            let targetWs = Math.max(1, root.lastActiveWs + (wheel.angleDelta.y > 0 ? -1 : 1))
-            root.lastActiveWs = targetWs; root.wsExpanded = true; wsCollapseTimer.restart()
-            root.runCmd((root.isHyprland ? "hyprctl dispatch workspace " : "niri msg action focus-workspace ") + targetWs)
+            root.wsExpanded = true; wsCollapseTimer.restart()
+            root.focusWorkspace(Math.max(1, root.lastActiveWs + (wheel.angleDelta.y > 0 ? -1 : 1)))
           }
         }
 
@@ -1709,13 +1672,7 @@ ShellRoot {
               color: modelData.active ? root.color4 : (modelData.occupied ? root.withAlpha(root.color2, 0.25) : root.subtleFill)
               border.width: modelData.occupied && !modelData.active ? 1 : 0; border.color: root.color2
               QsText { anchors.centerIn: parent; text: modelData.idx.toString(); color: modelData.active ? root.bg : (modelData.occupied ? root.color2 : root.color8); font.bold: true }
-              MouseArea {
-                anchors.fill: parent
-                onClicked: {
-                  root.lastActiveWs = modelData.idx
-                  root.runCmd((root.isHyprland ? "hyprctl dispatch workspace " : "niri msg action focus-workspace ") + modelData.idx)
-                }
-              }
+              MouseArea { anchors.fill: parent; onClicked: root.focusWorkspace(modelData.idx) }
             }
           }
         }
@@ -1749,7 +1706,23 @@ ShellRoot {
               QsText { text: (root.activePlayer && root.activePlayer.length > 0) ? root.formatSec(root.activePlayer.length) : ""; color: root.color8; font.pixelSize: 10 }
             }
           }
-          QsMediaControls { Layout.alignment: Qt.AlignHCenter }
+          RowLayout {
+            Layout.alignment: Qt.AlignHCenter; spacing: 22
+            Repeater {
+              model: ["prev", "play", "next"]
+              Rectangle {
+                required property string modelData
+                implicitWidth: modelData === "play" ? 32 : 24; implicitHeight: modelData === "play" ? 32 : 24; radius: 8
+                color: modelData === "play" ? root.subtleFillHover : "transparent"
+                QsText {
+                  anchors.centerIn: parent
+                  text: modelData === "prev" ? "󰒮" : (modelData === "next" ? "󰒭" : ((root.activePlayer && root.activePlayer.playbackState === MprisPlaybackState.Playing) ? "󰏤" : "󰐊"))
+                  font.pixelSize: modelData === "play" ? 16 : 18
+                }
+                MouseArea { anchors.fill: parent; onClicked: root.mediaAction(modelData) }
+              }
+            }
+          }
         }
       }
 
@@ -2262,7 +2235,7 @@ ShellRoot {
                 iconFg: isMuted ? root.color1 : (isNight ? root.color2 : root.color4)
                 function setRatio(r) {
                   let cl = Math.max(0, Math.min(1, r))
-                  if (modelData === "display") { let p = Math.max(5, Math.round(cl * 100)); root.brightnessPct = p; root.runCmd("brightnessctl s " + p + "%") }
+                  if (modelData === "display") root.setBrightness(cl * 100, false)
                   else if (modelData === "sound") root.setSinkVolume(cl * 100)
                   else root.setSourceVolume(cl * 100)
                 }
@@ -2425,9 +2398,8 @@ ShellRoot {
                     QsBar {
                       interactive: true; icon: "󰍹"; accentCol: root.color2; iconBg: root.withAlpha(root.color4, 0.2); iconFg: root.color4
                       label: modelData.name + (root.monitorsList.length > 1 ? ("  •  #" + (index + 1)) : ""); pct: root.brightnessPct
-                      function setBri(r) { if (r < 0) return; let p = Math.max(5, Math.min(100, Math.round(r * 100))); root.brightnessPct = p; root.runCmd("brightnessctl s " + p + "%") }
-                      onBarPressed: (btn, r) => setBri(r)
-                      onBarMoved: r => setBri(r)
+                      onBarPressed: (btn, r) => { if (r >= 0) root.setBrightness(r * 100, false) }
+                      onBarMoved: r => root.setBrightness(r * 100, false)
                     }
 
                     RowLayout {
@@ -2819,10 +2791,10 @@ ShellRoot {
             else root.toggleSinkMute()
           }
           onWheel: wheel => {
-            let up = wheel.angleDelta.y > 0
-            if (root.osdMode === "brightness") { let p = Math.max(5, Math.min(100, root.brightnessPct + (up ? 5 : -5))); root.brightnessPct = p; root.triggerOsd("brightness"); root.runCmd("brightnessctl s " + p + "%") }
-            else if (root.osdMode === "mic") root.setSourceVolume(root.micVolPct + (up ? 5 : -5))
-            else root.setSinkVolume(root.outVolPct + (up ? 5 : -5))
+            let delta = wheel.angleDelta.y > 0 ? 5 : -5
+            if (root.osdMode === "brightness") root.setBrightness(root.brightnessPct + delta, true)
+            else if (root.osdMode === "mic") root.setSourceVolume(root.micVolPct + delta)
+            else root.setSinkVolume(root.outVolPct + delta)
           }
         }
       }
@@ -2896,7 +2868,7 @@ ShellRoot {
       WlrLayershell.exclusionMode: ExclusionMode.Ignore
       WlrLayershell.keyboardFocus: root.screenLocked ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
       anchors { top: true; bottom: true; left: true; right: true }
-      color: root.showLiveLockWall ? "transparent" : root.bg
+      color: root.bg
 
       Loader {
         anchors.fill: parent
@@ -2920,15 +2892,51 @@ ShellRoot {
 
           Image {
             id: lockWall; anchors.fill: parent
-            source: !root.showLiveLockWall ? root.staticWallSource : ""
+            source: root.staticWallSource
             fillMode: Image.PreserveAspectCrop; asynchronous: true; cache: true
-            visible: !root.showLiveLockWall && (!root.blurActive || root.cfgLockBlurMax <= 0)
+            visible: root.showLiveLockWall || !root.blurActive || root.cfgLockBlurMax <= 0
           }
 
           MultiEffect {
             anchors.fill: parent; source: lockWall
-            visible: !root.showLiveLockWall && root.blurActive && root.cfgLockBlurMax > 0 && root.wallpaperPath !== ""
+            visible: !root.showLiveLockWall && root.blurActive && root.cfgLockBlurMax > 0 && root.staticWallSource !== ""
             blurEnabled: visible; blurMax: root.cfgLockBlurMax; blur: 1.0
+          }
+
+          Loader {
+            anchors.fill: parent
+            active: root.showLiveLockWall && root.wallpaperPath !== ""
+            sourceComponent: Item {
+              anchors.fill: parent
+
+              Connections {
+                target: root
+                function onIsMonitorDpmsOffChanged() {
+                  if (!root.isVideoFile) return
+                  if (root.isMonitorDpmsOff) lockVideoPlayer.pause()
+                  else lockVideoPlayer.play()
+                }
+              }
+
+              AnimatedImage {
+                anchors.fill: parent; visible: root.isAnimatedGif
+                source: root.isAnimatedGif ? ("file://" + root.wallpaperPath) : ""
+                playing: visible && !root.isMonitorDpmsOff
+                fillMode: Image.PreserveAspectCrop; asynchronous: true; cache: false; smooth: true
+              }
+
+              MediaPlayer {
+                id: lockVideoPlayer
+                source: root.isVideoFile ? ("file://" + root.wallpaperPath) : ""
+                loops: MediaPlayer.Infinite; videoOutput: lockVideoOut
+                Component.onCompleted: { if (root.isVideoFile && !root.isMonitorDpmsOff) play() }
+              }
+
+              VideoOutput {
+                id: lockVideoOut; anchors.fill: parent; visible: root.isVideoFile
+                fillMode: VideoOutput.PreserveAspectCrop
+              }
+            }
           }
 
           Rectangle { anchors.fill: parent; color: Qt.rgba(0, 0, 0, 0.38) }
@@ -3105,7 +3113,22 @@ ShellRoot {
                 text: (root.activePlayer && root.activePlayer.trackTitle) ? (root.activePlayer.trackTitle + (root.activePlayer.trackArtist ? " — " + root.activePlayer.trackArtist : "")) : "Media Playing"
                 font.pixelSize: 11; elide: Text.ElideRight
               }
-              QsMediaControls { btnSize: 20; playSize: 20; iconSize: 14; playIconSize: 15; spacing: 10; pillBg: false }
+              RowLayout {
+                spacing: 10
+                Repeater {
+                  model: ["prev", "play", "next"]
+                  Item {
+                    required property string modelData
+                    implicitWidth: 20; implicitHeight: 20
+                    QsText {
+                      anchors.centerIn: parent
+                      text: modelData === "prev" ? "󰒮" : (modelData === "next" ? "󰒭" : ((root.activePlayer && root.activePlayer.playbackState === MprisPlaybackState.Playing) ? "󰏤" : "󰐊"))
+                      color: modelData === "play" ? root.color4 : root.fg; font.pixelSize: modelData === "play" ? 15 : 14
+                    }
+                    MouseArea { anchors.fill: parent; onClicked: root.mediaAction(modelData) }
+                  }
+                }
+              }
             }
           }
 
