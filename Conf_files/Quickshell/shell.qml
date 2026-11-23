@@ -28,7 +28,7 @@ ShellRoot {
   property int cfgSubmenuSlidePx: 14
   // Wallpaper transition: "swarm" (Silhouette + Swarm patches) | "crossfade" | "zoom" | "none"
   property string cfgWallpaperTransition: "swarm"
-  property int cfgWallpaperTransitionMs: 1500
+  property int cfgWallpaperTransitionMs: 2400
   property real cfgGlassOpacity: 0.76
   property real cfgSolidOpacity: 0.96
   property bool cfgLockKeepAnimated: true
@@ -211,6 +211,7 @@ ShellRoot {
     id: wmRoot
     property bool activeVideo: false
     property bool activeGif: false
+    property bool active: activeVideo || activeGif
     property bool playing: false
     property string mediaPath: ""
 
@@ -226,7 +227,7 @@ ShellRoot {
     AnimatedImage {
       anchors.fill: parent; visible: wmRoot.activeGif && wmRoot.playing
       source: (wmRoot.activeGif && wmRoot.mediaPath !== "") ? ("file://" + wmRoot.mediaPath) : ""
-      playing: visible
+      playing: wmRoot.activeGif && wmRoot.playing
       fillMode: Image.PreserveAspectCrop; asynchronous: true; cache: false; smooth: true
     }
     MediaPlayer {
@@ -357,6 +358,11 @@ ShellRoot {
   property string wallpaperFrame: ""
   property string wallpaperSilhouette: ""
   property string prevWallSource: ""
+  property string liveMediaPath: ""
+  property bool liveMediaIsVideo: false
+  property bool liveMediaIsGif: false
+  property bool prevWasLive: false
+  property bool wallSwitching: false
   property bool wallTransitionActive: false
   property bool animWallpapers: false
   property bool firstRunDone: false
@@ -367,7 +373,7 @@ ShellRoot {
   property bool isMonitorDpmsOff: false
   property bool shouldPlayAnimation: {
     if (!animWallpapers || (!isVideoFile && !isAnimatedGif)) return false
-    if (wallTransitionActive || screenLocked) return false
+    if (screenLocked) return false
     if (cfgPauseOnScreenOff && isMonitorDpmsOff) return false
     if (cfgPauseOnFullscreen && hasActiveFullWindow) return false
     return true
@@ -685,7 +691,7 @@ ShellRoot {
     root.screenLocked = true
   }
 
-  // === INTERNAL HELPERS: HARDWARE, AUDIO, NETWORK & RECORDING ===
+  // === INTERNAL HELPERS: HARDWARE, AUDIO, NETWORK & WALLPAPER ===
 
   function setBrightness(pct, showOsd) {
     let p = Math.max(5, Math.min(100, Math.round(pct)))
@@ -711,9 +717,29 @@ ShellRoot {
     if (root.sourceAudio) root.sourceAudio.muted = !root.sourceAudio.muted
     else { root.micMuted = !root.micMuted; runCmd("wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle") }
   }
+  function syncLiveMedia() {
+    if (root.animWallpapers && (root.isVideoFile || root.isAnimatedGif) && root.wallpaperPath !== "") {
+      root.liveMediaPath = root.wallpaperPath
+      root.liveMediaIsVideo = root.isVideoFile
+      root.liveMediaIsGif = root.isAnimatedGif
+    } else {
+      root.liveMediaPath = ""
+      root.liveMediaIsVideo = false
+      root.liveMediaIsGif = false
+    }
+  }
+  function finishWallTransition() {
+    if (!root.wallTransitionActive && !root.prevWasLive && root.prevWallSource === "") return
+    root.wallTransitionActive = false
+    root.prevWasLive = false
+    root.prevWallSource = ""
+    root.syncLiveMedia()
+  }
   function toggleWallpaperMode() {
-    root.animWallpapers = !root.animWallpapers
-    runCmd("theming " + (root.animWallpapers ? "animated" : "static"))
+    if (root.wallSwitching) return
+    root.wallSwitching = true
+    wallSwitchTimeout.restart()
+    runCmd("theming " + (root.animWallpapers ? "static" : "animated"))
   }
   function toggleUiBlur() {
     if (root.isVM) return
@@ -776,20 +802,31 @@ ShellRoot {
     onLoaded: {
       try {
         let d = JSON.parse(text())
+        root.wallSwitching = false
+        wallSwitchTimeout.stop()
         let newWall = d.wallpaper ? String(d.wallpaper) : ""
         let newFrame = d.wallFrame !== undefined ? String(d.wallFrame) : ""
         let newIsVid = newWall.toLowerCase().endsWith(".webm") || newWall.toLowerCase().endsWith(".mp4")
         let newStatic = newWall !== "" ? (newIsVid ? (newFrame !== "" ? ("file://" + newFrame) : "") : ("file://" + newWall)) : ""
         if (d.silhouette !== undefined) root.wallpaperSilhouette = String(d.silhouette)
         if (newWall !== "" && newWall !== root.wallpaperPath) {
+          if (root.wallTransitionActive) root.finishWallTransition()
+          let wasLive = root.shouldPlayAnimation && root.liveMediaPath !== ""
           let doTrans = (root.wallpaperPath !== "" && root.animActive && root.cfgWallpaperTransition !== "none" && root.staticWallSource !== "" && newStatic !== "")
-          if (doTrans) { root.wallTransitionActive = false; root.prevWallSource = root.staticWallSource }
-          root.wallpaperFrame = newFrame; root.wallpaperPath = newWall
-          if (doTrans) root.wallTransitionActive = true
-        } else if (newFrame !== root.wallpaperFrame) {
+          if (doTrans) {
+            root.prevWallSource = root.staticWallSource
+            root.prevWasLive = wasLive
+          }
           root.wallpaperFrame = newFrame
+          root.wallpaperPath = newWall
+          if (d.wallMode) root.animWallpapers = (d.wallMode === "animated")
+          if (doTrans) root.wallTransitionActive = true
+          else root.syncLiveMedia()
+        } else {
+          if (newFrame !== root.wallpaperFrame) root.wallpaperFrame = newFrame
+          if (d.wallMode) root.animWallpapers = (d.wallMode === "animated")
+          if (!root.wallTransitionActive) root.syncLiveMedia()
         }
-        if (d.wallMode) root.animWallpapers = (d.wallMode === "animated")
         if (d.uiBlur !== undefined && !root.isVM) root.cfgEnableBlur = Boolean(d.uiBlur)
         if (d.uiAnimations !== undefined) root.cfgEnableAnimations = Boolean(d.uiAnimations)
         if (d.firstRunDone !== undefined) root.firstRunDone = Boolean(d.firstRunDone)
@@ -818,6 +855,7 @@ ShellRoot {
   Timer { id: autoCloseTimer; interval: root.cfgBarAutoCloseMs; onTriggered: { if ((root.centerMode === "calendar" || root.centerMode === "system") && root.wifiPromptSsid === "") root.closeCenterPill() } }
   Timer { id: popupTimer; interval: 5000; onTriggered: root.popupNotifications = [] }
   Timer { id: evDebounce; interval: 35; repeat: false; onTriggered: fastPoll.running = true }
+  Timer { id: wallSwitchTimeout; interval: 10000; onTriggered: root.wallSwitching = false }
   Timer {
     id: deferPollTimer; interval: 55; repeat: false
     onTriggered: {
@@ -1236,44 +1274,75 @@ ShellRoot {
 
         Image {
           id: baseStaticWall; anchors.fill: parent
-          visible: (!root.isVideoFile && !root.isAnimatedGif) || root.wallTransitionActive || !root.shouldPlayAnimation
           source: root.staticWallSource
           fillMode: Image.PreserveAspectCrop; asynchronous: true; cache: true; smooth: true
         }
-        QsWallMedia {
-          anchors.fill: parent
-          activeVideo: root.animWallpapers && root.isVideoFile
-          activeGif: root.isAnimatedGif
-          playing: root.shouldPlayAnimation
-          mediaPath: root.wallpaperPath
+
+        Item {
+          id: topMediaLayer; anchors.fill: parent
+          visible: desktopMedia.playing || root.wallTransitionActive
+          opacity: (root.wallTransitionActive && root.cfgWallpaperTransition !== "swarm") ? (1.0 - transLoader.progVal) : 1.0
+          scale: (root.wallTransitionActive && root.cfgWallpaperTransition === "zoom") ? (1.0 + transLoader.progVal * 0.08) : 1.0
+          layer.enabled: root.wallTransitionActive && root.cfgWallpaperTransition === "swarm" && transLoader.maskItem !== null
+          layer.smooth: true
+          layer.effect: MultiEffect {
+            maskEnabled: true
+            maskInverted: true
+            maskSource: transLoader.maskItem
+          }
+
+          Image {
+            anchors.fill: parent
+            visible: root.wallTransitionActive && root.prevWallSource !== ""
+            source: root.wallTransitionActive ? root.prevWallSource : ""
+            fillMode: Image.PreserveAspectCrop; asynchronous: false; cache: false
+          }
+          QsWallMedia {
+            id: desktopMedia; anchors.fill: parent
+            activeVideo: root.liveMediaIsVideo
+            activeGif: root.liveMediaIsGif
+            playing: !root.screenLocked && !(root.cfgPauseOnScreenOff && root.isMonitorDpmsOff)
+                     && (root.wallTransitionActive ? root.prevWasLive : root.shouldPlayAnimation)
+            mediaPath: root.liveMediaPath
+          }
         }
 
         Loader {
-          anchors.fill: parent
+          id: transLoader; anchors.fill: parent
+          property real progVal: item ? item.prog : 0.0
+          property var maskItem: item ? item.maskCanvas : null
           active: root.wallTransitionActive && root.prevWallSource !== ""
           sourceComponent: Item {
             id: transRoot; anchors.fill: parent
+            property alias maskCanvas: oldMaskCanvas
             property real prog: 0.0
-            property int lastBucket: -1
             property int fgw: 360
             property int fgh: 202
-            property int sw: root.isVM ? 320 : 480
-            property int sh: root.isVM ? 180 : 270
-            property int numBuckets: 240
-            property real cropU0: 0.0
-            property real cropV0: 0.0
-            property real cropUSpan: 1.0
-            property real cropVSpan: 1.0
+            property int sw: root.isVM ? 480 : 640
+            property int sh: Math.max(240, Math.min(440, Math.round(sw * (height > 0 ? height : 900) / Math.max(1, width > 0 ? width : 1440))))
+            property int numInB: 120
+            property int numOutB: 180
+            property int lastInB: -1
+            property int lastOutB: -1
+            property real fillSz: 3.0
             property var contourPts: []
-            property var swarmBuckets: []
-            property bool mapReady: false
+            property var inBuckets: []
+            property var outBuckets: []
+            property bool interiorClosed: false
             property bool outlineFinished: false
+            property bool maskCleared: false
+            property bool mapReady: false
             property bool started: false
 
-            function effectiveProg(p) {
-              if (p <= 0.58) return p
-              var u = Math.min(1.0, (p - 0.58) / 0.42)
-              return 0.58 + (0.30 * u + 0.70 * Math.pow(u, 2.5)) * 0.42
+            function traceContour(ctx, w, h, maxCount) {
+              var pts = contourPts
+              var n = maxCount > 0 ? Math.min(pts.length, maxCount) : pts.length
+              if (n < 2) return false
+              ctx.beginPath()
+              ctx.moveTo(pts[0].u * w, pts[0].v * h)
+              for (var i = 1; i < n; i++) ctx.lineTo(pts[i].u * w, pts[i].v * h)
+              if (maxCount <= 0 || maxCount >= pts.length) ctx.closePath()
+              return true
             }
 
             function buildSilhouetteMap() {
@@ -1283,8 +1352,8 @@ ShellRoot {
               var imgH = baseStaticWall.implicitHeight > 0 ? baseStaticWall.implicitHeight : 1080
               var scrW = width > 0 ? width : 1920, scrH = height > 0 ? height : 1080
               var sc = Math.max(scrW / imgW, scrH / imgH), dW = imgW * sc, dH = imgH * sc
-              cropU0 = Math.max(0.0, (dW - scrW) * 0.5 / dW); cropUSpan = Math.min(1.0 - cropU0, scrW / dW)
-              cropV0 = Math.max(0.0, (dH - scrH) * 0.5 / dH); cropVSpan = Math.min(1.0 - cropV0, scrH / dH)
+              var cropU0 = Math.max(0.0, (dW - scrW) * 0.5 / dW), cropUSpan = Math.min(1.0 - cropU0, scrW / dW)
+              var cropV0 = Math.max(0.0, (dH - scrH) * 0.5 / dH), cropVSpan = Math.min(1.0 - cropV0, scrH / dH)
 
               var activeCnt = 0
               if (sil && sil.length >= ftot) {
@@ -1310,12 +1379,12 @@ ShellRoot {
                 var rOff = ry * fgw
                 for (var rx = 1; rx < fgw - 1; rx++) if (mask[rOff + rx] === 1) { sx = rx; sy = ry; break }
               }
-              var loop = []
+              var rawLoop = []
               if (sx >= 0) {
                 var ddx = [1, 1, 0, -1, -1, -1, 0, 1], ddy = [0, 1, 1, 1, 0, -1, -1, -1]
                 var cx = sx, cy = sy, bDir = 4, firstDir = -1
                 for (var step = 0; step < 16000; step++) {
-                  loop.push({ x: cx, y: cy })
+                  rawLoop.push({ x: cx, y: cy })
                   var found = -1, startD = (bDir + 1) & 7
                   for (var k = 0; k < 8; k++) {
                     var dir = (startD + k) & 7
@@ -1323,35 +1392,58 @@ ShellRoot {
                   }
                   if (found < 0) break
                   if (firstDir < 0) firstDir = found
-                  else if (cx === sx && cy === sy && found === firstDir) { loop.pop(); break }
+                  else if (cx === sx && cy === sy && found === firstDir) { rawLoop.pop(); break }
                   cx += ddx[found]; cy += ddy[found]
                   bDir = (found + ((found & 1) ? 5 : 6)) & 7
                 }
               }
-              if (loop.length > 480) {
-                var sub = [], stride = loop.length / 480.0
-                for (var si = 0; si < 480; si++) sub.push(loop[Math.floor(si * stride)])
-                loop = sub
+              if (rawLoop.length > 480) {
+                var sub = [], stride = rawLoop.length / 480.0
+                for (var si = 0; si < 480; si++) sub.push(rawLoop[Math.floor(si * stride)])
+                rawLoop = sub
               }
-              for (var pass = 0; pass < 2 && loop.length > 6; pass++) {
-                var sm = [], blen = loop.length
-                for (var bi = 0; bi < blen; bi++) {
-                  var p0 = loop[(bi - 1 + blen) % blen], p1 = loop[bi], p2 = loop[(bi + 1) % blen]
+              for (var pass = 0; pass < 2 && rawLoop.length > 6; pass++) {
+                var sm = [], rlen = rawLoop.length
+                for (var bi = 0; bi < rlen; bi++) {
+                  var p0 = rawLoop[(bi - 1 + rlen) % rlen], p1 = rawLoop[bi], p2 = rawLoop[(bi + 1) % rlen]
                   sm.push({ x: p0.x * 0.25 + p1.x * 0.50 + p2.x * 0.25, y: p0.y * 0.25 + p1.y * 0.50 + p2.y * 0.25 })
                 }
-                loop = sm
+                rawLoop = sm
               }
-              contourPts = loop
 
-              // Distance Transform (2-pass Chamfer directly over mask)
-              var dw = 180, dh = 101, dist = new Float32Array(dw * dh)
+              var normLoop = [], invGw = 1.0 / (fgw - 1), invGh = 1.0 / (fgh - 1)
+              for (var ni = 0; ni < rawLoop.length; ni++) {
+                normLoop.push({
+                  u: (rawLoop[ni].x * invGw - cropU0) / cropUSpan,
+                  v: (rawLoop[ni].y * invGh - cropV0) / cropVSpan
+                })
+              }
+              if (normLoop.length < 3) {
+                for (var ei = 0; ei < 96; ei++) {
+                  var ea = (ei / 96.0) * Math.PI * 2.0
+                  normLoop.push({ u: 0.5 + Math.cos(ea) * 0.16, v: 0.5 + Math.sin(ea) * 0.22 })
+                }
+              }
+              contourPts = normLoop
+
+              // Distance Transform (2-pass Chamfer from exact silhouette contour)
+              var dw = 180, dh = 101, dtot = dw * dh
+              var dMask = new Uint8Array(dtot), dist = new Float32Array(dtot)
               dist.fill(100000.0)
-              function fgAt(x, y) { return mask[Math.min(fgh - 1, y * 2) * fgw + Math.min(fgw - 1, x * 2)] === 1 }
+              for (var dy0 = 0; dy0 < dh; dy0++) {
+                var mr0 = Math.min(fgh - 1, dy0 * 2) * fgw, mr1 = Math.min(fgh - 1, dy0 * 2 + 1) * fgw, dr = dy0 * dw
+                for (var dx0 = 0; dx0 < dw; dx0++) {
+                  var mc0 = Math.min(fgw - 1, dx0 * 2), mc1 = Math.min(fgw - 1, dx0 * 2 + 1)
+                  dMask[dr + dx0] = (mask[mr0 + mc0] | mask[mr0 + mc1] | mask[mr1 + mc0] | mask[mr1 + mc1])
+                }
+              }
               for (var by = 0; by < dh; by++) {
                 var brow = by * dw
                 for (var bx = 0; bx < dw; bx++) {
-                  if (fgAt(bx, by) && (bx === 0 || bx === dw - 1 || by === 0 || by === dh - 1 || !fgAt(bx - 1, by) || !fgAt(bx + 1, by) || !fgAt(bx, by - 1) || !fgAt(bx, by + 1))) {
-                    dist[brow + bx] = 0.0
+                  var bi0 = brow + bx
+                  if (dMask[bi0] === 1 && (bx === 0 || bx === dw - 1 || by === 0 || by === dh - 1 ||
+                      dMask[bi0 - 1] === 0 || dMask[bi0 + 1] === 0 || dMask[bi0 - dw] === 0 || dMask[bi0 + dw] === 0)) {
+                    dist[bi0] = 0.0
                   }
                 }
               }
@@ -1368,6 +1460,8 @@ ShellRoot {
                   dist[fi] = fv
                 }
               }
+              var xMinC = Math.floor(cropU0 * (dw - 1)), xMaxC = Math.ceil((cropU0 + cropUSpan) * (dw - 1))
+              var yMinC = Math.floor(cropV0 * (dh - 1)), yMaxC = Math.ceil((cropV0 + cropVSpan) * (dh - 1))
               var maxIn = 1.0, maxOut = 1.0
               for (var fy1 = dh - 1; fy1 >= 0; fy1--) {
                 var rrow = fy1 * dw
@@ -1380,97 +1474,171 @@ ShellRoot {
                     if (fx1 > 0) rv = Math.min(rv, dist[ri + dw - 1] + 1.4142)
                   }
                   dist[ri] = rv
-                  if (fgAt(fx1, fy1)) { if (rv > maxIn) maxIn = rv } else { if (rv > maxOut) maxOut = rv }
+                  if (fx1 >= xMinC && fx1 <= xMaxC && fy1 >= yMinC && fy1 <= yMaxC) {
+                    if (dMask[ri] === 1) { if (rv > maxIn) maxIn = rv } else { if (rv > maxOut) maxOut = rv }
+                  }
                 }
               }
 
-              // Swarm reveal buckets
-              var bkts = new Array(numBuckets)
-              for (var bInit = 0; bInit < numBuckets; bInit++) bkts[bInit] = []
-              for (var sy0 = 0; sy0 < sh; sy0++) {
-                var dfy = Math.max(0.0, Math.min(dh - 1, (cropV0 + (sy0 / (sh - 1)) * cropVSpan) * (dh - 1)))
-                var iy0 = Math.floor(dfy), iy1 = Math.min(dh - 1, iy0 + 1), wy = dfy - iy0, ryIn = Math.round(dfy)
-                for (var sx0 = 0; sx0 < sw; sx0++) {
-                  var dfx = Math.max(0.0, Math.min(dw - 1, (cropU0 + (sx0 / (sw - 1)) * cropUSpan) * (dw - 1)))
+              // Dense fine swarm buckets strictly expanding from contour line (d = 0 -> t = 0)
+              var inB = new Array(numInB), outB = new Array(numOutB)
+              for (var i0 = 0; i0 < numInB; i0++) inB[i0] = []
+              for (var o0 = 0; o0 < numOutB; o0++) outB[o0] = []
+
+              var nx = root.isVM ? 230 : 300
+              var ny = Math.max(120, Math.round(nx * sh / sw))
+              var stepX = sw / nx, stepY = sh / ny
+              fillSz = Math.max(stepX, stepY) * 1.28
+
+              var rng = 4242 + activeCnt * 31
+              function rand() { rng = (rng * 1664525 + 1013904223) >>> 0; return rng / 4294967296.0 }
+              var s1 = rand() * 6.283, s2 = rand() * 6.283
+              function fbm(u, v) {
+                var n1 = Math.sin(u * 10.5 + v * 7.3 + s1) * Math.cos(u * 6.7 - v * 11.1 + s2)
+                var n2 = Math.sin(u * 23.1 - v * 19.7 + s2 * 1.6) * Math.cos(u * 18.3 + v * 25.1 - s1)
+                return (n1 * 0.62 + n2 * 0.38) * 0.5 + 0.5
+              }
+              function pack(x, y, code) {
+                var px = Math.max(0, Math.min(sw - 1, Math.round(x)))
+                var py = Math.max(0, Math.min(sh - 1, Math.round(y)))
+                return (code << 20) | (py << 10) | px
+              }
+
+              for (var gy = 0; gy <= ny; gy++) {
+                var baseY = (gy / ny) * sh, vS = gy / ny
+                var vImg = cropV0 + vS * cropVSpan
+                var my = Math.max(0, Math.min(fgh - 1, Math.round(vImg * (fgh - 1))))
+                var dfy = Math.max(0.0, Math.min(dh - 1, vImg * (dh - 1)))
+                var iy0 = Math.floor(dfy), iy1 = Math.min(dh - 1, iy0 + 1), wy = dfy - iy0
+                for (var gx = 0; gx <= nx; gx++) {
+                  var baseX = (gx / nx) * sw, uS = gx / nx
+                  var uImg = cropU0 + uS * cropUSpan
+                  var mx = Math.max(0, Math.min(fgw - 1, Math.round(uImg * (fgw - 1))))
+                  var dfx = Math.max(0.0, Math.min(dw - 1, uImg * (dw - 1)))
                   var ix0 = Math.floor(dfx), ix1 = Math.min(dw - 1, ix0 + 1), wx = dfx - ix0
-                  var dVal = (1 - wy) * ((1 - wx) * dist[iy0 * dw + ix0] + wx * dist[iy0 * dw + ix1]) + wy * ((1 - wx) * dist[iy1 * dw + ix0] + wx * dist[iy1 * dw + ix1])
-                  var h1 = Math.sin(sx0 * 12.9898 + sy0 * 78.233) * 43758.5453
-                  var jitter = h1 - Math.floor(h1), ripple = (Math.sin(sx0 * 0.14 + sy0 * 0.12) + 1.0) * 0.5
-                  var tVal = fgAt(Math.round(dfx), ryIn)
-                    ? (0.24 + Math.min(1.0, dVal / maxIn) * 0.22 + ripple * 0.04 + jitter * 0.07)
-                    : (0.58 + Math.min(1.0, dVal / maxOut) * 0.28 + ripple * 0.04 + jitter * 0.08)
-                  bkts[Math.max(0, Math.min(numBuckets - 1, Math.floor(tVal * numBuckets)))].push((sy0 << 10) | sx0)
+                  var dVal = (1 - wy) * ((1 - wx) * dist[iy0 * dw + ix0] + wx * dist[iy0 * dw + ix1]) +
+                             wy * ((1 - wx) * dist[iy1 * dw + ix0] + wx * dist[iy1 * dw + ix1])
+                  var org = fbm(uS, vS), jit = rand()
+                  var sp1x = baseX + (rand() - 0.5) * stepX * 1.4, sp1y = baseY + (rand() - 0.5) * stepY * 1.4
+                  var sp2x = baseX + (rand() - 0.5) * stepX * 1.4, sp2y = baseY + (rand() - 0.5) * stepY * 1.4
+                  var fx = baseX + (rand() - 0.5) * stepX * 0.45, fy = baseY + (rand() - 0.5) * stepY * 0.45
+
+                  if (mask[my * fgw + mx] === 1) {
+                    var dIn = Math.min(1.0, dVal / maxIn)
+                    var tIn = (dIn * (0.58 + org * 0.34 + jit * 0.24) + jit * 0.03) / 1.19
+                    var bIn = Math.max(0, Math.min(numInB - 1, Math.floor(tIn * (numInB - 9))))
+                    inB[bIn].push(pack(sp1x, sp1y, 0))
+                    inB[Math.min(numInB - 1, bIn + 3)].push(pack(sp2x, sp2y, 1))
+                    inB[Math.min(numInB - 1, bIn + 8)].push(pack(fx, fy, 2))
+                  } else {
+                    var dOut = Math.min(1.0, dVal / maxOut)
+                    var tOut = (dOut * (0.60 + org * 0.32 + jit * 0.24) + jit * 0.02) / 1.18
+                    var bOut = Math.max(0, Math.min(numOutB - 1, Math.floor(tOut * (numOutB - 10))))
+                    outB[bOut].push(pack(sp1x, sp1y, 0))
+                    outB[Math.min(numOutB - 1, bOut + 3)].push(pack(sp2x, sp2y, 1))
+                    outB[Math.min(numOutB - 1, bOut + 9)].push(pack(fx, fy, 2))
+                  }
                 }
               }
-              swarmBuckets = bkts; lastBucket = -1; outlineFinished = false; mapReady = true
+
+              inBuckets = inB; outBuckets = outB
+              lastInB = -1; lastOutB = -1; interiorClosed = false; outlineFinished = false; maskCleared = false; mapReady = true
             }
 
-            Image {
-              id: oldWallImg; anchors.fill: parent; source: root.prevWallSource
-              fillMode: Image.PreserveAspectCrop; asynchronous: false; cache: false
-              visible: root.cfgWallpaperTransition !== "swarm"
-              opacity: root.cfgWallpaperTransition === "swarm" ? 1.0 : (1.0 - transRoot.prog)
-              scale: root.cfgWallpaperTransition === "zoom" ? (1.0 + transRoot.prog * 0.08) : 1.0
-            }
             Canvas {
               id: oldMaskCanvas; width: transRoot.sw; height: transRoot.sh
               visible: false; layer.enabled: root.cfgWallpaperTransition === "swarm"; layer.smooth: true
               onPaint: {
                 var ctx = getContext("2d")
-                if (!transRoot.mapReady || transRoot.lastBucket < 0) {
-                  ctx.reset(); ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, width, height); transRoot.lastBucket = 0
+                if (!transRoot.mapReady || !transRoot.maskCleared) {
+                  ctx.reset(); ctx.clearRect(0, 0, width, height); transRoot.maskCleared = true
                 }
-                if (!transRoot.mapReady || transRoot.prog < 0.22) return
-                if (transRoot.prog >= 0.985) { ctx.clearRect(0, 0, width, height); return }
-                var targetB = Math.min(transRoot.numBuckets - 1, Math.floor(transRoot.effectiveProg(transRoot.prog) * transRoot.numBuckets))
-                for (var b = transRoot.lastBucket; b <= targetB; b++) {
-                  var arr = transRoot.swarmBuckets[b]
-                  if (!arr) continue
-                  for (var i = 0; i < arr.length; i++) ctx.clearRect((arr[i] & 1023) - 0.25, (arr[i] >> 10) - 0.25, 1.5, 1.5)
+                if (!transRoot.mapReady || transRoot.prog < 0.20) return
+                ctx.fillStyle = "#ffffff"
+                if (transRoot.prog >= 0.985) { ctx.fillRect(0, 0, width, height); return }
+
+                var s0 = 1.35, s1 = 1.95, s2 = transRoot.fillSz
+                var h0 = s0 * 0.5, h1 = s1 * 0.5, h2 = s2 * 0.5
+
+                function paintRange(bkts, fromB, toB) {
+                  for (var b = fromB; b <= toB; b++) {
+                    var arr = bkts[b]
+                    if (!arr) continue
+                    for (var i = 0; i < arr.length; i++) {
+                      var v = arr[i], x = v & 1023, y = (v >> 10) & 1023, c = (v >> 20) & 3
+                      if (c === 0) ctx.fillRect(x - h0, y - h0, s0, s0)
+                      else if (c === 1) ctx.fillRect(x - h1, y - h1, s1, s1)
+                      else ctx.fillRect(x - h2, y - h2, s2, s2)
+                    }
+                  }
                 }
-                transRoot.lastBucket = targetB + 1
+
+                // Phase 1: Inside swarm expanding from contour line inward (strictly clipped)
+                var uIn = Math.max(0.0, Math.min(1.0, (transRoot.prog - 0.20) / 0.34))
+                var targetIn = Math.min(transRoot.numInB - 1, Math.floor(uIn * transRoot.numInB))
+                if (targetIn > transRoot.lastInB && !transRoot.interiorClosed) {
+                  ctx.save()
+                  if (transRoot.traceContour(ctx, width, height, 0)) {
+                    ctx.clip()
+                    paintRange(transRoot.inBuckets, transRoot.lastInB + 1, targetIn)
+                    if (uIn >= 0.95) { ctx.fill(); transRoot.interiorClosed = true }
+                  }
+                  ctx.restore()
+                  transRoot.lastInB = targetIn
+                }
+
+                // Phase 2: Outward swarm expanding from contour line to screen edges
+                var uOut = Math.max(0.0, Math.min(1.0, (transRoot.prog - 0.54) / 0.44))
+                if (uOut > 0.0) {
+                  if (!transRoot.interiorClosed) {
+                    ctx.save()
+                    if (transRoot.traceContour(ctx, width, height, 0)) ctx.fill()
+                    ctx.restore()
+                    transRoot.interiorClosed = true
+                  }
+                  var eOut = 0.45 * uOut + 0.55 * uOut * uOut
+                  var targetOut = Math.min(transRoot.numOutB - 1, Math.floor(eOut * transRoot.numOutB))
+                  if (targetOut > transRoot.lastOutB) {
+                    paintRange(transRoot.outBuckets, transRoot.lastOutB + 1, targetOut)
+                    transRoot.lastOutB = targetOut
+                  }
+                }
               }
             }
-            MultiEffect {
-              anchors.fill: parent; source: oldWallImg
-              visible: root.cfgWallpaperTransition === "swarm"
-              maskEnabled: true; maskSource: oldMaskCanvas
-            }
+
             Canvas {
               id: outlineCanvas; anchors.fill: parent
-              visible: root.cfgWallpaperTransition === "swarm" && transRoot.prog < 0.68
-              opacity: transRoot.prog < 0.54 ? 1.0 : Math.max(0.0, 1.0 - (transRoot.prog - 0.54) / 0.12)
+              visible: root.cfgWallpaperTransition === "swarm" && transRoot.prog < 0.70
+              opacity: transRoot.prog < 0.54 ? 1.0 : Math.max(0.0, 1.0 - (transRoot.prog - 0.54) / 0.16)
               onPaint: {
                 var ctx = getContext("2d"); ctx.reset()
-                var pts = transRoot.contourPts
-                if (!transRoot.mapReady || !pts || pts.length < 3) return
-                var drawFrac = Math.min(1.0, transRoot.prog / 0.28)
-                var maxPts = Math.max(2, Math.floor(pts.length * drawFrac))
-                var invGw = 1.0 / (transRoot.fgw - 1), invGh = 1.0 / (transRoot.fgh - 1)
-                ctx.strokeStyle = root.color4.toString(); ctx.lineWidth = 2.4; ctx.lineCap = "round"; ctx.lineJoin = "round"
-                ctx.beginPath()
-                ctx.moveTo(((pts[0].x * invGw - transRoot.cropU0) / transRoot.cropUSpan) * width, ((pts[0].y * invGh - transRoot.cropV0) / transRoot.cropVSpan) * height)
-                for (var i = 1; i < maxPts; i++)
-                  ctx.lineTo(((pts[i].x * invGw - transRoot.cropU0) / transRoot.cropUSpan) * width, ((pts[i].y * invGh - transRoot.cropV0) / transRoot.cropVSpan) * height)
-                if (drawFrac >= 0.999) { ctx.closePath(); transRoot.outlineFinished = true }
-                ctx.stroke()
+                if (!transRoot.mapReady) return
+                var drawFrac = Math.min(1.0, transRoot.prog / 0.26)
+                var maxPts = drawFrac >= 0.999 ? 0 : Math.max(2, Math.floor(transRoot.contourPts.length * drawFrac))
+                if (transRoot.traceContour(ctx, width, height, maxPts)) {
+                  ctx.strokeStyle = root.color4.toString()
+                  ctx.lineWidth = 2.4; ctx.lineCap = "round"; ctx.lineJoin = "round"
+                  ctx.stroke()
+                }
+                if (drawFrac >= 0.999) transRoot.outlineFinished = true
               }
             }
+
             NumberAnimation {
               id: swarmAnim; target: transRoot; property: "prog"; from: 0.0; to: 1.0
               duration: root.cfgWallpaperTransitionMs; easing.type: Easing.Linear
-              onStopped: { root.wallTransitionActive = false; root.prevWallSource = "" }
+              onStopped: root.finishWallTransition()
             }
-            Timer { interval: 3000; running: !transRoot.started; repeat: false; onTriggered: { root.wallTransitionActive = false; root.prevWallSource = "" } }
+            Timer { interval: 3000; running: !transRoot.started; repeat: false; onTriggered: root.finishWallTransition() }
             onProgChanged: {
               if (root.cfgWallpaperTransition === "swarm") {
-                if (transRoot.prog >= 0.22) oldMaskCanvas.requestPaint()
+                if (transRoot.prog >= 0.20) oldMaskCanvas.requestPaint()
                 if (!transRoot.outlineFinished) outlineCanvas.requestPaint()
               }
             }
             function startWhenReady() {
               if (started) return
-              if (baseStaticWall.status === Image.Error) { root.wallTransitionActive = false; root.prevWallSource = ""; return }
+              if (baseStaticWall.status === Image.Error) { root.finishWallTransition(); return }
               if (baseStaticWall.status === Image.Ready) {
                 started = true
                 if (root.cfgWallpaperTransition === "swarm") { buildSilhouetteMap(); oldMaskCanvas.requestPaint(); outlineCanvas.requestPaint() }
@@ -2080,7 +2248,7 @@ ShellRoot {
             }
             Repeater {
               model: root.sysSubmenu === "battery" ? [
-                { "key": "wall", "icon": root.animWallpapers ? "󰕧" : "󰸉", "title": "Animated Wallpapers", "sub": root.animWallpapers ? (root.shouldPlayAnimation ? "Playing (day_animated / night_animated)" : "Paused (Fullscreen / Standby)") : "Off • Static Power Saving (day / night)", "extra": "Loaded: " + root.wallpaperLabel, "on": root.animWallpapers, "col": root.color4, "scol": root.animWallpapers ? root.color4 : root.color2 }
+                { "key": "wall", "icon": root.animWallpapers ? "󰕧" : "󰸉", "title": "Animated Wallpapers", "sub": root.wallSwitching ? "Switching wallpaper..." : (root.animWallpapers ? (root.shouldPlayAnimation ? "Playing (day_animated / night_animated)" : "Paused (Fullscreen / Standby)") : "Off • Static Power Saving (day / night)"), "extra": "Loaded: " + root.wallpaperLabel, "on": root.animWallpapers, "col": root.color4, "scol": root.wallSwitching ? root.color3 : (root.animWallpapers ? root.color4 : root.color2) }
               ] : (root.sysSubmenu === "rec" ? [
                 { "key": "sys", "icon": "󰕾", "title": "Record System Audio", "sub": root.recSysAudio ? "Enabled • Desktop Audio" : "Muted", "extra": "", "on": root.recSysAudio, "col": root.color4, "scol": root.recSysAudio ? root.color4 : root.color8 },
                 { "key": "mic", "icon": "󰍬", "title": "Record Microphone", "sub": root.recMicAudio ? "Enabled • Voice Input" : "Muted", "extra": "", "on": root.recMicAudio, "col": root.color4, "scol": root.recMicAudio ? root.color4 : root.color8 },
