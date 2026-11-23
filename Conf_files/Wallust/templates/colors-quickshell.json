@@ -1,5 +1,7 @@
 {
 	"wallpaper": "{{wallpaper}}",
+	"wallFrame": "",
+	"silhouette": "",
 	"wallMode": "static",
 	"uiBlur": true,
 	"uiAnimations": true,
