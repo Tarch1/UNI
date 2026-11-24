@@ -23,7 +23,7 @@ SHOWerror () {
 CR () { "$chroot" /mnt "$@" ; }
 CR_USER () { CR sudo -u "$UNsel" bash -c "$1" ; }
 Check_required_files () {
-	local files=( Bootloader/Refind/themes/Blur-theme/theme.conf Bootloader/Grub-Sekiro/{theme.txt,sekiro_1920x1080.png,select_c.png} Bootloader/Grub-Eiffel/{theme.txt,eiffel_tower_under_construction.png,select_c.png} )
+	local files=( Bootloader/Refind/themes/Blur-theme/theme.conf Bootloader/Grub-Sekiro/{theme.txt,sekiro_1920x1080.png,select_c.png} Bootloader/Grub-Eiffel/{theme.txt,eiffel_tower_under_construction.png,select_c.png} Conf_files/Quickshell/{qs-session,shell.qml} Conf_files/Wallpapers/theming )
 	local miss=()
 	for a in "${files[@]}"; do if [[ ! -f "${SCRIPT_DIR}/$a" ]]; then miss+=("$a") ; fi ; done
 	if [[ ${#miss[@]} -gt 0 ]]; then echo 'Required file(s) missing:' "${miss[@]}" ; exit 1 ; fi
@@ -495,7 +495,6 @@ UserSetup () {
 		if [[ -f "${SCRIPT_DIR}/Conf_files/Wallpapers/theming" ]]; then
 			install -Dm755 "${SCRIPT_DIR}/Conf_files/Wallpapers/theming" /mnt/usr/bin/theming
 		fi
-		rm -f /mnt/home/"$UNsel"/.config/wallpapers/{theming,theme-switcher.sh}
 		sed -i -e 's/^[[:space:]]*backend *=.*/backend = "resized"/' -e 's/^[[:space:]]*color_space *=.*/color_space = "lch"/' -e '/^[[:space:]]*threshold *=/d' -e 's/^[[:space:]]*palette *=.*/palette = "dark16"/' /mnt/home/"$UNsel"/.config/wallust/wallust.toml 2>/dev/null || true
 		echo -e '$background = rgb(1e1e2e)\n$foreground = rgb(cdd6f4)\n$color0 = rgb(282a36)\n$color4 = rgb(89b4fa)\n$color5 = rgb(cba6f7)\n$color6 = rgb(94e2d5)' > /mnt/home/"$UNsel"/.config/hypr/colors.conf
 		if [[ -f "${SCRIPT_DIR}/Conf_files/Hyprlock/hypridle.conf" ]]; then cp "${SCRIPT_DIR}/Conf_files/Hyprlock/hypridle.conf" /mnt/home/"$UNsel"/.config/hypr/ ; fi
