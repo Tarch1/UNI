@@ -138,9 +138,12 @@ FileSystemFormat() {
 						if [[ "$LUKS_ENC" -eq 1 && -n "$LUKS_PASS" ]]; then
 							install -m 600 /dev/null /tmp/luks_old.key ; install -m 600 /dev/null /tmp/luks_new.key
 							printf '%s' "$old_pass" > /tmp/luks_old.key ; printf '%s' "$LUKS_PASS" > /tmp/luks_new.key
-							cryptsetup luksAddKey -q "$part" /tmp/luks_new.key -d /tmp/luks_old.key && cryptsetup luksRemoveKey -q "$part" /tmp/luks_old.key
+							if cryptsetup luksAddKey -q "$part" /tmp/luks_new.key -d /tmp/luks_old.key && cryptsetup luksRemoveKey -q "$part" /tmp/luks_old.key; then
+								CRYPT_ADD_MAP+=("$cname:$(blkid -s UUID -o value "$part")")
+							else
+								echo "[!] Warning: failed to unify LUKS passphrase on $part. Skipping auto-unlock entry."
+							fi
 							rm -f /tmp/luks_old.key /tmp/luks_new.key
-							CRYPT_ADD_MAP+=("$cname:$(blkid -s UUID -o value "$part")")
 						fi
 					fi
 					target_add="/dev/mapper/$cname"
