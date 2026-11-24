@@ -46,6 +46,7 @@ DiskPartition() {
 	if [[ $(wc -l < /proc/swaps) -gt 1 ]]; then echo "[i] Found active Swap. Disabling..." ; swapoff -a ; fi
 	for dev in /dev/mapper/crypt*; do [[ -b "$dev" ]] && cryptsetup close "${dev##*/}" ; done
 	if $PKGmanager$PKGchk ntfs-3g &>/dev/null && ! command -v mkfs.ntfs &>/dev/null; then $PKGmanager$PKGrmv$PKGfrc "${PKGrsk[@]}" ntfs-3g || true ; fi
+	if $PKGmanager$PKGchk exfat-utils &>/dev/null; then $PKGmanager$PKGrmv$PKGfrc "${PKGrsk[@]}" exfat-utils || true ; fi
 	$PKGmanager$PKGinst "${PKGskp[@]}" "${fs[@]}"
 	unmount_drive "$DRIVE"
 	sgdisk -ozZ "$DRIVE"
