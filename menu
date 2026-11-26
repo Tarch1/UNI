@@ -38,11 +38,11 @@ ArchRepoSetup () {
 	if ! grep -q 'mirrorlist-arch' "$target_conf"; then printf '\n# Arch\n[extra]\nInclude = /etc/pacman.d/mirrorlist-arch\n\n[multilib]\nInclude = /etc/pacman.d/mirrorlist-arch\n' >> "$target_conf" ; fi
 	pacman-key --populate artix archlinux
 }
-AutoOSsel () {
+DistroDetection () {
 	local os_id
 	if [[ -f /etc/os-release ]]; then if ! os_id=$(grep -i '^ID=' /etc/os-release | cut -d= -f2 | tr -d '"'); then os_id="" ; fi ; else os_id="" ; fi
-	if [[ "${os_id,,}" =~ ^(arch|artix|void)$ ]]; then OSsel="${os_id^}" ; else echo "Automated OS detection failed or unsupported Live OS." ; OperatingSystemSel ; fi
-	echo "Detected Live OS: $OSsel"
+	if [[ "${os_id,,}" =~ ^(arch|artix|void)$ ]]; then OS="${os_id^}" ; else echo "Automated OS detection failed or unsupported Live OS." ; OSsel ; fi
+	echo "Detected Live OS: $OS"
 }
 CPUsel () {
 	local cpu_info ; if ! cpu_info=$(echo "$SYS_CPU" | grep -m1 -Ei 'GenuineIntel|AuthenticAMD'); then cpu_info="" ; fi
@@ -50,7 +50,7 @@ CPUsel () {
 	elif [[ "$cpu_info" =~ AMD ]]; then CPU_TYPE="AMD" ; echo "Detected AMD CPU"
 	else CPU_TYPE="Unknown" ; echo "No microcode needed or unknown CPU" ; fi
 }
-DriveSelection() {
+DRIVEsel () {
 	udevadm settle || true
 	local avail_disks=() display_options=() choice_str
 	local -A p_size=() p_fstype=() p_label=() p_used=() p_valid=()
@@ -68,9 +68,9 @@ DriveSelection() {
 			has_p=1
 			local pfstype plabel pparttype used_str=""
 			pfstype=$(lsblk -dnpo FSTYPE "$pname" 2>/dev/null | tr -d ' ')
-			[[ -z "$pfstype" ]] && pfstype=$(blkid -s TYPE -o value "$pname" 2>/dev/null || true)
+			if [[ -z "$pfstype" ]]; then pfstype=$(blkid -s TYPE -o value "$pname" 2>/dev/null || true) ; fi
 			plabel=$(lsblk -dnpo LABEL "$pname" 2>/dev/null | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-			[[ -z "$plabel" ]] && plabel=$(blkid -s LABEL -o value "$pname" 2>/dev/null || true)
+			if [[ -z "$plabel" ]]; then plabel=$(blkid -s LABEL -o value "$pname" 2>/dev/null || true) ; fi
 			pparttype=$(lsblk -dnpo PARTTYPE "$pname" 2>/dev/null | tr -d ' ')
 			if [[ -n "$pfstype" && ! "$pfstype" =~ ^(swap|crypto_LUKS|LVM2_member)$ ]]; then
 				if grep -qs "^$pname " /proc/mounts; then
@@ -98,7 +98,7 @@ DriveSelection() {
 		if [[ "${avail_disks[$i]}" == "$DRIVE" ]]; then continue ; fi
 		add_avail+=("${avail_disks[$i]}") ; add_disp+=("${display_options[$i]}")
 	done
-	ADD_SETUP=0 ; ADD_FORMAT=0 ; ADD_FS="" ; ADD_LABEL="" ; ADDITIONAL_DRIVE="" ; ADD_PARTS=()
+	ADD_SETUP=0 ; ADD_FORMAT=0 ; ADD_FS="" ; ADD_LABEL="" ; ADD_DRIVE="" ; ADD_PARTS=()
 	if [[ ${#add_avail[@]} -gt 0 ]]; then
 		local part_opts=() part_devs=()
 		for d in "${add_avail[@]}"; do
@@ -120,15 +120,15 @@ DriveSelection() {
 		case "$sec_mode" in
 			"Format"*)			ADD_SETUP=1 ; ADD_FORMAT=1
 								MenuSel "choice_str" "Select Secondary Drive to Format" "${add_disp[@]}"
-								ADDITIONAL_DRIVE="${choice_str%% *}"
+								ADD_DRIVE="${choice_str%% *}"
 								MenuSel "ADD_FS" "Select the filesystem for the secondary drive" "ext4" "btrfs" "exfat" "ntfs"
 								TextPromptSel "ADD_LABEL" "Enter label for the secondary drive (leave empty for 'DATA')" "DATA"
 								;;
 			"Mount a single"*)	ADD_SETUP=1 ; ADD_FORMAT=0
 								MenuSel "choice_str" "Select Existing Partition to Mount" "${part_opts[@]}"
-								ADD_PARTS=("${choice_str%% *}") ; ADDITIONAL_DRIVE="${ADD_PARTS[0]}"
+								ADD_PARTS=("${choice_str%% *}") ; ADD_DRIVE="${ADD_PARTS[0]}"
 								;;
-			"Mount ALL"*)		ADD_SETUP=1 ; ADD_FORMAT=0 ; ADD_PARTS=("${part_devs[@]}") ; ADDITIONAL_DRIVE="${ADD_PARTS[*]}"
+			"Mount ALL"*)		ADD_SETUP=1 ; ADD_FORMAT=0 ; ADD_PARTS=("${part_devs[@]}") ; ADD_DRIVE="${ADD_PARTS[*]}"
 								;;
 		esac
 	fi
@@ -141,8 +141,8 @@ GPUsel () {
 	if [[ "$gpu_info" =~ (VMware|VirtualBox|Virtio|QXL) ]]; then echo "VM detected: Default Mesa driver will be used" ; fi
 	if [[ "$gpu_info" =~ NVIDIA ]]; then
 		HAS_NVIDIA=1
-		if [[ "${OSsel,,}" == "void" ]]; then
-			if [[ "$LIBsel" == "MUSL" ]]; then NVsel="MESA" ; echo "MUSL selection detected, forcing Mesa/Nouveau."
+		if [[ "${OS,,}" == "void" ]]; then
+			if [[ "$LIBRARY" == "MUSL" ]]; then NVsel="MESA" ; echo "MUSL selection detected, forcing Mesa/Nouveau."
 			else MenuSel "NVsel" "NVIDIA gpu found, choose driver" "PROPRIETARY" "MESA" ; fi
 		else
 			MenuSel "NVsel" "NVIDIA gpu found, choose driver" "OPEN" "NOUVEAU" "PROPRIETARY" "MESA"
@@ -151,106 +151,269 @@ GPUsel () {
 	fi
 	if [[ ! "$gpu_info" =~ (AMD|Radeon|VMware|VirtualBox|Virtio|QXL|NVIDIA) ]]; then echo "Generic/Intel GPU: Mesa will be used" ; fi
 }
-LUKSSel () {
+LUKSsel () {
+	local pass2
 	YesNoSel "Do you want to encrypt your system with LUKS (Full Disk Encryption)?"
 	if [[ "$CC" -eq 1 ]]; then
-		LUKS_ENC=1
+		CRYPT=1
 		while true; do
-			read -rsp "Enter LUKS passphrase: " LUKS_PASS ; echo
-			read -rsp "Verify LUKS passphrase: " LUKS_PASS2 ; echo
-			if [[ "$LUKS_PASS" == "$LUKS_PASS2" && -n "$LUKS_PASS" ]]; then echo "Passphrase confirmed." ; break ; else echo "Passphrases do not match or empty. Try again." ; fi
+			read -rsp "Enter LUKS passphrase: " PASS ; echo
+			read -rsp "Verify LUKS passphrase: " pass2 ; echo
+			if [[ "$PASS" == "$pass2" && -n "$PASS" ]]; then echo "Passphrase confirmed." ; break ; else echo "Passphrases do not match or empty. Try again." ; fi
 		done
-	else LUKS_ENC=0 ; LUKS_PASS="" ; fi
+	else CRYPT=0 ; PASS="" ; fi
 }
-HibernationSel () {
-	local total_ram_gb=$(( ($(free -m | awk '/^Mem:/{print $2}') + 1023) / 1024 ))
-	local auto_swap_gb
-	if [[ "$total_ram_gb" -le 8 ]]; then auto_swap_gb=$(( total_ram_gb + 1 ))
-	elif [[ "$total_ram_gb" -le 32 ]]; then auto_swap_gb="$total_ram_gb"
-	else auto_swap_gb=32 ; fi
+LVMsel () {
+	local lvm_prompt="Do you want to use LVM (Logical Volume Manager)?"
+	if [[ "${CRYPT:-0}" -eq 1 ]]; then
+		lvm_prompt="Do you want to use LVM on LUKS? (Single encrypted container with logical volumes for root & swap)"
+	fi
+	if [[ "${FS:-}" == "btrfs" ]]; then
+		echo -e "\n[i] Note: Btrfs already supports subvolumes; LVM is optional (mainly useful for a block-level swap volume without resume_offset)."
+	fi
+	YesNoSel "$lvm_prompt"
+	if [[ "$CC" -eq 1 ]]; then LVM=1 ; echo "LVM: Enabled"
+	else LVM=0 ; echo "LVM: Disabled" ; fi
+}
+SwapDiskMetrics () {
+	_SWAP_RAM_GB=$(( ($(LC_ALL=C free -m | awk '/^Mem:/{print $2}') + 1023) / 1024 ))
+	if (( _SWAP_RAM_GB <= 8 )); then _SWAP_AUTO_GB=$(( _SWAP_RAM_GB + 1 ))
+	elif (( _SWAP_RAM_GB <= 32 )); then _SWAP_AUTO_GB="$_SWAP_RAM_GB"
+	else _SWAP_AUTO_GB=32 ; fi
 
-	local std_swap_gb=4
+	_SWAP_ZRAM_GB=$(( _SWAP_RAM_GB / 2 ))
+	if (( _SWAP_ZRAM_GB < 1 )); then _SWAP_ZRAM_GB=1 ; fi
+	if (( _SWAP_ZRAM_GB > 16 )); then _SWAP_ZRAM_GB=16 ; fi
+	_SWAP_ZRAM_MAX_GB=$(( _SWAP_RAM_GB * 2 ))
+	if (( _SWAP_ZRAM_MAX_GB < 16 )); then _SWAP_ZRAM_MAX_GB=16 ; fi
+
 	local disk_bytes ; disk_bytes=$(lsblk -bdnpo SIZE "$DRIVE" 2>/dev/null || echo 25769803776)
-	local disk_gb=$(( disk_bytes / 1073741824 ))
-	if (( disk_gb <= 15 )); then std_swap_gb=2 ; fi
+	_SWAP_DISK_GB=$(( disk_bytes / 1073741824 ))
+	_SWAP_STD_GB=4
+	if (( _SWAP_DISK_GB <= 15 )); then _SWAP_STD_GB=2 ; fi
 
-	local os_base_gb=$(( disk_gb - 1 ))
-	[[ "$os_base_gb" -lt 1 ]] && os_base_gb=1
-	local os_after_auto_gb=$(( os_base_gb - auto_swap_gb ))
-	[[ "$os_after_auto_gb" -lt 1 ]] && os_after_auto_gb=1
-	local os_after_std_gb=$(( os_base_gb - std_swap_gb ))
-	[[ "$os_after_std_gb" -lt 1 ]] && os_after_std_gb=1
+	_SWAP_OS_BASE_GB=$(( _SWAP_DISK_GB - 1 ))
+	if (( _SWAP_OS_BASE_GB < 1 )); then _SWAP_OS_BASE_GB=1 ; fi
+	_SWAP_MAX_GB=$(( _SWAP_OS_BASE_GB - 5 ))
+	if (( _SWAP_MAX_GB < 1 )); then _SWAP_MAX_GB=1 ; fi
+}
+SWAPSIZEsel () {
+	local -n _target_var="$1" ; local default_gb="$2" ; local max_gb="$3" ; local label="${4:-Swap}" ; local custom_val=""
+	if (( default_gb > max_gb )); then default_gb="$max_gb" ; fi
+	while true; do
+		TextPromptSel "custom_val" "Enter ${label} size in GiB (1-${max_gb}, default ${default_gb})" "$default_gb"
+		if [[ "$custom_val" =~ ^[0-9]+$ ]] && (( custom_val >= 1 && custom_val <= max_gb )); then
+			_target_var="$custom_val"
+			break
+		else
+			echo "Invalid size: must be a number between 1 and ${max_gb} GiB."
+		fi
+	done
+}
+HIBERNATIONsel () {
+	SwapDiskMetrics
+	local os_after_auto_gb=$(( _SWAP_OS_BASE_GB - _SWAP_AUTO_GB ))
+	if (( os_after_auto_gb < 1 )); then os_after_auto_gb=1 ; fi
 
 	local hib_choice=""
-	local prompt_hdr="Hibernation Setup | RAM: ${total_ram_gb} GiB | Target Drive ($DRIVE): ~${disk_gb} GiB"
+	local prompt_hdr="Hibernation Setup | RAM: ${_SWAP_RAM_GB} GiB | Target Drive ($DRIVE): ~${_SWAP_DISK_GB} GiB"
 	MenuSel "hib_choice" "$prompt_hdr" \
-		"Enable Hibernation - Auto (${auto_swap_gb} GiB Swap -> ~${os_after_auto_gb} GiB left for OS)" \
+		"Enable Hibernation - Auto (${_SWAP_AUTO_GB} GiB Swap -> ~${os_after_auto_gb} GiB left for OS)" \
 		"Enable Hibernation - Custom Size (Specify Swap GiB for another PC)" \
-		"Disable Hibernation (Keep standard ${std_swap_gb} GiB Swap -> ~${os_after_std_gb} GiB left for OS)"
+		"Disable Hibernation"
 
 	case "$hib_choice" in
 		"Enable Hibernation - Auto"*)
-			HIBsel=1
-			SWAP_GIB="$auto_swap_gb"
+			HIB=1
+			SWAP_DIM="$_SWAP_AUTO_GB"
+			if (( SWAP_DIM > _SWAP_MAX_GB )); then
+				echo "[!] Auto swap (${SWAP_DIM} GiB) exceeds safe disk space (max ${_SWAP_MAX_GB} GiB). Please choose a custom size."
+				SWAPSIZEsel "SWAP_DIM" "$_SWAP_MAX_GB" "$_SWAP_MAX_GB" "Swap"
+			fi
 			;;
 		"Enable Hibernation - Custom"*)
-			local max_custom=$(( os_base_gb - 5 ))
-			[[ "$max_custom" -lt 1 ]] && max_custom=1
-			local custom_val=""
-			while true; do
-				TextPromptSel "custom_val" "Enter Swap size in GiB (1-${max_custom}, default ${auto_swap_gb})" "$auto_swap_gb"
-				if [[ "$custom_val" =~ ^[0-9]+$ ]] && (( custom_val >= 1 && custom_val <= max_custom )); then
-					HIBsel=1
-					SWAP_GIB="$custom_val"
-					break
-				else
-					echo "Invalid size: must be a number between 1 and ${max_custom} GiB."
-				fi
-			done
+			HIB=1
+			SWAPSIZEsel "SWAP_DIM" "$_SWAP_AUTO_GB" "$_SWAP_MAX_GB" "Swap"
 			;;
 		*)
-			HIBsel=0
-			SWAP_GIB="$std_swap_gb"
+			HIB=0
+			SWAP_DIM="$_SWAP_STD_GB"
 			;;
 	esac
 }
-Pacman_Locked() {
-	if [[ -f /var/lib/pacman/db.lck || -f /mnt/var/lib/pacman/db.lck ]]; then echo -e "Pacman is blocked. Removing lockfiles..." ; rm -f /var/lib/pacman/db.lck /mnt/var/lib/pacman/db.lck ; else echo "No locked database" ; fi
+SWAPsel () {
+	SwapDiskMetrics
+	local swap_choice="" swap_sub="" fs_note=""
+	if [[ "${FS:-}" == "btrfs" ]]; then fs_note=", @swap subvolume" ; fi
+	ZRAM=0 ; ZRAM_DIM=0
+
+	if [[ "${HIB:-0}" -eq 1 ]]; then
+		if [[ "${LVM:-0}" -eq 1 ]]; then
+			MenuSel "swap_choice" "Swap Type for Hibernation (${SWAP_DIM} GiB | LVM)" \
+				"LVM Logical Volume (vg0/swap - Recommended, no resume_offset)" \
+				"Swapfile (Inside root LV${fs_note}, uses resume_offset)"
+			case "$swap_choice" in
+				"LVM"*) SWAP="lvm" ;;
+				*)      SWAP="swapfile" ;;
+			esac
+		elif [[ "${CRYPT:-0}" -eq 1 ]]; then
+			SWAP="swapfile"
+			echo -e "\n[i] LUKS + Hibernation without LVM: automatically selecting Swapfile (${SWAP_DIM} GiB inside cryptroot${fs_note} - single passphrase, no keyfile in /boot)."
+		else
+			MenuSel "swap_choice" "Swap Type for Hibernation (${SWAP_DIM} GiB | Unencrypted)" \
+				"Swap Partition (Recommended without LUKS - simplest, no resume_offset)" \
+				"Swapfile (Inside root${fs_note} - easier to resize, uses resume_offset)"
+			case "$swap_choice" in
+				"Swap Partition"*) SWAP="partition" ;;
+				*)                 SWAP="swapfile" ;;
+			esac
+		fi
+		YesNoSel "Also enable Zram (${_SWAP_ZRAM_GB} GiB compressed RAM, higher priority) alongside hibernation swap?"
+		if [[ "$CC" -eq 1 ]]; then ZRAM=1 ; ZRAM_DIM="$_SWAP_ZRAM_GB" ; fi
+	else
+		if [[ "${LVM:-0}" -eq 1 ]]; then
+			MenuSel "swap_choice" "Swap Setup (Hibernation Disabled | LVM)" \
+				"Zram (${_SWAP_ZRAM_GB} GiB compressed RAM - Recommended, zero disk space)" \
+				"LVM Logical Volume (${_SWAP_STD_GB} GiB - vg0/swap)" \
+				"Swapfile (${_SWAP_STD_GB} GiB inside root LV${fs_note})" \
+				"Custom Size Swap (Zram, LVM Logical Volume or Swapfile)" \
+				"None (No swap)"
+			case "$swap_choice" in
+				"Zram"*)     SWAP="zram" ; SWAP_DIM=0 ; ZRAM=1 ; ZRAM_DIM="$_SWAP_ZRAM_GB" ;;
+				"LVM"*)      SWAP="lvm" ; SWAP_DIM="$_SWAP_STD_GB" ;;
+				"Swapfile"*) SWAP="swapfile" ; SWAP_DIM="$_SWAP_STD_GB" ;;
+				"Custom"*)
+					MenuSel "swap_sub" "Select Swap Type for Custom Size" \
+						"Zram (Compressed RAM)" \
+						"LVM Logical Volume (vg0/swap)" \
+						"Swapfile (Inside root LV${fs_note})"
+					case "$swap_sub" in
+						"Zram"*) SWAP="zram" ; SWAP_DIM=0 ; ZRAM=1 ; SWAPSIZEsel "ZRAM_DIM" "$_SWAP_ZRAM_GB" "$_SWAP_ZRAM_MAX_GB" "Zram" ;;
+						"LVM"*)  SWAP="lvm" ; SWAPSIZEsel "SWAP_DIM" "$_SWAP_STD_GB" "$_SWAP_MAX_GB" "Swap" ;;
+						*)       SWAP="swapfile" ; SWAPSIZEsel "SWAP_DIM" "$_SWAP_STD_GB" "$_SWAP_MAX_GB" "Swap" ;;
+					esac
+					;;
+				*)           SWAP="none" ; SWAP_DIM=0 ;;
+			esac
+		elif [[ "${CRYPT:-0}" -eq 1 ]]; then
+			MenuSel "swap_choice" "Swap Setup (Hibernation Disabled | LUKS)" \
+				"Zram (${_SWAP_ZRAM_GB} GiB compressed RAM - Recommended, zero disk space)" \
+				"Swapfile (${_SWAP_STD_GB} GiB inside cryptroot${fs_note})" \
+				"Ephemeral Swap Partition (${_SWAP_STD_GB} GiB - plain dm-crypt, random key per boot)" \
+				"Custom Size Swap (Zram, Swapfile or Ephemeral Partition)" \
+				"None (No swap)"
+			case "$swap_choice" in
+				"Zram"*)      SWAP="zram" ; SWAP_DIM=0 ; ZRAM=1 ; ZRAM_DIM="$_SWAP_ZRAM_GB" ;;
+				"Swapfile"*)  SWAP="swapfile" ; SWAP_DIM="$_SWAP_STD_GB" ;;
+				"Ephemeral"*) SWAP="partition" ; SWAP_DIM="$_SWAP_STD_GB" ;;
+				"Custom"*)
+					MenuSel "swap_sub" "Select Swap Type for Custom Size" \
+						"Zram (Compressed RAM)" \
+						"Swapfile (Inside cryptroot${fs_note})" \
+						"Ephemeral Swap Partition (plain dm-crypt, random key per boot)"
+					case "$swap_sub" in
+						"Zram"*)     SWAP="zram" ; SWAP_DIM=0 ; ZRAM=1 ; SWAPSIZEsel "ZRAM_DIM" "$_SWAP_ZRAM_GB" "$_SWAP_ZRAM_MAX_GB" "Zram" ;;
+						"Swapfile"*) SWAP="swapfile" ; SWAPSIZEsel "SWAP_DIM" "$_SWAP_STD_GB" "$_SWAP_MAX_GB" "Swap" ;;
+						*)           SWAP="partition" ; SWAPSIZEsel "SWAP_DIM" "$_SWAP_STD_GB" "$_SWAP_MAX_GB" "Swap" ;;
+					esac
+					;;
+				*)            SWAP="none" ; SWAP_DIM=0 ;;
+			esac
+		else
+			MenuSel "swap_choice" "Swap Setup (Hibernation Disabled)" \
+				"Zram (${_SWAP_ZRAM_GB} GiB compressed RAM - Recommended, zero disk space)" \
+				"Swap Partition (${_SWAP_STD_GB} GiB)" \
+				"Swapfile (${_SWAP_STD_GB} GiB inside root${fs_note})" \
+				"Custom Size Swap (Zram, Partition or Swapfile)" \
+				"None (No swap)"
+			case "$swap_choice" in
+				"Zram"*)           SWAP="zram" ; SWAP_DIM=0 ; ZRAM=1 ; ZRAM_DIM="$_SWAP_ZRAM_GB" ;;
+				"Swap Partition"*) SWAP="partition" ; SWAP_DIM="$_SWAP_STD_GB" ;;
+				"Swapfile"*)       SWAP="swapfile" ; SWAP_DIM="$_SWAP_STD_GB" ;;
+				"Custom"*)
+					MenuSel "swap_sub" "Select Swap Type for Custom Size" \
+						"Zram (Compressed RAM)" \
+						"Swap Partition" \
+						"Swapfile (Inside root${fs_note})"
+					case "$swap_sub" in
+						"Zram"*)           SWAP="zram" ; SWAP_DIM=0 ; ZRAM=1 ; SWAPSIZEsel "ZRAM_DIM" "$_SWAP_ZRAM_GB" "$_SWAP_ZRAM_MAX_GB" "Zram" ;;
+						"Swap Partition"*) SWAP="partition" ; SWAPSIZEsel "SWAP_DIM" "$_SWAP_STD_GB" "$_SWAP_MAX_GB" "Swap" ;;
+						*)                 SWAP="swapfile" ; SWAPSIZEsel "SWAP_DIM" "$_SWAP_STD_GB" "$_SWAP_MAX_GB" "Swap" ;;
+					esac
+					;;
+				*)                 SWAP="none" ; SWAP_DIM=0 ;;
+			esac
+		fi
+	fi
 }
-TimezoneSel () {
+ValidateStorage () {
+	SwapDiskMetrics
+	if [[ -z "${SWAP:-}" ]]; then SWAPsel ; return 0 ; fi
+	if [[ "$SWAP" != "none" && "$SWAP" != "zram" ]] && (( SWAP_DIM > _SWAP_MAX_GB )); then
+		echo -e "\n[!] Current swap size (${SWAP_DIM} GiB) exceeds safe space on $DRIVE (max ${_SWAP_MAX_GB} GiB). Reconfiguring swap..."
+		if [[ "${HIB:-0}" -eq 1 ]]; then HIBERNATIONsel ; fi
+		SWAPsel
+		return 0
+	fi
+	if [[ "${HIB:-0}" -eq 1 && ( "$SWAP" == "none" || "$SWAP" == "zram" ) ]]; then
+		echo -e "\n[i] Hibernation requires disk-backed swap. Selecting swap type..."
+		SWAPsel
+		return 0
+	fi
+	if [[ "${LVM:-0}" -eq 1 && "$SWAP" == "partition" ]]; then
+		SWAP="lvm"
+		echo -e "\n[i] LVM enabled: switched swap from raw partition to LVM Logical Volume (vg0/swap)."
+	elif [[ "${LVM:-0}" -eq 0 && "$SWAP" == "lvm" ]]; then
+		echo -e "\n[i] LVM disabled: re-selecting swap type..."
+		SWAPsel
+		return 0
+	fi
+	if [[ "${CRYPT:-0}" -eq 1 && "${LVM:-0}" -eq 0 && "${HIB:-0}" -eq 1 && "$SWAP" == "partition" ]]; then
+		SWAP="swapfile"
+		echo -e "\n[i] LUKS + Hibernation without LVM: switched swap to Swapfile inside cryptroot (single passphrase, no keyfile in /boot)."
+	fi
+	if [[ "$SWAP" == "zram" ]]; then
+		SWAP_DIM=0 ; ZRAM=1
+		if (( ${ZRAM_DIM:-0} < 1 )); then ZRAM_DIM="$_SWAP_ZRAM_GB" ; fi
+	elif [[ "$SWAP" == "none" ]]; then
+		SWAP_DIM=0 ; ZRAM=0 ; ZRAM_DIM=0
+	fi
+}
+TIMEZONEsel () {
+	local input_val
 	while true; do
 		read -rp $'\n=== Select Timezone ===\nType \'1\' for the default Europe/Rome or write custom format (e.g. America/New_York) [\'q\' to quit]: ' input_val
 		if [[ -z "$input_val" ]]; then echo "Input cannot be empty." ; continue ; fi
-		if [[ "$input_val" == "1" ]]; then TZsel="Europe/Rome" ; break ; fi
-		if [[ "${input_val,,}" =~ ^(q|quit)$ ]]; then TZsel="" ; break ; fi
-		YesNoSel "Confirm timezone: $input_val ?" ; if [[ "$CC" -eq 1 ]]; then TZsel="$input_val" ; break ; fi
+		if [[ "$input_val" == "1" ]]; then TZONE="Europe/Rome" ; break ; fi
+		if [[ "${input_val,,}" =~ ^(q|quit)$ ]]; then TZONE="" ; break ; fi
+		YesNoSel "Confirm timezone: $input_val ?" ; if [[ "$CC" -eq 1 ]]; then TZONE="$input_val" ; break ; fi
 	done
-	echo "Selected Timezone: $TZsel"
+	echo "Selected Timezone: $TZONE"
 }
 UEFIsel () {
-	if [[ -d "/sys/firmware/efi/" ]]; then if ! mount | grep -q "/sys/firmware/efi/efivars"; then mount -t efivarfs efivarfs /sys/firmware/efi/efivars ; fi ; UEFImode=1 ; echo 'UEFI Mode detected' ; else UEFImode=0 ; echo 'BIOS Mode detected' ; fi
+	if [[ -d "/sys/firmware/efi/" ]]; then if ! mount | grep -q "/sys/firmware/efi/efivars"; then mount -t efivarfs efivarfs /sys/firmware/efi/efivars ; fi ; FW=1 ; echo 'UEFI Mode detected' ; else FW=0 ; echo 'BIOS Mode detected' ; fi
 }
-DisplayManagerSel() {
-	if [[ "$DEsel" == "GNOME" ]]; then DMsel="GDM"
-	elif [[ "$DEsel" == "KDE" ]]; then DMsel="SDDM"
-	elif [[ "$SHELLsel" == "Quickshell" ]]; then MenuSel "DMsel" "Select Display Manager / Login Method" "Quickshell (best if you have selected disk encryption)" "Greetd" "Ly" "LightDM" "None" ; if [[ "$DMsel" == "Quickshell"* ]]; then DMsel="Quickshell" ; fi
-	else MenuSel "DMsel" "Select Display Manager" "Ly" "Greetd" "LightDM" "SDDM" "None"
+LOGINsel () {
+	if [[ "$DE" == "GNOME" ]]; then DM="GDM"
+	elif [[ "$DE" == "KDE" ]]; then DM="SDDM"
+	elif [[ "$UI" == "Quickshell" ]]; then MenuSel "DM" "Select Display Manager / Login Method" "Quickshell (best if you have selected disk encryption)" "Greetd" "Ly" "LightDM" "None" ; if [[ "$DM" == "Quickshell"* ]]; then DM="Quickshell" ; fi
+	else MenuSel "DM" "Select Display Manager" "Ly" "Greetd" "LightDM" "SDDM" "None"
 	fi
 }
-ArchRepoSel() { YesNoSel "Do you want Arch repositories as well as Artix repositories?" ; if [[ "$CC" -eq 1 ]]; then ARCHrepo=1 ; echo "OK, adding Arch repositories!" ; else ARCHrepo='' ; echo "Proceeding without them..." ; fi ; }
-BootloaderSel() { if [[ "$UEFImode" -eq 0 ]]; then BLsel="grub" ; echo "BIOS mode: GRUB selected automatically" ; return 0 ; fi ; local bl_options=( "refind" "grub" "efistub" "limine" ) ; if [[ "${OSsel,,}" == "arch" ]]; then bl_options+=( "systemd-boot" "uki" ) ; fi ; MenuSel "BLsel" "Select Bootloader" "${bl_options[@]}" ; }
-DesktopEnvSel() { MenuSel "DEsel" "Select Desktop Environment / Window Manager" "KDE" "GNOME" "LXQt" "COSMIC" "Hyprland" "Niri" "None" ; ShellSel ; }
-ShellSel() { if [[ "$DEsel" =~ ^(Hyprland|Niri)$ ]]; then MenuSel "SHELLsel" "Select Desktop Shell for $DEsel" "Traditional (Waybar + Swaync + Fuzzel)" "Quickshell" ; if [[ "$SHELLsel" == "Traditional"* ]]; then SHELLsel="Traditional" ; if [[ "${DMsel:-}" == "Quickshell" ]]; then DMsel="Ly" ; fi; fi ; else SHELLsel="None" ; fi ; }
-FilesystemSel() { MenuSel "FSsel" "Select filesystem for ROOT" "ext4" "btrfs" ; }
-HostnameSel() { TextPromptSel "HNsel" "Enter preferred hostname" ; }
-InitSystemSel() { if [[ "${OSsel,,}" == "artix" ]]; then MenuSel "INITsel" "Select preferred Init System for Artix" "OpenRC" "Runit" "s6" "dinit" ; else INITsel="systemd" ; fi ; }
-IRFsel() { if [[ "${OSsel,,}" == "void" ]]; then IRFSetup="dracut" ; echo "Selected Initramfs: dracut" ; else MenuSel "IRFSetup" "Select preferred Initramfs Generator" "booster" "mkinitcpio" "dracut" ; fi ; }
-IRFSModeSel() { MenuSel "IRFSMode" "Select preferred Initramfs Mode, if universal for all PC or just for this one" "Host" "Universal" ; }
-KernelSel() { if [[ "${OSsel,,}" == "void" ]]; then MenuSel "KSel" "Select preferred Kernel" "linux" "linux-lts" ; else MenuSel "KSel" "Select preferred Kernel" "linux" "linux-lts" "linux-hardened" "linux-zen" ; fi ; }
-LibrarySel() { MenuSel "LIBsel" "Select base library" "GLIBC" "MUSL" ; }
-LanguageSel() { MenuSel "LANGsel" "Select preferred Language" "${LOC_LIST[@]}" ; }
-LocalizationSel() { MenuSel "LOCsel" "Select localization" "${LOC_LIST[@]}" ; }
-OperatingSystemSel() { MenuSel "OSsel" "Select the distro to setup" "Arch" "Artix" "Void" ; }
-PartIDSel() { MenuSel "PIDsel" "Select partition identifier" "UUID" "PARTUUID" "LABEL" ; }
-UsernameSel() { TextPromptSel "UNsel" "Enter preferred username" ; }
-VoidInstMethod() { MenuSel "VImethod" "Select installation type" "XBPS" "ROOTFS" ; }
+ARCHREPOsel () { YesNoSel "Do you want Arch repositories as well as Artix repositories?" ; if [[ "$CC" -eq 1 ]]; then ARCHREPO=1 ; echo "OK, adding Arch repositories!" ; else ARCHREPO='' ; echo "Proceeding without them..." ; fi ; }
+BOOTLOADERsel () { if [[ "$FW" -eq 0 ]]; then BL="grub" ; echo "BIOS mode: GRUB selected automatically" ; return 0 ; fi ; local bl_options=( "refind" "grub" "efistub" "limine" ) ; if [[ "${OS,,}" == "arch" ]]; then bl_options+=( "systemd-boot" "uki" ) ; fi ; MenuSel "BL" "Select Bootloader" "${bl_options[@]}" ; }
+DESKTOPsel () { MenuSel "DE" "Select Desktop Environment / Window Manager" "KDE" "GNOME" "LXQt" "COSMIC" "Hyprland" "Niri" "None" ; SHELLsel ; }
+SHELLsel () { if [[ "$DE" =~ ^(Hyprland|Niri)$ ]]; then MenuSel "UI" "Select Desktop Shell for $DE" "Traditional (Waybar + Swaync + Fuzzel)" "Quickshell" ; if [[ "$UI" == "Traditional"* ]]; then UI="Traditional" ; if [[ "${DM:-}" == "Quickshell" ]]; then DM="Ly" ; fi; fi ; else UI="None" ; fi ; }
+FILESYSTEMsel () { MenuSel "FS" "Select filesystem for ROOT" "ext4" "btrfs" ; }
+HOSTNAMEsel () { TextPromptSel "HN" "Enter preferred hostname" ; }
+INITsel () { if [[ "${OS,,}" == "artix" ]]; then MenuSel "INIT" "Select preferred Init System for Artix" "OpenRC" "Runit" "s6" "dinit" ; else INIT="systemd" ; fi ; }
+IRFsel () { if [[ "${OS,,}" == "void" ]]; then IRF="dracut" ; echo "Selected Initramfs: dracut" ; else MenuSel "IRF" "Select preferred Initramfs Generator" "booster" "mkinitcpio" "dracut" ; fi ; }
+IRFSsel () { MenuSel "IRFS" "Select preferred Initramfs Mode, if universal for all PC or just for this one" "Host" "Universal" ; }
+KERNELsel () { if [[ "${OS,,}" == "void" ]]; then MenuSel "KERNEL" "Select preferred Kernel" "linux" "linux-lts" ; else MenuSel "KERNEL" "Select preferred Kernel" "linux" "linux-lts" "linux-hardened" "linux-zen" ; fi ; }
+LIBRARYsel () { MenuSel "LIBRARY" "Select base library" "GLIBC" "MUSL" ; }
+LANGUAGEsel () { MenuSel "LANGUAGE" "Select preferred Language" "${LOC_LIST[@]}" ; }
+LOCALEsel () { MenuSel "LOCALE" "Select localization" "${LOC_LIST[@]}" ; }
+OSsel () { MenuSel "OS" "Select the distro to setup" "Arch" "Artix" "Void" ; }
+PARTIDsel () { MenuSel "PID" "Select partition identifier" "UUID" "PARTUUID" "LABEL" ; }
+USERNAMEsel () { TextPromptSel "UN" "Enter preferred username" ; }
+VOIDINSTALLsel () { MenuSel "VOIDINSTALL" "Select installation type" "XBPS" "ROOTFS" ; }
