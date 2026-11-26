@@ -53,9 +53,23 @@ DiskPartition() {
 	if [[ $(wc -l < /proc/swaps) -gt 1 ]]; then echo "[i] Found active Swap. Disabling..." ; swapoff -a ; fi
 	if command -v vgchange &>/dev/null; then vgchange -an 2>/dev/null || true ; fi
 	for dev in /dev/mapper/crypt*; do [[ -b "$dev" ]] && cryptsetup close "${dev##*/}" || true ; done
-	if $PKGmanager$PKGchk ntfs-3g &>/dev/null && ! command -v mkfs.ntfs &>/dev/null; then $PKGmanager$PKGrmv$PKGfrc "${PKGrsk[@]}" ntfs-3g || true ; fi
-	if $PKGmanager$PKGchk exfat-utils &>/dev/null; then $PKGmanager$PKGrmv$PKGfrc "${PKGrsk[@]}" exfat-utils || true ; fi
-	$PKGmanager$PKGinst "${PKGskp[@]}" "${fs[@]}"
+	local live_pkgs=()
+	if ! command -v sgdisk &>/dev/null; then live_pkgs+=(gptfdisk) ; fi
+	if ! command -v parted &>/dev/null; then live_pkgs+=(parted) ; fi
+	if ! command -v mkfs.fat &>/dev/null; then live_pkgs+=(dosfstools) ; fi
+	if [[ "$FS" == "ext4" || "${ADD_FS:-}" == "ext4" ]] && { ! command -v mkfs.ext4 &>/dev/null || ! command -v filefrag &>/dev/null; }; then live_pkgs+=(e2fsprogs) ; fi
+	if [[ "$FS" == "btrfs" || "${ADD_FS:-}" == "btrfs" ]] && ! command -v mkfs.btrfs &>/dev/null; then live_pkgs+=(btrfs-progs) ; fi
+	if [[ "${CRYPT:-0}" -eq 1 ]] && ! command -v cryptsetup &>/dev/null; then live_pkgs+=(cryptsetup) ; fi
+	if [[ "${LVM:-0}" -eq 1 ]] && ! command -v vgcreate &>/dev/null; then live_pkgs+=(lvm2) ; fi
+	if [[ "$ADD_SETUP" -eq 1 && "$ADD_FORMAT" -eq 1 ]]; then
+		if [[ "$ADD_FS" == "ntfs" ]] && ! command -v mkfs.ntfs &>/dev/null; then
+			if [[ "${OS,,}" == "void" ]]; then live_pkgs+=(ntfs-3g) ; else live_pkgs+=(ntfsprogs) ; fi
+		elif [[ "$ADD_FS" == "exfat" ]] && ! command -v mkfs.exfat &>/dev/null; then
+			if $PKGmanager$PKGchk exfat-utils &>/dev/null; then $PKGmanager$PKGrmv$PKGfrc "${PKGrsk[@]}" exfat-utils || true ; fi
+			live_pkgs+=(exfatprogs)
+		fi
+	fi
+	if [[ ${#live_pkgs[@]} -gt 0 ]]; then $PKGmanager$PKGinst "${PKGskp[@]}" "${live_pkgs[@]}" ; fi
 	unmount_drive "$DRIVE"
 	sgdisk -ozZ "$DRIVE"
 	SWAP_PART=""
@@ -653,6 +667,7 @@ PKGcheck () {
 	filemanager=(yazi pcmanfm-qt tumbler file-roller android-tools qt6ct papirus-icon-theme librsvg adwaita-icon-theme) ; if [[ "$os_l" != "void" ]]; then filemanager+=(gvfs-mtp) ; fi
 	if [[ "$os_l" == "void" ]]; then fonts=(nerd-fonts) ; else fonts=(ttf-jetbrains-mono-nerd) ; fi
 	fs=(dialog mtools parted gptfdisk dosfstools ntfs-3g exfatprogs)
+	if [[ "$os_l" != "void" ]]; then fs+=(ntfsprogs) ; fi
 	if [[ "$FS" == "ext4" ]]; then fs+=(e2fsprogs) ; fi
 	if [[ "$FS" == "btrfs" || "${ADD_FS:-}" == "btrfs" ]]; then fs+=(btrfs-progs) ; fi
 	if [[ "${CRYPT:-0}" -eq 1 ]]; then fs+=(cryptsetup) ; fi
