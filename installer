@@ -291,10 +291,10 @@ FStabGen () {
 				fi
 			done
 		fi
-		if [[ "${EPHEMERAL_SWAP:-0}" -eq 1 && -n "$SWAP_PARTUUID" ]]; then
+		iif [[ "${EPHEMERAL_SWAP:-0}" -eq 1 && -n "$SWAP_PARTUUID" ]]; then
 			printf 'cryptswap PARTUUID=%s /dev/urandom swap,cipher=aes-xts-plain64,size=512,sector-size=4096\n' "$SWAP_PARTUUID" >> /mnt/etc/crypttab
 			if [[ "${OS,,}" == "artix" && "$init_sys" == "openrc" ]]; then
-				printf "swap='cryptswap'\nsource='PARTUUID=%s'\noptions='-c aes-xts-plain64 -s 512 --sector-size 4096'\n\n" "$SWAP_PARTUUID" >> /mnt/etc/conf.d/dmcrypt
+				printf "swap='cryptswap'\nsource='/dev/disk/by-partuuid/%s'\noptions='-c aes-xts-plain64 -s 512 --sector-size 4096'\n\n" "$SWAP_PARTUUID" >> /mnt/etc/conf.d/dmcrypt
 			fi
 		fi
 	fi
@@ -555,7 +555,7 @@ BootloaderSetup () {
 	if [[ "${HIB:-0}" -eq 1 && -n "$RESUME_DEV" ]]; then
 		res_flag="resume=${RESUME_DEV}"
 		if [[ -n "${RESUME_OFFSET:-}" ]]; then res_flag+=" resume_offset=${RESUME_OFFSET}" ; fi
-	elif [[ "${HIB:-0}" -eq 0 && ( "${EPHEMERAL_SWAP:-0}" -eq 1 || "$SWAP" == "zram" || "$SWAP" == "none" ) ]]; then
+	elif [[ "${HIB:-0}" -eq 0 ]]; then
 		res_flag="hibernate=no"
 	fi
 
@@ -653,9 +653,8 @@ PKGcheck () {
 	filemanager=(yazi pcmanfm-qt tumbler file-roller android-tools qt6ct papirus-icon-theme librsvg adwaita-icon-theme) ; if [[ "$os_l" != "void" ]]; then filemanager+=(gvfs-mtp) ; fi
 	if [[ "$os_l" == "void" ]]; then fonts=(nerd-fonts) ; else fonts=(ttf-jetbrains-mono-nerd) ; fi
 	fs=(dialog mtools parted gptfdisk dosfstools ntfs-3g exfatprogs)
-	if [[ "$os_l" != "void" ]]; then fs+=(ntfsprogs) ; fi
 	if [[ "$FS" == "ext4" ]]; then fs+=(e2fsprogs) ; fi
-	if [[ "$FS" == "btrfs" ]]; then fs+=(btrfs-progs) ; fi
+	if [[ "$FS" == "btrfs" || "${ADD_FS:-}" == "btrfs" ]]; then fs+=(btrfs-progs) ; fi
 	if [[ "${CRYPT:-0}" -eq 1 ]]; then fs+=(cryptsetup) ; fi
 	if [[ "${LVM:-0}" -eq 1 ]]; then fs+=(lvm2) ; fi
 	grub=() ; grubbtrfs=() ; limine=() ; refind=() ; uki=()
