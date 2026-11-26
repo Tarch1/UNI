@@ -11,8 +11,40 @@ trap 'SHOWerror' ERR
 CR () { "$chroot" /mnt "$@" ; }
 CR_USER () { CR sudo -u "$UN" bash -c "$1" ; }
 unmount_drive () {
-	local p
-	for p in "$1"?*; do if [[ -b "$p" ]] && grep -qs "^$p " /proc/mounts; then echo "[i] Unmounting active partition $p..." ; umount "$p" ; fi ; done
+	local disk="$1" dev type mp sw dm_name
+	[[ -b "$disk" ]] || return 0
+	echo "[i] Releasing mounts, swap and mappings on $disk..."
+	while read -r dev type; do
+		[[ -n "$dev" ]] || continue
+		if grep -qs "^${dev}[[:space:]]" /proc/swaps; then
+			swapoff "$dev" 2>/dev/null || true
+		fi
+		while read -r mp; do
+			[[ -n "$mp" && "$mp" != "/" && "$mp" != /run/* ]] || continue
+			while read -r sw; do
+				[[ -n "$sw" ]] && swapoff "$sw" 2>/dev/null || true
+			done < <(awk -v m="$mp" 'NR>1 && $2=="file" && ($1==m || index($1, m"/")==1) {print $1}' /proc/swaps)
+			if command -v fuser &>/dev/null; then fuser -km "$mp" 2>/dev/null || true ; fi
+			umount -R "$mp" 2>/dev/null || umount -R -l "$mp" 2>/dev/null || true
+		done < <(findmnt -rn -o TARGET "$dev" 2>/dev/null | tac || true)
+		dm_name="${dev##*/}"
+		if [[ "$dev" == /dev/dm-* && -r "/sys/block/${dm_name}/dm/name" ]]; then
+			dm_name="$(<"/sys/block/${dm_name}/dm/name")"
+		fi
+		case "$type" in
+			lvm)					if command -v lvchange &>/dev/null; then lvchange -an "$dev" 2>/dev/null || true ; fi
+									if command -v dmsetup &>/dev/null; then dmsetup remove -f "$dm_name" 2>/dev/null || true ; fi
+									;;
+			crypt)					if command -v cryptsetup &>/dev/null; then cryptsetup close "$dm_name" 2>/dev/null || true ; fi
+									if command -v dmsetup &>/dev/null; then dmsetup remove -f "$dm_name" 2>/dev/null || true ; fi
+									;;
+			raid*)					if command -v mdadm &>/dev/null; then mdadm --stop "$dev" 2>/dev/null || true ; fi
+									;;
+			dm|linear|multipath)	if command -v dmsetup &>/dev/null; then dmsetup remove -f "$dm_name" 2>/dev/null || true ; fi
+									;;
+		esac
+	done < <(lsblk -rnpo NAME,TYPE "$disk" 2>/dev/null | tac || true)
+	udevadm settle || true
 }
 part_path () {
 	local p="" ; if [[ "$1" =~ [0-9]$ ]]; then p="p" ; fi
@@ -71,6 +103,7 @@ DiskPartition() {
 	fi
 	if [[ ${#live_pkgs[@]} -gt 0 ]]; then $PKGmanager$PKGinst "${PKGskp[@]}" "${live_pkgs[@]}" ; fi
 	unmount_drive "$DRIVE"
+	for d in "$DRIVE"?* "$DRIVE"; do [[ -b "$d" ]] && wipefs -af "$d" 2>/dev/null || true ; done
 	sgdisk -ozZ "$DRIVE"
 	SWAP_PART=""
 	if [[ "${LVM:-0}" -eq 0 && "$SWAP" == "partition" ]]; then
@@ -96,6 +129,7 @@ DiskPartition() {
 	echo "DRIVE=$DRIVE DEVICE=$DEVICE"
 	if [[ "$ADD_SETUP" -eq 1 && "$ADD_FORMAT" -eq 1 && -n "$ADD_DRIVE" ]]; then
 		unmount_drive "$ADD_DRIVE"
+		for d in "$ADD_DRIVE"?* "$ADD_DRIVE"; do [[ -b "$d" ]] && wipefs -af "$d" 2>/dev/null || true ; done
 		sgdisk -ozZ "$ADD_DRIVE"
 		parted -s "$ADD_DRIVE" -- mktable gpt mkpart "DATA" 1MiB 100%
 		udevadm settle || true
