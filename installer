@@ -156,7 +156,7 @@ FileSystemFormat() {
 					swapon /mnt/swapfile
 					UNIfstab+="/swapfile none swap defaults 0 0\n"
 					if [[ "${HIB:-0}" -eq 1 ]]; then
-						RESUME_OFFSET="$(filefrag -v /mnt/swapfile | awk '$1=="0:" {gsub(/\.\.$/,"",$4); print $4; exit}')"
+						RESUME_OFFSET="$(filefrag -v /mnt/swapfile | awk -F: '$1 ~ /^[[:space:]]*0$/ {gsub(/^[[:space:]]+|\.\..*/, "", $3); print $3; exit}')"
 					fi
 				fi
 				;;
@@ -517,8 +517,10 @@ BootloaderSetup () {
 	if [[ "$VBTsel" -eq 1 && "$VM_TYPE" == "vmware" ]]; then vm_flags="mem_sleep_default=shallow" ; fi
 	if [[ -n "$UCODEsel" && -f "/mnt/boot/${UCODEsel}.img" ]]; then ucode_img="${UCODEsel}.img" ; initrd_flags="initrd=\\${ucode_img} initrd=\\${irfs}" ; else initrd_flags="initrd=\\${irfs}" ; fi
 
-	if [[ "${LVM:-0}" -eq 1 ]]; then root_dev="/dev/vg0/root"
-	elif [[ "${CRYPT:-0}" -eq 1 ]]; then root_dev="/dev/mapper/${CRYPT_ROOT_NAME}"
+	if [[ "${LVM:-0}" -eq 1 ]]; then root_dev="/dev/mapper/vg0-root"
+	elif [[ "${CRYPT:-0}" -eq 1 ]]; then
+		if [[ "$IRF" == "dracut" ]]; then root_dev="UUID=${ROOT_FS_UUID}"
+		else root_dev="/dev/mapper/${CRYPT_ROOT_NAME}" ; fi
 	else root_dev="${EFF_PID}=$ROOTID" ; fi
 
 	if [[ "${CRYPT:-0}" -eq 1 ]]; then
@@ -526,7 +528,7 @@ BootloaderSetup () {
 			luks_flags="root=${root_dev}"
 			grub_luks=""
 		elif [[ "$IRF" == "dracut" ]]; then
-			luks_flags="rd.luks.name=${CRYPT_ROOT_UUID}=${CRYPT_ROOT_NAME}"
+			luks_flags="rd.luks.uuid=${CRYPT_ROOT_UUID}"
 			if [[ "${LVM:-0}" -eq 1 ]]; then
 				luks_flags+=" rd.lvm.lv=vg0/root"
 				if [[ "$SWAP" == "lvm" ]]; then luks_flags+=" rd.lvm.lv=vg0/swap" ; fi
@@ -653,6 +655,8 @@ PKGcheck () {
 	fs=(dialog mtools parted gptfdisk dosfstools ntfs-3g exfatprogs)
 	if [[ "$os_l" != "void" ]]; then fs+=(ntfsprogs) ; fi
 	if [[ "$FS" == "ext4" ]]; then fs+=(e2fsprogs) ; fi
+	if [[ "$FS" == "btrfs" ]]; then fs+=(btrfs-progs) ; fi
+	if [[ "${CRYPT:-0}" -eq 1 ]]; then fs+=(cryptsetup) ; fi
 	if [[ "${LVM:-0}" -eq 1 ]]; then fs+=(lvm2) ; fi
 	grub=() ; grubbtrfs=() ; limine=() ; refind=() ; uki=()
 	case "$bl_l" in
@@ -981,7 +985,7 @@ InstallationSetup () {
 			"LVM") LVMsel ; ValidateStorage ;;
 			"Hibernation") HIBERNATIONsel ; ValidateStorage ;;
 			"Swap") SWAPsel ; ValidateStorage ;;
-			"Desktop") DESKTOPsel ;;
+			"Desktop") DESKTOPsel ; LOGINsel ;;
 			"UI Shell") SHELLsel ;;
 			"Display Manager") LOGINsel ;;
 			"Init System") INITsel ;;
