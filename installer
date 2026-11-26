@@ -63,7 +63,7 @@ DiskPartition() {
 	if [[ "${LVM:-0}" -eq 1 ]] && ! command -v vgcreate &>/dev/null; then live_pkgs+=(lvm2) ; fi
 	if [[ "$ADD_SETUP" -eq 1 && "$ADD_FORMAT" -eq 1 ]]; then
 		if [[ "$ADD_FS" == "ntfs" ]] && ! command -v mkfs.ntfs &>/dev/null; then
-			if [[ "${OS,,}" == "void" ]]; then live_pkgs+=(ntfs-3g) ; else live_pkgs+=(ntfsprogs) ; fi
+			if [[ "${OS,,}" == "void" ]]; then live_pkgs+=(ntfs-3g) ; else live_pkgs+=(ntfs-3g ntfsprogs) ; fi
 		elif [[ "$ADD_FS" == "exfat" ]] && ! command -v mkfs.exfat &>/dev/null; then
 			if $PKGmanager$PKGchk exfat-utils &>/dev/null; then $PKGmanager$PKGrmv$PKGfrc "${PKGrsk[@]}" exfat-utils || true ; fi
 			live_pkgs+=(exfatprogs)
