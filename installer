@@ -81,10 +81,15 @@ SHOWerror () {
 }
 DiskPartition() {
 	if [[ -z "$DRIVE" ]]; then echo "No drive selected. Closing installation!" ; exit 1 ; fi
-	if grep -qs '/mnt' /proc/mounts; then echo "[i] Found active mount point in /mnt. Unmounting..." ; umount -R /mnt ; fi
-	if [[ $(wc -l < /proc/swaps) -gt 1 ]]; then echo "[i] Found active Swap. Disabling..." ; swapoff -a ; fi
+	if [[ $(wc -l < /proc/swaps) -gt 1 ]]; then echo "[i] Found active Swap. Disabling..." ; swapoff -a 2>/dev/null || true ; fi
+	if grep -qs '/tmp/btrpool' /proc/mounts; then umount -R /tmp/btrpool 2>/dev/null || umount -R -l /tmp/btrpool 2>/dev/null || true ; fi
+	if grep -qs '/mnt' /proc/mounts; then
+		echo "[i] Found active mount point in /mnt. Unmounting..."
+		if command -v fuser &>/dev/null; then fuser -km /mnt 2>/dev/null || true ; fi
+		umount -R /mnt 2>/dev/null || umount -R -l /mnt 2>/dev/null || true
+	fi
 	if command -v vgchange &>/dev/null; then vgchange -an 2>/dev/null || true ; fi
-	for dev in /dev/mapper/crypt*; do [[ -b "$dev" ]] && cryptsetup close "${dev##*/}" || true ; done
+	for dev in /dev/mapper/crypt*; do [[ -b "$dev" ]] && { cryptsetup close "${dev##*/}" 2>/dev/null || dmsetup remove -f "${dev##*/}" 2>/dev/null || true; } || true ; done
 	local live_pkgs=()
 	if ! command -v sgdisk &>/dev/null; then live_pkgs+=(gptfdisk) ; fi
 	if ! command -v parted &>/dev/null; then live_pkgs+=(parted) ; fi
