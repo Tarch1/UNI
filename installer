@@ -291,7 +291,7 @@ FStabGen () {
 				fi
 			done
 		fi
-		iif [[ "${EPHEMERAL_SWAP:-0}" -eq 1 && -n "$SWAP_PARTUUID" ]]; then
+		if [[ "${EPHEMERAL_SWAP:-0}" -eq 1 && -n "$SWAP_PARTUUID" ]]; then
 			printf 'cryptswap PARTUUID=%s /dev/urandom swap,cipher=aes-xts-plain64,size=512,sector-size=4096\n' "$SWAP_PARTUUID" >> /mnt/etc/crypttab
 			if [[ "${OS,,}" == "artix" && "$init_sys" == "openrc" ]]; then
 				printf "swap='cryptswap'\nsource='/dev/disk/by-partuuid/%s'\noptions='-c aes-xts-plain64 -s 512 --sector-size 4096'\n\n" "$SWAP_PARTUUID" >> /mnt/etc/conf.d/dmcrypt
