@@ -910,13 +910,37 @@ InstallationSetup () {
 	elif echo "$SYS_LSPCI" | grep -qEi "(VMware)"; then VM_TYPE="vmware" ; VBTsel=1
 	elif echo "$SYS_LSPCI" | grep -qEi "(Virtio|QXL)"; then VM_TYPE="qemu" ; VBTsel=1 ; fi
 	echo "Synchronizing system clock..." ; local t_ok=0
-	if command -v timedatectl &>/dev/null && timedatectl status &>/dev/null && timedatectl set-ntp true &>/dev/null; then t_ok=1
-	elif command -v chronyc &>/dev/null && chronyc makestep &>/dev/null; then t_ok=1
+	if command -v timedatectl &>/dev/null && timedatectl status &>/dev/null; then
+		if timedatectl set-ntp true &>/dev/null; then
+			for _ in {1..5}; do
+				if [[ "$(timedatectl show -p NTPSynchronized --value 2>/dev/null || true)" == "yes" ]]; then t_ok=1 ; break ; fi
+				sleep 1
+			done
+		fi
+	elif command -v chronyc &>/dev/null && chronyc tracking &>/dev/null; then
+		chronyc -a online &>/dev/null || true
+		chronyc -a 'burst 4/4' &>/dev/null || true
+		sleep 2
+		if chronyc -a makestep &>/dev/null && chronyc -n sources 2>/dev/null | grep -q '^\^\*'; then t_ok=1 ; fi
 	elif command -v chronyd &>/dev/null && chronyd -q "pool pool.ntp.org iburst" &>/dev/null; then t_ok=1
 	elif command -v ntpd &>/dev/null && ntpd -qg &>/dev/null; then t_ok=1
 	elif command -v ntpdate &>/dev/null && ntpdate pool.ntp.org &>/dev/null; then t_ok=1 ; fi
+	local http_date="" http_ep="" now_ep="" diff_s=0
+	http_date=$(curl -fsI --max-time 5 http://1.1.1.1 2>/dev/null | awk -F': ' 'tolower($1)=="date"{gsub(/\r/,"",$2); print $2; exit}' || true)
+	if [[ -z "$http_date" ]]; then http_date=$(curl -fsI --max-time 5 http://clients3.google.com/generate_204 2>/dev/null | awk -F': ' 'tolower($1)=="date"{gsub(/\r/,"",$2); print $2; exit}' || true) ; fi
+	if [[ -n "$http_date" ]]; then
+		http_ep=$(date -u -d "$http_date" +%s 2>/dev/null || true)
+		now_ep=$(date -u +%s)
+		if [[ -n "$http_ep" ]]; then
+			diff_s=$(( now_ep - http_ep ))
+			if (( diff_s < 0 )); then diff_s=$(( -diff_s )) ; fi
+			if [[ "$t_ok" -eq 0 || "$diff_s" -gt 60 ]]; then
+				if date -u -s "@$http_ep" &>/dev/null; then t_ok=1 ; fi
+			fi
+		fi
+	fi
 	if [[ "$t_ok" -eq 0 ]]; then echo "[!] CRITICAL: System clock synchronization failed." >&2 ; return 1 ; fi
-	sleep 2
+	echo "System clock: $(date)"
 	echo 'List of all errors occurred during the installation process:' > Errors
 	local CheckandSetup=( Check_required_files DistroDetection UEFIsel KERNELsel IRFsel IRFSsel BOOTLOADERsel )
 	for c in "${CheckandSetup[@]}"; do "$c" ; done
