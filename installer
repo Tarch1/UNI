@@ -378,11 +378,19 @@ KernelSetup () {
 					fi
 					;;
 		booster)    local b_opts="mount_timeout: 3m\nvconsole: true"
-					if [[ "${HIBsel:-0}" -eq 1 && -n "$SWAP_UUID" ]]; then b_opts+="\nresume: /dev/disk/by-uuid/${SWAP_UUID}" ; fi
 					b_opts+="\nmodules: ahci,ata_piix,sd_mod,nvme,vmd" ; local b_flag=""
 					if [[ "$IRFSMode" == "Universal" ]]; then b_opts="universal: true\n$b_opts" ; b_flag="--universal" ; fi
 					if [[ "$FSsel" == "btrfs" ]]; then b_opts+=",btrfs" ; fi
 					if [[ ${#nvidiadrivers[@]} -gt 0 ]]; then b_opts+=",nvidia,nvidia_modeset,nvidia_uvm,nvidia_drm" ; fi
+					if [[ "$LUKS_ENC" -eq 1 && -n "$CRYPT_ROOT_UUID" ]]; then
+						install -m 600 /dev/null /mnt/etc/booster-crypttab
+						printf 'cryptroot UUID=%s none x-initrd.attach\n' "$CRYPT_ROOT_UUID" > /mnt/etc/booster-crypttab
+						if [[ "${HIBsel:-0}" -eq 1 && -n "$CRYPT_SWAP_UUID" && -f /mnt/etc/crypt_key.bin ]]; then
+							printf 'cryptswap UUID=%s /etc/crypt_key.bin luks,x-initrd.attach\n' "$CRYPT_SWAP_UUID" >> /mnt/etc/booster-crypttab
+							b_opts+="\nextra_files: /etc/crypt_key.bin"
+						fi
+						b_opts+="\ncrypttab_path: /etc/booster-crypttab"
+					fi
 					printf '%b\n' "$b_opts" > /mnt/etc/booster.yaml
 					if [[ "$OS" != "void" ]]; then mkdir -p /mnt/etc/pacman.d/hooks ; printf "[Trigger]\nOperation = Install\nOperation = Upgrade\nType = Package\nTarget = linux\nTarget = linux-*\n\n[Action]\nDescription = Forcing Booster initramfs update...\nWhen = PostTransaction\nDepends = booster\nNeedsTargets\nExec = /bin/bash -c 'while read -r pkg; do for d in /usr/lib/modules/*; do if [[ -f \"\$d/pkgbase\" && \"\$(<\"\$d/pkgbase\")\" == \"\$pkg\" ]]; then kver=\"\${d##*/}\"; /usr/bin/booster build --force $b_flag --kernel-version=\"\$kver\" \"/boot/initramfs-\${pkg}.img\"; break; fi; done; done'\n" > /mnt/etc/pacman.d/hooks/95-booster-force.hook ; fi
 					CR /bin/bash -c "booster build --force $b_flag --kernel-version=$kver /boot/initramfs-${KSel}.img"
@@ -669,21 +677,26 @@ BootloaderSetup () {
 	local k_file kname
 	k_file=$(find /mnt/boot/ -maxdepth 1 -type f -name 'vmlinuz-*' -print -quit || true)
 	if [[ -n "$k_file" ]]; then kname=$(basename "$k_file") ; else kname="vmlinuz-$KSel" ; fi
-	local irfs initrd_flags rootflags="" nvdrm="" nvosi="" luks_flags="" grub_luks="" res_flag="" ucode_img=""
+	local irfs initrd_flags rootflags="" nvdrm="" nvosi="" luks_flags="" grub_luks="" res_flag="" vm_flags="" ucode_img=""
 	if [[ "$OS" == "void" ]]; then irfs="initramfs-${kname#vmlinuz-}.img" ; else irfs="initramfs-$KSel.img" ; fi
 	if [[ "$FSsel" == "btrfs" ]]; then rootflags='rootflags=subvol=@' ; fi
 	if [[ ${#nvidiadrivers[@]} -gt 0 ]]; then nvdrm="nvidia-drm.modeset=1 nvidia-drm.fbdev=1" ; fi
 	if [[ "${GPUMANAGERsel,,}" == "cardwire" ]]; then nvosi="lsm=lockdown,capability,landlock,bpf" ; fi
+	if [[ "$VBTsel" -eq 1 && "$VM_TYPE" == "vmware" ]]; then vm_flags="mem_sleep_default=shallow" ; fi
 	if [[ -n "$UCODEsel" && -f "/mnt/boot/${UCODEsel}.img" ]]; then ucode_img="${UCODEsel}.img" ; initrd_flags="initrd=\\${ucode_img} initrd=\\${irfs}" ; else initrd_flags="initrd=\\${irfs}" ; fi
 	if [[ "$LUKS_ENC" -eq 1 ]]; then
-		if [[ "${HIBsel:-0}" -eq 1 && -n "$CRYPT_SWAP_UUID" ]]; then luks_flags="rd.luks.uuid=${CRYPT_SWAP_UUID} rd.luks.name=${CRYPT_SWAP_UUID}=cryptswap " ; fi
-		luks_flags+="cryptdevice=UUID=${CRYPT_ROOT_UUID}:cryptroot rd.luks.uuid=${CRYPT_ROOT_UUID} rd.luks.name=${CRYPT_ROOT_UUID}=cryptroot root=/dev/mapper/cryptroot"
-		grub_luks="$luks_flags "
+		if [[ "$IRFSetup" == "booster" ]]; then
+			luks_flags="root=/dev/mapper/cryptroot"
+		else
+			if [[ "${HIBsel:-0}" -eq 1 && -n "$CRYPT_SWAP_UUID" ]]; then luks_flags="rd.luks.uuid=${CRYPT_SWAP_UUID} rd.luks.name=${CRYPT_SWAP_UUID}=cryptswap " ; fi
+			luks_flags+="cryptdevice=UUID=${CRYPT_ROOT_UUID}:cryptroot rd.luks.uuid=${CRYPT_ROOT_UUID} rd.luks.name=${CRYPT_ROOT_UUID}=cryptroot root=/dev/mapper/cryptroot"
+			grub_luks="$luks_flags "
+		fi
 	else
 		luks_flags="root=${EFF_PID}=$ROOTID"
 	fi
 	if [[ "${HIBsel:-0}" -eq 1 && -n "$SWAP_UUID" ]]; then res_flag="resume=UUID=$SWAP_UUID" ; fi
-	local c_flags="rw $luks_flags ${res_flag:+$res_flag }rootfstype=$FSsel $rootflags $nvdrm $nvosi"
+	local c_flags="rw $luks_flags ${res_flag:+$res_flag }rootfstype=$FSsel $rootflags $nvdrm $nvosi $vm_flags"
 	local e_dev="$DRIVE" e_num="${BOOT_PART##*[a-z]}"
 	case "${BLsel,,}" in
 		refind)         CR refind-install
@@ -696,7 +709,7 @@ BootloaderSetup () {
 		grub)           if [[ "$UEFImode" -eq 0 ]]; then CR grub-install --target=i386-pc --recheck --debug "$DRIVE" ; else CR grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB ; fi
 						local g_thm="Grub-Sekiro" ; mkdir -p /mnt/boot/grub/themes ; cp -r "${SCRIPT_DIR}/Bootloader/$g_thm" /mnt/boot/grub/themes/
 						local g_res="1920x1080,1024x768,auto" ; if [[ "$VBTsel" -eq 1 ]]; then g_res="1024x768,auto" ; fi
-						sed -i -e "/GRUB_DISABLE_OS_PROBER=/ s/#//g" -e "s/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=3/" -e "s/^#GRUB_GFXMODE=.*/GRUB_GFXMODE=$g_res/" -e '/GRUB_THEME=/c GRUB_THEME="/boot/grub/themes/'"$g_thm"'/theme.txt"' -e "s|^GRUB_CMDLINE_LINUX=.*|GRUB_CMDLINE_LINUX=\"${grub_luks}${res_flag:+$res_flag }$nvosi\"|" /mnt/etc/default/grub
+						sed -i -e "/GRUB_DISABLE_OS_PROBER=/ s/#//g" -e "s/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=3/" -e "s/^#GRUB_GFXMODE=.*/GRUB_GFXMODE=$g_res/" -e '/GRUB_THEME=/c GRUB_THEME="/boot/grub/themes/'"$g_thm"'/theme.txt"' -e "s|^GRUB_CMDLINE_LINUX=.*|GRUB_CMDLINE_LINUX=\"${grub_luks}${res_flag:+$res_flag }${vm_flags:+$vm_flags }$nvosi\"|" /mnt/etc/default/grub
 						if [[ ${#nvidiadrivers[@]} -gt 0 ]]; then sed -i "s/^GRUB_CMDLINE_LINUX_DEFAULT=\"\(.*\)\"/GRUB_CMDLINE_LINUX_DEFAULT=\"\1 quiet splash $nvdrm\"/" /mnt/etc/default/grub ; fi
 						CR grub-mkconfig -o /boot/grub/grub.cfg
 						;;
