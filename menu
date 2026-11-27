@@ -1,24 +1,23 @@
 #!/bin/bash
-LOC_LIST=( "en_US.UTF-8" "en_GB.UTF-8" "it_IT.UTF-8" )
 
 MenuSel () {
-	local -n var_name="$1" ; local question="$2" ; local user_choice ; shift 2 ; local options=("$@")
+	local -n _ms_ref="$1" ; local question="$2" ; local user_choice ; shift 2 ; local options=("$@")
 	while true; do
 		echo -e "\n=== $question ==="
 		for i in "${!options[@]}"; do echo "$((i+1))) ${options[$i]}" ; done
 		read -rp "Choice: " user_choice
-		if [[ "$user_choice" =~ ^[0-9]+$ ]] && [[ "$user_choice" -le "${#options[@]}" ]] && [[ "$user_choice" -gt 0 ]]; then var_name="${options[$((user_choice-1))]}" ; echo "Selected: $var_name" ; break ; else echo "Invalid choice, please try again." ; fi
+		if [[ "$user_choice" =~ ^[0-9]+$ ]] && [[ "$user_choice" -le "${#options[@]}" ]] && [[ "$user_choice" -gt 0 ]]; then _ms_ref="${options[$((user_choice-1))]}" ; echo "Selected: $_ms_ref" ; break ; else echo "Invalid choice, please try again." ; fi
 	done
 }
 TextPromptSel () {
-	local -n var_name="$1" ; local prompt_msg="$2" ; local default_val="${3:-}" ; local input_val
+	local -n _tp_ref="$1" ; local prompt_msg="$2" ; local default_val="${3:-}" ; local input_val
 	while true; do
 		read -rp "$prompt_msg: " input_val
 		if [[ -z "$input_val" ]]; then
 			if [[ -n "$default_val" ]]; then input_val="$default_val" ; else echo "Input cannot be empty." ; continue ; fi
 		fi
 		YesNoSel "Confirm << $input_val >> is correct?"
-		if [[ "$CC" -eq 1 ]]; then var_name="$input_val" ; break ; else echo "Let's try again..." ; fi
+		if [[ "$CC" -eq 1 ]]; then _tp_ref="$input_val" ; break ; else echo "Let's try again..." ; fi
 	done
 }
 YesNoSel () {
@@ -39,16 +38,213 @@ ArchRepoSetup () {
 	pacman-key --populate artix archlinux
 }
 DistroDetection () {
-	local os_id
-	if [[ -f /etc/os-release ]]; then if ! os_id=$(grep -i '^ID=' /etc/os-release | cut -d= -f2 | tr -d '"'); then os_id="" ; fi ; else os_id="" ; fi
+	local os_id=""
+	if [[ -f /etc/os-release ]]; then os_id=$(grep -i '^ID=' /etc/os-release | cut -d= -f2 | tr -d '"' || true) ; fi
 	if [[ "${os_id,,}" =~ ^(arch|artix|void)$ ]]; then OS="${os_id^}" ; else echo "Automated OS detection failed or unsupported Live OS." ; OSsel ; fi
 	echo "Detected Live OS: $OS"
 }
+UEFIsel () {
+	if [[ -d "/sys/firmware/efi/" ]]; then if ! mount | grep -q "/sys/firmware/efi/efivars"; then mount -t efivarfs efivarfs /sys/firmware/efi/efivars ; fi ; FW=1 ; echo 'UEFI Mode detected' ; else FW=0 ; echo 'BIOS Mode detected' ; fi
+}
+_CountryToLocale () {
+	case "${1^^}" in
+		IT|SM|VA) echo "it_IT.UTF-8" ;;
+		GB|UK)    echo "en_GB.UTF-8" ;;
+		US)       echo "en_US.UTF-8" ;;
+		DE)       echo "de_DE.UTF-8" ;;
+		AT)       echo "de_AT.UTF-8" ;;
+		CH)       echo "de_CH.UTF-8" ;;
+		FR)       echo "fr_FR.UTF-8" ;;
+		ES)       echo "es_ES.UTF-8" ;;
+		PT)       echo "pt_PT.UTF-8" ;;
+		BR)       echo "pt_BR.UTF-8" ;;
+		NL)       echo "nl_NL.UTF-8" ;;
+		BE)       echo "nl_BE.UTF-8" ;;
+		PL)       echo "pl_PL.UTF-8" ;;
+		SE)       echo "sv_SE.UTF-8" ;;
+		NO)       echo "nb_NO.UTF-8" ;;
+		DK)       echo "da_DK.UTF-8" ;;
+		FI)       echo "fi_FI.UTF-8" ;;
+		IE)       echo "en_IE.UTF-8" ;;
+		CA)       echo "en_CA.UTF-8" ;;
+		AU)       echo "en_AU.UTF-8" ;;
+		NZ)       echo "en_NZ.UTF-8" ;;
+		JP)       echo "ja_JP.UTF-8" ;;
+		*)        echo "en_GB.UTF-8" ;;
+	esac
+}
+SystemScan () {
+	SYS_LSPCI=$(lspci 2>/dev/null || true)
+	SYS_CPU=$(cat /proc/cpuinfo 2>/dev/null || true)
+
+	HOST_IS_LAPTOP=0 ; HOST_VBTsel=0 ; HOST_VM_TYPE="none" ; HOST_CPU_TYPE="Unknown"
+	HOST_HAS_AMD=0 ; HOST_HAS_NVIDIA=0 ; HOST_GPU_DESC="Generic / Intel"
+	HOST_RAM_GB=$(( ($(LC_ALL=C free -m | awk '/^Mem:/{print $2}') + 1023) / 1024 ))
+
+	if compgen -G "/sys/class/power_supply/BAT*" >/dev/null; then HOST_IS_LAPTOP=1 ; fi
+
+	if echo "$SYS_LSPCI" | grep -qEi "(VirtualBox)"; then HOST_VM_TYPE="vbox" ; HOST_VBTsel=1
+	elif echo "$SYS_LSPCI" | grep -qEi "(VMware)"; then HOST_VM_TYPE="vmware" ; HOST_VBTsel=1
+	elif echo "$SYS_LSPCI" | grep -qEi "(Virtio|QXL)"; then HOST_VM_TYPE="qemu" ; HOST_VBTsel=1 ; fi
+
+	local cpu_info="" ; cpu_info=$(echo "$SYS_CPU" | grep -m1 -Ei 'GenuineIntel|AuthenticAMD' || true)
+	if [[ "$cpu_info" =~ Intel ]]; then HOST_CPU_TYPE="Intel"
+	elif [[ "$cpu_info" =~ AMD ]]; then HOST_CPU_TYPE="AMD" ; fi
+
+	local gpu_info="" gpu_tags=()
+	gpu_info=$(echo "$SYS_LSPCI" | grep -Ei 'VGA|3D|Display' || true)
+	if [[ "$gpu_info" =~ (AMD|Radeon) ]]; then HOST_HAS_AMD=1 ; gpu_tags+=("AMD/Radeon") ; fi
+	if [[ "$gpu_info" =~ NVIDIA ]]; then HOST_HAS_NVIDIA=1 ; gpu_tags+=("NVIDIA") ; fi
+	if [[ "$gpu_info" =~ Intel ]]; then gpu_tags+=("Intel") ; fi
+	if [[ "$gpu_info" =~ (VMware|VirtualBox|Virtio|QXL) ]]; then gpu_tags+=("VM ($HOST_VM_TYPE)") ; fi
+	if [[ ${#gpu_tags[@]} -gt 0 ]]; then HOST_GPU_DESC=$(IFS=' + '; echo "${gpu_tags[*]}") ; fi
+
+	SYS_MEM_SLEEP=$(cat /sys/power/mem_sleep 2>/dev/null || true)
+	SYS_POWER_STATE=$(cat /sys/power/state 2>/dev/null || true)
+	LOCKDOWN_ACTIVE=0 ; HOST_CAN_HIBERNATE=0 ; HOST_HAS_RTC_WAKE=0
+	if [[ -r /sys/kernel/security/lockdown ]] && grep -qE '\[(integrity|confidentiality)\]' /sys/kernel/security/lockdown 2>/dev/null; then
+		LOCKDOWN_ACTIVE=1
+	fi
+	if grep -qw 'disk' <<< "$SYS_POWER_STATE" && [[ "$LOCKDOWN_ACTIVE" -eq 0 ]]; then HOST_CAN_HIBERNATE=1 ; fi
+	if [[ -e /sys/class/rtc/rtc0/wakealarm ]]; then HOST_HAS_RTC_WAKE=1 ; fi
+
+	GEO_DETECTED=0 ; GEO_CC="" ; GEO_TZ="" ; GEO_LOCALE=""
+	local geo_raw="" geo_st="" geo_cc="" geo_tz=""
+	geo_raw=$(curl -fsSL --connect-timeout 2 --max-time 3 "http://ip-api.com/line/?fields=status,countryCode,timezone" 2>/dev/null || true)
+	if [[ -n "$geo_raw" ]]; then
+		geo_st=$(sed -n '1p' <<< "$geo_raw")
+		geo_cc=$(sed -n '2p' <<< "$geo_raw")
+		geo_tz=$(sed -n '3p' <<< "$geo_raw")
+		if [[ "$geo_st" == "success" && -n "$geo_tz" ]]; then GEO_CC="$geo_cc" ; GEO_TZ="$geo_tz" ; fi
+	fi
+	if [[ -z "$GEO_TZ" ]]; then
+		GEO_TZ=$(curl -fsSL --connect-timeout 2 --max-time 3 "https://ipapi.co/timezone" 2>/dev/null | tr -d '\r\n' || true)
+		GEO_CC=$(curl -fsSL --connect-timeout 2 --max-time 3 "https://ipapi.co/country_code" 2>/dev/null | tr -d '\r\n' || true)
+	fi
+	if [[ -n "$GEO_TZ" && -f "/usr/share/zoneinfo/$GEO_TZ" ]]; then
+		GEO_DETECTED=1
+		GEO_LOCALE="$(_CountryToLocale "${GEO_CC:-}")"
+	else
+		GEO_TZ="Europe/Rome"
+		GEO_LOCALE="it_IT.UTF-8"
+	fi
+
+	IS_LAPTOP="$HOST_IS_LAPTOP" ; VBTsel="$HOST_VBTsel" ; VM_TYPE="$HOST_VM_TYPE"
+	CPU_TYPE="$HOST_CPU_TYPE" ; HAS_AMD="$HOST_HAS_AMD" ; HAS_NVIDIA="$HOST_HAS_NVIDIA"
+	CAN_HIBERNATE="$HOST_CAN_HIBERNATE" ; HAS_RTC_WAKE="$HOST_HAS_RTC_WAKE"
+	NVsel="None" ; GPUMANAGERsel="None"
+
+	local ff_str="Desktop" vm_str="Bare Metal" hib_str="Unsupported" rtc_str="No" geo_str="Fallback ($GEO_TZ / $GEO_LOCALE)"
+	if [[ "$HOST_IS_LAPTOP" -eq 1 ]]; then ff_str="Laptop (Battery detected)" ; fi
+	if [[ "$HOST_VBTsel" -eq 1 ]]; then vm_str="Virtual Machine ($HOST_VM_TYPE)" ; fi
+	if [[ "$LOCKDOWN_ACTIVE" -eq 1 ]]; then hib_str="Blocked (Secure Boot / Kernel Lockdown)"
+	elif [[ "$HOST_CAN_HIBERNATE" -eq 1 ]]; then hib_str="Supported (disk/S4)" ; fi
+	if [[ "$HOST_HAS_RTC_WAKE" -eq 1 ]]; then rtc_str="Yes (suspend-then-hibernate ready)" ; fi
+	if [[ "$GEO_DETECTED" -eq 1 ]]; then geo_str="$GEO_TZ | $GEO_LOCALE (${GEO_CC:-?})" ; fi
+
+	echo -e "\n=== HARDWARE & SYSTEM SCAN ==="
+	echo "Platform : $ff_str | $vm_str"
+	echo "CPU / RAM: $HOST_CPU_TYPE | ${HOST_RAM_GB} GiB RAM"
+	echo "GPU      : $HOST_GPU_DESC"
+	echo "Sleep    : ${SYS_MEM_SLEEP:-N/A} | Hibernate: $hib_str | RTC Wake: $rtc_str"
+	echo "Geo-IP   : $geo_str"
+	echo "=============================="
+}
+InstallModeSel () {
+	local mode_choice=""
+	MenuSel "mode_choice" "Select Installation Mode" \
+		"This machine (Auto-configure hardware & power from scan | Host initramfs)" \
+		"Personalize (Full manual control / Portable install | Universal initramfs default)"
+	if [[ "$mode_choice" == "This machine"* ]]; then
+		INSTALL_MODE="host"
+		IRFS="Host"
+		IS_LAPTOP="$HOST_IS_LAPTOP" ; VBTsel="$HOST_VBTsel" ; VM_TYPE="$HOST_VM_TYPE"
+		CPU_TYPE="$HOST_CPU_TYPE" ; HAS_AMD="$HOST_HAS_AMD" ; HAS_NVIDIA="$HOST_HAS_NVIDIA"
+		CAN_HIBERNATE="$HOST_CAN_HIBERNATE" ; HAS_RTC_WAKE="$HOST_HAS_RTC_WAKE"
+	else
+		INSTALL_MODE="personalize"
+		IRFS="Universal"
+	fi
+}
 CPUsel () {
-	local cpu_info ; if ! cpu_info=$(echo "$SYS_CPU" | grep -m1 -Ei 'GenuineIntel|AuthenticAMD'); then cpu_info="" ; fi
-	if [[ "$cpu_info" =~ Intel ]]; then CPU_TYPE="Intel" ; echo "Detected Intel CPU"
-	elif [[ "$cpu_info" =~ AMD ]]; then CPU_TYPE="AMD" ; echo "Detected AMD CPU"
-	else CPU_TYPE="Unknown" ; echo "No microcode needed or unknown CPU" ; fi
+	if [[ "${1:-}" != "manual" && "${INSTALL_MODE:-host}" == "host" ]]; then
+		CPU_TYPE="$HOST_CPU_TYPE"
+		echo "CPU Microcode (Auto): $CPU_TYPE"
+		return 0
+	fi
+	local cpu_choice=""
+	MenuSel "cpu_choice" "Select Target CPU Microcode (Host detected: $HOST_CPU_TYPE)" \
+		"Both (Intel + AMD - Universal portable)" \
+		"Intel" \
+		"AMD" \
+		"None (No microcode)"
+	case "$cpu_choice" in
+		"Both"*)  CPU_TYPE="Both" ;;
+		"Intel")  CPU_TYPE="Intel" ;;
+		"AMD")    CPU_TYPE="AMD" ;;
+		*)        CPU_TYPE="Unknown" ;;
+	esac
+}
+_NvidiaDriverPrompt () {
+	NVsel="None" ; GPUMANAGERsel="None"
+	if [[ "${OS,,}" == "void" ]]; then
+		if [[ "$LIBRARY" == "MUSL" ]]; then NVsel="MESA" ; echo "MUSL selection detected, forcing Mesa/Nouveau."
+		else MenuSel "NVsel" "NVIDIA GPU selected/found, choose driver" "PROPRIETARY" "MESA" ; fi
+	else
+		MenuSel "NVsel" "NVIDIA GPU selected/found, choose driver" "OPEN" "NOUVEAU" "PROPRIETARY" "MESA"
+	fi
+	if [[ "$NVsel" =~ ^(OPEN|PROPRIETARY)$ ]]; then MenuSel "GPUMANAGERsel" "Select NVIDIA Optimus Manager" "Native" "Envycontrol" "Cardwire" ; fi
+}
+GPUsel () {
+	if [[ "${1:-}" != "manual" && "${INSTALL_MODE:-host}" == "host" ]]; then
+		HAS_AMD="$HOST_HAS_AMD" ; HAS_NVIDIA="$HOST_HAS_NVIDIA" ; NVsel="None" ; GPUMANAGERsel="None"
+		echo "GPU Profile (Auto): $HOST_GPU_DESC"
+		if [[ "$HAS_NVIDIA" -eq 1 ]]; then _NvidiaDriverPrompt ; fi
+		return 0
+	fi
+	local gpu_choice=""
+	MenuSel "gpu_choice" "Select Target GPU Profile (Host detected: $HOST_GPU_DESC)" \
+		"Keep host detected ($HOST_GPU_DESC)" \
+		"Generic / Intel / Multi-PC (Mesa)" \
+		"AMD / Radeon (Mesa + RADV)" \
+		"NVIDIA (Dedicated or Intel+NVIDIA Optimus)" \
+		"AMD + NVIDIA (AMD iGPU + NVIDIA Optimus)"
+	case "$gpu_choice" in
+		"Keep host"*)
+			HAS_AMD="$HOST_HAS_AMD" ; HAS_NVIDIA="$HOST_HAS_NVIDIA" ; NVsel="None" ; GPUMANAGERsel="None"
+			if [[ "$HAS_NVIDIA" -eq 1 ]]; then _NvidiaDriverPrompt ; fi ;;
+		"AMD / Radeon"*)
+			HAS_AMD=1 ; HAS_NVIDIA=0 ; NVsel="None" ; GPUMANAGERsel="None" ;;
+		"NVIDIA"*)
+			HAS_AMD=0 ; HAS_NVIDIA=1 ; _NvidiaDriverPrompt ;;
+		"AMD + NVIDIA"*)
+			HAS_AMD=1 ; HAS_NVIDIA=1 ; _NvidiaDriverPrompt ;;
+		*)
+			HAS_AMD=0 ; HAS_NVIDIA=0 ; NVsel="None" ; GPUMANAGERsel="None" ;;
+	esac
+}
+FORMFACTORsel () {
+	local ff_choice="" host_ff="Desktop"
+	if [[ "$HOST_IS_LAPTOP" -eq 1 ]]; then host_ff="Laptop" ; fi
+	MenuSel "ff_choice" "Select Target Machine Type (Host detected: $host_ff)" \
+		"Laptop (Battery power management, lid switch, no numlock)" \
+		"Desktop (No battery/TLP, numlock enabled)"
+	if [[ "$ff_choice" == "Laptop"* ]]; then IS_LAPTOP=1 ; else IS_LAPTOP=0 ; fi
+}
+VMMODEsel () {
+	local vm_choice="" host_vm="Bare Metal"
+	if [[ "$HOST_VBTsel" -eq 1 ]]; then host_vm="VM ($HOST_VM_TYPE)" ; fi
+	MenuSel "vm_choice" "Select Target Environment (Host detected: $host_vm)" \
+		"Bare Metal (Physical PC)" \
+		"VMware Guest" \
+		"VirtualBox Guest" \
+		"QEMU / KVM Guest"
+	case "$vm_choice" in
+		"VMware"*)     VBTsel=1 ; VM_TYPE="vmware" ;;
+		"VirtualBox"*) VBTsel=1 ; VM_TYPE="vbox" ;;
+		"QEMU"*)       VBTsel=1 ; VM_TYPE="qemu" ;;
+		*)             VBTsel=0 ; VM_TYPE="none" ;;
+	esac
 }
 DRIVEsel () {
 	udevadm settle || true
@@ -133,24 +329,6 @@ DRIVEsel () {
 		esac
 	fi
 }
-GPUsel () {
-	echo "Detecting video chipset..."
-	HAS_AMD=0 ; HAS_NVIDIA=0 ; NVsel="None" ; GPUMANAGERsel="None"
-	local gpu_info ; if ! gpu_info=$(echo "$SYS_LSPCI" | grep -Ei 'VGA|3D'); then gpu_info="" ; fi
-	if [[ "$gpu_info" =~ (AMD|Radeon) ]]; then HAS_AMD=1 ; echo "Detected AMD/Radeon GPU" ; fi
-	if [[ "$gpu_info" =~ (VMware|VirtualBox|Virtio|QXL) ]]; then echo "VM detected: Default Mesa driver will be used" ; fi
-	if [[ "$gpu_info" =~ NVIDIA ]]; then
-		HAS_NVIDIA=1
-		if [[ "${OS,,}" == "void" ]]; then
-			if [[ "$LIBRARY" == "MUSL" ]]; then NVsel="MESA" ; echo "MUSL selection detected, forcing Mesa/Nouveau."
-			else MenuSel "NVsel" "NVIDIA gpu found, choose driver" "PROPRIETARY" "MESA" ; fi
-		else
-			MenuSel "NVsel" "NVIDIA gpu found, choose driver" "OPEN" "NOUVEAU" "PROPRIETARY" "MESA"
-		fi
-		if [[ "$NVsel" =~ ^(OPEN|PROPRIETARY)$ ]]; then MenuSel "GPUMANAGERsel" "Select NVIDIA Optimus Manager" "Native" "Envycontrol" "Cardwire" ; fi
-	fi
-	if [[ ! "$gpu_info" =~ (AMD|Radeon|VMware|VirtualBox|Virtio|QXL|NVIDIA) ]]; then echo "Generic/Intel GPU: Mesa will be used" ; fi
-}
 LUKSsel () {
 	local pass2
 	YesNoSel "Do you want to encrypt your system with LUKS (Full Disk Encryption)?"
@@ -176,7 +354,7 @@ LVMsel () {
 	else LVM=0 ; echo "LVM: Disabled" ; fi
 }
 SwapDiskMetrics () {
-	_SWAP_RAM_GB=$(( ($(LC_ALL=C free -m | awk '/^Mem:/{print $2}') + 1023) / 1024 ))
+	_SWAP_RAM_GB="${HOST_RAM_GB:-$(( ($(LC_ALL=C free -m | awk '/^Mem:/{print $2}') + 1023) / 1024 ))}"
 	if (( _SWAP_RAM_GB <= 8 )); then _SWAP_AUTO_GB=$(( _SWAP_RAM_GB + 1 ))
 	elif (( _SWAP_RAM_GB <= 32 )); then _SWAP_AUTO_GB="$_SWAP_RAM_GB"
 	else _SWAP_AUTO_GB=32 ; fi
@@ -198,28 +376,66 @@ SwapDiskMetrics () {
 	if (( _SWAP_MAX_GB < 1 )); then _SWAP_MAX_GB=1 ; fi
 }
 SWAPSIZEsel () {
-	local -n _target_var="$1" ; local default_gb="$2" ; local max_gb="$3" ; local label="${4:-Swap}" ; local custom_val=""
+	local -n _ss_ref="$1" ; local default_gb="$2" ; local max_gb="$3" ; local label="${4:-Swap}" ; local custom_val=""
 	if (( default_gb > max_gb )); then default_gb="$max_gb" ; fi
 	while true; do
 		TextPromptSel "custom_val" "Enter ${label} size in GiB (1-${max_gb}, default ${default_gb})" "$default_gb"
 		if [[ "$custom_val" =~ ^[0-9]+$ ]] && (( custom_val >= 1 && custom_val <= max_gb )); then
-			_target_var="$custom_val"
+			_ss_ref="$custom_val"
 			break
 		else
 			echo "Invalid size: must be a number between 1 and ${max_gb} GiB."
 		fi
 	done
 }
+AutoPowerSwap () {
+	SwapDiskMetrics
+	if [[ "${IS_LAPTOP:-0}" -eq 1 && "${CAN_HIBERNATE:-0}" -eq 1 ]] && (( _SWAP_AUTO_GB <= _SWAP_MAX_GB )); then
+		HIB=1
+		SWAP_DIM="$_SWAP_AUTO_GB"
+		ZRAM=1
+		ZRAM_DIM="$_SWAP_ZRAM_GB"
+		if [[ "${HAS_RTC_WAKE:-0}" -eq 1 ]]; then HIB_DELAY=30 ; else HIB_DELAY=0 ; fi
+		if [[ "${LVM:-0}" -eq 1 ]]; then SWAP="lvm"
+		elif [[ "${CRYPT:-0}" -eq 1 ]]; then SWAP="swapfile"
+		else SWAP="partition" ; fi
+		local d_note="manual only (no RTC wakealarm)"
+		if (( HIB_DELAY > 0 )); then d_note="suspend-then-hibernate after ${HIB_DELAY}min on battery" ; fi
+		echo -e "\n[i] Auto Power/Swap (Laptop): Hibernation ENABLED (${SWAP}, ${SWAP_DIM} GiB) + Zram (${ZRAM_DIM} GiB) | ${d_note}."
+	else
+		HIB=0 ; HIB_DELAY=0 ; SWAP="zram" ; SWAP_DIM=0 ; ZRAM=1 ; ZRAM_DIM="$_SWAP_ZRAM_GB"
+		if [[ "${IS_LAPTOP:-0}" -eq 1 ]]; then
+			if [[ "${LOCKDOWN_ACTIVE:-0}" -eq 1 ]]; then
+				echo -e "\n[!] Auto Power/Swap: Secure Boot / Kernel Lockdown blocks hibernation -> falling back to Zram (${ZRAM_DIM} GiB)."
+			elif [[ "${CAN_HIBERNATE:-0}" -eq 0 ]]; then
+				echo -e "\n[!] Auto Power/Swap: Firmware does not expose disk/S4 hibernation -> falling back to Zram (${ZRAM_DIM} GiB)."
+			else
+				echo -e "\n[!] Auto Power/Swap: Drive $DRIVE too small for ${_SWAP_AUTO_GB} GiB hibernation swap -> falling back to Zram (${ZRAM_DIM} GiB)."
+			fi
+		else
+			echo -e "\n[i] Auto Power/Swap (Desktop): Hibernation disabled -> Zram (${ZRAM_DIM} GiB) enabled."
+		fi
+	fi
+}
 HIBERNATIONsel () {
 	SwapDiskMetrics
 	local os_after_auto_gb=$(( _SWAP_OS_BASE_GB - _SWAP_AUTO_GB ))
 	if (( os_after_auto_gb < 1 )); then os_after_auto_gb=1 ; fi
 
+	local hib_stat="Supported" rtc_stat="OK"
+	if [[ "${LOCKDOWN_ACTIVE:-0}" -eq 1 ]]; then hib_stat="Blocked by Lockdown"
+	elif [[ "${HOST_CAN_HIBERNATE:-0}" -eq 0 ]]; then hib_stat="Not exposed by host" ; fi
+	if [[ "${HOST_HAS_RTC_WAKE:-0}" -eq 0 ]]; then rtc_stat="No" ; fi
+	echo -e "\n[i] Host Power Capabilities | Sleep: ${SYS_MEM_SLEEP:-N/A} | Hibernate: ${hib_stat} | RTC Wake: ${rtc_stat}"
+	if [[ "${INSTALL_MODE:-host}" == "host" && "${LOCKDOWN_ACTIVE:-0}" -eq 1 ]]; then
+		echo "[!] Warning: Secure Boot / Kernel Lockdown is active on this machine and will prevent hibernation unless disabled."
+	fi
+
 	local hib_choice=""
 	local prompt_hdr="Hibernation Setup | RAM: ${_SWAP_RAM_GB} GiB | Target Drive ($DRIVE): ~${_SWAP_DISK_GB} GiB"
 	MenuSel "hib_choice" "$prompt_hdr" \
 		"Enable Hibernation - Auto (${_SWAP_AUTO_GB} GiB Swap -> ~${os_after_auto_gb} GiB left for OS)" \
-		"Enable Hibernation - Custom Size (Specify Swap GiB for another PC)" \
+		"Enable Hibernation - Custom Size (Specify Swap GiB)" \
 		"Disable Hibernation"
 
 	case "$hib_choice" in
@@ -237,9 +453,28 @@ HIBERNATIONsel () {
 			;;
 		*)
 			HIB=0
+			HIB_DELAY=0
 			SWAP_DIM="$_SWAP_STD_GB"
 			;;
 	esac
+
+	if [[ "$HIB" -eq 1 ]]; then
+		local delay_choice="" custom_min=""
+		MenuSel "delay_choice" "Suspend-then-Hibernate Policy (On battery; AC stays suspended)" \
+			"Enable after 30 minutes (Recommended for laptops)" \
+			"Custom delay (minutes)" \
+			"Disable (Manual hibernation / normal suspend only)"
+		case "$delay_choice" in
+			"Enable after 30"*) HIB_DELAY=30 ;;
+			"Custom"*)
+				while true; do
+					TextPromptSel "custom_min" "Enter suspend-then-hibernate delay in minutes (5-240, default 30)" "30"
+					if [[ "$custom_min" =~ ^[0-9]+$ ]] && (( custom_min >= 5 && custom_min <= 240 )); then HIB_DELAY="$custom_min" ; break
+					else echo "Invalid delay: enter a number between 5 and 240." ; fi
+				done ;;
+			*) HIB_DELAY=0 ;;
+		esac
+	fi
 }
 SWAPsel () {
 	SwapDiskMetrics
@@ -348,6 +583,7 @@ SWAPsel () {
 }
 ValidateStorage () {
 	SwapDiskMetrics
+	if [[ "${HIB:-0}" -eq 0 ]]; then HIB_DELAY=0 ; fi
 	if [[ -z "${SWAP:-}" ]]; then SWAPsel ; return 0 ; fi
 	if [[ "$SWAP" != "none" && "$SWAP" != "zram" ]] && (( SWAP_DIM > _SWAP_MAX_GB )); then
 		echo -e "\n[!] Current swap size (${SWAP_DIM} GiB) exceeds safe space on $DRIVE (max ${_SWAP_MAX_GB} GiB). Reconfiguring swap..."
@@ -380,18 +616,81 @@ ValidateStorage () {
 	fi
 }
 TIMEZONEsel () {
-	local input_val
-	while true; do
-		read -rp $'\n=== Select Timezone ===\nType \'1\' for the default Europe/Rome or write custom format (e.g. America/New_York) [\'q\' to quit]: ' input_val
-		if [[ -z "$input_val" ]]; then echo "Input cannot be empty." ; continue ; fi
-		if [[ "$input_val" == "1" ]]; then TZONE="Europe/Rome" ; break ; fi
-		if [[ "${input_val,,}" =~ ^(q|quit)$ ]]; then TZONE="" ; break ; fi
-		YesNoSel "Confirm timezone: $input_val ?" ; if [[ "$CC" -eq 1 ]]; then TZONE="$input_val" ; break ; fi
-	done
+	local def_tz="${GEO_TZ:-Europe/Rome}" tag="Default" tz_choice="" query="" pick=""
+	if [[ "${GEO_DETECTED:-0}" -eq 1 ]]; then tag="Detected via IP" ; fi
+	MenuSel "tz_choice" "Select Timezone" \
+		"${def_tz} (${tag})" \
+		"UTC" \
+		"Search / Custom Timezone (Guided help)"
+	case "$tz_choice" in
+		"${def_tz}"*) TZONE="$def_tz" ;;
+		"UTC")        TZONE="UTC" ;;
+		*)
+			if [[ -d /usr/share/zoneinfo ]]; then
+				while true; do
+					read -rp "Search timezone (e.g. Rome, London, New_York, Tokyo): " query
+					if [[ -z "$query" ]]; then echo "Please enter a city, region or country." ; continue ; fi
+					local matches=()
+					mapfile -t matches < <(find /usr/share/zoneinfo -mindepth 1 -maxdepth 3 -type f ! -path '*/posix/*' ! -path '*/right/*' ! -name '*.tab' ! -name 'leap*' ! -name 'tzdata.zi' ! -name 'SECURITY' 2>/dev/null | sed 's|^/usr/share/zoneinfo/||' | grep -i -- "$query" | sort || true)
+					if [[ ${#matches[@]} -eq 0 ]]; then echo "No timezone matched '$query'. Try another keyword." ; continue ; fi
+					if [[ ${#matches[@]} -gt 25 ]]; then echo "Found ${#matches[@]} matches. Please type a more specific keyword (e.g. city name)." ; continue ; fi
+					matches+=( "Search again" )
+					MenuSel "pick" "Matching Timezones" "${matches[@]}"
+					if [[ "$pick" != "Search again" ]]; then TZONE="$pick" ; break ; fi
+				done
+			else
+				TextPromptSel "TZONE" "Enter timezone (e.g. Europe/Rome, America/New_York)" "$def_tz"
+			fi ;;
+	esac
 	echo "Selected Timezone: $TZONE"
 }
-UEFIsel () {
-	if [[ -d "/sys/firmware/efi/" ]]; then if ! mount | grep -q "/sys/firmware/efi/efivars"; then mount -t efivarfs efivarfs /sys/firmware/efi/efivars ; fi ; FW=1 ; echo 'UEFI Mode detected' ; else FW=0 ; echo 'BIOS Mode detected' ; fi
+_LocaleHelpPicker () {
+	local -n _lp_ref="$1" ; local kind="$2" ; local query="" pick="" src_file=""
+	echo -e "\n[i] Locale = regional formats (date, time, currency, decimal separator)."
+	echo "[i] Language = interface and system message text (e.g. Italian locale + British English UI)."
+	if [[ -f /etc/locale.gen ]]; then src_file="/etc/locale.gen"
+	elif [[ -f /etc/default/libc-locales ]]; then src_file="/etc/default/libc-locales" ; fi
+	local all_locs=()
+	if [[ -n "$src_file" ]]; then
+		mapfile -t all_locs < <(awk '/UTF-8/{gsub(/^#+[[:space:]]*/, ""); if ($1 ~ /^[a-z]{2,3}_[A-Z]{2}\.UTF-8$/) print $1}' "$src_file" | sort -u || true)
+	fi
+	if [[ ${#all_locs[@]} -eq 0 ]]; then
+		all_locs=( "de_AT.UTF-8" "de_CH.UTF-8" "de_DE.UTF-8" "en_AU.UTF-8" "en_CA.UTF-8" "en_GB.UTF-8" "en_IE.UTF-8" "en_US.UTF-8" "es_ES.UTF-8" "fr_FR.UTF-8" "it_IT.UTF-8" "ja_JP.UTF-8" "nl_NL.UTF-8" "pl_PL.UTF-8" "pt_BR.UTF-8" "pt_PT.UTF-8" "sv_SE.UTF-8" )
+	fi
+	while true; do
+		read -rp "Search ${kind} code (e.g. it, en, de, fr, es, pt): " query
+		if [[ -z "$query" ]]; then echo "Please enter a 2-letter language/country code." ; continue ; fi
+		local matches=()
+		mapfile -t matches < <(printf '%s\n' "${all_locs[@]}" | grep -i -- "$query" || true)
+		if [[ ${#matches[@]} -eq 0 ]]; then echo "No UTF-8 locale matched '$query'. Try again." ; continue ; fi
+		if [[ ${#matches[@]} -gt 25 ]]; then echo "Found ${#matches[@]} matches. Type a more specific code (e.g. en_GB or de_DE)." ; continue ; fi
+		matches+=( "Search again" )
+		MenuSel "pick" "Select ${kind}" "${matches[@]}"
+		if [[ "$pick" != "Search again" ]]; then _lp_ref="$pick" ; break ; fi
+	done
+}
+LOCALEsel () {
+	local def_loc="${GEO_LOCALE:-it_IT.UTF-8}" tag="Default" choice="" opts=()
+	if [[ "${GEO_DETECTED:-0}" -eq 1 ]]; then tag="Detected via IP" ; fi
+	opts+=( "${def_loc} (${tag})" )
+	if [[ "$def_loc" != "en_GB.UTF-8" ]]; then opts+=( "en_GB.UTF-8 (British English)" ) ; fi
+	if [[ "$def_loc" != "en_US.UTF-8" ]]; then opts+=( "en_US.UTF-8 (US English)" ) ; fi
+	opts+=( "Other / Help me choose" )
+	MenuSel "choice" "Select Localization / Regional Formats (Locale)" "${opts[@]}"
+	if [[ "$choice" == "Other"* ]]; then _LocaleHelpPicker "LOCALE" "Locale"
+	else LOCALE="${choice%% *}" ; fi
+	echo "Selected Locale: $LOCALE"
+}
+LANGUAGEsel () {
+	local def_lang="${LOCALE:-${GEO_LOCALE:-it_IT.UTF-8}}" choice="" opts=()
+	opts+=( "${def_lang} (Same as Locale)" )
+	if [[ "$def_lang" != "en_GB.UTF-8" ]]; then opts+=( "en_GB.UTF-8 (British English)" ) ; fi
+	if [[ "$def_lang" != "en_US.UTF-8" ]]; then opts+=( "en_US.UTF-8 (US English)" ) ; fi
+	opts+=( "Other / Help me choose" )
+	MenuSel "choice" "Select Interface Language" "${opts[@]}"
+	if [[ "$choice" == "Other"* ]]; then _LocaleHelpPicker "LANGUAGE" "Language"
+	else LANGUAGE="${choice%% *}" ; fi
+	echo "Selected Language: $LANGUAGE"
 }
 LOGINsel () {
 	if [[ "$DE" == "GNOME" ]]; then DM="GDM"
@@ -400,20 +699,25 @@ LOGINsel () {
 	else MenuSel "DM" "Select Display Manager" "Ly" "Greetd" "LightDM" "SDDM" "None"
 	fi
 }
+BOOTLOADERsel () {
+	if [[ "$FW" -eq 0 ]]; then BL="grub" ; echo "BIOS mode: GRUB selected automatically" ; return 0 ; fi
+	if [[ "${INSTALL_MODE:-host}" == "personalize" ]]; then
+		echo -e "\n[i] Portable note: 'efistub' writes directly to this motherboard's NVRAM (not portable to other PCs). Use grub, refind, limine or uki for portable disks."
+	fi
+	local bl_options=( "refind" "grub" "efistub" "limine" )
+	if [[ "${OS,,}" == "arch" ]]; then bl_options+=( "systemd-boot" "uki" ) ; fi
+	MenuSel "BL" "Select Bootloader" "${bl_options[@]}"
+}
 ARCHREPOsel () { YesNoSel "Do you want Arch repositories as well as Artix repositories?" ; if [[ "$CC" -eq 1 ]]; then ARCHREPO=1 ; echo "OK, adding Arch repositories!" ; else ARCHREPO='' ; echo "Proceeding without them..." ; fi ; }
-BOOTLOADERsel () { if [[ "$FW" -eq 0 ]]; then BL="grub" ; echo "BIOS mode: GRUB selected automatically" ; return 0 ; fi ; local bl_options=( "refind" "grub" "efistub" "limine" ) ; if [[ "${OS,,}" == "arch" ]]; then bl_options+=( "systemd-boot" "uki" ) ; fi ; MenuSel "BL" "Select Bootloader" "${bl_options[@]}" ; }
 DESKTOPsel () { MenuSel "DE" "Select Desktop Environment / Window Manager" "KDE" "GNOME" "LXQt" "COSMIC" "Hyprland" "Niri" "None" ; SHELLsel ; }
 SHELLsel () { if [[ "$DE" =~ ^(Hyprland|Niri)$ ]]; then MenuSel "UI" "Select Desktop Shell for $DE" "Traditional (Waybar + Swaync + Fuzzel)" "Quickshell" ; if [[ "$UI" == "Traditional"* ]]; then UI="Traditional" ; if [[ "${DM:-}" == "Quickshell" ]]; then DM="Ly" ; fi; fi ; else UI="None" ; fi ; }
 FILESYSTEMsel () { MenuSel "FS" "Select filesystem for ROOT" "ext4" "btrfs" ; }
 HOSTNAMEsel () { TextPromptSel "HN" "Enter preferred hostname" ; }
 INITsel () { if [[ "${OS,,}" == "artix" ]]; then MenuSel "INIT" "Select preferred Init System for Artix" "OpenRC" "Runit" "s6" "dinit" ; else INIT="systemd" ; fi ; }
 IRFsel () { if [[ "${OS,,}" == "void" ]]; then IRF="dracut" ; echo "Selected Initramfs: dracut" ; else MenuSel "IRF" "Select preferred Initramfs Generator" "booster" "mkinitcpio" "dracut" ; fi ; }
-IRFSsel () { MenuSel "IRFS" "Select preferred Initramfs Mode, if universal for all PC or just for this one" "Host" "Universal" ; }
+IRFSsel () { MenuSel "IRFS" "Select Initramfs Mode" "Host" "Universal" ; }
 KERNELsel () { if [[ "${OS,,}" == "void" ]]; then MenuSel "KERNEL" "Select preferred Kernel" "linux" "linux-lts" ; else MenuSel "KERNEL" "Select preferred Kernel" "linux" "linux-lts" "linux-hardened" "linux-zen" ; fi ; }
 LIBRARYsel () { MenuSel "LIBRARY" "Select base library" "GLIBC" "MUSL" ; }
-LANGUAGEsel () { MenuSel "LANGUAGE" "Select preferred Language" "${LOC_LIST[@]}" ; }
-LOCALEsel () { MenuSel "LOCALE" "Select localization" "${LOC_LIST[@]}" ; }
 OSsel () { MenuSel "OS" "Select the distro to setup" "Arch" "Artix" "Void" ; }
-PARTIDsel () { MenuSel "PID" "Select partition identifier" "UUID" "PARTUUID" "LABEL" ; }
 USERNAMEsel () { TextPromptSel "UN" "Enter preferred username" ; }
 VOIDINSTALLsel () { MenuSel "VOIDINSTALL" "Select installation type" "XBPS" "ROOTFS" ; }
