@@ -79,7 +79,7 @@ SHOWerror () {
 	YesNoSel "Do you want to continue the installation anyway? (Fix: 'nano +$err_line installer')"
 	if [[ "$CC" -eq 1 ]]; then echo "OK, still going..." ; else echo "OK, exit." ; exit 1 ; fi
 }
-DiskPartition() {
+DiskPartition () {
 	if [[ -z "$DRIVE" ]]; then echo "No drive selected. Closing installation!" ; exit 1 ; fi
 	if [[ $(wc -l < /proc/swaps) -gt 1 ]]; then echo "[i] Found active Swap. Disabling..." ; swapoff -a 2>/dev/null || true ; fi
 	if grep -qs '/tmp/btrpool' /proc/mounts; then umount -R /tmp/btrpool 2>/dev/null || umount -R -l /tmp/btrpool 2>/dev/null || true ; fi
@@ -141,20 +141,15 @@ DiskPartition() {
 		ADD_PARTS=("$(part_path "$ADD_DRIVE" 1)")
 	fi
 	echo 'We can proceed with the formatting of file system'
-	sleep 1 ; echo -e " BP=$BOOT_PART RP=$ROOT_PART SP=${SWAP_PART:-none} AP=${ADD_PARTS[*]} PID=$PID" ; lsblk -f
+	sleep 1 ; echo -e " BP=$BOOT_PART RP=$ROOT_PART SP=${SWAP_PART:-none} AP=${ADD_PARTS[*]}" ; lsblk -f
 }
-FileSystemFormat() {
+FileSystemFormat () {
 	BootLabel='EFI' ; RootLabel='ROOT' ; modules=() ; binaries='' ; CRYPT_ADD_MAP=()
 	CRYPT_ROOT_UUID="" ; CRYPT_ROOT_NAME="" ; TARGET_ROOT="" ; TARGET_SWAP=""
-	SWAPID="" ; SWAP_UUID="" ; SWAP_PARTUUID="" ; ROOT_FS_UUID=""
+	SWAP_UUID="" ; SWAP_PARTUUID="" ; ROOT_FS_UUID=""
 	RESUME_DEV="" ; RESUME_OFFSET="" ; EPHEMERAL_SWAP=0
-	local eff_pid="$PID"
 	mkfs.fat -F32 -n "$BootLabel" "$BOOT_PART"
-	BOOTID="$(blkid -s "$PID" -o value "$BOOT_PART")"
-
-	if [[ "${CRYPT:-0}" -eq 1 || "${LVM:-0}" -eq 1 ]]; then
-		if [[ "$PID" == "PARTUUID" ]]; then eff_pid="UUID" ; fi
-	fi
+	BOOT_UUID="$(blkid -s UUID -o value "$BOOT_PART")"
 
 	local pv_dev="$ROOT_PART"
 	if [[ "${CRYPT:-0}" -eq 1 ]]; then
@@ -186,20 +181,18 @@ FileSystemFormat() {
 		fi
 	fi
 
-	UNIfstab="$PID=$BOOTID /boot vfat defaults 0 2\n"
+	UNIfstab="UUID=$BOOT_UUID /boot vfat defaults 0 2\n"
 	if [[ -n "$TARGET_SWAP" ]]; then
 		mkswap -L SWAP "$TARGET_SWAP" ; udevadm settle || true
-		SWAPID="$(blkid -s "$eff_pid" -o value "$TARGET_SWAP")"
 		SWAP_UUID="$(blkid -s UUID -o value "$TARGET_SWAP")"
-		UNIfstab+="$eff_pid=$SWAPID none swap defaults 0 0\n"
+		UNIfstab+="UUID=$SWAP_UUID none swap defaults 0 0\n"
 	fi
 
 	case "$FS" in
 		ext4)	mkfs.ext4 -F -L "$RootLabel" "$TARGET_ROOT"
-				ROOTID="$(blkid -s "$eff_pid" -o value "$TARGET_ROOT")"
 				ROOT_FS_UUID="$(blkid -s UUID -o value "$TARGET_ROOT")"
 				mount "$TARGET_ROOT" /mnt
-				UNIfstab+="$eff_pid=$ROOTID / ext4 defaults 0 1\n"
+				UNIfstab+="UUID=$ROOT_FS_UUID / ext4 defaults 0 1\n"
 				if [[ "$SWAP" == "swapfile" ]]; then
 					if ! mkswap -U clear --size "${SWAP_DIM}G" --file /mnt/swapfile 2>/dev/null; then
 						dd if=/dev/zero of=/mnt/swapfile bs=1M count=$(( SWAP_DIM * 1024 )) status=progress
@@ -216,7 +209,6 @@ FileSystemFormat() {
 		btrfs)	modules=(btrfs) ; binaries='btrfs'
 				local options='noatime,compress=zstd,space_cache=v2,discard=async'
 				mkfs.btrfs -fL "$RootLabel" "$TARGET_ROOT"
-				ROOTID="$(blkid -s "$eff_pid" -o value "$TARGET_ROOT")"
 				ROOT_FS_UUID="$(blkid -s UUID -o value "$TARGET_ROOT")"
 				mkdir -p /tmp/btrpool ; mount "$TARGET_ROOT" /tmp/btrpool
 				for sv_map in "@:/" "@home:/home" "@var_log:/var/log" "@var_cache:/var/cache" "@snapshots:/.snapshots"; do
@@ -224,13 +216,13 @@ FileSystemFormat() {
 					btrfs su cr "/tmp/btrpool/$sv"
 					mkdir -p "/mnt$d_path"
 					mount -o "defaults,$options,subvol=$sv" "$TARGET_ROOT" "/mnt$d_path"
-					UNIfstab+="$eff_pid=$ROOTID $d_path btrfs $options,subvol=$sv 0 0\n"
+					UNIfstab+="UUID=$ROOT_FS_UUID $d_path btrfs $options,subvol=$sv 0 0\n"
 				done
 				if [[ "$SWAP" == "swapfile" ]]; then
 					btrfs su cr /tmp/btrpool/@swap
 					mkdir -p /mnt/swap
 					mount -o "defaults,noatime,subvol=@swap" "$TARGET_ROOT" /mnt/swap
-					UNIfstab+="$eff_pid=$ROOTID /swap btrfs noatime,subvol=@swap 0 0\n"
+					UNIfstab+="UUID=$ROOT_FS_UUID /swap btrfs noatime,subvol=@swap 0 0\n"
 				fi
 				umount /tmp/btrpool ; rmdir /tmp/btrpool
 				if [[ "$SWAP" == "swapfile" ]]; then
@@ -244,7 +236,6 @@ FileSystemFormat() {
 				;;
 	esac
 
-	EFF_PID="$eff_pid"
 	if [[ -n "$TARGET_SWAP" ]]; then swapon "$TARGET_SWAP" ; fi
 	if [[ "${HIB:-0}" -eq 1 ]]; then
 		if [[ "$SWAP" == "swapfile" ]]; then RESUME_DEV="UUID=$ROOT_FS_UUID"
@@ -297,11 +288,13 @@ FileSystemFormat() {
 				if [[ -n "$plbl" && ! -d "/mnt/media/$plbl" ]]; then mnt_name="$plbl" ; else mnt_name="HDD$((idx+1))" ; fi
 			fi
 			mkdir -p "/mnt/media/$mnt_name" ; mount "$target_add" "/mnt/media/$mnt_name"
-			local add_pid add_type ; add_type=$(blkid -s TYPE -o value "$target_add" || echo auto)
-			if ! add_pid=$(blkid -s "$eff_pid" -o value "$target_add") || [[ -z "$add_pid" ]]; then
-				add_pid=$(blkid -s UUID -o value "$target_add") ; UNIfstab+="UUID=$add_pid /media/$mnt_name $add_type defaults,noatime,nofail 0 2\n"
+			local add_uuid add_type
+			add_type=$(blkid -s TYPE -o value "$target_add" || echo auto)
+			add_uuid=$(blkid -s UUID -o value "$target_add" || true)
+			if [[ -n "$add_uuid" ]]; then
+				UNIfstab+="UUID=$add_uuid /media/$mnt_name $add_type defaults,noatime,nofail 0 2\n"
 			else
-				UNIfstab+="$eff_pid=$add_pid /media/$mnt_name $add_type defaults,noatime,nofail 0 2\n"
+				UNIfstab+="$target_add /media/$mnt_name $add_type defaults,noatime,nofail 0 2\n"
 			fi
 		done
 	fi
@@ -353,7 +346,7 @@ FStabGen () {
 	fi
 	if [[ -f /mnt/etc/fstab ]]; then mv -f /mnt/etc/fstab /mnt/etc/old-fstab ; fi
 	if [[ "${OS,,}" == "void" ]]; then printf '%b' "$UNIfstab" > /mnt/etc/fstab
-	else "$FSTABgen" -t "$EFF_PID" /mnt >> /mnt/etc/fstab ; fi
+	else "$FSTABgen" -t UUID /mnt >> /mnt/etc/fstab ; fi
 	if [[ "${EPHEMERAL_SWAP:-0}" -eq 1 ]]; then
 		printf '/dev/mapper/cryptswap none swap defaults 0 0\n' >> /mnt/etc/fstab
 	fi
@@ -408,7 +401,7 @@ PackageInstall () {
 	CR $PKGmanager$PKGinst$PKGupd$PKGupg "${PKGskp[@]}" "${FinalPKGs[@]}" </dev/tty >/dev/tty 2>&1
 }
 KernelSetup () {
-	if [[ "$CPU_TYPE" == "Intel" ]]; then modules+=(vmd) ; fi
+	if [[ "$CPU_TYPE" == "Intel" || "$CPU_TYPE" == "Both" ]]; then modules+=(vmd) ; fi
 	if [[ ${#nvidiadrivers[@]} -gt 0 ]]; then
 		modules+=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)
 		mkdir -p /mnt/etc/modprobe.d /mnt/etc/udev/rules.d
@@ -419,7 +412,7 @@ KernelSetup () {
 	case "$IRF" in
 		dracut)     mkdir -p /mnt/etc/dracut.conf.d
 					local d_opts=""
-					if [[ "$CPU_TYPE" == "Intel" ]]; then d_opts+='add_drivers+=" vmd "\n' ; fi
+					if [[ "$CPU_TYPE" == "Intel" || "$CPU_TYPE" == "Both" ]]; then d_opts+='add_drivers+=" vmd "\n' ; fi
 					if [[ "${CRYPT:-0}" -eq 1 ]]; then d_opts+='add_dracutmodules+=" crypt "\n' ; fi
 					if [[ "${LVM:-0}" -eq 1 ]]; then d_opts+='add_dracutmodules+=" lvm "\n' ; fi
 					if [[ "${HIB:-0}" -eq 1 && -n "$RESUME_DEV" ]]; then d_opts+='add_dracutmodules+=" resume "\n' ; fi
@@ -476,7 +469,7 @@ ServiceSetup () {
 	esac
 	if [[ "$IS_LAPTOP" -eq 1 ]]; then
 		if [[ "$os_l" == "arch" && "$DE" =~ ^(KDE|GNOME|COSMIC)$ ]]; then Services+=( power-profiles-daemon ) ; else Services+=( tlp ) ; fi
-		if [[ "$CPU_TYPE" == "Intel" ]]; then Services+=( thermald ) ; fi
+		if [[ "$CPU_TYPE" == "Intel" || "$CPU_TYPE" == "Both" ]]; then Services+=( thermald ) ; fi
 	fi
 	if [[ "$VBTsel" -eq 1 && "$VM_TYPE" == "vbox" && "$os_l" != "artix" ]]; then Services+=( vboxservice ) ; fi
 	if [[ "$VBTsel" -eq 1 && "$VM_TYPE" == "vmware" && "$os_l" == "arch" ]]; then Services+=( vmtoolsd ) ; fi
@@ -507,6 +500,17 @@ ServiceSetup () {
 	if [[ -f /mnt/etc/bluetooth/main.conf ]]; then sed -i 's/#AutoEnable=false/AutoEnable=true/g' /mnt/etc/bluetooth/main.conf ; fi
 	if [[ "$init_sys" == "systemd" ]]; then CR systemctl --global enable pipewire.socket pipewire-pulse.socket wireplumber.service ; fi
 	if [[ -f "${SCRIPT_DIR}/Conf_files/51-android.rules" ]]; then cp "${SCRIPT_DIR}/Conf_files/51-android.rules" /mnt/etc/udev/rules.d/ ; fi
+
+	if [[ "${HIB:-0}" -eq 1 && "${HIB_DELAY:-0}" -gt 0 ]]; then
+		local logind_dir="/mnt/etc/elogind"
+		if [[ "$init_sys" == "systemd" ]]; then logind_dir="/mnt/etc/systemd" ; fi
+		mkdir -p "${logind_dir}/sleep.conf.d"
+		printf '[Sleep]\nAllowSuspend=yes\nAllowHibernation=yes\nAllowSuspendThenHibernate=yes\nHibernateDelaySec=%smin\nHibernateOnACPower=no\n' "$HIB_DELAY" > "${logind_dir}/sleep.conf.d/10-installer-hibernate.conf"
+		if [[ "$IS_LAPTOP" -eq 1 ]]; then
+			mkdir -p "${logind_dir}/logind.conf.d"
+			printf '[Login]\nHandleLidSwitch=suspend-then-hibernate\nHandleLidSwitchExternalPower=suspend\nHandleLidSwitchDocked=ignore\n' > "${logind_dir}/logind.conf.d/10-installer-lid.conf"
+		fi
+	fi
 
 	if [[ "${ZRAM:-0}" -eq 1 && "${ZRAM_DIM:-0}" -gt 0 ]]; then
 		if [[ "$init_sys" == "systemd" ]]; then
@@ -562,19 +566,23 @@ BootloaderSetup () {
 	local k_file kname os_l="${OS,,}"
 	k_file=$(find /mnt/boot/ -maxdepth 1 -type f -name 'vmlinuz-*' -print -quit || true)
 	if [[ -n "$k_file" ]]; then kname=$(basename "$k_file") ; else kname="vmlinuz-$KERNEL" ; fi
-	local irfs initrd_flags rootflags="" nvdrm="" nvosi="" luks_flags="" grub_luks="" res_flag="" vm_flags="" ucode_img="" root_dev=""
+	local irfs initrd_flags="" rootflags="" nvdrm="" nvosi="" luks_flags="" grub_luks="" res_flag="" vm_flags="" root_dev=""
+	local ucode_imgs=()
 	if [[ "$os_l" == "void" ]]; then irfs="initramfs-${kname#vmlinuz-}.img" ; else irfs="initramfs-$KERNEL.img" ; fi
 	if [[ "$FS" == "btrfs" ]]; then rootflags='rootflags=subvol=@' ; fi
 	if [[ ${#nvidiadrivers[@]} -gt 0 ]]; then nvdrm="nvidia-drm.modeset=1 nvidia-drm.fbdev=1" ; fi
 	if [[ "${GPUMANAGERsel,,}" == "cardwire" ]]; then nvosi="lsm=lockdown,capability,landlock,bpf" ; fi
 	if [[ "$VBTsel" -eq 1 && "$VM_TYPE" == "vmware" ]]; then vm_flags="mem_sleep_default=shallow" ; fi
-	if [[ -n "$UCODEsel" && -f "/mnt/boot/${UCODEsel}.img" ]]; then ucode_img="${UCODEsel}.img" ; initrd_flags="initrd=\\${ucode_img} initrd=\\${irfs}" ; else initrd_flags="initrd=\\${irfs}" ; fi
+	if [[ "$CPU_TYPE" == "Intel" || "$CPU_TYPE" == "Both" ]] && [[ -f /mnt/boot/intel-ucode.img ]]; then ucode_imgs+=("intel-ucode.img") ; fi
+	if [[ "$CPU_TYPE" == "AMD" || "$CPU_TYPE" == "Both" ]] && [[ -f /mnt/boot/amd-ucode.img ]]; then ucode_imgs+=("amd-ucode.img") ; fi
+	for ui in "${ucode_imgs[@]}"; do initrd_flags+="initrd=\\${ui} " ; done
+	initrd_flags+="initrd=\\${irfs}"
 
 	if [[ "${LVM:-0}" -eq 1 ]]; then root_dev="/dev/mapper/vg0-root"
 	elif [[ "${CRYPT:-0}" -eq 1 ]]; then
 		if [[ "$IRF" == "dracut" ]]; then root_dev="UUID=${ROOT_FS_UUID}"
 		else root_dev="/dev/mapper/${CRYPT_ROOT_NAME}" ; fi
-	else root_dev="${EFF_PID}=$ROOTID" ; fi
+	else root_dev="UUID=${ROOT_FS_UUID}" ; fi
 
 	if [[ "${CRYPT:-0}" -eq 1 ]]; then
 		if [[ "$IRF" == "booster" ]]; then
@@ -624,7 +632,14 @@ BootloaderSetup () {
 						printf 'timeout 3\nshowtools shell, gdisk, apple_recovery, windows_recovery, mok_tool, bootorder, firmware, shutdown\nenable_mouse\nalso_scan_dirs +,@/boot\nscanfor internal,external,optical,manual,firmware\nextra_kernel_version_strings linux-hardened,linux-rt-lts,linux-zen,linux-lts,linux-rt,linux\ninclude themes/Blur-theme/theme.conf\nresolution %s\n' "$r_res" >> /mnt/boot/EFI/"$e_fld"/refind.conf
 						printf '"Boot Standard"\t"%s %s"\n"Boot Terminal"\t"%s %s 3"\n' "$c_flags" "$initrd_flags" "$c_flags" "$initrd_flags" > /mnt/boot/refind_linux.conf
 						;;
-		grub)           if [[ "$FW" -eq 0 ]]; then CR grub-install --target=i386-pc --recheck --debug "$DRIVE" ; else CR grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB ; fi
+		grub)           if [[ "$FW" -eq 0 ]]; then
+							CR grub-install --target=i386-pc --recheck --debug "$DRIVE"
+						else
+							CR grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB
+							if [[ "$IRFS" == "Universal" || "${INSTALL_MODE:-host}" == "personalize" ]]; then
+								CR grub-install --target=x86_64-efi --efi-directory=/boot --removable
+							fi
+						fi
 						local g_thm="Grub-Sekiro" ; mkdir -p /mnt/boot/grub/themes ; cp -r "${SCRIPT_DIR}/Bootloader/$g_thm" /mnt/boot/grub/themes/
 						local g_res="1920x1080,1024x768,auto" ; if [[ "$VBTsel" -eq 1 ]]; then g_res="1024x768,auto" ; fi
 						sed -i -e "/GRUB_DISABLE_OS_PROBER=/ s/#//g" -e "s/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=3/" -e "s/^#GRUB_GFXMODE=.*/GRUB_GFXMODE=$g_res/" -e '/GRUB_THEME=/c GRUB_THEME="/boot/grub/themes/'"$g_thm"'/theme.txt"' -e "s|^GRUB_CMDLINE_LINUX=.*|GRUB_CMDLINE_LINUX=\"${grub_extra}\"|" /mnt/etc/default/grub
@@ -635,19 +650,26 @@ BootloaderSetup () {
 						;;
 		limine)         mkdir -p /mnt/boot/EFI/BOOT ; cp /mnt/usr/share/limine/BOOTX64.EFI /mnt/boot/EFI/BOOT/
 						printf 'timeout: 3\n\n/Linux (%s)\n    protocol: linux\n    kernel_path: boot():/%s\n' "$OS" "$kname" > /mnt/boot/limine.conf
-						if [[ -n "$ucode_img" ]]; then printf '    module_path: boot():/%s\n' "$ucode_img" >> /mnt/boot/limine.conf ; fi
+						for ui in "${ucode_imgs[@]}"; do printf '    module_path: boot():/%s\n' "$ui" >> /mnt/boot/limine.conf ; done
 						printf '    module_path: boot():/%s\n    cmdline: %s\n' "$irfs" "$c_flags" >> /mnt/boot/limine.conf
 						CR efibootmgr -c -d "$e_dev" -p "${e_num:-1}" -L "Limine Bootloader" -l '\EFI\BOOT\BOOTX64.EFI'
 						;;
 		systemd-boot)   CR bootctl --path=/boot install
 						printf 'default arch.conf\ntimeout 3\nconsole-mode max\neditor no\n' > /mnt/boot/loader/loader.conf
 						printf 'title Arch Linux\nlinux /%s\n' "$kname" > /mnt/boot/loader/entries/arch.conf
-						if [[ -n "$ucode_img" ]]; then printf 'initrd /%s\n' "$ucode_img" >> /mnt/boot/loader/entries/arch.conf ; fi
+						for ui in "${ucode_imgs[@]}"; do printf 'initrd /%s\n' "$ui" >> /mnt/boot/loader/entries/arch.conf ; done
 						printf 'initrd /%s\noptions %s\n' "$irfs" "$c_flags" >> /mnt/boot/loader/entries/arch.conf
 						;;
 		uki)            mkdir -p /mnt/boot/EFI/BOOT ; printf '%s\n' "$c_flags" > /mnt/boot/cmdline.txt
-						CR ukify build --linux=/boot/${kname} --initrd=/boot/${irfs} ${ucode_img:+--microcode=/boot/${ucode_img}} --cmdline=@/boot/cmdline.txt --output=/boot/EFI/BOOT/BOOTX64.EFI
-						rm -f /mnt/boot/cmdline.txt
+						local uki_ucode=()
+						if [[ ${#ucode_imgs[@]} -eq 1 ]]; then
+							uki_ucode=( --microcode="/boot/${ucode_imgs[0]}" )
+						elif [[ ${#ucode_imgs[@]} -gt 1 ]]; then
+							cat "${ucode_imgs[@]/#//mnt/boot/}" > /mnt/tmp/ucode-combined.img
+							uki_ucode=( --microcode=/tmp/ucode-combined.img )
+						fi
+						CR ukify build --linux="/boot/${kname}" --initrd="/boot/${irfs}" "${uki_ucode[@]}" --cmdline=@/boot/cmdline.txt --output=/boot/EFI/BOOT/BOOTX64.EFI
+						rm -f /mnt/boot/cmdline.txt /mnt/tmp/ucode-combined.img
 						CR efibootmgr -c -d "$e_dev" -p "${e_num:-1}" -L "Arch Linux (UKI)" -l '\EFI\BOOT\BOOTX64.EFI'
 						;;
 	esac
@@ -655,11 +677,14 @@ BootloaderSetup () {
 PKGcheck () {
 	echo "Initializing package groups..."
 	local dm_l="${DM,,}" bl_l="${BL,,}" os_l="${OS,,}"
-	UCODEsel="" ; microcode=() ; amddrivers=() ; nvidiadrivers=()
-	if [[ "$CPU_TYPE" == "Intel" ]]; then UCODEsel="intel-ucode"
-	elif [[ "$CPU_TYPE" == "AMD" ]]; then if [[ "$os_l" == "void" ]]; then UCODEsel="linux-firmware-amd" ; else UCODEsel="amd-ucode" ; fi ; fi
-	if [[ -n "$UCODEsel" ]]; then microcode=("$UCODEsel") ; fi
-	if [[ "$HAS_AMD" -eq 1 ]]; then if [[ "$os_l" == "void" ]]; then amddrivers=(mesa-dri vulkan-loader mesa-vulkan-radeon) ; else amddrivers=(mesa vulkan-radeon) ; fi ; fi
+	microcode=() ; amddrivers=() ; nvidiadrivers=()
+	if [[ "$CPU_TYPE" == "Intel" || "$CPU_TYPE" == "Both" ]]; then microcode+=(intel-ucode) ; fi
+	if [[ "$CPU_TYPE" == "AMD" || "$CPU_TYPE" == "Both" ]]; then
+		if [[ "$os_l" == "void" ]]; then microcode+=(linux-firmware-amd) ; else microcode+=(amd-ucode) ; fi
+	fi
+	if [[ "$HAS_AMD" -eq 1 || "$CPU_TYPE" == "Both" ]]; then
+		if [[ "$os_l" == "void" ]]; then amddrivers=(mesa-dri vulkan-loader mesa-vulkan-radeon) ; else amddrivers=(mesa vulkan-radeon) ; fi
+	fi
 	if [[ "$HAS_NVIDIA" -eq 1 && "$NVsel" =~ ^(OPEN|PROPRIETARY)$ ]]; then
 		if [[ "$os_l" == "void" ]]; then
 			if [[ "$LIBRARY" != "MUSL" ]]; then nvidiadrivers=(nvidia nvidia-libs-32bit) ; fi
@@ -718,7 +743,7 @@ PKGcheck () {
 		refind) refind=(refind) ;;
 		uki)    uki=(systemd-ukify) ;;
 	esac
-	if [[ "$os_l" == "void" ]]; then hardwareacceleration=(mesa-dri mesa-vaapi mesa-vulkan-radeon) ; else hardwareacceleration=(vkd3d) ; if [[ "$CPU_TYPE" == "Intel" ]]; then hardwareacceleration+=(intel-media-driver) ; fi ; fi
+	if [[ "$os_l" == "void" ]]; then hardwareacceleration=(mesa-dri mesa-vaapi mesa-vulkan-radeon) ; else hardwareacceleration=(vkd3d) ; if [[ "$CPU_TYPE" == "Intel" || "$CPU_TYPE" == "Both" ]]; then hardwareacceleration+=(intel-media-driver) ; fi ; fi
 	kernel=("${KERNEL}" "${KERNEL}-headers") ; if [[ "$os_l" == "void" ]]; then kernel+=(linux-firmware-network) ; else kernel+=(linux-firmware) ; fi
 	if [[ "$IRF" =~ ^(booster|dracut|mkinitcpio)$ ]]; then kernel+=("$IRF") ; fi
 	if [[ "$os_l" == "artix" ]]; then logind=(elogind elogind-"${init_sys}" "${init_sys}"-settingsd) ; elif [[ "$os_l" == "void" ]]; then logind=(seatd elogind) ; else logind=() ; fi
@@ -734,7 +759,7 @@ PKGcheck () {
 	if [[ "$IS_LAPTOP" -eq 1 ]]; then
 		if [[ "$os_l" == "arch" && "$DE" =~ ^(KDE|GNOME|COSMIC)$ ]]; then utility+=(power-profiles-daemon)
 		else utility+=(tlp) ; if [[ "$os_l" == "artix" ]]; then utility+=("tlp-${init_sys}") ; fi ; fi
-		if [[ "$CPU_TYPE" == "Intel" ]]; then utility+=(thermald) ; if [[ "$os_l" == "artix" ]]; then utility+=("thermald-${init_sys}") ; fi ; fi
+		if [[ "$CPU_TYPE" == "Intel" || "$CPU_TYPE" == "Both" ]]; then utility+=(thermald) ; if [[ "$os_l" == "artix" ]]; then utility+=("thermald-${init_sys}") ; fi ; fi
 	fi
 	if [[ "$VBTsel" -eq 1 ]]; then
 		if [[ "$VM_TYPE" == "qemu" ]]; then utility+=(spice-vdagent)
@@ -743,7 +768,7 @@ PKGcheck () {
 		fi
 	fi
 	if [[ "${GPUMANAGERsel,,}" =~ ^(envycontrol|cardwire)$ ]]; then utility+=("${GPUMANAGERsel,,}") ; fi
-	if [[ "$os_l" == "void" ]]; then vulkan=(vulkan-loader) ; else vulkan=(vulkan-icd-loader vulkan-mesa-layers) ; if [[ "$CPU_TYPE" == "Intel" ]]; then vulkan+=(vulkan-intel) ; fi ; fi
+	if [[ "$os_l" == "void" ]]; then vulkan=(vulkan-loader) ; else vulkan=(vulkan-icd-loader vulkan-mesa-layers) ; if [[ "$CPU_TYPE" == "Intel" || "$CPU_TYPE" == "Both" ]]; then vulkan+=(vulkan-intel) ; fi ; fi
 	if [[ "$os_l" == "void" ]]; then
 		VOID_REPOS=(void-repo-nonfree) ; if [[ "$LIBRARY" == "GLIBC" ]]; then VOID_REPOS+=(void-repo-multilib void-repo-multilib-nonfree) ; fi
 		$PKGmanager$PKGinst$PKGupd "${PKGskp[@]}" "${VOID_REPOS[@]}" ; $PKGmanager$PKGinst$PKGupd
@@ -787,10 +812,18 @@ UserSetup () {
 	printf 'include "/usr/share/nano/*.nanorc"\nset linenumbers\n' > /mnt/etc/nanorc
 	printf '[Default]\nsave_dir=/home/%s/Pictures/Screenshots\nsave_filename_format=swappy-%%Y%%m%%d-%%H%%M%%S.png\nshow_panel=false\nline_size=5\ntext_size=20\ntext_font=sans-serif\npaint_mode=brush\nearly_exit=false\nfill_shape=false\n' "$UN" > "$ucfg/swappy/config"
 
-	local va_drv="iHD" gpu_pci ; gpu_pci=$(grep -Ei "VGA|3D|Display" <<< "$SYS_LSPCI" || true)
-	if grep -qi "Intel" <<< "$gpu_pci"; then va_drv="iHD"
-	elif grep -qiE "AMD|ATI|Radeon" <<< "$gpu_pci" || [[ "$CPU_TYPE" == "AMD" || "$HAS_AMD" -eq 1 ]]; then va_drv="radeonsi"
-	elif [[ "$HAS_NVIDIA" -eq 1 ]]; then va_drv="nvidia" ; fi
+	local va_drv="" gpu_pci=""
+	if [[ "${INSTALL_MODE:-host}" == "host" ]]; then
+		va_drv="iHD"
+		gpu_pci=$(grep -Ei "VGA|3D|Display" <<< "$SYS_LSPCI" || true)
+		if grep -qi "Intel" <<< "$gpu_pci"; then va_drv="iHD"
+		elif grep -qiE "AMD|ATI|Radeon" <<< "$gpu_pci" || [[ "$CPU_TYPE" == "AMD" || "$HAS_AMD" -eq 1 ]]; then va_drv="radeonsi"
+		elif [[ "$HAS_NVIDIA" -eq 1 ]]; then va_drv="nvidia" ; fi
+	else
+		if [[ "$HAS_AMD" -eq 1 || "$CPU_TYPE" == "AMD" ]]; then va_drv="radeonsi"
+		elif [[ "$CPU_TYPE" == "Intel" ]]; then va_drv="iHD"
+		elif [[ "$HAS_NVIDIA" -eq 1 ]]; then va_drv="nvidia" ; fi
+	fi
 
 	if [[ "$DE" =~ ^(Hyprland|Niri)$ ]]; then
 		echo "Installing Wallust..." ; local w_ok=0 API_URL
@@ -817,7 +850,16 @@ UserSetup () {
 		if [[ -f "${SCRIPT_DIR}/Conf_files/Wallpapers/theming" ]]; then install -Dm755 "${SCRIPT_DIR}/Conf_files/Wallpapers/theming" /mnt/usr/bin/theming ; fi
 		rm -f "$ucfg/wallpapers/"{theming,theme-switcher.sh} "$ucfg/quickshell/qs-session"
 		printf '$background = rgb(1e1e2e)\n$foreground = rgb(cdd6f4)\n$color0 = rgb(282a36)\n$color4 = rgb(89b4fa)\n$color5 = rgb(cba6f7)\n$color6 = rgb(94e2d5)\n' > "$ucfg/hypr/colors.conf"
-		if [[ -f "${SCRIPT_DIR}/Conf_files/Hyprlock/hypridle.conf" ]]; then cp "${SCRIPT_DIR}/Conf_files/Hyprlock/hypridle.conf" "$ucfg/hypr/" ; fi
+		if [[ -f "${SCRIPT_DIR}/Conf_files/Hyprlock/hypridle.conf" ]]; then
+			cp "${SCRIPT_DIR}/Conf_files/Hyprlock/hypridle.conf" "$ucfg/hypr/"
+			if [[ "${HIB:-0}" -eq 1 && "${HIB_DELAY:-0}" -gt 0 ]]; then
+				local idle_sleep_cmd="loginctl suspend-then-hibernate"
+				if [[ "$IS_LAPTOP" -eq 1 ]]; then
+					idle_sleep_cmd='grep -qi discharging /sys/class/power_supply/BAT*/status 2>/dev/null \&\& loginctl suspend-then-hibernate || loginctl suspend'
+				fi
+				sed -i -E "s#(on-timeout[[:space:]]*=[[:space:]]*)(loginctl|systemctl)[[:space:]]+suspend([[:space:]]*)\$#\1${idle_sleep_cmd}\3#" "$ucfg/hypr/hypridle.conf"
+			fi
+		fi
 
 		local cur_hr ; printf -v cur_hr '%(%k)T' -1
 		local init_sub="night" init_pal="dark16" init_fx="true"
@@ -870,10 +912,12 @@ UserSetup () {
 					fi
 				done
 			fi
-			local qs_env="DRI_PRIME=0 __NV_PRIME_RENDER_OFFLOAD=0 __GLX_VENDOR_LIBRARY_NAME=mesa __EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/50_mesa.json VK_LOADER_DRIVERS_DISABLE=*nvidia* VDPAU_DRIVER=null LIBVA_DRIVER_NAME=$va_drv QT_FFMPEG_DECODING_HW_DEVICE_TYPES=vaapi QSG_RHI_BACKEND=opengl QT_LOGGING_RULES=qt.qpa.wayland.textinput=false"
+			local qs_env="DRI_PRIME=0 __NV_PRIME_RENDER_OFFLOAD=0 __GLX_VENDOR_LIBRARY_NAME=mesa __EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/50_mesa.json VK_LOADER_DRIVERS_DISABLE=*nvidia* VDPAU_DRIVER=null${va_drv:+ LIBVA_DRIVER_NAME=$va_drv} QT_FFMPEG_DECODING_HW_DEVICE_TYPES=vaapi QSG_RHI_BACKEND=opengl QT_LOGGING_RULES=qt.qpa.wayland.textinput=false"
 			if [[ "$VBTsel" -eq 1 ]]; then qs_env="QSG_RHI_BACKEND=opengl QSG_RENDER_LOOP=basic QT_LOGGING_RULES=qt.qpa.wayland.textinput=false" ; fi
 			local qs_loop="while :; do env $qs_env quickshell; [[ -f /tmp/qs_lock_active_\$UID ]] || break; sleep 1; done"
-			sed -i -e "s|lock_cmd = .*|lock_cmd = quickshell ipc call lock lock|" -e "s|loginctl lock-session|quickshell ipc call lock lock|g" "$ucfg/hypr/hypridle.conf"
+			if [[ -f "$ucfg/hypr/hypridle.conf" ]]; then
+				sed -i -e "s|lock_cmd = .*|lock_cmd = quickshell ipc call lock lock|" -e "s|loginctl lock-session|quickshell ipc call lock lock|g" "$ucfg/hypr/hypridle.conf"
+			fi
 			if [[ "$DE" == "Niri" ]]; then
 				if ! grep -q "wallpaper-backdrop" "$cfg"; then cfg_appends+='\nlayer-rule {\n\tmatch namespace="^wallpaper-backdrop$"\n\tplace-within-backdrop true\n}\n' ; fi
 				if ! grep -q "skip-at-startup" "$cfg"; then cfg_appends+='\nhotkey-overlay {\n\tskip-at-startup\n}\n' ; fi
@@ -895,7 +939,9 @@ UserSetup () {
 			fi
 		else
 			printf 'auth required pam_unix.so nullok\naccount required pam_unix.so\npassword required pam_unix.so\nsession required pam_unix.so\n' > /mnt/etc/pam.d/hyprlock
-			sed -i "s|loginctl lock-session|pidof hyprlock \|\| hyprlock|g" "$ucfg/hypr/hypridle.conf"
+			if [[ -f "$ucfg/hypr/hypridle.conf" ]]; then
+				sed -i "s|loginctl lock-session|pidof hyprlock \|\| hyprlock|g" "$ucfg/hypr/hypridle.conf"
+			fi
 			touch "$ucfg/fuzzel/colors.ini" "$ucfg/wallust/colors-waybar.css"
 			if [[ "$DE" == "Hyprland" ]]; then touch "$ucfg/hypr/hyprpaper.conf" ; fi
 			if [[ -f "${SCRIPT_DIR}/Conf_files/Hyprlock/hyprlock.conf" ]]; then cp "${SCRIPT_DIR}/Conf_files/Hyprlock/hyprlock.conf" "$ucfg/hypr/" ; fi
@@ -950,19 +996,17 @@ UserSetup () {
 	if [[ "$VBTsel" -eq 1 ]]; then
 		printf 'WLR_NO_HARDWARE_CURSORS=1\nWLR_RENDERER_ALLOW_SOFTWARE=1\nLIBGL_ALWAYS_SOFTWARE=1\nKITTY_DISABLE_WAYLAND=1\nQT_QPA_PLATFORMTHEME=qt6ct\n' >> /mnt/etc/environment
 	else
-		printf 'MOZ_ENABLE_WAYLAND=1\nQT_QPA_PLATFORM="wayland;xcb"\nQT_QPA_PLATFORMTHEME=qt6ct\nGDK_BACKEND="wayland,x11"\nSDL_VIDEODRIVER=wayland\nELECTRON_OZONE_PLATFORM_HINT=auto\nDRI_PRIME=0\n__NV_PRIME_RENDER_OFFLOAD=0\n__GLX_VENDOR_LIBRARY_NAME=mesa\n__EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/50_mesa.json\nVK_LOADER_DRIVERS_DISABLE="*nvidia*"\nVDPAU_DRIVER=null\nLIBVA_DRIVER_NAME=%s\nQT_FFMPEG_DECODING_HW_DEVICE_TYPES=vaapi\n' "$va_drv" >> /mnt/etc/environment
+		printf 'MOZ_ENABLE_WAYLAND=1\nQT_QPA_PLATFORM="wayland;xcb"\nQT_QPA_PLATFORMTHEME=qt6ct\nGDK_BACKEND="wayland,x11"\nSDL_VIDEODRIVER=wayland\nELECTRON_OZONE_PLATFORM_HINT=auto\nDRI_PRIME=0\n__NV_PRIME_RENDER_OFFLOAD=0\n__GLX_VENDOR_LIBRARY_NAME=mesa\n__EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/50_mesa.json\nVK_LOADER_DRIVERS_DISABLE="*nvidia*"\nVDPAU_DRIVER=null\nQT_FFMPEG_DECODING_HW_DEVICE_TYPES=vaapi\n' >> /mnt/etc/environment
+		if [[ -n "$va_drv" ]]; then printf 'LIBVA_DRIVER_NAME=%s\n' "$va_drv" >> /mnt/etc/environment ; fi
 	fi
 	mkdir -p /mnt/etc/skel/.config
 	cp -r "$ucfg/"* /mnt/etc/skel/.config/ 2>/dev/null || true
 }
 InstallationSetup () {
-	SYS_LSPCI=$(lspci || true) ; SYS_CPU=$(cat /proc/cpuinfo || true)
-	VBTsel=0 ; VM_TYPE="none" ; HAS_NVIDIA=0 ; HAS_AMD=0 ; CPU_TYPE="Unknown" ; IS_LAPTOP=0
-	CRYPT=0 ; PASS="" ; LVM=0 ; HIB=0 ; SWAP="none" ; SWAP_DIM=0 ; ZRAM=0 ; ZRAM_DIM=0 ; ARCHREPO="" ; VOIDINSTALL="" ; LIBRARY=""
-	if compgen -G "/sys/class/power_supply/BAT*" >/dev/null; then IS_LAPTOP=1 ; fi
-	if echo "$SYS_LSPCI" | grep -qEi "(VirtualBox)"; then VM_TYPE="vbox" ; VBTsel=1
-	elif echo "$SYS_LSPCI" | grep -qEi "(VMware)"; then VM_TYPE="vmware" ; VBTsel=1
-	elif echo "$SYS_LSPCI" | grep -qEi "(Virtio|QXL)"; then VM_TYPE="qemu" ; VBTsel=1 ; fi
+	INSTALL_MODE="host" ; IRFS="Host"
+	CRYPT=0 ; PASS="" ; LVM=0 ; HIB=0 ; HIB_DELAY=0 ; SWAP="none" ; SWAP_DIM=0 ; ZRAM=0 ; ZRAM_DIM=0
+	ARCHREPO="" ; VOIDINSTALL="" ; LIBRARY=""
+
 	echo "Synchronizing system clock..." ; local t_ok=0
 	if command -v timedatectl &>/dev/null && timedatectl status &>/dev/null; then
 		if timedatectl set-ntp true &>/dev/null; then
@@ -996,30 +1040,49 @@ InstallationSetup () {
 	if [[ "$t_ok" -eq 0 ]]; then echo "[!] CRITICAL: System clock synchronization failed." >&2 ; return 1 ; fi
 	echo "System clock: $(date)"
 	echo 'List of all errors occurred during the installation process:' > Errors
-	local CheckandSetup=( Check_required_files DistroDetection UEFIsel KERNELsel IRFsel IRFSsel BOOTLOADERsel )
-	for c in "${CheckandSetup[@]}"; do "$c" ; done
+
+	Check_required_files
+	DistroDetection
+	UEFIsel
+	SystemScan
+	InstallModeSel
+
 	local os_l="${OS,,}"
-	if [[ "$VBTsel" == "1" ]]; then
-		LANGUAGE='en_GB.UTF-8' ; LOCALE='it_IT.UTF-8' ; HN=tarch1 ; UN=tarch1 ; TZONE='Europe/Rome' ; PID=UUID ; FS=btrfs
-		if [[ "$os_l" == "artix" ]]; then ARCHREPO=1 ; INIT="OpenRC"
-		elif [[ "$os_l" == "void" ]]; then LIBRARY="GLIBC" ; VOIDINSTALL="XBPS" ; INIT="Runit"
-		else INIT="systemd" ; fi
-		CPUsel ; GPUsel ; DRIVEsel ; LUKSsel ; LVMsel ; HIBERNATIONsel ; SWAPsel ; DESKTOPsel ; LOGINsel
+	if [[ "$os_l" == "artix" ]]; then ARCHREPOsel ; INITsel
+	elif [[ "$os_l" == "void" ]]; then VOIDINSTALLsel ; LIBRARYsel ; INIT="Runit"
+	else INIT="systemd" ; fi
+
+	if [[ "$INSTALL_MODE" == "host" ]]; then
+		CPUsel ; GPUsel
 	else
-		if [[ "$os_l" == "artix" ]]; then ARCHREPOsel ; INITsel
-		elif [[ "$os_l" == "void" ]]; then VOIDINSTALLsel ; LIBRARYsel ; INIT="Runit"
-		else INIT="systemd" ; fi
-		CPUsel ; GPUsel ; DRIVEsel
-		local Personalization=( LOCALEsel LANGUAGEsel TIMEZONEsel HOSTNAMEsel USERNAMEsel PARTIDsel FILESYSTEMsel LUKSsel LVMsel )
-		if [[ "$IS_LAPTOP" -eq 1 ]]; then Personalization+=( HIBERNATIONsel ) ; fi
-		Personalization+=( SWAPsel DESKTOPsel LOGINsel )
-		for s in "${Personalization[@]}"; do "$s" ; done
+		VMMODEsel ; FORMFACTORsel ; CPUsel manual ; GPUsel manual
 	fi
+
+	KERNELsel ; IRFsel ; BOOTLOADERsel ; DRIVEsel ; FILESYSTEMsel ; LUKSsel ; LVMsel
+
+	if [[ "$INSTALL_MODE" == "host" ]]; then
+		AutoPowerSwap
+	else
+		HIBERNATIONsel ; SWAPsel
+	fi
+
+	local Personalization=( LOCALEsel LANGUAGEsel TIMEZONEsel HOSTNAMEsel USERNAMEsel DESKTOPsel LOGINsel )
+	for s in "${Personalization[@]}"; do "$s" ; done
+
 	while true; do
-		local sec_str="None" luks_str="No" lvm_str="No" hib_str="Disabled" swap_str="None"
+		local mode_str="This machine (Auto)" ff_str="Desktop" sec_str="None" luks_str="No" lvm_str="No" hib_str="Disabled" swap_str="None"
+		if [[ "$INSTALL_MODE" == "personalize" ]]; then mode_str="Personalize" ; fi
+		if [[ "$IS_LAPTOP" -eq 1 ]]; then ff_str="Laptop" ; fi
 		if [[ "$CRYPT" -eq 1 ]]; then luks_str="Yes" ; fi
 		if [[ "$LVM" -eq 1 ]]; then if [[ "$CRYPT" -eq 1 ]]; then lvm_str="Yes (LVM on LUKS)" ; else lvm_str="Yes" ; fi ; fi
-		if [[ "$HIB" -eq 1 ]]; then hib_str="Enabled" ; fi
+		if [[ "$HIB" -eq 1 ]]; then
+			if (( ${HIB_DELAY:-0} > 0 )); then
+				if [[ "$IS_LAPTOP" -eq 1 ]]; then hib_str="Enabled (Suspend->Hibernate ${HIB_DELAY}min on battery)"
+				else hib_str="Enabled (Suspend->Hibernate ${HIB_DELAY}min)" ; fi
+			else
+				hib_str="Enabled (Manual only)"
+			fi
+		fi
 		case "$SWAP" in
 			lvm)       swap_str="LVM vg0/swap (${SWAP_DIM} GiB)" ;;
 			partition) if [[ "$CRYPT" -eq 1 ]]; then swap_str="Ephemeral Partition (${SWAP_DIM} GiB)" ; else swap_str="Partition (${SWAP_DIM} GiB)" ; fi ;;
@@ -1029,23 +1092,27 @@ InstallationSetup () {
 		esac
 		if [[ "$ZRAM" -eq 1 && "$SWAP" != "zram" ]]; then swap_str+=" + Zram (${ZRAM_DIM} GiB)" ; fi
 		if [[ "$ADD_SETUP" -eq 1 ]]; then if [[ "$ADD_FORMAT" -eq 1 ]]; then sec_str="$ADD_DRIVE (Format) | FS: $ADD_FS | Label: $ADD_LABEL | LUKS: $luks_str" ; else sec_str="${ADD_PARTS[*]} (Mount existing - Keep data)" ; fi ; fi
-		local sum="\n=== CONFIGURATION SUMMARY ===\nOS: $OS | Init: $INIT | Kernel: $KERNEL | Initramfs: $IRF ($IRFS) | Bootloader: $BL\nOS Drive: $DRIVE | FS: $FS | LUKS: $luks_str | LVM: $lvm_str | ID: $PID\nHibernation: $hib_str | Swap: $swap_str\nSec. Drive: $sec_str\nUser: $UN | Hostname: $HN | Locale: $LOCALE | Language: $LANGUAGE | Timezone: $TZONE\nDesktop: $DE | UI: ${UI:-None} | DM: $DM\n"
+		local sum="\n=== CONFIGURATION SUMMARY ===\nMode: $mode_str | Target: $ff_str\nOS: $OS | Init: $INIT | Kernel: $KERNEL | Initramfs: $IRF ($IRFS) | Bootloader: $BL\nOS Drive: $DRIVE | FS: $FS | LUKS: $luks_str | LVM: $lvm_str | ID: UUID\nHibernation: $hib_str | Swap: $swap_str\nSec. Drive: $sec_str\nUser: $UN | Hostname: $HN | Locale: $LOCALE | Language: $LANGUAGE | Timezone: $TZONE\nDesktop: $DE | UI: ${UI:-None} | DM: $DM\n"
 		if [[ "$CPU_TYPE" != "Unknown" ]]; then sum+="CPU: $CPU_TYPE (Microcode enabled)\n" ; fi
 		if [[ "$HAS_NVIDIA" -eq 1 ]]; then sum+="NVIDIA Driver: $NVsel | Manager: $GPUMANAGERsel\n" ; fi
-		if [[ "$HAS_AMD" -eq 1 ]]; then sum+="AMD GPU: Detected (Mesa/RADV)\n" ; fi
+		if [[ "$HAS_AMD" -eq 1 ]]; then sum+="AMD GPU: Enabled (Mesa/RADV)\n" ; fi
 		if [[ "$VBTsel" -eq 1 ]]; then sum+="Virtual Machine Mode: ON ($VM_TYPE)\n" ; fi
 		echo -e "${sum}============================="
 		YesNoSel "Is this configuration correct to proceed with partitioning?"
 		if [[ "$CC" -eq 1 ]]; then echo "Proceeding with installation..." ; break ; fi
-		local edit_options=( "Drive Selection" "Kernel" "Initramfs" "Initramfs Mode" "Bootloader" "Hostname" "Username" "Locale" "Language" "Timezone" "Filesystem" "Partition ID" "LUKS" "LVM" "Hibernation" "Swap" "Desktop" )
+		local edit_options=( "Install Mode" "Machine Type (Laptop/Desktop)" "Environment (Bare Metal/VM)" "CPU Microcode" "GPU Profile" "Drive Selection" "Kernel" "Initramfs" "Initramfs Mode" "Bootloader" "Hostname" "Username" "Locale" "Language" "Timezone" "Filesystem" "LUKS" "LVM" "Hibernation" "Swap" "Desktop" )
 		if [[ "$DE" =~ ^(Hyprland|Niri)$ ]]; then edit_options+=( "UI Shell" ) ; fi
 		edit_options+=( "Display Manager" )
 		if [[ "$os_l" == "artix" ]]; then edit_options+=( "Init System" "Arch Repos" ) ; fi
 		if [[ "$os_l" == "void" ]]; then edit_options+=( "Library" "Install Method" ) ; fi
-		if [[ "$HAS_NVIDIA" -eq 1 ]]; then edit_options+=( "NVIDIA Driver" ) ; fi
 		edit_options+=( "Abort Installation" )
 		MenuSel "EDIT_CHOICE" "What would you like to change?" "${edit_options[@]}"
 		case "$EDIT_CHOICE" in
+			"Install Mode") InstallModeSel ; if [[ "$INSTALL_MODE" == "host" ]]; then CPUsel ; GPUsel ; AutoPowerSwap ; else VMMODEsel ; FORMFACTORsel ; CPUsel manual ; GPUsel manual ; ValidateStorage ; fi ;;
+			"Machine Type"*) FORMFACTORsel ; ValidateStorage ;;
+			"Environment"*) VMMODEsel ;;
+			"CPU Microcode") CPUsel manual ;;
+			"GPU Profile") GPUsel manual ;;
 			"Drive Selection") DRIVEsel ; ValidateStorage ;;
 			"Kernel") KERNELsel ;;
 			"Initramfs") IRFsel ;;
@@ -1057,7 +1124,6 @@ InstallationSetup () {
 			"Language") LANGUAGEsel ;;
 			"Timezone") TIMEZONEsel ;;
 			"Filesystem") FILESYSTEMsel ; ValidateStorage ;;
-			"Partition ID") PARTIDsel ;;
 			"LUKS") LUKSsel ; ValidateStorage ;;
 			"LVM") LVMsel ; ValidateStorage ;;
 			"Hibernation") HIBERNATIONsel ; ValidateStorage ;;
@@ -1069,7 +1135,6 @@ InstallationSetup () {
 			"Arch Repos") ARCHREPOsel ;;
 			"Library") LIBRARYsel ; if [[ "$HAS_NVIDIA" -eq 1 && "$LIBRARY" == "MUSL" ]]; then NVsel="MESA" ; GPUMANAGERsel="None" ; fi ;;
 			"Install Method") VOIDINSTALLsel ;;
-			"NVIDIA Driver") GPUsel ;;
 			"Abort Installation") exit 1 ;;
 		esac
 	done
