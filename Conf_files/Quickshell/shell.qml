@@ -959,6 +959,7 @@ ShellRoot {
       can_hib=0
       grep -qw disk /sys/power/state 2>/dev/null && grep -qE '(^| )resume=' /proc/cmdline 2>/dev/null && ! grep -qE '(^| )hibernate=no( |$)' /proc/cmdline 2>/dev/null && ! grep -qE '\\[(integrity|confidentiality)\\]' /sys/kernel/security/lockdown 2>/dev/null && can_hib=1
       printf '%s|%s|%s|%s threads|%s|%d|%d\n' \"$(awk -F': ' '/model name/{print $2; exit}' /proc/cpuinfo)\" \"$(uname -r)\" \"${u%,}\" \"$(nproc 2>/dev/null || echo 4)\" \"$ram_sl\" \"$has_bat\" \"$can_hib\"
+    "]
     stdout: SplitParser {
       onRead: data => {
         let p = data.trim().split("|")
@@ -974,6 +975,7 @@ ShellRoot {
         if (p.length >= 4) root.cpuThreads = p[3]
         if (p.length >= 5) root.ramSlotsInfo = p[4]
         if (p.length >= 6) root.hasBattery = (p[5] === "1")
+        if (p.length >= 7) root.canHibernate = (p[6] === "1")
         root.audioReady = true
       }
     }
@@ -1003,7 +1005,6 @@ ShellRoot {
           root.tempHistory = root.pushHist(root.tempHistory, ct, 30)
           root.ramHistory = root.pushHist(root.ramHistory, rp, 30)
         }
-        if (p.length >= 7) root.canHibernate = (p[6] === "1")
       }
     }
   }
