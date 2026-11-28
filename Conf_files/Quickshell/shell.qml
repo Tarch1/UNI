@@ -473,6 +473,7 @@ ShellRoot {
   property int nightLightTemp: 4000
 
   property bool hasBattery: UPower.displayDevice ? UPower.displayDevice.isLaptopBattery : false
+  property bool canHibernate: false
   property int batPct: (UPower.displayDevice && UPower.displayDevice.isLaptopBattery) ? Math.round(UPower.displayDevice.percentage * 100) : 100
   property bool batCharging: UPower.displayDevice && UPower.displayDevice.state === UPowerDeviceState.Charging
   property string batHealth: "100%"
@@ -604,8 +605,8 @@ ShellRoot {
     const cmds = {
       "poweroff": "loginctl poweroff 2>/dev/null || sudo -n poweroff 2>/dev/null || poweroff",
       "reboot": "loginctl reboot 2>/dev/null || sudo -n reboot 2>/dev/null || reboot",
-      "suspend": "loginctl suspend 2>/dev/null || sudo -n zzz 2>/dev/null || zzz",
-      "hibernate": "loginctl hibernate 2>/dev/null || sudo -n ZZZ 2>/dev/null || ZZZ"
+      "suspend": "sleep 0.3; if { [ -f /etc/elogind/sleep.conf.d/10-installer-hibernate.conf ] || [ -f /etc/systemd/sleep.conf.d/10-installer-hibernate.conf ]; } && grep -qi discharging /sys/class/power_supply/BAT*/status 2>/dev/null; then loginctl suspend-then-hibernate 2>/dev/null || loginctl suspend; else loginctl suspend 2>/dev/null || sudo -n zzz 2>/dev/null || zzz; fi",
+      "hibernate": "sleep 0.3; loginctl hibernate 2>/dev/null || sudo -n ZZZ 2>/dev/null || ZZZ"
     }
     if (cmds[action]) runCmd(cmds[action])
   }
@@ -955,8 +956,9 @@ ShellRoot {
       ')
       [[ -z \"$ram_sl\" ]] && ram_sl=\"1/1 slot (Unified / VM)\"
       has_bat=0; for bd in /sys/class/power_supply/BAT*; do [[ -d \"$bd\" ]] && { has_bat=1; break; }; done
-      printf '%s|%s|%s|%s threads|%s|%d\n' \"$(awk -F': ' '/model name/{print $2; exit}' /proc/cpuinfo)\" \"$(uname -r)\" \"${u%,}\" \"$(nproc 2>/dev/null || echo 4)\" \"$ram_sl\" \"$has_bat\"
-    "]
+      can_hib=0
+      grep -qw disk /sys/power/state 2>/dev/null && grep -qE '(^| )resume=' /proc/cmdline 2>/dev/null && ! grep -qE '(^| )hibernate=no( |$)' /proc/cmdline 2>/dev/null && ! grep -qE '\\[(integrity|confidentiality)\\]' /sys/kernel/security/lockdown 2>/dev/null && can_hib=1
+      printf '%s|%s|%s|%s threads|%s|%d|%d\n' \"$(awk -F': ' '/model name/{print $2; exit}' /proc/cpuinfo)\" \"$(uname -r)\" \"${u%,}\" \"$(nproc 2>/dev/null || echo 4)\" \"$ram_sl\" \"$has_bat\" \"$can_hib\"
     stdout: SplitParser {
       onRead: data => {
         let p = data.trim().split("|")
@@ -1001,6 +1003,7 @@ ShellRoot {
           root.tempHistory = root.pushHist(root.tempHistory, ct, 30)
           root.ramHistory = root.pushHist(root.ramHistory, rp, 30)
         }
+        if (p.length >= 7) root.canHibernate = (p[6] === "1")
       }
     }
   }
@@ -2559,7 +2562,7 @@ ShellRoot {
               visible: root.sysSubmenu === "power"; Layout.fillWidth: true; spacing: 6
               Repeater {
                 model: [{ "icon": "󰑐", "label": "Reboot System", "act": "reboot" }, { "icon": "󰤄", "label": "Suspend", "act": "suspend" }, { "icon": "󰒲", "label": "Hibernate", "act": "hibernate" }, { "icon": "󰌾", "label": "Lock Screen", "act": "lock" }, { "icon": "󰍃", "label": "Log Out", "act": "logout" }]
-                QsTile { required property var modelData; implicitHeight: 46; icon: modelData.icon; iconFg: root.color4; title: modelData.label; onTileClicked: root.execPower(modelData.act); onIconClicked: root.execPower(modelData.act) }
+                QsTile { required property var modelData; visible: modelData.act !== "hibernate" || root.canHibernate; implicitHeight: 46; icon: modelData.icon; iconFg: root.color4; title: modelData.label; onTileClicked: root.execPower(modelData.act); onIconClicked: root.execPower(modelData.act) }
               }
             }
           }
@@ -2861,7 +2864,7 @@ ShellRoot {
                 model: [{ "label": "HIBERNATE", "act": "hibernate" }, { "label": "SUSPEND", "act": "suspend" }, { "label": "REBOOT", "act": "reboot" }]
                 Item {
                   required property var modelData
-                  visible: lockPowerHover.hovered; Layout.alignment: Qt.AlignRight
+                  visible: lockPowerHover.hovered && (modelData.act !== "hibernate" || root.canHibernate); Layout.alignment: Qt.AlignRight
                   implicitWidth: pwrOptTxt.implicitWidth + 8; implicitHeight: 20
                   QsText { id: pwrOptTxt; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; text: modelData.label; color: pwrOptMouse.containsMouse ? root.color4 : root.withAlpha(root.fg, 0.75); font.pixelSize: 11; font.bold: pwrOptMouse.containsMouse; font.letterSpacing: 2 }
                   MouseArea { id: pwrOptMouse; anchors.fill: parent; hoverEnabled: true; onClicked: root.execPower(modelData.act) }
